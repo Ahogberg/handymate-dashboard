@@ -32,11 +32,7 @@ export async function POST(request: NextRequest) {
         })
 
         const result = await response.json()
-        
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to send SMS')
-        }
-
+        if (!response.ok) throw new Error(result.message || 'Failed to send SMS')
         return NextResponse.json({ success: true, smsId: result.id })
       }
 
@@ -52,18 +48,12 @@ export async function POST(request: NextRequest) {
           body: new URLSearchParams({
             from: ELKS_PHONE_NUMBER,
             to: to,
-            voice_start: JSON.stringify({
-              connect: '+46708379552', // Ditt nummer - ändra till teknikerns nummer
-            }),
+            voice_start: JSON.stringify({ connect: '+46708379552' }),
           }),
         })
 
         const result = await response.json()
-        
-        if (!response.ok) {
-          throw new Error(result.message || 'Failed to initiate call')
-        }
-
+        if (!response.ok) throw new Error(result.message || 'Failed to initiate call')
         return NextResponse.json({ success: true, callId: result.id })
       }
 
@@ -79,7 +69,6 @@ export async function POST(request: NextRequest) {
           .eq('queue_id', queueId)
 
         if (error) throw error
-
         return NextResponse.json({ success: true })
       }
 
@@ -95,7 +84,108 @@ export async function POST(request: NextRequest) {
           .eq('case_id', caseId)
 
         if (error) throw error
+        return NextResponse.json({ success: true })
+      }
 
+      case 'create_customer': {
+        const { name, phone_number, email, address_line } = data
+        
+        const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
+        
+        const { error } = await supabase
+          .from('customer')
+          .insert({
+            customer_id: customerId,
+            business_id: 'elexperten_sthlm',
+            name,
+            phone_number,
+            email: email || null,
+            address_line: address_line || null,
+            created_at: new Date().toISOString(),
+          })
+
+        if (error) throw error
+        return NextResponse.json({ success: true, customerId })
+      }
+
+      case 'update_customer': {
+        const { customerId, name, phone_number, email, address_line } = data
+        
+        const { error } = await supabase
+          .from('customer')
+          .update({
+            name,
+            phone_number,
+            email: email || null,
+            address_line: address_line || null,
+          })
+          .eq('customer_id', customerId)
+
+        if (error) throw error
+        return NextResponse.json({ success: true })
+      }
+
+      case 'delete_customer': {
+        const { customerId } = data
+        
+        const { error } = await supabase
+          .from('customer')
+          .delete()
+          .eq('customer_id', customerId)
+
+        if (error) throw error
+        return NextResponse.json({ success: true })
+      }
+
+      case 'create_booking': {
+        const { customerId, scheduledStart, scheduledEnd, notes } = data
+        
+        const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
+        
+        const { error } = await supabase
+          .from('booking')
+          .insert({
+            booking_id: bookingId,
+            business_id: 'elexperten_sthlm',
+            customer_id: customerId,
+            scheduled_start: scheduledStart,
+            scheduled_end: scheduledEnd,
+            status: 'confirmed',
+            notes: notes || null,
+            created_at: new Date().toISOString(),
+          })
+
+        if (error) throw error
+        return NextResponse.json({ success: true, bookingId })
+      }
+
+      case 'update_booking': {
+        const { bookingId, scheduledStart, scheduledEnd, status, notes } = data
+        
+        const { error } = await supabase
+          .from('booking')
+          .update({
+            scheduled_start: scheduledStart,
+            scheduled_end: scheduledEnd,
+            status,
+            notes,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('booking_id', bookingId)
+
+        if (error) throw error
+        return NextResponse.json({ success: true })
+      }
+
+      case 'delete_booking': {
+        const { bookingId } = data
+        
+        const { error } = await supabase
+          .from('booking')
+          .delete()
+          .eq('booking_id', bookingId)
+
+        if (error) throw error
         return NextResponse.json({ success: true })
       }
 
