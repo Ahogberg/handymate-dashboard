@@ -7,10 +7,12 @@ import {
   Phone,
   Clock,
   CheckCircle,
-  ArrowRight,
   User,
   MessageSquare,
-  Zap
+  Zap,
+  Send,
+  X,
+  Loader2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -64,81 +66,126 @@ export default function AIInboxPage() {
   const [openCases, setOpenCases] = useState<OpenCase[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'followups' | 'calls' | 'cases'>('followups')
+  
+  // Modal states
+  const [smsModal, setSmsModal] = useState<{ open: boolean; phone: string; name: string }>({ open: false, phone: '', name: '' })
+  const [smsMessage, setSmsMessage] = useState('')
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   useEffect(() => {
-    async function fetchData() {
-      // Hämta followup-kön
-      const { data: followupData } = await supabase
-        .from('human_followup_queue')
-        .select(`
-          queue_id,
-          case_id,
-          reason,
-          priority,
-          notes,
-          queued_at,
-          case_record (
-            customer_id,
-            service_type,
-            problem_summary,
-            urgency,
-            customer (
-              name,
-              phone_number
-            )
-          )
-        `)
-        .eq('business_id', 'elexperten_sthlm')
-        .is('resolved_at', null)
-        .order('queued_at', { ascending: false })
-        .limit(10)
+    fetchData()
+  }, [])
 
-      // Hämta senaste samtal
-      const { data: callsData } = await supabase
-        .from('call')
-        .select(`
-          call_id,
-          phone_number,
-          direction,
-          started_at,
-          duration_seconds,
-          outcome,
-          customer (
-            name
-          )
-        `)
-        .eq('business_id', 'elexperten_sthlm')
-        .order('started_at', { ascending: false })
-        .limit(10)
-
-      // Hämta öppna ärenden
-      const { data: casesData } = await supabase
-        .from('case_record')
-        .select(`
-          case_id,
+  async function fetchData() {
+    const { data: followupData } = await supabase
+      .from('human_followup_queue')
+      .select(`
+        queue_id,
+        case_id,
+        reason,
+        priority,
+        notes,
+        queued_at,
+        case_record (
+          customer_id,
           service_type,
-          urgency,
           problem_summary,
-          status,
-          created_at,
+          urgency,
           customer (
             name,
             phone_number
           )
-        `)
-        .eq('business_id', 'elexperten_sthlm')
-        .in('status', ['new', 'open', 'in_progress'])
-        .order('created_at', { ascending: false })
-        .limit(10)
+        )
+      `)
+      .eq('business_id', 'elexperten_sthlm')
+      .is('resolved_at', null)
+      .order('queued_at', { ascending: false })
+      .limit(10)
 
-      setFollowups(followupData || [])
-      setRecentCalls(callsData || [])
-      setOpenCases(casesData || [])
-      setLoading(false)
+    const { data: callsData } = await supabase
+      .from('call')
+      .select(`
+        call_id,
+        phone_number,
+        direction,
+        started_at,
+        duration_seconds,
+        outcome,
+        customer (
+          name
+        )
+      `)
+      .eq('business_id', 'elexperten_sthlm')
+      .order('started_at', { ascending: false })
+      .limit(10)
+
+    const { data: casesData } = await supabase
+      .from('case_record')
+      .select(`
+        case_id,
+        service_type,
+        urgency,
+        problem_summary,
+        status,
+        created_at,
+        customer (
+          name,
+          phone_number
+        )
+      `)
+      .eq('business_id', 'elexperten_sthlm')
+      .in('status', ['new', 'open', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    setFollowups(followupData || [])
+    setRecentCalls(callsData || [])
+    setOpenCases(casesData || [])
+    setLoading(false)
+  }
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ show: true, message, type })
+    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
+  }
+
+  const handleAction = async (actionType: string, data: any, itemId: string) => {
+    setActionLoading(itemId)
+    try {
+      const response = await fetch('/api/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: actionType, data }),
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) throw new Error(result.error)
+      
+      showToast(
+        actionType === 'send_sms' ? 'SMS skickat!' :
+        actionType === 'initiate_call' ? 'Samtal initierat!' :
+        actionType === 'mark_resolved' ? 'Markerat som klart!' :
+        'Åtgärd utförd!',
+        'success'
+      )
+      
+      // Refresh data
+      fetchData()
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setActionLoading(null)
     }
+  }
 
-    fetchData()
-  }, [])
+  const handleSendSms = async () => {
+    if (!smsMessage.trim()) return
+    await handleAction('send_sms', { to: smsModal.phone, message: smsMessage }, 'sms')
+    setSmsModal({ open: false, phone: '', name: '' })
+    setSmsMessage('')
+  }
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -178,7 +225,6 @@ export default function AIInboxPage() {
     }
   }
 
-  // AI-genererade insikter baserat på data
   const generateInsights = () => {
     const insights = []
     
@@ -239,6 +285,53 @@ export default function AIInboxPage() {
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
       </div>
+
+      {/* Toast */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
+      {/* SMS Modal */}
+      {smsModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">Skicka SMS</h3>
+              <button onClick={() => setSmsModal({ open: false, phone: '', name: '' })} className="text-zinc-500 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-zinc-400 mb-4">Till: {smsModal.name} ({smsModal.phone})</p>
+            <textarea
+              value={smsMessage}
+              onChange={(e) => setSmsMessage(e.target.value)}
+              placeholder="Skriv ditt meddelande..."
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              rows={4}
+            />
+            <div className="flex justify-end space-x-3 mt-4">
+              <button
+                onClick={() => setSmsModal({ open: false, phone: '', name: '' })}
+                className="px-4 py-2 text-zinc-400 hover:text-white transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleSendSms}
+                disabled={!smsMessage.trim() || actionLoading === 'sms'}
+                className="flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {actionLoading === 'sms' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+                Skicka
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="relative">
         {/* Header */}
@@ -334,13 +427,38 @@ export default function AIInboxPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         <span className={`px-2.5 py-1 text-xs rounded-full border ${getPriorityStyle(item.priority)}`}>
                           {item.priority === 'urgent' ? 'Akut' : item.priority === 'high' ? 'Hög' : 'Normal'}
                         </span>
                         <span className="text-xs text-zinc-500">{formatTime(item.queued_at)}</span>
-                        <button className="px-3 py-1.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-xs font-medium text-white hover:opacity-90">
-                          Ring upp
+                        <button 
+                          onClick={() => handleAction('initiate_call', { to: item.case_record?.customer?.phone_number }, item.queue_id)}
+                          disabled={actionLoading === item.queue_id || !item.case_record?.customer?.phone_number}
+                          className="px-3 py-1.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50 flex items-center"
+                        >
+                          {actionLoading === item.queue_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3 mr-1" />}
+                          Ring
+                        </button>
+                        <button 
+                          onClick={() => setSmsModal({ 
+                            open: true, 
+                            phone: item.case_record?.customer?.phone_number || '', 
+                            name: item.case_record?.customer?.name || 'Kund'
+                          })}
+                          disabled={!item.case_record?.customer?.phone_number}
+                          className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50 flex items-center"
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          SMS
+                        </button>
+                        <button 
+                          onClick={() => handleAction('mark_resolved', { queueId: item.queue_id }, `resolve-${item.queue_id}`)}
+                          disabled={actionLoading === `resolve-${item.queue_id}`}
+                          className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50 flex items-center"
+                        >
+                          {actionLoading === `resolve-${item.queue_id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3 mr-1" />}
+                          Klar
                         </button>
                       </div>
                     </div>
@@ -381,10 +499,26 @@ export default function AIInboxPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         <span className="text-xs text-zinc-500">{formatTime(call.started_at)}</span>
-                        <button className="text-violet-400 hover:text-violet-300 text-sm">
-                          Visa detaljer
+                        <button 
+                          onClick={() => handleAction('initiate_call', { to: call.phone_number }, call.call_id)}
+                          disabled={actionLoading === call.call_id}
+                          className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-medium text-white hover:bg-zinc-700 disabled:opacity-50 flex items-center"
+                        >
+                          {actionLoading === call.call_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3 mr-1" />}
+                          Ring tillbaka
+                        </button>
+                        <button 
+                          onClick={() => setSmsModal({ 
+                            open: true, 
+                            phone: call.phone_number, 
+                            name: call.customer?.name || 'Kund'
+                          })}
+                          className="px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-medium text-white hover:bg-zinc-700 flex items-center"
+                        >
+                          <Send className="w-3 h-3 mr-1" />
+                          SMS
                         </button>
                       </div>
                     </div>
@@ -420,15 +554,28 @@ export default function AIInboxPage() {
                           )}
                         </div>
                       </div>
-                      <div className="flex items-center space-x-3">
+                      <div className="flex items-center space-x-2">
                         <span className={`px-2.5 py-1 text-xs rounded-full border ${getUrgencyStyle(caseItem.urgency)}`}>
                           {caseItem.urgency === 'emergency' ? 'Akut' : 
                            caseItem.urgency === 'urgent' ? 'Brådskande' : 
                            caseItem.urgency === 'same_day' ? 'Idag' : 'Normal'}
                         </span>
                         <span className="text-xs text-zinc-500">{formatTime(caseItem.created_at)}</span>
-                        <button className="text-violet-400 hover:text-violet-300 text-sm">
-                          Hantera
+                        <button 
+                          onClick={() => handleAction('initiate_call', { to: caseItem.customer?.phone_number }, caseItem.case_id)}
+                          disabled={actionLoading === caseItem.case_id || !caseItem.customer?.phone_number}
+                          className="px-3 py-1.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50 flex items-center"
+                        >
+                          {actionLoading === caseItem.case_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Phone className="w-3 h-3 mr-1" />}
+                          Ring
+                        </button>
+                        <button 
+                          onClick={() => handleAction('update_case_status', { caseId: caseItem.case_id, status: 'resolved' }, `close-${caseItem.case_id}`)}
+                          disabled={actionLoading === `close-${caseItem.case_id}`}
+                          className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs font-medium text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50 flex items-center"
+                        >
+                          {actionLoading === `close-${caseItem.case_id}` ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3 mr-1" />}
+                          Stäng
                         </button>
                       </div>
                     </div>
