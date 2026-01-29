@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Users, Plus, Search, Phone, Mail, MapPin, X, Loader2, Trash2, Edit } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useBusiness } from '@/lib/BusinessContext'
 
 interface Customer {
   customer_id: string
@@ -14,6 +15,7 @@ interface Customer {
 }
 
 export default function CustomersPage() {
+  const business = useBusiness()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -26,13 +28,13 @@ export default function CustomersPage() {
 
   useEffect(() => {
     fetchCustomers()
-  }, [])
+  }, [business.business_id])
 
   async function fetchCustomers() {
     const { data } = await supabase
       .from('customer')
       .select('*')
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     setCustomers(data || [])
@@ -76,7 +78,7 @@ export default function CustomersPage() {
           action: editingCustomer ? 'update_customer' : 'create_customer',
           data: editingCustomer 
             ? { customerId: editingCustomer.customer_id, ...form }
-            : form
+            : { ...form, businessId: business.business_id }
         }),
       })
 
@@ -132,7 +134,6 @@ export default function CustomersPage() {
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
       </div>
 
-      {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
@@ -141,7 +142,6 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
@@ -290,7 +290,12 @@ export default function CustomersPage() {
         {filteredCustomers.length === 0 && (
           <div className="text-center py-12">
             <Users className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-            <p className="text-zinc-500">Inga kunder hittades</p>
+            <p className="text-zinc-500">{searchTerm ? 'Inga kunder hittades' : 'Inga kunder ännu'}</p>
+            {!searchTerm && (
+              <button onClick={openCreateModal} className="mt-4 text-violet-400 hover:text-violet-300">
+                Skapa din första kund →
+              </button>
+            )}
           </div>
         )}
       </div>
