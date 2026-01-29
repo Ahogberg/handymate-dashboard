@@ -5,9 +5,7 @@ import {
   Sparkles, 
   AlertTriangle, 
   Phone,
-  Clock,
   CheckCircle,
-  User,
   MessageSquare,
   Zap,
   Send,
@@ -15,6 +13,7 @@ import {
   Loader2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useBusiness } from '@/lib/BusinessContext'
 
 interface FollowupItem {
   queue_id: string
@@ -61,13 +60,13 @@ interface OpenCase {
 }
 
 export default function AIInboxPage() {
+  const business = useBusiness()
   const [followups, setFollowups] = useState<FollowupItem[]>([])
   const [recentCalls, setRecentCalls] = useState<RecentCall[]>([])
   const [openCases, setOpenCases] = useState<OpenCase[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'followups' | 'calls' | 'cases'>('followups')
   
-  // Modal states
   const [smsModal, setSmsModal] = useState<{ open: boolean; phone: string; name: string }>({ open: false, phone: '', name: '' })
   const [smsMessage, setSmsMessage] = useState('')
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -75,7 +74,7 @@ export default function AIInboxPage() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [business.business_id])
 
   async function fetchData() {
     const { data: followupData } = await supabase
@@ -98,7 +97,7 @@ export default function AIInboxPage() {
           )
         )
       `)
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
       .is('resolved_at', null)
       .order('queued_at', { ascending: false })
       .limit(10)
@@ -116,7 +115,7 @@ export default function AIInboxPage() {
           name
         )
       `)
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
       .order('started_at', { ascending: false })
       .limit(10)
 
@@ -134,7 +133,7 @@ export default function AIInboxPage() {
           phone_number
         )
       `)
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
       .in('status', ['new', 'open', 'in_progress'])
       .order('created_at', { ascending: false })
       .limit(10)
@@ -171,7 +170,6 @@ export default function AIInboxPage() {
         'success'
       )
       
-      // Refresh data
       fetchData()
     } catch (error: any) {
       showToast(error.message || 'Något gick fel', 'error')
@@ -286,7 +284,6 @@ export default function AIInboxPage() {
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
       </div>
 
-      {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
@@ -295,7 +292,6 @@ export default function AIInboxPage() {
         </div>
       )}
 
-      {/* SMS Modal */}
       {smsModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
@@ -334,7 +330,6 @@ export default function AIInboxPage() {
       )}
 
       <div className="relative">
-        {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center">
             <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 mr-4">
@@ -347,7 +342,6 @@ export default function AIInboxPage() {
           </div>
         </div>
 
-        {/* AI Insights */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {insights.map((insight, i) => (
             <div 
@@ -373,7 +367,6 @@ export default function AIInboxPage() {
           ))}
         </div>
 
-        {/* Tabs */}
         <div className="flex space-x-2 mb-6">
           {[
             { id: 'followups', label: 'Uppföljning', count: followups.length },
@@ -399,9 +392,7 @@ export default function AIInboxPage() {
           ))}
         </div>
 
-        {/* Content */}
         <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800">
-          {/* Followups Tab */}
           {activeTab === 'followups' && (
             <div className="divide-y divide-zinc-800">
               {followups.length === 0 ? (
@@ -468,13 +459,13 @@ export default function AIInboxPage() {
             </div>
           )}
 
-          {/* Calls Tab */}
           {activeTab === 'calls' && (
             <div className="divide-y divide-zinc-800">
               {recentCalls.length === 0 ? (
                 <div className="p-12 text-center">
                   <Phone className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
                   <p className="text-zinc-400">Inga samtal ännu</p>
+                  <p className="text-zinc-600 text-sm mt-2">Samtal visas här när AI-assistenten är aktiv</p>
                 </div>
               ) : (
                 recentCalls.map((call) => (
@@ -528,7 +519,6 @@ export default function AIInboxPage() {
             </div>
           )}
 
-          {/* Cases Tab */}
           {activeTab === 'cases' && (
             <div className="divide-y divide-zinc-800">
               {openCases.length === 0 ? (
