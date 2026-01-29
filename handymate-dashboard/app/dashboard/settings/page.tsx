@@ -74,21 +74,34 @@ export default function SettingsPage() {
     fetchConfig()
   }, [business.business_id])
 
-  async function fetchConfig() {
-    const { data } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .single()
+async function fetchConfig() {
+  const { data } = await supabase
+    .from('business_config')
+    .select('*')
+    .eq('business_id', business.business_id)
+    .single()
 
-    if (data) {
-      setConfig(data)
-      if (data.working_hours) {
-        setWorkingHours({ ...DEFAULT_HOURS, ...data.working_hours })
-      }
+  if (data) {
+    setConfig(data)
+    
+    // Säker merge av working_hours
+    if (data.working_hours && typeof data.working_hours === 'object') {
+      setWorkingHours(prev => {
+        const merged = { ...prev }
+        for (const day of Object.keys(prev)) {
+          if (data.working_hours[day]) {
+            merged[day as keyof typeof merged] = {
+              ...prev[day as keyof typeof prev],
+              ...data.working_hours[day]
+            }
+          }
+        }
+        return merged
+      })
     }
-    setLoading(false)
   }
+  setLoading(false)
+}
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
