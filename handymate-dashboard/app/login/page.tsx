@@ -97,7 +97,12 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
-
+            
+<div className="text-right">
+  <a href="/forgot-password" className="text-sm text-violet-400 hover:text-violet-300">
+    Glömt lösenordet?
+  </a>
+</div>
             {error && (
               <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
                 {error}
