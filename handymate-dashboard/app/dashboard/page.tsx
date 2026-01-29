@@ -12,6 +12,7 @@ import {
   ArrowDownRight
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useBusiness } from '@/lib/BusinessContext'
 
 interface Booking {
   booking_id: string
@@ -34,6 +35,7 @@ interface Stats {
 }
 
 export default function DashboardPage() {
+  const business = useBusiness()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [stats, setStats] = useState<Stats>({ bookingsToday: 0, totalCustomers: 0, callsToday: 0, urgentCases: 0 })
   const [loading, setLoading] = useState(true)
@@ -56,6 +58,7 @@ export default function DashboardPage() {
             phone_number
           )
         `)
+        .eq('business_id', business.business_id)
         .gte('scheduled_start', today)
         .lt('scheduled_start', today + 'T23:59:59')
         .order('scheduled_start', { ascending: true })
@@ -63,11 +66,12 @@ export default function DashboardPage() {
       const { count: totalCustomers } = await supabase
         .from('customer')
         .select('*', { count: 'exact', head: true })
-        .eq('business_id', 'elexperten_sthlm')
+        .eq('business_id', business.business_id)
 
       const { count: bookingsToday } = await supabase
         .from('booking')
         .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
         .gte('scheduled_start', today)
         .lt('scheduled_start', today + 'T23:59:59')
 
@@ -75,14 +79,14 @@ export default function DashboardPage() {
       setStats({
         bookingsToday: bookingsToday || 0,
         totalCustomers: totalCustomers || 0,
-        callsToday: 12,
-        urgentCases: 2
+        callsToday: 0,
+        urgentCases: 0
       })
       setLoading(false)
     }
 
     fetchData()
-  }, [])
+  }, [business.business_id])
 
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
@@ -93,18 +97,25 @@ export default function DashboardPage() {
     return notes.split(' - ')[0] || notes.substring(0, 20)
   }
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 10) return 'God morgon'
+    if (hour < 18) return 'Hej'
+    return 'God kväll'
+  }
+
   const statCards = [
-    { name: 'Bokningar idag', value: stats.bookingsToday.toString(), change: '+12%', trend: 'up', icon: Calendar, color: 'from-violet-500 to-fuchsia-500' },
-    { name: 'Aktiva kunder', value: stats.totalCustomers.toString(), change: '+5%', trend: 'up', icon: Users, color: 'from-cyan-500 to-blue-500' },
-    { name: 'Samtal idag', value: stats.callsToday.toString(), change: '+18%', trend: 'up', icon: Phone, color: 'from-emerald-500 to-green-500' },
-    { name: 'Akuta ärenden', value: stats.urgentCases.toString(), change: '-1', trend: 'down', icon: AlertTriangle, color: 'from-orange-500 to-red-500' },
+    { name: 'Bokningar idag', value: stats.bookingsToday.toString(), change: '', trend: 'up', icon: Calendar, color: 'from-violet-500 to-fuchsia-500' },
+    { name: 'Aktiva kunder', value: stats.totalCustomers.toString(), change: '', trend: 'up', icon: Users, color: 'from-cyan-500 to-blue-500' },
+    { name: 'Samtal idag', value: stats.callsToday.toString(), change: '', trend: 'up', icon: Phone, color: 'from-emerald-500 to-green-500' },
+    { name: 'Akuta ärenden', value: stats.urgentCases.toString(), change: '', trend: 'down', icon: AlertTriangle, color: 'from-orange-500 to-red-500' },
   ]
 
-  const aiInsights = [
-    { type: 'warning', title: 'Akut ärende väntar', description: 'Kund med strömavbrott har väntat 2 timmar.' },
-    { type: 'suggestion', title: 'Optimera rutten', description: 'Byt ordning på bokning 2 och 3 för att spara 30 min.' },
-    { type: 'info', title: 'Veckosammanfattning', description: '23% fler bokningar än förra veckan.' },
-  ]
+  const aiInsights = stats.bookingsToday === 0 && stats.totalCustomers === 0
+    ? [{ type: 'info', title: 'Välkommen!', description: 'Skapa din första kund och bokning för att komma igång.' }]
+    : [
+        { type: 'success', title: 'Allt under kontroll', description: 'Inga akuta ärenden just nu.' },
+      ]
 
   if (loading) {
     return (
@@ -123,8 +134,8 @@ export default function DashboardPage() {
 
       <div className="relative">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">God morgon! 👋</h1>
-          <p className="text-zinc-400">Här är en översikt av dagen.</p>
+          <h1 className="text-3xl font-bold text-white mb-2">{getGreeting()}, {business.contact_name?.split(' ')[0]}! 👋</h1>
+          <p className="text-zinc-400">Här är en översikt för {business.business_name}.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -133,10 +144,6 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-4">
                 <div className={`p-3 rounded-xl bg-gradient-to-br ${stat.color}`}>
                   <stat.icon className="w-5 h-5 text-white" />
-                </div>
-                <div className={`flex items-center text-sm ${stat.trend === 'up' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {stat.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                  {stat.change}
                 </div>
               </div>
               <p className="text-3xl font-bold text-white mb-1">{stat.value}</p>
@@ -193,6 +200,7 @@ export default function DashboardPage() {
                 <div key={i} className={`p-4 rounded-xl border ${
                   insight.type === 'warning' ? 'bg-red-500/10 border-red-500/30' :
                   insight.type === 'suggestion' ? 'bg-violet-500/10 border-violet-500/30' :
+                  insight.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30' :
                   'bg-zinc-800/50 border-zinc-700'
                 }`}>
                   <p className="font-medium text-white text-sm">{insight.title}</p>
