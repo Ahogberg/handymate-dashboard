@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'E-postadressen är redan registrerad' }, { status: 400 })
       }
 
-      // Skapa business_config med rätt kolumnnamn
+      // Skapa business_config
       const { error: configError } = await supabase
         .from('business_config')
         .insert({
@@ -42,13 +42,13 @@ export async function POST(request: NextRequest) {
           contact_name: contact_name,
           contact_email: email,
           phone_number: phone,
-          services_offered: [branch], // Spara branch som första tjänst
+          services_offered: [branch],
           timezone: 'Europe/Stockholm',
           is_active: true,
           onboarding_status: 'pending',
           subscription_status: 'trial',
           subscription_plan: 'starter',
-          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 dagar
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
           created_at: new Date().toISOString(),
         })
 
@@ -57,18 +57,19 @@ export async function POST(request: NextRequest) {
         throw new Error('Kunde inte skapa företagskonfiguration')
       }
 
-      // Skapa credentials
+      // Skapa credentials med rätt struktur
       const { error: credError } = await supabase
         .from('business_credentials')
         .insert({
           business_id: businessId,
-          password_hash: password, // I produktion: använd bcrypt
+          credential_type: 'password',
+          credential_data: { password_hash: password }, // I produktion: hasha med bcrypt
+          is_active: true,
           created_at: new Date().toISOString(),
         })
 
       if (credError) {
         console.error('Credentials error:', credError)
-        // Rensa upp om det misslyckas
         await supabase.from('business_config').delete().eq('business_id', businessId)
         throw new Error('Kunde inte skapa inloggningsuppgifter')
       }
