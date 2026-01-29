@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Hitta matchande token
-      const matchingToken = tokenData.find(t => t.credential_data?.token === token)
+      const matchingToken = tokenData.find((t: any) => t.credential_data?.token === token)
 
       if (!matchingToken) {
         return NextResponse.json({ error: 'Ogiltig eller utgången länk' }, { status: 400 })
