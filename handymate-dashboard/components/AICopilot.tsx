@@ -44,7 +44,7 @@ export default function AICopilot() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 transition"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white rounded-2xl shadow-lg shadow-violet-500/25 flex items-center justify-center hover:scale-105 transition-transform"
       >
         <Sparkles className="w-6 h-6" />
       </button>
@@ -52,15 +52,15 @@ export default function AICopilot() {
   }
 
   return (
-    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border">
+    <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-zinc-800">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-primary-600 text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500">
         <div className="flex items-center">
-          <Sparkles className="w-5 h-5 mr-2" />
-          <span className="font-medium">AI Copilot</span>
+          <Sparkles className="w-5 h-5 text-white mr-2" />
+          <span className="font-medium text-white">AI Copilot</span>
         </div>
-        <button onClick={() => setIsOpen(false)} className="hover:bg-primary-700 p-1 rounded">
-          <X className="w-5 h-5" />
+        <button onClick={() => setIsOpen(false)} className="hover:bg-white/20 p-1 rounded-lg transition-colors">
+          <X className="w-5 h-5 text-white" />
         </button>
       </div>
 
@@ -74,8 +74,8 @@ export default function AICopilot() {
             <div
               className={`max-w-[80%] px-4 py-2 rounded-2xl ${
                 message.role === 'user'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-100 text-gray-900'
+                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
+                  : 'bg-zinc-800 text-zinc-100 border border-zinc-700'
               }`}
             >
               {message.content}
@@ -84,7 +84,7 @@ export default function AICopilot() {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-100 text-gray-500 px-4 py-2 rounded-2xl">
+            <div className="bg-zinc-800 text-zinc-400 px-4 py-2 rounded-2xl border border-zinc-700">
               Tänker...
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function AICopilot() {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t">
+      <div className="p-4 border-t border-zinc-800">
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -100,12 +100,12 @@ export default function AICopilot() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="Ställ en fråga..."
-            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500"
           />
           <button
             onClick={sendMessage}
             disabled={isLoading}
-            className="w-10 h-10 bg-primary-600 text-white rounded-full flex items-center justify-center hover:bg-primary-700 disabled:opacity-50"
+            className="w-10 h-10 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             <Send className="w-4 h-4" />
           </button>
