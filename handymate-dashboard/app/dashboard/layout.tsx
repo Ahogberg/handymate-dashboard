@@ -3,6 +3,7 @@
 import Sidebar from '@/components/Sidebar'
 import AICopilot from '@/components/AICopilot'
 import { useAuth } from '@/lib/useAuth'
+import { BusinessContext } from '@/lib/BusinessContext'
 
 export default function DashboardLayout({
   children,
@@ -20,16 +21,18 @@ export default function DashboardLayout({
   }
 
   if (!business) {
-    return null // Redirectas till login av useAuth
+    return null
   }
 
   return (
-    <div className="flex min-h-screen bg-[#09090b]">
-      <Sidebar businessName={business.business_name} onLogout={logout} />
-      <main className="flex-1 ml-64">
-        {children}
-      </main>
-      <AICopilot />
-    </div>
+    <BusinessContext.Provider value={business}>
+      <div className="flex min-h-screen bg-[#09090b]">
+        <Sidebar businessName={business.business_name} onLogout={logout} />
+        <main className="flex-1 ml-64">
+          {children}
+        </main>
+        <AICopilot />
+      </div>
+    </BusinessContext.Provider>
   )
 }
