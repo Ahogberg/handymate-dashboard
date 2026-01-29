@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,6 +10,14 @@ const supabase = createClient(
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 const ELKS_PHONE_NUMBER = process.env.ELKS_PHONE_NUMBER || '+46766867337'
+
+async function getBusinessId(providedId?: string): Promise<string> {
+  if (providedId) return providedId
+  const cookieStore = await cookies()
+  const businessId = cookieStore.get('business_id')?.value
+  if (!businessId) throw new Error('Inte inloggad')
+  return businessId
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,7 +97,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'create_customer': {
-        const { name, phone_number, email, address_line } = data
+        const { name, phone_number, email, address_line, businessId } = data
+        const business_id = await getBusinessId(businessId)
         
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
         
@@ -96,7 +106,7 @@ export async function POST(request: NextRequest) {
           .from('customer')
           .insert({
             customer_id: customerId,
-            business_id: 'elexperten_sthlm',
+            business_id: business_id,
             name,
             phone_number,
             email: email || null,
@@ -138,7 +148,8 @@ export async function POST(request: NextRequest) {
       }
 
       case 'create_booking': {
-        const { customerId, scheduledStart, scheduledEnd, notes } = data
+        const { customerId, scheduledStart, scheduledEnd, notes, businessId } = data
+        const business_id = await getBusinessId(businessId)
         
         const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
         
@@ -146,7 +157,7 @@ export async function POST(request: NextRequest) {
           .from('booking')
           .insert({
             booking_id: bookingId,
-            business_id: 'elexperten_sthlm',
+            business_id: business_id,
             customer_id: customerId,
             scheduled_start: scheduledStart,
             scheduled_end: scheduledEnd,
