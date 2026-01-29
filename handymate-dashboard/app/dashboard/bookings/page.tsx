@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Calendar, Plus, Clock, User, X, Loader2, Trash2, Edit } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useBusiness } from '@/lib/BusinessContext'
 
 interface Booking {
   booking_id: string
@@ -15,7 +16,6 @@ interface Booking {
   customer?: {
     name: string
     phone_number: string
-    address_line: string
   }
 }
 
@@ -26,10 +26,11 @@ interface Customer {
 }
 
 export default function BookingsPage() {
+  const business = useBusiness()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'today' | 'upcoming'>('all')
+  const [filter, setFilter] = useState<'all' | 'today' | 'upcoming'>('upcoming')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
@@ -46,22 +47,22 @@ export default function BookingsPage() {
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [business.business_id])
 
   async function fetchData() {
     const { data: bookingsData } = await supabase
       .from('booking')
       .select(`
         booking_id, customer_id, scheduled_start, scheduled_end, status, notes, created_at,
-        customer (name, phone_number, address_line)
+        customer (name, phone_number)
       `)
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
       .order('scheduled_start', { ascending: true })
 
     const { data: customersData } = await supabase
       .from('customer')
       .select('customer_id, name, phone_number')
-      .eq('business_id', 'elexperten_sthlm')
+      .eq('business_id', business.business_id)
 
     setBookings(bookingsData || [])
     setCustomers(customersData || [])
@@ -75,7 +76,16 @@ export default function BookingsPage() {
 
   const openCreateModal = () => {
     setEditingBooking(null)
-    setForm({ customer_id: '', date: '', start_time: '09:00', end_time: '10:00', notes: '', status: 'confirmed' })
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    setForm({ 
+      customer_id: '', 
+      date: tomorrow.toISOString().split('T')[0], 
+      start_time: '09:00', 
+      end_time: '10:00', 
+      notes: '', 
+      status: 'confirmed' 
+    })
     setModalOpen(true)
   }
 
@@ -112,7 +122,7 @@ export default function BookingsPage() {
           action: editingBooking ? 'update_booking' : 'create_booking',
           data: editingBooking
             ? { bookingId: editingBooking.booking_id, scheduledStart, scheduledEnd, status: form.status, notes: form.notes }
-            : { customerId: form.customer_id, scheduledStart, scheduledEnd, notes: form.notes }
+            : { customerId: form.customer_id, scheduledStart, scheduledEnd, notes: form.notes, businessId: business.business_id }
         }),
       })
 
@@ -222,6 +232,9 @@ export default function BookingsPage() {
                     <option key={c.customer_id} value={c.customer_id}>{c.name} ({c.phone_number})</option>
                   ))}
                 </select>
+                {customers.length === 0 && (
+                  <p className="text-xs text-zinc-500 mt-1">Du behöver skapa en kund först</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm text-zinc-400 mb-1">Datum *</label>
@@ -283,7 +296,7 @@ export default function BookingsPage() {
               <button onClick={() => setModalOpen(false)} className="px-4 py-2 text-zinc-400 hover:text-white">Avbryt</button>
               <button
                 onClick={handleSubmit}
-                disabled={actionLoading}
+                disabled={actionLoading || customers.length === 0}
                 className="flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -322,65 +335,74 @@ export default function BookingsPage() {
         </div>
 
         <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-zinc-800">
-                <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tjänst</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum & Tid</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-800">
-              {filteredBookings.map((booking) => (
-                <tr key={booking.booking_id} className="hover:bg-zinc-800/30 transition-all">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
-                        <User className="w-5 h-5 text-violet-400" />
-                      </div>
-                      <div className="ml-4">
-                        <p className="font-medium text-white">{booking.customer?.name || 'Okänd'}</p>
-                        <p className="text-sm text-zinc-500">{booking.customer?.phone_number || '-'}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-white">{getServiceFromNotes(booking.notes)}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center">
-                      <Clock className="w-4 h-4 text-zinc-500 mr-2" />
-                      <div>
-                        <p className="text-white">{formatDate(booking.scheduled_start)}</p>
-                        <p className="text-sm text-zinc-500">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
-                      {getStatusText(booking.status)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex space-x-2">
-                      <button onClick={() => openEditModal(booking)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg">
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(booking.booking_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {filteredBookings.length === 0 && (
+          {filteredBookings.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-500">Inga bokningar hittades</p>
+              <p className="text-zinc-500">{filter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
+              {customers.length > 0 ? (
+                <button onClick={openCreateModal} className="mt-4 text-violet-400 hover:text-violet-300">
+                  Skapa din första bokning →
+                </button>
+              ) : (
+                <a href="/dashboard/customers" className="mt-4 text-violet-400 hover:text-violet-300 block">
+                  Skapa en kund först →
+                </a>
+              )}
             </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tjänst</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum & Tid</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-800">
+                {filteredBookings.map((booking) => (
+                  <tr key={booking.booking_id} className="hover:bg-zinc-800/30 transition-all">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
+                          <User className="w-5 h-5 text-violet-400" />
+                        </div>
+                        <div className="ml-4">
+                          <p className="font-medium text-white">{booking.customer?.name || 'Okänd'}</p>
+                          <p className="text-sm text-zinc-500">{booking.customer?.phone_number || '-'}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-white">{getServiceFromNotes(booking.notes)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center">
+                        <Clock className="w-4 h-4 text-zinc-500 mr-2" />
+                        <div>
+                          <p className="text-white">{formatDate(booking.scheduled_start)}</p>
+                          <p className="text-sm text-zinc-500">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
+                        {getStatusText(booking.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex space-x-2">
+                        <button onClick={() => openEditModal(booking)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(booking.booking_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       </div>
