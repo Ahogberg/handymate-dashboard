@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
       // Generera business_id
       const businessId = business_name
         .toLowerCase()
+        .replace(/[åä]/g, 'a')
+        .replace(/[ö]/g, 'o')
         .replace(/[^a-z0-9]/g, '_')
         .replace(/_+/g, '_')
         .substring(0, 30) + '_' + Math.random().toString(36).substr(2, 6)
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'E-postadressen är redan registrerad' }, { status: 400 })
       }
 
-      // Skapa business_config
+      // Skapa business_config med rätt kolumnnamn
       const { error: configError } = await supabase
         .from('business_config')
         .insert({
@@ -39,10 +41,14 @@ export async function POST(request: NextRequest) {
           business_name: business_name,
           contact_name: contact_name,
           contact_email: email,
-          contact_phone: phone,
-          branch: branch,
+          phone_number: phone,
+          services_offered: [branch], // Spara branch som första tjänst
           timezone: 'Europe/Stockholm',
-          locale: 'sv-SE',
+          is_active: true,
+          onboarding_status: 'pending',
+          subscription_status: 'trial',
+          subscription_plan: 'starter',
+          trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(), // 14 dagar
           created_at: new Date().toISOString(),
         })
 
@@ -51,7 +57,7 @@ export async function POST(request: NextRequest) {
         throw new Error('Kunde inte skapa företagskonfiguration')
       }
 
-      // Skapa credentials (lösenord hashas inte här för enkelhetens skull - i produktion bör det hashas)
+      // Skapa credentials
       const { error: credError } = await supabase
         .from('business_credentials')
         .insert({
