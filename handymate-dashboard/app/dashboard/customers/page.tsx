@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { Users, Plus, Search, Phone, Mail, MapPin, X, Loader2, Trash2, Edit } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import Link from 'next/link'
+import { Upload } from 'lucide-react'
 
 interface Customer {
   customer_id: string
