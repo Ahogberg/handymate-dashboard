@@ -164,17 +164,19 @@ export default function NewCampaignPage() {
       // Skapa kampanj
       const campaignId = 'camp_' + Math.random().toString(36).substr(2, 12)
       
-      const { error: campaignError } = await supabase
-        .from('sms_campaign')
-        .insert({
-          campaign_id: campaignId,
-          business_id: business.business_id,
-          name: campaignName,
-          message: message,
-          status: 'sending',
-          recipient_filter: { type: filterType },
-          recipient_count: recipients.length,
-        })
+const { error: campaignError } = await supabase
+  .from('sms_campaign')
+  .insert({
+    campaign_id: campaignId,
+    business_id: business.business_id,
+    name: campaignName,
+    message: message,
+    status: 'sending',
+    recipient_filter: { type: filterType },
+    recipient_count: recipients.length,
+    campaign_type: campaignType,
+    auto_reply: campaignType === 'interactive',
+  })
 
       if (campaignError) throw campaignError
 
