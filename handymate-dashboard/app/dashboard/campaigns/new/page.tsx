@@ -608,6 +608,22 @@ const messageSuggestions = [
                 
                 <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
                   <span className="text-zinc-400">Totalt SMS</span>
+                  <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+  <span className="text-zinc-400">Kampanjtyp</span>
+  <span className="text-white font-medium flex items-center gap-2">
+    {campaignType === 'interactive' ? (
+      <>
+        <Sparkles className="w-4 h-4 text-violet-400" />
+        Interaktiv (AI-svar)
+      </>
+    ) : (
+      <>
+        <Send className="w-4 h-4 text-zinc-400" />
+        Broadcast
+      </>
+    )}
+  </span>
+</div>
                   <span className="text-white font-medium">{Math.ceil(message.length / 160) * recipientCount} st</span>
                 </div>
               </div>
