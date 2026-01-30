@@ -251,7 +251,7 @@ export default function CustomersPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredCustomers.map((customer) => (
-            <div key={customer.customer_id} className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 hover:border-zinc-700 transition-all">
+            <Link href={`/dashboard/customers/${customer.customer_id}`} key={customer.customer_id} className="p-4 hover:bg-zinc-800/50 transition-all cursor-pointer block">
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center">
                   <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
