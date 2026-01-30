@@ -532,6 +532,19 @@ export default function SettingsPage() {
                 className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
               />
               <p className="text-xs text-zinc-600 mt-1">Detta säger AI-assistenten när den svarar</p>
+              <Link
+              href="/dashboard/settings/knowledge"
+              className="mt-4 flex items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl hover:bg-violet-500/20 transition-all"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="w-5 h-5 text-violet-400" />
+                <div>
+                  <p className="font-medium text-white text-sm">Knowledge Base</p>
+                  <p className="text-xs text-zinc-400">Lär AI:n om dina tjänster, priser och policyer</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-violet-400" />
+            </Link>
             </div>
 
             <div className="p-4 bg-violet-500/10 border border-violet-500/30 rounded-xl">
