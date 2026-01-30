@@ -407,7 +407,7 @@ export default function BookingDetailPage() {
               <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Snabbåtgärder</h2>
               
               <div className="space-y-2">
-                {booking.customer?.phone_number && (
+{booking.customer?.phone_number && (
                   
                     href={`tel:${booking.customer.phone_number}`}
                     className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-all"
