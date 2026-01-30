@@ -48,6 +48,8 @@ export default function NewCampaignPage() {
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
+  const [campaignType, setCampaignType] = useState<'broadcast' | 'interactive'>('interactive')
+  const [autoReply, setAutoReply] = useState(true)
 
   useEffect(() => {
     fetchCustomers()
