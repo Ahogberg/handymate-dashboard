@@ -228,13 +228,22 @@ export default function CustomersPage() {
                 className="pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               />
             </div>
-            <button 
-              onClick={openCreateModal}
-              className="flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Ny kund
-            </button>
+<div className="flex items-center gap-3">
+  <Link
+    href="/dashboard/customers/import"
+    className="flex items-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700"
+  >
+    <Upload className="w-4 h-4 mr-2" />
+    Importera
+  </Link>
+  <button 
+    onClick={openCreateModal}
+    className="flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+  >
+    <Plus className="w-4 h-4 mr-2" />
+    Ny kund
+  </button>
+</div>
           </div>
         </div>
 
