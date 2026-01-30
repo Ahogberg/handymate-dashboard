@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Plus, Search, Phone, Mail, MapPin, X, Loader2, Trash2, Edit } from 'lucide-react'
+import { Users, Plus, Search, Phone, Mail, MapPin, X, Loader2, Trash2, Edit, Upload } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-import { Upload } from 'lucide-react'
 
 interface Customer {
   customer_id: string
@@ -54,7 +53,9 @@ export default function CustomersPage() {
     setModalOpen(true)
   }
 
-  const openEditModal = (customer: Customer) => {
+  const openEditModal = (customer: Customer, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     setEditingCustomer(customer)
     setForm({
       name: customer.name || '',
@@ -96,7 +97,9 @@ export default function CustomersPage() {
     }
   }
 
-  const handleDelete = async (customerId: string) => {
+  const handleDelete = async (customerId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     if (!confirm('Är du säker på att du vill ta bort denna kund?')) return
 
     try {
@@ -123,15 +126,15 @@ export default function CustomersPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
         <div className="text-zinc-400">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-8 bg-[#09090b] min-h-screen">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
       </div>
@@ -145,8 +148,8 @@ export default function CustomersPage() {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white">
                 {editingCustomer ? 'Redigera kund' : 'Ny kund'}
@@ -214,12 +217,13 @@ export default function CustomersPage() {
       )}
 
       <div className="relative">
-        <div className="flex items-center justify-between mb-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Kunder</h1>
-            <p className="text-zinc-400">{customers.length} kunder totalt</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">Kunder</h1>
+            <p className="text-sm sm:text-base text-zinc-400">{customers.length} kunder totalt</p>
           </div>
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
               <input
@@ -227,52 +231,57 @@ export default function CustomersPage() {
                 placeholder="Sök kund..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full sm:w-auto pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
               />
             </div>
-<div className="flex items-center gap-3">
-  <Link
-    href="/dashboard/customers/import"
-    className="flex items-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700"
-  >
-    <Upload className="w-4 h-4 mr-2" />
-    Importera
-  </Link>
-  <button 
-    onClick={openCreateModal}
-    className="flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
-  >
-    <Plus className="w-4 h-4 mr-2" />
-    Ny kund
-  </button>
-</div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/dashboard/customers/import"
+                className="flex items-center justify-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700"
+              >
+                <Upload className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Importera</span>
+              </Link>
+              <button 
+                onClick={openCreateModal}
+                className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+              >
+                <Plus className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Ny kund</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Customer Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {filteredCustomers.map((customer) => (
-            <Link href={`/dashboard/customers/${customer.customer_id}`} key={customer.customer_id} className="p-4 hover:bg-zinc-800/50 transition-all cursor-pointer block">
+            <Link 
+              href={`/dashboard/customers/${customer.customer_id}`} 
+              key={customer.customer_id} 
+              className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-zinc-800 p-4 sm:p-5 hover:bg-zinc-800/50 transition-all block"
+            >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center">
-                  <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
-                    <span className="text-white font-bold text-lg">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+                    <span className="text-white font-bold text-base sm:text-lg">
                       {customer.name ? customer.name.split(' ').map(n => n[0]).join('').substring(0, 2) : '?'}
                     </span>
                   </div>
-                  <div className="ml-4">
-                    <h3 className="font-semibold text-white">{customer.name || 'Okänd'}</h3>
-                    <p className="text-sm text-zinc-500">Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
+                  <div className="ml-3 sm:ml-4">
+                    <h3 className="font-semibold text-white text-sm sm:text-base">{customer.name || 'Okänd'}</h3>
+                    <p className="text-xs sm:text-sm text-zinc-500">Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
                   </div>
                 </div>
                 <div className="flex space-x-1">
                   <button 
-                    onClick={() => openEditModal(customer)}
+                    onClick={(e) => openEditModal(customer, e)}
                     className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
                   >
                     <Edit className="w-4 h-4" />
                   </button>
                   <button 
-                    onClick={() => handleDelete(customer.customer_id)}
+                    onClick={(e) => handleDelete(customer.customer_id, e)}
                     className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -280,21 +289,21 @@ export default function CustomersPage() {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center text-sm">
-                  <Phone className="w-4 h-4 text-zinc-500 mr-3" />
-                  <span className="text-zinc-300">{customer.phone_number || '-'}</span>
+              <div className="space-y-2 sm:space-y-3">
+                <div className="flex items-center text-xs sm:text-sm">
+                  <Phone className="w-4 h-4 text-zinc-500 mr-2 sm:mr-3 flex-shrink-0" />
+                  <span className="text-zinc-300 truncate">{customer.phone_number || '-'}</span>
                 </div>
-                <div className="flex items-center text-sm">
-                  <Mail className="w-4 h-4 text-zinc-500 mr-3" />
-                  <span className="text-zinc-300">{customer.email || '-'}</span>
+                <div className="flex items-center text-xs sm:text-sm">
+                  <Mail className="w-4 h-4 text-zinc-500 mr-2 sm:mr-3 flex-shrink-0" />
+                  <span className="text-zinc-300 truncate">{customer.email || '-'}</span>
                 </div>
-                <div className="flex items-center text-sm">
-                  <MapPin className="w-4 h-4 text-zinc-500 mr-3" />
-                  <span className="text-zinc-300">{customer.address_line || '-'}</span>
+                <div className="flex items-center text-xs sm:text-sm">
+                  <MapPin className="w-4 h-4 text-zinc-500 mr-2 sm:mr-3 flex-shrink-0" />
+                  <span className="text-zinc-300 truncate">{customer.address_line || '-'}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 
