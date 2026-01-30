@@ -411,93 +411,176 @@ const messageSuggestions = [
           </div>
         )}
 
-        {/* Step 2: Skriv meddelande */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Kampanjnamn</h2>
-              <input
-                type="text"
-                value={campaignName}
-                onChange={(e) => setCampaignName(e.target.value)}
-                placeholder="T.ex. Vårens reaktivering"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-              />
-            </div>
+{/* Step 2: Skriv meddelande */}
+{step === 2 && (
+  <div className="space-y-6">
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Kampanjnamn</h2>
+      <input
+        type="text"
+        value={campaignName}
+        onChange={(e) => setCampaignName(e.target.value)}
+        placeholder="T.ex. Vårens reaktivering"
+        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+      />
+    </div>
 
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Meddelande</h2>
-              
-              {/* Förslag */}
-              <div className="flex items-center gap-2 mb-4 flex-wrap">
-                <Sparkles className="w-4 h-4 text-violet-400" />
-                <span className="text-sm text-zinc-400">Förslag:</span>
-                {messageSuggestions.map((s, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setMessage(s.text)}
-                    className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-300"
-                  >
-                    {s.title}
-                  </button>
-                ))}
-              </div>
+    {/* Kampanjtyp */}
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Kampanjtyp</h2>
+      <div className="grid grid-cols-2 gap-4">
+        <button
+          onClick={() => setCampaignType('interactive')}
+          className={`p-4 rounded-xl border text-left transition-all ${
+            campaignType === 'interactive'
+              ? 'bg-violet-500/10 border-violet-500/30'
+              : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <MessageSquare className={`w-5 h-5 ${campaignType === 'interactive' ? 'text-violet-400' : 'text-zinc-500'}`} />
+            <span className={`font-medium ${campaignType === 'interactive' ? 'text-white' : 'text-zinc-300'}`}>
+              Interaktiv
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500">
+            AI svarar automatiskt på kundsvar. Perfekt för "Svara JA"-kampanjer.
+          </p>
+        </button>
 
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Skriv ditt meddelande här..."
-                rows={5}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
-              />
-              
-              <div className="flex items-center justify-between mt-3">
-                <p className="text-sm text-zinc-500">
-                  {message.length} tecken
-                  {message.length > 160 && <span className="text-amber-400"> (kommer delas upp i {Math.ceil(message.length / 153)} SMS)</span>}
-                </p>
-                <p className="text-sm text-zinc-500">
-                  Kostnad: ~{Math.ceil(message.length / 160) * recipientCount} SMS
-                </p>
-              </div>
-            </div>
+        <button
+          onClick={() => setCampaignType('broadcast')}
+          className={`p-4 rounded-xl border text-left transition-all ${
+            campaignType === 'broadcast'
+              ? 'bg-violet-500/10 border-violet-500/30'
+              : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+          }`}
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Send className={`w-5 h-5 ${campaignType === 'broadcast' ? 'text-violet-400' : 'text-zinc-500'}`} />
+            <span className={`font-medium ${campaignType === 'broadcast' ? 'text-white' : 'text-zinc-300'}`}>
+              Broadcast
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500">
+            Enkel utskick utan AI-svar. Svar hamnar i AI Inbox.
+          </p>
+        </button>
+      </div>
 
-            {/* Preview */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Förhandsgranskning</h2>
-              <div className="bg-zinc-950 rounded-2xl p-4 max-w-sm">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center">
-                    <MessageSquare className="w-4 h-4 text-white" />
-                  </div>
-                  <span className="text-sm font-medium text-white">{business.business_name}</span>
-                </div>
-                <div className="bg-zinc-800 rounded-2xl rounded-tl-none p-3">
-                  <p className="text-sm text-zinc-200 whitespace-pre-wrap">
-                    {message || 'Ditt meddelande visas här...'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => setStep(1)}
-                className="px-6 py-3 text-zinc-400 hover:text-white transition-colors"
-              >
-                ← Tillbaka
-              </button>
-              <button
-                onClick={() => setStep(3)}
-                disabled={!campaignName || !message}
-                className="px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Fortsätt
-              </button>
+      {campaignType === 'interactive' && (
+        <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+          <div className="flex items-start gap-3">
+            <Sparkles className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-emerald-400 font-medium">AI-svar aktiverat</p>
+              <p className="text-xs text-emerald-400/70 mt-1">
+                När kunder svarar på kampanjen kommer AI automatiskt att fortsätta konversationen, 
+                boka tider och svara på frågor.
+              </p>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Meddelande</h2>
+      
+      {/* Förslag */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <Sparkles className="w-4 h-4 text-violet-400" />
+        <span className="text-sm text-zinc-400">Förslag:</span>
+        {messageSuggestions.map((s, i) => (
+          <button
+            key={i}
+            onClick={() => setMessage(s.text)}
+            className="px-3 py-1 text-xs bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded-lg text-zinc-300"
+          >
+            {s.title}
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Skriv ditt meddelande här..."
+        rows={5}
+        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+      />
+      
+      <div className="flex items-center justify-between mt-3">
+        <p className="text-sm text-zinc-500">
+          {message.length} tecken
+          {message.length > 160 && <span className="text-amber-400"> (kommer delas upp i {Math.ceil(message.length / 153)} SMS)</span>}
+        </p>
+        <p className="text-sm text-zinc-500">
+          Kostnad: ~{Math.ceil(message.length / 160) * recipientCount} SMS
+        </p>
+      </div>
+
+      {campaignType === 'interactive' && !message.toLowerCase().includes('svara') && message.length > 0 && (
+        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+          <p className="text-xs text-amber-400">
+            💡 Tips: Lägg till "Svara JA" eller liknande för att uppmuntra interaktion
+          </p>
+        </div>
+      )}
+    </div>
+
+    {/* Preview */}
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Förhandsgranskning</h2>
+      <div className="bg-zinc-950 rounded-2xl p-4 max-w-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-full flex items-center justify-center">
+            <MessageSquare className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-sm font-medium text-white">{business.business_name}</span>
+        </div>
+        <div className="bg-zinc-800 rounded-2xl rounded-tl-none p-3 mb-3">
+          <p className="text-sm text-zinc-200 whitespace-pre-wrap">
+            {message || 'Ditt meddelande visas här...'}
+          </p>
+        </div>
+        
+        {campaignType === 'interactive' && (
+          <div className="space-y-2">
+            <div className="flex justify-end">
+              <div className="bg-violet-600 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
+                <p className="text-sm text-white">JA, gärna!</p>
+              </div>
+            </div>
+            <div className="bg-zinc-800 rounded-2xl rounded-tl-none p-3">
+              <p className="text-sm text-zinc-200">
+                Vad bra! 🎉 Vilken dag passar dig bäst nästa vecka?
+              </p>
+            </div>
+            <p className="text-xs text-zinc-600 text-center">↑ AI svarar automatiskt</p>
+          </div>
         )}
+      </div>
+    </div>
+
+    {/* Actions */}
+    <div className="flex items-center justify-between">
+      <button
+        onClick={() => setStep(1)}
+        className="px-6 py-3 text-zinc-400 hover:text-white transition-colors"
+      >
+        ← Tillbaka
+      </button>
+      <button
+        onClick={() => setStep(3)}
+        disabled={!campaignName || !message}
+        className="px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Fortsätt
+      </button>
+    </div>
+  </div>
+)}
 
         {/* Step 3: Bekräfta och skicka */}
         {step === 3 && (
