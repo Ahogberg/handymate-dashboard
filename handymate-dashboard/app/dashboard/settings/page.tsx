@@ -453,60 +453,75 @@ async function fetchConfig() {
 
         {/* Subscription Tab */}
         {activeTab === 'subscription' && (
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-white mb-2">Prenumeration</h2>
-            
-            <div className="p-6 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-2xl">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-sm text-zinc-400">Nuvarande plan</p>
-                  <p className="text-2xl font-bold text-white capitalize">{config.subscription_plan || 'Starter'}</p>
-                </div>
-                <div className={`px-4 py-2 rounded-full text-sm font-medium ${
-                  config.subscription_status === 'trial' 
-                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                    : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                }`}>
-                  {config.subscription_status === 'trial' ? 'Provperiod' : 'Aktiv'}
-                </div>
-              </div>
-              
-              {config.subscription_status === 'trial' && getDaysUntilTrialEnds() !== null && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <p className="text-sm text-amber-400">
-                    ⏰ {getDaysUntilTrialEnds()} dagar kvar av din provperiod
-                  </p>
-                </div>
-              )}
-            </div>
+  <div className="space-y-6">
+    {/* Nuvarande plan */}
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Din prenumeration</h2>
+      
+      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl mb-4">
+        <div>
+          <p className="text-white font-semibold text-lg">{config.plan || 'Starter'}</p>
+          <p className="text-zinc-400 text-sm">
+            {config.subscription_status === 'trial' 
+              ? `Provperiod - ${trialDaysLeft} dagar kvar`
+              : 'Aktiv prenumeration'
+            }
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-2xl font-bold text-white">
+            {config.plan === 'Professional' ? '4 995' : config.plan === 'Business' ? '9 995' : '1 995'}
+          </p>
+          <p className="text-zinc-500 text-sm">kr/mån</p>
+        </div>
+      </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { name: 'Starter', price: '1 995', calls: '75 samtal/mån' },
-                { name: 'Professional', price: '4 995', calls: '300 samtal/mån' },
-                { name: 'Business', price: '9 995', calls: '1000 samtal/mån' },
-              ].map((plan) => (
-                <div 
-                  key={plan.name}
-                  className={`p-4 rounded-xl border ${
-                    config.subscription_plan?.toLowerCase() === plan.name.toLowerCase()
-                      ? 'bg-violet-500/10 border-violet-500/30'
-                      : 'bg-zinc-800/50 border-zinc-700'
-                  }`}
-                >
-                  <p className="font-semibold text-white">{plan.name}</p>
-                  <p className="text-2xl font-bold text-white mt-1">{plan.price} <span className="text-sm font-normal text-zinc-500">kr/mån</span></p>
-                  <p className="text-xs text-zinc-500 mt-1">{plan.calls}</p>
-                </div>
-              ))}
-            </div>
+      {config.subscription_status === 'trial' && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+          <p className="text-amber-400 text-sm">
+            ⏰ Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
+          </p>
+        </div>
+      )}
+    </div>
 
-            <p className="text-center text-sm text-zinc-500">
-              Vill du uppgradera? <a href="mailto:hej@handymate.se" className="text-violet-400 hover:text-violet-300">Kontakta oss</a>
-            </p>
+    {/* SMS-användning */}
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">SMS-användning denna månad</h2>
+      
+      <SMSUsageWidget businessId={business.business_id} plan={config.plan || 'Starter'} />
+    </div>
+
+    {/* Planöversikt */}
+    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+      <h2 className="text-lg font-semibold text-white mb-4">Tillgängliga planer</h2>
+      
+      <div className="grid md:grid-cols-3 gap-4">
+        {[
+          { name: 'Starter', price: '1 995', sms: 100, calls: 75 },
+          { name: 'Professional', price: '4 995', sms: 500, calls: 300 },
+          { name: 'Business', price: '9 995', sms: 2000, calls: 1000 }
+        ].map((plan) => (
+          <div 
+            key={plan.name}
+            className={`p-4 rounded-xl border ${
+              config.plan === plan.name 
+                ? 'bg-violet-500/10 border-violet-500/30' 
+                : 'bg-zinc-800/50 border-zinc-700'
+            }`}
+          >
+            <p className="font-semibold text-white">{plan.name}</p>
+            <p className="text-2xl font-bold text-white mt-1">{plan.price} <span className="text-sm text-zinc-500">kr/mån</span></p>
+            <div className="mt-3 space-y-1 text-sm text-zinc-400">
+              <p>✓ {plan.sms} SMS/mån</p>
+              <p>✓ {plan.calls} samtal/mån</p>
+            </div>
+            {config.plan === plan.name && (
+              <p className="mt-3 text-xs text-violet-400 font-medium">Nuvarande plan</p>
+            )}
           </div>
-        )}
+        ))}
       </div>
     </div>
-  )
-}
+  </div>
+)}
