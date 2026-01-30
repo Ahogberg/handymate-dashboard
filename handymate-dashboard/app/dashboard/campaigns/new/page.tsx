@@ -66,7 +66,7 @@ export default function NewCampaignPage() {
 
     // Mappa senaste bokning till kunder
     const lastBookingMap = new Map<string, string>()
-    bookingsData?.forEach(b => {
+    bookingsData?.forEach((b: any) => {
       if (!lastBookingMap.has(b.customer_id)) {
         lastBookingMap.set(b.customer_id, b.scheduled_start)
       }
