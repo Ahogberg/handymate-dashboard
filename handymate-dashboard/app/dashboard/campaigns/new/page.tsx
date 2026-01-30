@@ -26,6 +26,11 @@ interface Customer {
   last_booking_at?: string
 }
 
+interface Booking {
+  customer_id: string
+  scheduled_start: string
+}
+
 type FilterType = 'all' | 'inactive_30' | 'inactive_90' | 'manual'
 
 export default function NewCampaignPage() {
@@ -66,13 +71,15 @@ export default function NewCampaignPage() {
 
     // Mappa senaste bokning till kunder
     const lastBookingMap = new Map<string, string>()
-    bookingsData?.forEach((b: any) => {
-      if (!lastBookingMap.has(b.customer_id)) {
-        lastBookingMap.set(b.customer_id, b.scheduled_start)
-      }
-    })
+    if (bookingsData) {
+      bookingsData.forEach((b: Booking) => {
+        if (!lastBookingMap.has(b.customer_id)) {
+          lastBookingMap.set(b.customer_id, b.scheduled_start)
+        }
+      })
+    }
 
-    const customersWithBookings = customersData?.map(c => ({
+    const customersWithBookings: Customer[] = customersData?.map((c: Customer) => ({
       ...c,
       last_booking_at: lastBookingMap.get(c.customer_id)
     })) || []
@@ -82,7 +89,7 @@ export default function NewCampaignPage() {
   }
 
   // Filtrera kunder baserat på vald filter
-  const getFilteredCustomers = () => {
+  const getFilteredCustomers = (): Customer[] => {
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
@@ -91,7 +98,7 @@ export default function NewCampaignPage() {
 
     // Sök
     if (searchTerm) {
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter((c: Customer) => 
         c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.phone_number?.includes(searchTerm)
       )
@@ -100,19 +107,19 @@ export default function NewCampaignPage() {
     // Filter
     switch (filterType) {
       case 'inactive_30':
-        filtered = filtered.filter(c => {
+        filtered = filtered.filter((c: Customer) => {
           if (!c.last_booking_at) return true
           return new Date(c.last_booking_at) < thirtyDaysAgo
         })
         break
       case 'inactive_90':
-        filtered = filtered.filter(c => {
+        filtered = filtered.filter((c: Customer) => {
           if (!c.last_booking_at) return true
           return new Date(c.last_booking_at) < ninetyDaysAgo
         })
         break
       case 'manual':
-        filtered = filtered.filter(c => selectedCustomers.has(c.customer_id))
+        filtered = filtered.filter((c: Customer) => selectedCustomers.has(c.customer_id))
         break
     }
 
@@ -133,7 +140,7 @@ export default function NewCampaignPage() {
   }
 
   const selectAll = () => {
-    const allIds = filteredCustomers.map(c => c.customer_id)
+    const allIds = filteredCustomers.map((c: Customer) => c.customer_id)
     setSelectedCustomers(new Set(allIds))
   }
 
@@ -149,7 +156,7 @@ export default function NewCampaignPage() {
     try {
       // Hämta mottagare
       const recipients = filterType === 'manual' 
-        ? customers.filter(c => selectedCustomers.has(c.customer_id))
+        ? customers.filter((c: Customer) => selectedCustomers.has(c.customer_id))
         : filteredCustomers
 
       // Skapa kampanj
@@ -170,7 +177,7 @@ export default function NewCampaignPage() {
       if (campaignError) throw campaignError
 
       // Skapa mottagare
-      const recipientRows = recipients.map(c => ({
+      const recipientRows = recipients.map((c: Customer) => ({
         campaign_id: campaignId,
         customer_id: c.customer_id,
         phone_number: c.phone_number,
@@ -202,12 +209,18 @@ export default function NewCampaignPage() {
     }
   }
 
-  const getDaysInactive = (lastBooking: string | undefined) => {
+  const getDaysInactive = (lastBooking: string | undefined): string => {
     if (!lastBooking) return 'Aldrig bokat'
     const days = Math.floor((Date.now() - new Date(lastBooking).getTime()) / (1000 * 60 * 60 * 24))
     if (days === 0) return 'Idag'
     if (days === 1) return 'Igår'
     return `${days} dagar sedan`
+  }
+
+  // Beräkna inaktiva kunder för filter-knapparna
+  const getInactiveCount = (days: number): number => {
+    const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    return customers.filter((c: Customer) => !c.last_booking_at || new Date(c.last_booking_at) < cutoff).length
   }
 
   // Förslag på meddelanden
@@ -290,8 +303,8 @@ export default function NewCampaignPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[
                   { id: 'all', label: 'Alla kunder', icon: Users, count: customers.length },
-                  { id: 'inactive_30', label: 'Inaktiva 30+ dagar', icon: Clock, count: customers.filter(c => !c.last_booking_at || new Date(c.last_booking_at) < new Date(Date.now() - 30*24*60*60*1000)).length },
-                  { id: 'inactive_90', label: 'Inaktiva 90+ dagar', icon: Clock, count: customers.filter(c => !c.last_booking_at || new Date(c.last_booking_at) < new Date(Date.now() - 90*24*60*60*1000)).length },
+                  { id: 'inactive_30', label: 'Inaktiva 30+ dagar', icon: Clock, count: getInactiveCount(30) },
+                  { id: 'inactive_90', label: 'Inaktiva 90+ dagar', icon: Clock, count: getInactiveCount(90) },
                   { id: 'manual', label: 'Välj manuellt', icon: Filter, count: selectedCustomers.size }
                 ].map((f) => (
                   <button
@@ -335,11 +348,11 @@ export default function NewCampaignPage() {
                   </div>
 
                   <div className="max-h-64 overflow-y-auto space-y-2">
-                    {customers.filter(c => 
+                    {customers.filter((c: Customer) => 
                       !searchTerm || 
                       c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                       c.phone_number?.includes(searchTerm)
-                    ).map((customer) => (
+                    ).map((customer: Customer) => (
                       <label
                         key={customer.customer_id}
                         className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${
@@ -410,7 +423,7 @@ export default function NewCampaignPage() {
               <h2 className="text-lg font-semibold text-white mb-4">Meddelande</h2>
               
               {/* Förslag */}
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <Sparkles className="w-4 h-4 text-violet-400" />
                 <span className="text-sm text-zinc-400">Förslag:</span>
                 {messageSuggestions.map((s, i) => (
