@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useEffect, useState } from 'react'
 
 interface BusinessConfig {
   business_id: string
@@ -58,7 +59,120 @@ const SERVICE_SUGGESTIONS = [
   'Målning', 'Tapetsering', 'Snickeri', 'Golvläggning',
   'Låsbyte', 'Inbrottsskydd', 'Städning', 'Fönsterputs'
 ]
+function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string }) {
+  const [usage, setUsage] = useState({ sent: 0, delivered: 0, failed: 0 })
+  const [loading, setLoading] = useState(true)
 
+  const included = plan === 'Business' ? 2000 : plan === 'Professional' ? 500 : 100
+  const overage = Math.max(0, usage.sent - included)
+  const overageRate = plan === 'Business' ? 0.59 : plan === 'Professional' ? 0.79 : 0.99
+  const overageCost = overage * overageRate
+
+  useEffect(() => {
+    async function fetchUsage() {
+      // Första dagen denna månad
+      const startOfMonth = new Date()
+      startOfMonth.setDate(1)
+      startOfMonth.setHours(0, 0, 0, 0)
+
+      // Hämta kampanj-SMS
+      const { data: campaigns } = await supabase
+        .from('sms_campaign')
+        .select('delivered_count, failed_count, recipient_count')
+        .eq('business_id', businessId)
+        .eq('status', 'sent')
+        .gte('sent_at', startOfMonth.toISOString())
+
+      // Hämta bekräftelse/påminnelse-SMS (från bookings med confirmation_sent)
+      const { data: bookings } = await supabase
+        .from('booking')
+        .select('booking_id')
+        .eq('business_id', businessId)
+        .gte('created_at', startOfMonth.toISOString())
+
+      // Räkna SMS
+      let sent = 0
+      let delivered = 0
+      let failed = 0
+
+      campaigns?.forEach((c: any) => {
+        sent += c.recipient_count || 0
+        delivered += c.delivered_count || 0
+        failed += c.failed_count || 0
+      })
+
+      // Anta att varje bokning = 1 bekräftelse-SMS
+      const confirmationSMS = bookings?.length || 0
+      sent += confirmationSMS
+      delivered += confirmationSMS
+
+      setUsage({ sent, delivered, failed })
+      setLoading(false)
+    }
+
+    fetchUsage()
+  }, [businessId])
+
+  if (loading) {
+    return <div className="text-zinc-500">Laddar...</div>
+  }
+
+  const percentUsed = Math.min(100, (usage.sent / included) * 100)
+
+  return (
+    <div className="space-y-4">
+      {/* Progress bar */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-zinc-400">Använda SMS</span>
+          <span className="text-sm text-white font-medium">{usage.sent} / {included}</span>
+        </div>
+        <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all ${
+              percentUsed > 90 ? 'bg-red-500' : percentUsed > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+            }`}
+            style={{ width: `${percentUsed}%` }}
+          />
+        </div>
+        {percentUsed > 90 && (
+          <p className="text-xs text-amber-400 mt-2">
+            ⚠️ Du närmar dig gränsen. Överskjutande SMS kostar {overageRate} kr/st.
+          </p>
+        )}
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
+          <p className="text-xl font-bold text-white">{usage.sent}</p>
+          <p className="text-xs text-zinc-500">Skickade</p>
+        </div>
+        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
+          <p className="text-xl font-bold text-emerald-400">{usage.delivered}</p>
+          <p className="text-xs text-zinc-500">Levererade</p>
+        </div>
+        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
+          <p className="text-xl font-bold text-red-400">{usage.failed}</p>
+          <p className="text-xs text-zinc-500">Misslyckade</p>
+        </div>
+      </div>
+
+      {/* Överskjutande kostnad */}
+      {overage > 0 && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-amber-400 font-medium">Överskjutande SMS</p>
+              <p className="text-sm text-amber-400/70">{overage} SMS × {overageRate} kr</p>
+            </div>
+            <p className="text-xl font-bold text-amber-400">{overageCost.toFixed(0)} kr</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 export default function SettingsPage() {
   const business = useBusiness()
   const [loading, setLoading] = useState(true)
