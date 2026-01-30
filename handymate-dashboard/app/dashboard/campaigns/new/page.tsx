@@ -224,20 +224,24 @@ export default function NewCampaignPage() {
   }
 
   // Förslag på meddelanden
-  const messageSuggestions = [
-    {
-      title: 'Återaktivering',
-      text: `Hej! Det var ett tag sedan vi sågs. Vi har lediga tider – vill du boka? Svara på detta SMS eller ring oss. //${business.business_name}`
-    },
-    {
-      title: 'Erbjudande',
-      text: `Hej! Som trogen kund får du 15% rabatt på din nästa bokning. Gäller t.o.m. månadsskiftet. Boka nu! //${business.business_name}`
-    },
-    {
-      title: 'Påminnelse service',
-      text: `Hej! Dags för årlig service? Vi hjälper dig gärna. Svara på detta SMS så återkommer vi med förslag på tider. //${business.business_name}`
-    }
-  ]
+const messageSuggestions = [
+  {
+    title: 'Återaktivering',
+    text: `Hej! Det var ett tag sedan – har du något hemma som behöver fixas? Vi har lediga tider! Svara så hjälper vi dig. //${business.business_name}`
+  },
+  {
+    title: 'Säsongserbjudande',
+    text: `Hej! Nu är perfekt tid för [TJÄNST]. Vi har bra tider i [MÅNAD]. Svara JA för kostnadsfri offert! //${business.business_name}`
+  },
+  {
+    title: 'Rabatt',
+    text: `Hej! Som tidigare kund får du 10% rabatt på ditt nästa jobb. Gäller tom månadsskiftet. Svara för att boka! //${business.business_name}`
+  },
+  {
+    title: 'Ledig tid',
+    text: `Hej! Vi har fått en ledig tid [DAG]. Passar det dig? Svara JA så bokar vi in dig! //${business.business_name}`
+  }
+]
 
   if (loading) {
     return (
