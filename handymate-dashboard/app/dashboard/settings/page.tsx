@@ -16,7 +16,6 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
-import { useEffect, useState } from 'react'
 
 interface BusinessConfig {
   business_id: string
@@ -59,6 +58,7 @@ const SERVICE_SUGGESTIONS = [
   'Målning', 'Tapetsering', 'Snickeri', 'Golvläggning',
   'Låsbyte', 'Inbrottsskydd', 'Städning', 'Fönsterputs'
 ]
+
 function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string }) {
   const [usage, setUsage] = useState({ sent: 0, delivered: 0, failed: 0 })
   const [loading, setLoading] = useState(true)
@@ -70,12 +70,10 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 
   useEffect(() => {
     async function fetchUsage() {
-      // Första dagen denna månad
       const startOfMonth = new Date()
       startOfMonth.setDate(1)
       startOfMonth.setHours(0, 0, 0, 0)
 
-      // Hämta kampanj-SMS
       const { data: campaigns } = await supabase
         .from('sms_campaign')
         .select('delivered_count, failed_count, recipient_count')
@@ -83,14 +81,12 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
         .eq('status', 'sent')
         .gte('sent_at', startOfMonth.toISOString())
 
-      // Hämta bekräftelse/påminnelse-SMS (från bookings med confirmation_sent)
       const { data: bookings } = await supabase
         .from('booking')
         .select('booking_id')
         .eq('business_id', businessId)
         .gte('created_at', startOfMonth.toISOString())
 
-      // Räkna SMS
       let sent = 0
       let delivered = 0
       let failed = 0
@@ -101,7 +97,6 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
         failed += c.failed_count || 0
       })
 
-      // Anta att varje bokning = 1 bekräftelse-SMS
       const confirmationSMS = bookings?.length || 0
       sent += confirmationSMS
       delivered += confirmationSMS
@@ -121,7 +116,6 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 
   return (
     <div className="space-y-4">
-      {/* Progress bar */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-zinc-400">Använda SMS</span>
@@ -142,7 +136,6 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
         )}
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
           <p className="text-xl font-bold text-white">{usage.sent}</p>
@@ -158,7 +151,6 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
         </div>
       </div>
 
-      {/* Överskjutande kostnad */}
       {overage > 0 && (
         <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
           <div className="flex items-center justify-between">
@@ -173,6 +165,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
     </div>
   )
 }
+
 export default function SettingsPage() {
   const business = useBusiness()
   const [loading, setLoading] = useState(true)
@@ -188,34 +181,33 @@ export default function SettingsPage() {
     fetchConfig()
   }, [business.business_id])
 
-async function fetchConfig() {
-  const { data } = await supabase
-    .from('business_config')
-    .select('*')
-    .eq('business_id', business.business_id)
-    .single()
+  async function fetchConfig() {
+    const { data } = await supabase
+      .from('business_config')
+      .select('*')
+      .eq('business_id', business.business_id)
+      .single()
 
-  if (data) {
-    setConfig(data)
-    
-    // Säker merge av working_hours
-    if (data.working_hours && typeof data.working_hours === 'object') {
-      setWorkingHours(prev => {
-        const merged = { ...prev }
-        for (const day of Object.keys(prev)) {
-          if (data.working_hours[day]) {
-            merged[day as keyof typeof merged] = {
-              ...prev[day as keyof typeof prev],
-              ...data.working_hours[day]
+    if (data) {
+      setConfig(data)
+      
+      if (data.working_hours && typeof data.working_hours === 'object') {
+        setWorkingHours(prev => {
+          const merged = { ...prev }
+          for (const day of Object.keys(prev)) {
+            if (data.working_hours[day]) {
+              merged[day as keyof typeof merged] = {
+                ...prev[day as keyof typeof prev],
+                ...data.working_hours[day]
+              }
             }
           }
-        }
-        return merged
-      })
+          return merged
+        })
+      }
     }
+    setLoading(false)
   }
-  setLoading(false)
-}
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -277,13 +269,15 @@ async function fetchConfig() {
     })
   }
 
-  const getDaysUntilTrialEnds = () => {
+  const getTrialDaysLeft = () => {
     if (!config?.trial_ends_at) return null
     const trialEnd = new Date(config.trial_ends_at)
     const now = new Date()
     const diff = Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     return diff > 0 ? diff : 0
   }
+
+  const trialDaysLeft = getTrialDaysLeft()
 
   if (loading) {
     return (
@@ -307,6 +301,8 @@ async function fetchConfig() {
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
   ]
+
+  const currentPlan = config.subscription_plan || 'Starter'
 
   return (
     <div className="p-8 bg-[#09090b] min-h-screen">
@@ -340,12 +336,12 @@ async function fetchConfig() {
         </div>
 
         {/* Tabs */}
-        <div className="flex space-x-2 mb-8">
+        <div className="flex space-x-2 mb-8 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
                   : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
@@ -362,7 +358,7 @@ async function fetchConfig() {
           <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 space-y-6">
             <h2 className="text-lg font-semibold text-white">Företagsinformation</h2>
             
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
                   <Building2 className="w-4 h-4" />
@@ -482,8 +478,8 @@ async function fetchConfig() {
             
             <div className="space-y-4">
               {Object.entries(workingHours).map(([day, hours]) => (
-                <div key={day} className="flex items-center gap-4 p-4 bg-zinc-800/50 rounded-xl">
-                  <label className="flex items-center gap-3 w-32">
+                <div key={day} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-zinc-800/50 rounded-xl">
+                  <label className="flex items-center gap-3 sm:w-32">
                     <input
                       type="checkbox"
                       checked={hours.enabled}
@@ -567,75 +563,79 @@ async function fetchConfig() {
 
         {/* Subscription Tab */}
         {activeTab === 'subscription' && (
-  <div className="space-y-6">
-    {/* Nuvarande plan */}
-    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-      <h2 className="text-lg font-semibold text-white mb-4">Din prenumeration</h2>
-      
-      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl mb-4">
-        <div>
-          <p className="text-white font-semibold text-lg">{config.plan || 'Starter'}</p>
-          <p className="text-zinc-400 text-sm">
-            {config.subscription_status === 'trial' 
-              ? `Provperiod - ${trialDaysLeft} dagar kvar`
-              : 'Aktiv prenumeration'
-            }
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-2xl font-bold text-white">
-            {config.plan === 'Professional' ? '4 995' : config.plan === 'Business' ? '9 995' : '1 995'}
-          </p>
-          <p className="text-zinc-500 text-sm">kr/mån</p>
-        </div>
-      </div>
+          <div className="space-y-6">
+            {/* Nuvarande plan */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Din prenumeration</h2>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl mb-4 gap-4">
+                <div>
+                  <p className="text-white font-semibold text-lg">{currentPlan}</p>
+                  <p className="text-zinc-400 text-sm">
+                    {config.subscription_status === 'trial' && trialDaysLeft !== null
+                      ? `Provperiod - ${trialDaysLeft} dagar kvar`
+                      : 'Aktiv prenumeration'
+                    }
+                  </p>
+                </div>
+                <div className="sm:text-right">
+                  <p className="text-2xl font-bold text-white">
+                    {currentPlan === 'Professional' ? '4 995' : currentPlan === 'Business' ? '9 995' : '1 995'}
+                  </p>
+                  <p className="text-zinc-500 text-sm">kr/mån</p>
+                </div>
+              </div>
 
-      {config.subscription_status === 'trial' && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-          <p className="text-amber-400 text-sm">
-            ⏰ Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
-          </p>
-        </div>
-      )}
-    </div>
-
-    {/* SMS-användning */}
-    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-      <h2 className="text-lg font-semibold text-white mb-4">SMS-användning denna månad</h2>
-      
-      <SMSUsageWidget businessId={business.business_id} plan={config.plan || 'Starter'} />
-    </div>
-
-    {/* Planöversikt */}
-    <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-      <h2 className="text-lg font-semibold text-white mb-4">Tillgängliga planer</h2>
-      
-      <div className="grid md:grid-cols-3 gap-4">
-        {[
-          { name: 'Starter', price: '1 995', sms: 100, calls: 75 },
-          { name: 'Professional', price: '4 995', sms: 500, calls: 300 },
-          { name: 'Business', price: '9 995', sms: 2000, calls: 1000 }
-        ].map((plan) => (
-          <div 
-            key={plan.name}
-            className={`p-4 rounded-xl border ${
-              config.plan === plan.name 
-                ? 'bg-violet-500/10 border-violet-500/30' 
-                : 'bg-zinc-800/50 border-zinc-700'
-            }`}
-          >
-            <p className="font-semibold text-white">{plan.name}</p>
-            <p className="text-2xl font-bold text-white mt-1">{plan.price} <span className="text-sm text-zinc-500">kr/mån</span></p>
-            <div className="mt-3 space-y-1 text-sm text-zinc-400">
-              <p>✓ {plan.sms} SMS/mån</p>
-              <p>✓ {plan.calls} samtal/mån</p>
+              {config.subscription_status === 'trial' && trialDaysLeft !== null && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <p className="text-amber-400 text-sm">
+                    ⏰ Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
+                  </p>
+                </div>
+              )}
             </div>
-            {config.plan === plan.name && (
-              <p className="mt-3 text-xs text-violet-400 font-medium">Nuvarande plan</p>
-            )}
+
+            {/* SMS-användning */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">SMS-användning denna månad</h2>
+              
+              <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
+            </div>
+
+            {/* Planöversikt */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Tillgängliga planer</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  { name: 'Starter', price: '1 995', sms: 100, calls: 75 },
+                  { name: 'Professional', price: '4 995', sms: 500, calls: 300 },
+                  { name: 'Business', price: '9 995', sms: 2000, calls: 1000 }
+                ].map((plan) => (
+                  <div 
+                    key={plan.name}
+                    className={`p-4 rounded-xl border ${
+                      currentPlan === plan.name 
+                        ? 'bg-violet-500/10 border-violet-500/30' 
+                        : 'bg-zinc-800/50 border-zinc-700'
+                    }`}
+                  >
+                    <p className="font-semibold text-white">{plan.name}</p>
+                    <p className="text-2xl font-bold text-white mt-1">{plan.price} <span className="text-sm text-zinc-500">kr/mån</span></p>
+                    <div className="mt-3 space-y-1 text-sm text-zinc-400">
+                      <p>✓ {plan.sms} SMS/mån</p>
+                      <p>✓ {plan.calls} samtal/mån</p>
+                    </div>
+                    {currentPlan === plan.name && (
+                      <p className="mt-3 text-xs text-violet-400 font-medium">Nuvarande plan</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        ))}
+        )}
       </div>
     </div>
-  </div>
-)}
+  )
+}
