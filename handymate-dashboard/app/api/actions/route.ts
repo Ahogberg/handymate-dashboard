@@ -147,28 +147,77 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
 
-      case 'create_booking': {
-        const { customerId, scheduledStart, scheduledEnd, notes, businessId } = data
-        const business_id = await getBusinessId(businessId)
-        
-        const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
-        
-        const { error } = await supabase
-          .from('booking')
-          .insert({
-            booking_id: bookingId,
-            business_id: business_id,
-            customer_id: customerId,
-            scheduled_start: scheduledStart,
-            scheduled_end: scheduledEnd,
-            status: 'confirmed',
-            notes: notes || null,
-            created_at: new Date().toISOString(),
-          })
+case 'create_booking': {
+  const { customerId, scheduledStart, scheduledEnd, notes, businessId } = data
+  const business_id = await getBusinessId(businessId)
+  
+  const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
+  
+  // Skapa bokning
+  const { error } = await supabase
+    .from('booking')
+    .insert({
+      booking_id: bookingId,
+      business_id: business_id,
+      customer_id: customerId,
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      status: 'confirmed',
+      notes: notes || null,
+      created_at: new Date().toISOString(),
+    })
 
-        if (error) throw error
-        return NextResponse.json({ success: true, bookingId })
-      }
+  if (error) throw error
+
+  // Hämta kund och företagsinfo för SMS
+  const { data: customer } = await supabase
+    .from('customer')
+    .select('name, phone_number')
+    .eq('customer_id', customerId)
+    .single()
+
+  const { data: businessConfig } = await supabase
+    .from('business_config')
+    .select('business_name')
+    .eq('business_id', business_id)
+    .single()
+
+  // Skicka bekräftelse-SMS
+  if (customer?.phone_number && businessConfig?.business_name) {
+    const bookingDate = new Date(scheduledStart)
+    const dateStr = bookingDate.toLocaleDateString('sv-SE', { 
+      weekday: 'long', 
+      day: 'numeric', 
+      month: 'long' 
+    })
+    const timeStr = bookingDate.toLocaleTimeString('sv-SE', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+
+    const message = `Hej${customer.name ? ' ' + customer.name.split(' ')[0] : ''}! Din tid hos ${businessConfig.business_name} är bokad: ${dateStr} kl ${timeStr}. Välkommen! Svara på detta SMS om du behöver ändra tiden.`
+
+    try {
+      await fetch('https://api.46elks.com/a1/sms', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          from: businessConfig.business_name.substring(0, 11),
+          to: customer.phone_number,
+          message: message,
+        }),
+      })
+    } catch (smsError) {
+      console.error('Failed to send confirmation SMS:', smsError)
+      // Fortsätt ändå - bokningen är skapad
+    }
+  }
+
+  return NextResponse.json({ success: true, bookingId })
+}
 
       case 'update_booking': {
         const { bookingId, scheduledStart, scheduledEnd, status, notes } = data
