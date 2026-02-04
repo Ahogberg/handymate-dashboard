@@ -158,9 +158,9 @@ export default function TimePage() {
       .gte('work_date', format(monthStart, 'yyyy-MM-dd'))
       .lte('work_date', format(monthEnd, 'yyyy-MM-dd'))
 
-    const totalMinutesWeek = weekData?.reduce((sum, e) => sum + (e.duration_minutes || 0), 0) || 0
-    const billableMinutesWeek = weekData?.filter(e => e.is_billable).reduce((sum, e) => sum + (e.duration_minutes || 0), 0) || 0
-    const totalMinutesMonth = monthData?.reduce((sum, e) => sum + (e.duration_minutes || 0), 0) || 0
+    const totalMinutesWeek = weekData?.reduce((sum: number, e: { duration_minutes: number; is_billable: boolean }) => sum + (e.duration_minutes || 0), 0) || 0
+    const billableMinutesWeek = weekData?.filter((e: { is_billable: boolean }) => e.is_billable).reduce((sum: number, e: { duration_minutes: number }) => sum + (e.duration_minutes || 0), 0) || 0
+    const totalMinutesMonth = monthData?.reduce((sum: number, e: { duration_minutes: number }) => sum + (e.duration_minutes || 0), 0) || 0
 
     setEntries(entriesData || [])
     setStats({

@@ -121,9 +121,9 @@ export default function AIInboxPage() {
       .select('status')
       .eq('business_id', business.business_id)
 
-    const pending = allSuggestions?.filter(s => s.status === 'pending').length || 0
-    const approved = allSuggestions?.filter(s => s.status === 'approved' || s.status === 'completed').length || 0
-    const rejected = allSuggestions?.filter(s => s.status === 'rejected').length || 0
+    const pending = allSuggestions?.filter((s: { status: string }) => s.status === 'pending').length || 0
+    const approved = allSuggestions?.filter((s: { status: string }) => s.status === 'approved' || s.status === 'completed').length || 0
+    const rejected = allSuggestions?.filter((s: { status: string }) => s.status === 'rejected').length || 0
     setStats({ pending, approved, rejected })
 
     // Hämta förslag med filter
@@ -142,7 +142,7 @@ export default function AIInboxPage() {
     const { data: suggestions } = await query
 
     // Hämta unika recording IDs
-    const recordingIds = [...new Set(suggestions?.map(s => s.recording_id).filter(Boolean))]
+    const recordingIds = Array.from(new Set(suggestions?.map((s: AISuggestion) => s.recording_id).filter(Boolean)))
 
     // Hämta recordings
     const { data: recordings } = await supabase
@@ -161,12 +161,12 @@ export default function AIInboxPage() {
 
     // Gruppera förslag per recording
     const grouped: GroupedSuggestions[] = []
-    const recordingMap = new Map(recordings?.map(r => [r.recording_id, r]) || [])
+    const recordingMap = new Map<string, Recording>(recordings?.map((r: Recording) => [r.recording_id, r] as [string, Recording]) || [])
 
     // Gruppera suggestions by recording
     const suggestionsByRecording = new Map<string, AISuggestion[]>()
 
-    suggestions?.forEach(s => {
+    suggestions?.forEach((s: AISuggestion) => {
       const key = s.recording_id || 'no-recording'
       if (!suggestionsByRecording.has(key)) {
         suggestionsByRecording.set(key, [])
@@ -175,7 +175,7 @@ export default function AIInboxPage() {
     })
 
     suggestionsByRecording.forEach((suggs, recordingId) => {
-      const recording = recordingId !== 'no-recording' ? recordingMap.get(recordingId) : null
+      const recording = recordingId !== 'no-recording' ? (recordingMap.get(recordingId) || null) : null
 
       // Extrahera kundinfo från action_data
       const extractedInfo: GroupedSuggestions['extractedInfo'] = {}
@@ -552,7 +552,7 @@ export default function AIInboxPage() {
                       <div className="flex items-center gap-2">
                         {/* Suggestion type badges */}
                         <div className="hidden sm:flex gap-1">
-                          {[...new Set(group.suggestions.map(s => s.suggestion_type))].slice(0, 3).map(type => {
+                          {Array.from(new Set(group.suggestions.map(s => s.suggestion_type))).slice(0, 3).map(type => {
                             const Icon = getSuggestionIcon(type)
                             return (
                               <div
