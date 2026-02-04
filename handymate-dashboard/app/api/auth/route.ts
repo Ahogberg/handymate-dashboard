@@ -17,58 +17,60 @@ export async function POST(request: NextRequest) {
     // Skapa Supabase client med cookies
     const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-    // ==================== REGISTER ====================
-    if (action === 'register') {
-      const { email, password, businessName, contactName, phone } = data
+// ==================== REGISTER ====================
+if (action === 'register') {
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea } = data
 
-      // 1. Skapa auth user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            business_name: businessName,
-            contact_name: contactName
-          }
-        }
-      })
-
-      if (authError) {
-        console.error('Auth error:', authError)
-        return NextResponse.json({ error: authError.message }, { status: 400 })
+  // 1. Skapa auth user
+  const { data: authData, error: authError } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      data: {
+        business_name: businessName,
+        contact_name: contactName
       }
-
-      if (!authData.user) {
-        return NextResponse.json({ error: 'Kunde inte skapa användare' }, { status: 400 })
-      }
-
-      // 2. Skapa business_config
-      const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
-      
-      const { error: businessError } = await supabaseAdmin
-        .from('business_config')
-        .insert({
-          business_id: businessId,
-          user_id: authData.user.id,
-          business_name: businessName,
-          contact_name: contactName,
-          contact_email: email,
-          phone_number: phone || null,
-        })
-
-      if (businessError) {
-        console.error('Business error:', businessError)
-        // Rollback: ta bort auth user om business_config misslyckas
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
-      }
-
-      return NextResponse.json({ 
-        success: true,
-        message: 'Konto skapat! Kolla din e-post för verifiering.',
-        businessId
-      })
     }
+  })
+
+  if (authError) {
+    console.error('Auth error:', authError)
+    return NextResponse.json({ error: authError.message }, { status: 400 })
+  }
+
+  if (!authData.user) {
+    return NextResponse.json({ error: 'Kunde inte skapa användare' }, { status: 400 })
+  }
+
+  // 2. Skapa business_config
+  const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
+  
+  const { error: businessError } = await supabaseAdmin
+    .from('business_config')
+    .insert({
+      business_id: businessId,
+      user_id: authData.user.id,
+      business_name: businessName,
+      display_name: displayName || businessName,
+      contact_name: contactName,
+      contact_email: email,
+      phone_number: phone,
+      branch: branch,
+      service_area: serviceArea || null,
+    })
+
+  if (businessError) {
+    console.error('Business error:', businessError)
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
+  }
+
+  return NextResponse.json({ 
+    success: true,
+    message: 'Konto skapat!',
+    businessId
+  })
+}
 
     // ==================== LOGIN ====================
     if (action === 'login') {
