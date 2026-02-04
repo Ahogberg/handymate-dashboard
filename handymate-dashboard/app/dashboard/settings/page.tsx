@@ -3,10 +3,10 @@
 import Link from 'next/link'
 import { ChevronRight, FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { 
-  Building2, 
-  Clock, 
-  Bot, 
+import {
+  Building2,
+  Clock,
+  Bot,
   CreditCard,
   Save,
   Loader2,
@@ -14,7 +14,10 @@ import {
   X,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  PhoneCall,
+  Mic,
+  AlertTriangle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -32,6 +35,11 @@ interface BusinessConfig {
   subscription_plan: string
   subscription_status: string
   trial_ends_at: string
+  // Telefoni
+  assigned_phone_number: string | null
+  forward_phone_number: string | null
+  call_recording_enabled: boolean
+  call_recording_consent_message: string | null
 }
 
 const DEFAULT_HOURS = {
@@ -179,6 +187,11 @@ export default function SettingsPage() {
   const [workingHours, setWorkingHours] = useState(DEFAULT_HOURS)
   const [newService, setNewService] = useState('')
 
+  // Phone provisioning state
+  const [forwardNumber, setForwardNumber] = useState('')
+  const [provisioning, setProvisioning] = useState(false)
+  const [savingPhone, setSavingPhone] = useState(false)
+
   useEffect(() => {
     fetchConfig()
   }, [business.business_id])
@@ -271,6 +284,96 @@ export default function SettingsPage() {
     })
   }
 
+  const handleProvisionPhone = async () => {
+    if (!forwardNumber.trim()) {
+      showToast('Ange ditt mobilnummer för vidarekoppling', 'error')
+      return
+    }
+
+    setProvisioning(true)
+    try {
+      const response = await fetch('/api/phone/provision', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: business.business_id,
+          forward_phone_number: forwardNumber.trim()
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte tilldela nummer')
+      }
+
+      showToast(`Telefonnummer ${result.number} har tilldelats!`, 'success')
+      fetchConfig()
+      setForwardNumber('')
+
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setProvisioning(false)
+    }
+  }
+
+  const handleSavePhoneSettings = async () => {
+    if (!config) return
+
+    setSavingPhone(true)
+    try {
+      const response = await fetch('/api/phone/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: business.business_id,
+          forward_phone_number: config.forward_phone_number,
+          call_recording_enabled: config.call_recording_enabled,
+          call_recording_consent_message: config.call_recording_consent_message
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Kunde inte spara inställningar')
+      }
+
+      showToast('Telefoninställningar sparade!', 'success')
+
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSavingPhone(false)
+    }
+  }
+
+  const handleRemovePhone = async () => {
+    if (!confirm('Är du säker på att du vill ta bort telefonnumret? Detta kan inte ångras.')) {
+      return
+    }
+
+    setProvisioning(true)
+    try {
+      const response = await fetch(`/api/phone/provision?business_id=${business.business_id}`, {
+        method: 'DELETE'
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte ta bort nummer')
+      }
+
+      showToast('Telefonnummer borttaget', 'success')
+      fetchConfig()
+
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setProvisioning(false)
+    }
+  }
+
   const getTrialDaysLeft = () => {
     if (!config?.trial_ends_at) return null
     const trialEnd = new Date(config.trial_ends_at)
@@ -300,6 +403,7 @@ export default function SettingsPage() {
   const tabs = [
     { id: 'company', label: 'Företag', icon: Building2 },
     { id: 'hours', label: 'Öppettider', icon: Clock },
+    { id: 'phone', label: 'Telefoni', icon: PhoneCall },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
   ]
@@ -515,6 +619,184 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Phone Tab */}
+        {activeTab === 'phone' && (
+          <div className="space-y-6">
+            {/* Nuvarande nummer eller tilldela nytt */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Ditt Handymate-nummer</h2>
+
+              {config.assigned_phone_number ? (
+                // Har redan ett nummer
+                <div className="space-y-4">
+                  <div className="p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl">
+                          <Phone className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-white">{config.assigned_phone_number}</p>
+                          <p className="text-sm text-zinc-400">Ditt kundnummer för samtal</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleRemovePhone}
+                        disabled={provisioning}
+                        className="px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg text-sm"
+                      >
+                        Ta bort
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-1">Vidarekopplas till</p>
+                    <input
+                      type="tel"
+                      value={config.forward_phone_number || ''}
+                      onChange={(e) => setConfig({ ...config, forward_phone_number: e.target.value })}
+                      placeholder="+46701234567"
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    />
+                    <p className="text-xs text-zinc-600 mt-1">Din mobil eller fast telefon dit samtal kopplas</p>
+                  </div>
+                </div>
+              ) : (
+                // Inget nummer - visa formulär för att tilldela
+                <div className="space-y-4">
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-white">Inget telefonnummer tilldelat</p>
+                        <p className="text-sm text-zinc-400 mt-1">
+                          För att ta emot samtal via Handymate behöver du ett telefonnummer.
+                          Kunder ringer detta nummer och samtalet spelas in och analyseras av AI.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-zinc-400 mb-2">Ditt mobilnummer (för vidarekoppling)</label>
+                    <input
+                      type="tel"
+                      value={forwardNumber}
+                      onChange={(e) => setForwardNumber(e.target.value)}
+                      placeholder="+46701234567"
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    />
+                    <p className="text-xs text-zinc-600 mt-1">
+                      Samtal till ditt Handymate-nummer kopplas hit efter GDPR-meddelandet
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleProvisionPhone}
+                    disabled={provisioning || !forwardNumber.trim()}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {provisioning ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Phone className="w-5 h-5" />
+                    )}
+                    Tilldela telefonnummer
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Inspelningsinställningar (endast om nummer finns) */}
+            {config.assigned_phone_number && (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Mic className="w-5 h-5 text-violet-400" />
+                  <h2 className="text-lg font-semibold text-white">Samtalsinspelning</h2>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Toggle inspelning */}
+                  <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+                    <div>
+                      <p className="font-medium text-white">Spela in samtal</p>
+                      <p className="text-sm text-zinc-500">
+                        Samtal spelas in för AI-analys och transkribering
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setConfig({
+                        ...config,
+                        call_recording_enabled: !config.call_recording_enabled
+                      })}
+                      className={`w-12 h-6 rounded-full transition-all ${
+                        config.call_recording_enabled
+                          ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+                          : 'bg-zinc-700'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                        config.call_recording_enabled ? 'translate-x-6' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+
+                  {/* GDPR-meddelande */}
+                  {config.call_recording_enabled && (
+                    <div>
+                      <label className="block text-sm text-zinc-400 mb-2">
+                        GDPR-meddelande (spelas upp innan samtalet kopplas)
+                      </label>
+                      <textarea
+                        value={config.call_recording_consent_message || ''}
+                        onChange={(e) => setConfig({
+                          ...config,
+                          call_recording_consent_message: e.target.value
+                        })}
+                        placeholder="Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål."
+                        rows={3}
+                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                      />
+                      <p className="text-xs text-zinc-600 mt-1">
+                        Enligt GDPR måste du informera att samtalet spelas in
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Info om vad som händer */}
+                  <div className="p-4 bg-violet-500/10 border border-violet-500/30 rounded-xl">
+                    <p className="text-sm text-violet-300">
+                      <strong>Så här fungerar det:</strong>
+                    </p>
+                    <ol className="mt-2 space-y-1 text-sm text-zinc-400">
+                      <li>1. Kund ringer ditt Handymate-nummer</li>
+                      <li>2. GDPR-meddelandet spelas upp</li>
+                      <li>3. Samtalet kopplas till din mobil</li>
+                      <li>4. Inspelningen transkriberas automatiskt</li>
+                      <li>5. AI analyserar och skapar förslag (bokningar, offerter, etc.)</li>
+                    </ol>
+                  </div>
+
+                  {/* Spara-knapp */}
+                  <button
+                    onClick={handleSavePhoneSettings}
+                    disabled={savingPhone}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {savingPhone ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Save className="w-5 h-5" />
+                    )}
+                    Spara telefoninställningar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

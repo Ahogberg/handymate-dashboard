@@ -27,7 +27,7 @@ export default function DashboardLayout({
   return (
     <BusinessContext.Provider value={business}>
       <div className="flex min-h-screen bg-[#09090b]">
-        <Sidebar businessName={business.business_name} onLogout={logout} />
+        <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
         <main className="flex-1 ml-64">
           {children}
         </main>
