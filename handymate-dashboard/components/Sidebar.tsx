@@ -7,14 +7,13 @@ import {
   LayoutDashboard,
   Calendar,
   Users,
-  Sparkles,
+  Inbox,
   Settings,
   Zap,
   LogOut,
-  Megaphone,
   FileText,
-  Clock,
-  Mic
+  Receipt,
+  ChevronDown
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -24,21 +23,35 @@ interface SidebarProps {
   onLogout: () => void
 }
 
-const menuItems = [
+interface MenuItem {
+  name: string
+  href: string
+  icon: any
+  badge?: boolean
+  subItems?: { name: string; href: string; icon: any }[]
+}
+
+const menuItems: MenuItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Bokningar', href: '/dashboard/bookings', icon: Calendar },
-  { name: 'Tidrapport', href: '/dashboard/time', icon: Clock },
-  { name: 'Inspelningar', href: '/dashboard/recordings', icon: Mic },
+  { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox, badge: true },
+  { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Kunder', href: '/dashboard/customers', icon: Users },
-  { name: 'AI Inbox', href: '/dashboard/ai-inbox', icon: Sparkles, badge: true },
-  { name: 'Kampanjer', href: '/dashboard/campaigns', icon: Megaphone },
-  { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
+  {
+    name: 'Offerter & Fakturor',
+    href: '/dashboard/quotes',
+    icon: FileText,
+    subItems: [
+      { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
+      { name: 'Fakturor', href: '/dashboard/invoices', icon: Receipt },
+    ]
+  },
   { name: 'Inställningar', href: '/dashboard/settings', icon: Settings },
 ]
 
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
+  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Offerter & Fakturor'])
 
   useEffect(() => {
     if (!businessId) return
@@ -46,9 +59,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     // Initial fetch
     fetchPendingCount()
 
-    // Set up realtime subscription
+    // Set up realtime subscription for AI suggestions
     const channel = supabase
-      .channel('ai_suggestions_changes')
+      .channel('inbox_changes')
       .on(
         'postgres_changes',
         {
@@ -75,13 +88,21 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   async function fetchPendingCount() {
     if (!businessId) return
 
-    const { count } = await supabase
+    // Count pending AI suggestions
+    const { count: aiCount } = await supabase
       .from('ai_suggestion')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .eq('status', 'pending')
 
-    setPendingCount(count || 0)
+    // Count unprocessed recordings (no transcript yet)
+    const { count: recordingCount } = await supabase
+      .from('call_recording')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .is('transcript', null)
+
+    setPendingCount((aiCount || 0) + (recordingCount || 0))
   }
 
   return (
@@ -97,10 +118,61 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 p-4 space-y-1">
         {menuItems.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+          const hasSubItems = item.subItems && item.subItems.length > 0
+          const isExpanded = expandedMenus.includes(item.name)
+          const isSubItemActive = hasSubItems && item.subItems?.some(sub => pathname === sub.href || pathname?.startsWith(sub.href + '/'))
           const showBadge = item.badge && pendingCount > 0
+
+          if (hasSubItems) {
+            return (
+              <div key={item.name}>
+                <button
+                  onClick={() => {
+                    if (isExpanded) {
+                      setExpandedMenus(expandedMenus.filter(m => m !== item.name))
+                    } else {
+                      setExpandedMenus([...expandedMenus, item.name])
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+                    isSubItemActive
+                      ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
+                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className={`w-5 h-5 ${isSubItemActive ? 'text-violet-400' : ''}`} />
+                    {item.name}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {isExpanded && (
+                  <div className="ml-4 mt-1 space-y-1">
+                    {item.subItems?.map((sub) => {
+                      const isSubActive = pathname === sub.href || pathname?.startsWith(sub.href + '/')
+                      return (
+                        <Link
+                          key={sub.name}
+                          href={sub.href}
+                          className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+                            isSubActive
+                              ? 'text-violet-400 bg-violet-500/10'
+                              : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
+                          }`}
+                        >
+                          <sub.icon className="w-4 h-4" />
+                          {sub.name}
+                        </Link>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          }
 
           return (
             <Link

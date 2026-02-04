@@ -18,7 +18,8 @@ import {
   FileText,
   User,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  Receipt
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -74,6 +75,7 @@ export default function QuoteDetailPage() {
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendMethod, setSendMethod] = useState<'sms' | 'email' | 'both'>('sms')
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
+  const [creatingInvoice, setCreatingInvoice] = useState(false)
 
   useEffect(() => {
     fetchQuote()
@@ -161,6 +163,43 @@ export default function QuoteDetailPage() {
 
     await supabase.from('quotes').delete().eq('quote_id', quoteId)
     router.push('/dashboard/quotes')
+  }
+
+  const createInvoiceFromQuote = async () => {
+    if (!quote) return
+    setCreatingInvoice(true)
+
+    try {
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: quote.business_id,
+          customer_id: quote.customer_id,
+          quote_id: quote.quote_id,
+          items: quote.items.map((item: any) => ({
+            description: item.name,
+            quantity: item.quantity || 1,
+            unit: item.unit === 'hour' ? 'timmar' : 'st',
+            unit_price: item.unit_price || 0,
+            total: item.total || 0,
+            type: item.type === 'labor' ? 'labor' : 'material'
+          })),
+          vat_rate: quote.vat_rate,
+          rot_rut_type: quote.rot_rut_type
+        })
+      })
+
+      if (!response.ok) throw new Error('Kunde inte skapa faktura')
+
+      const data = await response.json()
+      showToast('Faktura skapad!', 'success')
+      router.push(`/dashboard/invoices/${data.invoice.invoice_id}`)
+    } catch {
+      showToast('Något gick fel', 'error')
+    } finally {
+      setCreatingInvoice(false)
+    }
   }
 
   const formatCurrency = (amount: number) => {
@@ -261,6 +300,16 @@ export default function QuoteDetailPage() {
             >
               <RefreshCw className="w-4 h-4" />
               Skicka påminnelse
+            </button>
+          )}
+          {quote.status === 'accepted' && (
+            <button
+              onClick={createInvoiceFromQuote}
+              disabled={creatingInvoice}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+              Skapa faktura
             </button>
           )}
           <button
