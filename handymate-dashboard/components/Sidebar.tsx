@@ -10,7 +10,8 @@ import {
   Settings,
   Zap,
   LogOut,
-  Megaphone
+  Megaphone,
+  FileText
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -24,6 +25,7 @@ const menuItems = [
   { name: 'Kunder', href: '/dashboard/customers', icon: Users },
   { name: 'AI Inbox', href: '/dashboard/ai-inbox', icon: Sparkles },
   { name: 'Kampanjer', href: '/dashboard/campaigns', icon: Megaphone },
+  { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
   { name: 'Inställningar', href: '/dashboard/settings', icon: Settings },
 ]
 
