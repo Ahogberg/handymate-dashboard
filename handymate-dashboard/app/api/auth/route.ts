@@ -72,38 +72,45 @@ if (action === 'register') {
   })
 }
 
-    // ==================== LOGIN ====================
-    if (action === 'login') {
-      const { email, password } = data
+// ==================== LOGIN ====================
+if (action === 'login') {
+  const { email, password } = data
 
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+  // Skapa en vanlig klient för login (inte admin)
+  const { createClient } = await import('@supabase/supabase-js')
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
-      if (authError) {
-        console.error('Login error:', authError)
-        return NextResponse.json({ error: 'Fel e-post eller lösenord' }, { status: 401 })
-      }
+  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  })
 
-      // Hämta business_config
-      const { data: business, error: businessError } = await supabaseAdmin
-        .from('business_config')
-        .select('business_id, business_name, contact_name')
-        .eq('user_id', authData.user.id)
-        .single()
+  if (authError) {
+    console.error('Login error:', authError)
+    return NextResponse.json({ error: 'Fel e-post eller lösenord' }, { status: 401 })
+  }
 
-      if (businessError || !business) {
-        console.error('Business lookup error:', businessError)
-        return NextResponse.json({ error: 'Inget företag kopplat till kontot' }, { status: 401 })
-      }
+  // Hämta business_config
+  const { data: business, error: businessError } = await supabaseAdmin
+    .from('business_config')
+    .select('business_id, business_name, contact_name')
+    .eq('user_id', authData.user.id)
+    .single()
 
-      return NextResponse.json({ 
-        success: true,
-        businessId: business.business_id,
-        businessName: business.business_name
-      })
-    }
+  if (businessError || !business) {
+    console.error('Business lookup error:', businessError)
+    return NextResponse.json({ error: 'Inget företag kopplat till kontot' }, { status: 401 })
+  }
+
+  return NextResponse.json({ 
+    success: true,
+    businessId: business.business_id,
+    businessName: business.business_name
+  })
+}
 
     // ==================== LOGOUT ====================
     if (action === 'logout') {
