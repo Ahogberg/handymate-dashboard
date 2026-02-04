@@ -14,7 +14,8 @@ import {
   FileText,
   Receipt,
   ChevronDown,
-  Package
+  Package,
+  Mic
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -34,6 +35,7 @@ interface MenuItem {
 
 const menuItems: MenuItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Assistent', href: '/dashboard/assistant', icon: Mic },
   { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox, badge: true },
   { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
   { name: 'Kunder', href: '/dashboard/customers', icon: Users },
