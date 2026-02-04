@@ -178,9 +178,9 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen pt-16 sm:pt-8">
       {/* Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-500/20 rounded-full blur-[128px]"></div>
       </div>
 

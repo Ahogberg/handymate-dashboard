@@ -408,11 +408,11 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-white mb-3">Snabbåtgärder</h2>
               <div className="space-y-2">
                 <Link
-                  href="/dashboard/bookings"
-                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
+                  href="/dashboard/calendar"
+                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
                 >
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-violet-400" />
+                  <div className="flex items-center gap-3">
+                    <Calendar className="w-5 h-5 text-violet-400" />
                     <span className="text-sm text-white">Ny bokning</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-colors" />
@@ -420,33 +420,33 @@ export default function DashboardPage() {
 
                 <Link
                   href="/dashboard/quotes/new"
-                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
+                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
                 >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-fuchsia-400" />
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-fuchsia-400" />
                     <span className="text-sm text-white">Ny offert</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-fuchsia-400 transition-colors" />
                 </Link>
 
                 <Link
-                  href="/dashboard/time"
-                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
+                  href="/dashboard/calendar"
+                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
                 >
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-400" />
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-amber-400" />
                     <span className="text-sm text-white">Rapportera tid</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors" />
                 </Link>
 
                 <Link
-                  href="/dashboard/campaigns/new"
-                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
+                  href="/dashboard/assistant"
+                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
                 >
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-emerald-400" />
-                    <span className="text-sm text-white">SMS-kampanj</span>
+                  <div className="flex items-center gap-3">
+                    <Mic className="w-5 h-5 text-emerald-400" />
+                    <span className="text-sm text-white">Röstassistent</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
                 </Link>

@@ -401,9 +401,9 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
       {/* Background effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
       </div>
@@ -419,8 +419,8 @@ export default function CalendarPage() {
 
       {/* Booking Modal */}
       {bookingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white">{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</h3>
               <button onClick={() => setBookingModalOpen(false)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
@@ -513,8 +513,8 @@ export default function CalendarPage() {
 
       {/* Time Entry Modal */}
       {timeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md mx-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white">{editingTimeEntry ? 'Redigera tid' : 'Registrera tid'}</h3>
               <button onClick={() => setTimeModalOpen(false)} className="text-zinc-500 hover:text-white"><X className="w-5 h-5" /></button>
@@ -628,115 +628,120 @@ export default function CalendarPage() {
 
       <div className="relative">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Kalender</h1>
-            <p className="text-zinc-400">Hantera bokningar och tidrapportering</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Kalender</h1>
+            <p className="text-sm text-zinc-400">Hantera bokningar och tidrapportering</p>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('bookings')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'bookings'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              Bokningar
-            </button>
-            <button
-              onClick={() => setActiveTab('time')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'time'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Timer className="w-4 h-4" />
-              Tidrapport
-            </button>
-          </div>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+              <button
+                onClick={() => setActiveTab('bookings')}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
+                  activeTab === 'bookings'
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                Bokningar
+              </button>
+              <button
+                onClick={() => setActiveTab('time')}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
+                  activeTab === 'time'
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Timer className="w-4 h-4" />
+                Tidrapport
+              </button>
+            </div>
 
-          {/* Tab-specific controls */}
-          {activeTab === 'bookings' && (
-            <>
-              <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                {(['all', 'today', 'upcoming'] as const).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setBookingFilter(f)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      bookingFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    {f === 'all' ? 'Alla' : f === 'today' ? 'Idag' : 'Kommande'}
-                  </button>
-                ))}
-              </div>
-              <button onClick={openCreateBookingModal} className="ml-auto flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90">
+            {/* Tab-specific controls */}
+            {activeTab === 'bookings' && (
+              <button onClick={openCreateBookingModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
                 <Plus className="w-4 h-4 mr-2" />
                 Ny bokning
               </button>
-            </>
-          )}
+            )}
 
-          {activeTab === 'time' && (
-            <>
-              <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                <button onClick={() => changeWeek(-1)} className="p-2 text-zinc-400 hover:text-white">
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="px-3 text-sm text-white min-w-[180px] text-center">{formatWeekRange()}</span>
-                <button onClick={() => changeWeek(1)} className="p-2 text-zinc-400 hover:text-white">
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-              <button onClick={openCreateTimeModal} className="ml-auto flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90">
+            {activeTab === 'time' && (
+              <button onClick={openCreateTimeModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
                 <Plus className="w-4 h-4 mr-2" />
                 Registrera tid
               </button>
-            </>
+            )}
+          </div>
+
+          {/* Filter controls on their own row on mobile */}
+          {activeTab === 'bookings' && (
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+              {(['all', 'today', 'upcoming'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setBookingFilter(f)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap min-h-[40px] ${
+                    bookingFilter === f ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {f === 'all' ? 'Alla' : f === 'today' ? 'Idag' : 'Kommande'}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {activeTab === 'time' && (
+            <div className="flex items-center justify-center gap-2 bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+              <button onClick={() => changeWeek(-1)} className="p-3 text-zinc-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <span className="px-3 text-sm text-white min-w-[160px] sm:min-w-[180px] text-center">{formatWeekRange()}</span>
+              <button onClick={() => changeWeek(1)} className="p-3 text-zinc-400 hover:text-white min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
           )}
         </div>
 
         {/* Time Stats */}
         {activeTab === 'time' && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                  <Timer className="w-5 h-5 text-violet-400" />
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-violet-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{timeTotals.hours.toFixed(1)}h</p>
-                  <p className="text-sm text-zinc-500">Arbetade timmar</p>
+                  <p className="text-lg sm:text-2xl font-bold text-white">{timeTotals.hours.toFixed(1)}h</p>
+                  <p className="text-xs sm:text-sm text-zinc-500">Timmar</p>
                 </div>
               </div>
             </div>
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                  <DollarSign className="w-5 h-5 text-emerald-400" />
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{timeTotals.revenue.toLocaleString('sv-SE')} kr</p>
-                  <p className="text-sm text-zinc-500">Intäkter</p>
+                  <p className="text-lg sm:text-2xl font-bold text-white">{(timeTotals.revenue / 1000).toFixed(0)}k</p>
+                  <p className="text-xs sm:text-sm text-zinc-500">kr</p>
                 </div>
               </div>
             </div>
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-blue-400" />
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 sm:p-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-white">{timeTotals.count}</p>
-                  <p className="text-sm text-zinc-500">Registreringar</p>
+                  <p className="text-lg sm:text-2xl font-bold text-white">{timeTotals.count}</p>
+                  <p className="text-xs sm:text-sm text-zinc-500">Poster</p>
                 </div>
               </div>
             </div>
@@ -762,59 +767,99 @@ export default function CalendarPage() {
                   )}
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tjänst</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum & Tid</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                <>
+                  {/* Mobile Card View */}
+                  <div className="sm:hidden divide-y divide-zinc-800">
                     {filteredBookings.map((booking) => (
-                      <tr key={booking.booking_id} className="hover:bg-zinc-800/30 transition-all">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
+                      <div key={booking.booking_id} className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 min-w-0 flex-1">
+                            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30 flex-shrink-0">
                               <User className="w-5 h-5 text-violet-400" />
                             </div>
-                            <div className="ml-4">
-                              <p className="font-medium text-white">{booking.customer?.name || 'Okänd'}</p>
-                              <p className="text-sm text-zinc-500">{booking.customer?.phone_number || '-'}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-white truncate">{booking.customer?.name || 'Okänd'}</p>
+                              <p className="text-sm text-zinc-500">{booking.notes ? booking.notes.split(' - ')[0] : 'Tjänst ej angiven'}</p>
+                              <div className="flex items-center gap-2 mt-2 text-sm text-zinc-400">
+                                <Clock className="w-3.5 h-3.5" />
+                                <span>{formatDate(booking.scheduled_start)}</span>
+                                <span className="text-zinc-600">•</span>
+                                <span>{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</span>
+                              </div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-white">{booking.notes ? booking.notes.split(' - ')[0] : 'Tjänst ej angiven'}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <Clock className="w-4 h-4 text-zinc-500 mr-2" />
-                            <div>
-                              <p className="text-white">{formatDate(booking.scheduled_start)}</p>
-                              <p className="text-sm text-zinc-500">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
+                          <span className={`inline-flex px-2 py-1 text-xs rounded-full border flex-shrink-0 ${getStatusStyle(booking.status)}`}>
                             {getStatusText(booking.status)}
                           </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex space-x-2">
-                            <button onClick={() => openEditBookingModal(booking)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleBookingDelete(booking.booking_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                        </div>
+                        <div className="flex gap-2 mt-3 ml-13">
+                          <button onClick={() => openEditBookingModal(booking)} className="flex-1 flex items-center justify-center gap-2 p-2.5 text-zinc-400 hover:text-white bg-zinc-800/50 rounded-lg min-h-[44px]">
+                            <Edit className="w-4 h-4" />
+                            Redigera
+                          </button>
+                          <button onClick={() => handleBookingDelete(booking.booking_id)} className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <table className="w-full hidden sm:table">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tjänst</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum & Tid</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {filteredBookings.map((booking) => (
+                        <tr key={booking.booking_id} className="hover:bg-zinc-800/30 transition-all">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
+                                <User className="w-5 h-5 text-violet-400" />
+                              </div>
+                              <div className="ml-4">
+                                <p className="font-medium text-white">{booking.customer?.name || 'Okänd'}</p>
+                                <p className="text-sm text-zinc-500">{booking.customer?.phone_number || '-'}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-white">{booking.notes ? booking.notes.split(' - ')[0] : 'Tjänst ej angiven'}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <Clock className="w-4 h-4 text-zinc-500 mr-2" />
+                              <div>
+                                <p className="text-white">{formatDate(booking.scheduled_start)}</p>
+                                <p className="text-sm text-zinc-500">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
+                              {getStatusText(booking.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex space-x-2">
+                              <button onClick={() => openEditBookingModal(booking)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button onClick={() => handleBookingDelete(booking.booking_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
               )}
             </>
           )}
@@ -830,70 +875,118 @@ export default function CalendarPage() {
                   </button>
                 </div>
               ) : (
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Beskrivning</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tid</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Summa</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                <>
+                  {/* Mobile Card View */}
+                  <div className="sm:hidden divide-y divide-zinc-800">
                     {timeEntries.map((entry) => {
                       const laborCost = (entry.hours_worked || 0) * (entry.hourly_rate || 0)
                       const total = laborCost + (entry.materials_cost || 0)
                       return (
-                        <tr key={entry.entry_id} className="hover:bg-zinc-800/30 transition-all">
-                          <td className="px-6 py-4">
-                            <p className="text-white">{new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                            {entry.start_time && entry.end_time && (
-                              <p className="text-sm text-zinc-500">{entry.start_time} - {entry.end_time}</p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            {entry.customer ? (
-                              <div>
-                                <p className="text-white">{entry.customer.name}</p>
-                                <p className="text-sm text-zinc-500">{entry.customer.phone_number}</p>
+                        <div key={entry.entry_id} className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-medium text-white">
+                                  {new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                </p>
+                                <span className="text-sm text-zinc-500">
+                                  {entry.hours_worked}h @ {entry.hourly_rate} kr
+                                </span>
                               </div>
-                            ) : (
-                              <span className="text-zinc-500">-</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-white">{entry.description || '-'}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-2">
-                              <Timer className="w-4 h-4 text-zinc-500" />
-                              <span className="text-white">{entry.hours_worked}h</span>
-                              <span className="text-zinc-500 text-sm">@ {entry.hourly_rate} kr</span>
+                              {entry.customer && (
+                                <p className="text-sm text-zinc-400 mt-1">{entry.customer.name}</p>
+                              )}
+                              {entry.description && (
+                                <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{entry.description}</p>
+                              )}
                             </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-white font-medium">{total.toLocaleString('sv-SE')} kr</p>
-                            {(entry.materials_cost || 0) > 0 && (
-                              <p className="text-xs text-zinc-500">inkl. {entry.materials_cost} kr material</p>
-                            )}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex space-x-2">
-                              <button onClick={() => openEditTimeModal(entry)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg">
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => handleTimeDelete(entry.entry_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                            <div className="text-right flex-shrink-0">
+                              <p className="font-bold text-white">{total.toLocaleString('sv-SE')} kr</p>
+                              {(entry.materials_cost || 0) > 0 && (
+                                <p className="text-xs text-zinc-500">+{entry.materials_cost} material</p>
+                              )}
                             </div>
-                          </td>
-                        </tr>
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <button onClick={() => openEditTimeModal(entry)} className="flex-1 flex items-center justify-center gap-2 p-2.5 text-zinc-400 hover:text-white bg-zinc-800/50 rounded-lg min-h-[44px]">
+                              <Edit className="w-4 h-4" />
+                              Redigera
+                            </button>
+                            <button onClick={() => handleTimeDelete(entry.entry_id)} className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
                       )
                     })}
-                  </tbody>
-                </table>
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <table className="w-full hidden sm:table">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Beskrivning</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Tid</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Summa</th>
+                        <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {timeEntries.map((entry) => {
+                        const laborCost = (entry.hours_worked || 0) * (entry.hourly_rate || 0)
+                        const total = laborCost + (entry.materials_cost || 0)
+                        return (
+                          <tr key={entry.entry_id} className="hover:bg-zinc-800/30 transition-all">
+                            <td className="px-6 py-4">
+                              <p className="text-white">{new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                              {entry.start_time && entry.end_time && (
+                                <p className="text-sm text-zinc-500">{entry.start_time} - {entry.end_time}</p>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              {entry.customer ? (
+                                <div>
+                                  <p className="text-white">{entry.customer.name}</p>
+                                  <p className="text-sm text-zinc-500">{entry.customer.phone_number}</p>
+                                </div>
+                              ) : (
+                                <span className="text-zinc-500">-</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-white">{entry.description || '-'}</p>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-2">
+                                <Timer className="w-4 h-4 text-zinc-500" />
+                                <span className="text-white">{entry.hours_worked}h</span>
+                                <span className="text-zinc-500 text-sm">@ {entry.hourly_rate} kr</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-white font-medium">{total.toLocaleString('sv-SE')} kr</p>
+                              {(entry.materials_cost || 0) > 0 && (
+                                <p className="text-xs text-zinc-500">inkl. {entry.materials_cost} kr material</p>
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex space-x-2">
+                                <button onClick={() => openEditTimeModal(entry)} className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                  <Edit className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => handleTimeDelete(entry.entry_id)} className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </>
               )}
             </>
           )}

@@ -443,14 +443,15 @@ export default function InboxPage() {
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveTab('suggestions')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'suggestions'
                 ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
                 : 'bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white'
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            AI-förslag
+            <span className="hidden sm:inline">AI-förslag</span>
+            <span className="sm:hidden">Förslag</span>
             {stats.pending > 0 && (
               <span className="ml-1 px-2 py-0.5 text-xs rounded-full bg-white/20">
                 {stats.pending}
@@ -459,7 +460,7 @@ export default function InboxPage() {
           </button>
           <button
             onClick={() => setActiveTab('recordings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all ${
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'recordings'
                 ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
                 : 'bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white'
@@ -789,26 +790,26 @@ export default function InboxPage() {
                                       <div className="flex items-center gap-2">
                                         <button
                                           onClick={() => startEdit(suggestion)}
-                                          className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg"
+                                          className="p-2.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg min-w-[44px] min-h-[44px] flex items-center justify-center"
                                         >
                                           <Edit2 className="w-4 h-4" />
                                         </button>
                                         <button
                                           onClick={() => handleApprove(suggestion)}
                                           disabled={actionLoading === suggestion.suggestion_id}
-                                          className="flex items-center gap-1 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm hover:bg-emerald-500/30 disabled:opacity-50"
+                                          className="flex items-center gap-1 px-3 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm hover:bg-emerald-500/30 disabled:opacity-50 min-h-[44px]"
                                         >
                                           {actionLoading === suggestion.suggestion_id ? (
-                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            <Loader2 className="w-4 h-4 animate-spin" />
                                           ) : (
-                                            <Check className="w-3 h-3" />
+                                            <Check className="w-4 h-4" />
                                           )}
-                                          Godkänn
+                                          <span className="hidden sm:inline">Godkänn</span>
                                         </button>
                                         <button
                                           onClick={() => handleReject(suggestion.suggestion_id)}
                                           disabled={actionLoading === suggestion.suggestion_id}
-                                          className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg disabled:opacity-50"
+                                          className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg disabled:opacity-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
                                         >
                                           <X className="w-4 h-4" />
                                         </button>
@@ -863,7 +864,7 @@ export default function InboxPage() {
                         <button
                           onClick={() => togglePlay(recording)}
                           disabled={!recording.recording_url}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
+                          className={`w-11 h-11 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                             playingId === recording.recording_id
                               ? 'bg-gradient-to-br from-violet-500 to-fuchsia-500 border-violet-500/50'
                               : recording.recording_url
@@ -872,9 +873,9 @@ export default function InboxPage() {
                           }`}
                         >
                           {playingId === recording.recording_id ? (
-                            <Pause className="w-4 h-4 text-white" />
+                            <Pause className="w-5 h-5 text-white" />
                           ) : (
-                            <Play className="w-4 h-4 text-zinc-400" />
+                            <Play className="w-5 h-5 text-zinc-400" />
                           )}
                         </button>
 
@@ -909,14 +910,14 @@ export default function InboxPage() {
                           <button
                             onClick={() => handleTranscribe(recording.recording_id)}
                             disabled={actionLoading === recording.recording_id}
-                            className="flex items-center gap-2 px-3 py-2 bg-violet-500/20 border border-violet-500/30 rounded-lg text-violet-400 text-sm hover:bg-violet-500/30 disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-2.5 bg-violet-500/20 border border-violet-500/30 rounded-lg text-violet-400 text-sm hover:bg-violet-500/30 disabled:opacity-50 min-h-[44px]"
                           >
                             {actionLoading === recording.recording_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (
                               <Wand2 className="w-4 h-4" />
                             )}
-                            Analysera
+                            <span className="hidden sm:inline">Analysera</span>
                           </button>
                         )}
                       </div>

@@ -308,98 +308,172 @@ export default function InvoicesPage() {
               </Link>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-zinc-800">
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Faktura</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Förfaller</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Belopp</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärder</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-800">
-                  {filteredInvoices.map((invoice) => (
-                    <tr key={invoice.invoice_id} className="hover:bg-zinc-800/30 transition-all">
-                      <td className="px-6 py-4">
-                        <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-white hover:text-violet-400">
-                          #{invoice.invoice_number}
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-white">{invoice.customer?.name || 'Ingen kund'}</p>
-                        <p className="text-sm text-zinc-500">{invoice.customer?.email || ''}</p>
-                      </td>
-                      <td className="px-6 py-4 text-zinc-400">
-                        {new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}
-                      </td>
-                      <td className="px-6 py-4 text-zinc-400">
-                        {new Date(invoice.due_date).toLocaleDateString('sv-SE')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-white font-medium">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+            <>
+              {/* Mobile Card View */}
+              <div className="sm:hidden divide-y divide-zinc-800">
+                {filteredInvoices.map((invoice) => (
+                  <div key={invoice.invoice_id} className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-white hover:text-violet-400">
+                            #{invoice.invoice_number}
+                          </Link>
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
+                            {getStatusIcon(invoice.status)}
+                            {getStatusText(invoice.status)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-zinc-400 mt-1">{invoice.customer?.name || 'Ingen kund'}</p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                          <span>Förfaller {new Date(invoice.due_date).toLocaleDateString('sv-SE')}</span>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-bold text-white">{invoice.total?.toLocaleString('sv-SE')} kr</p>
                         {invoice.rot_rut_type && (
                           <p className="text-xs text-emerald-400">
                             {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
                           </p>
                         )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
-                          {getStatusIcon(invoice.status)}
-                          {getStatusText(invoice.status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <a
-                            href={`/api/invoices/pdf?invoiceId=${invoice.invoice_id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
-                            title="Visa PDF"
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <a
+                        href={`/api/invoices/pdf?invoiceId=${invoice.invoice_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 flex items-center justify-center gap-2 p-2.5 text-zinc-400 hover:text-white bg-zinc-800/50 rounded-lg min-h-[44px]"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Visa PDF
+                      </a>
+                      {invoice.status === 'draft' && (
+                        <>
+                          <button
+                            onClick={() => handleSend(invoice.invoice_id)}
+                            disabled={sendingId === invoice.invoice_id}
+                            className="flex-1 flex items-center justify-center gap-2 p-2.5 text-violet-400 bg-violet-500/10 rounded-lg min-h-[44px] disabled:opacity-50"
                           >
-                            <Eye className="w-4 h-4" />
-                          </a>
+                            <Send className="w-4 h-4" />
+                            Skicka
+                          </button>
+                          <button
+                            onClick={() => handleDelete(invoice.invoice_id)}
+                            className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      {invoice.status === 'sent' && (
+                        <button
+                          onClick={() => handleMarkPaid(invoice.invoice_id)}
+                          className="flex-1 flex items-center justify-center gap-2 p-2.5 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg min-h-[44px]"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Betald
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                          {invoice.status === 'draft' && (
-                            <>
-                              <button
-                                onClick={() => handleSend(invoice.invoice_id)}
-                                disabled={sendingId === invoice.invoice_id}
-                                className="p-2 text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-all disabled:opacity-50"
-                                title="Skicka"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(invoice.invoice_id)}
-                                className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
-                                title="Ta bort"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-
-                          {invoice.status === 'sent' && (
-                            <button
-                              onClick={() => handleMarkPaid(invoice.invoice_id)}
-                              className="px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg"
-                            >
-                              Markera betald
-                            </button>
-                          )}
-                        </div>
-                      </td>
+              {/* Desktop Table View */}
+              <div className="overflow-x-auto hidden sm:block">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Faktura</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Förfaller</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Belopp</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärder</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-800">
+                    {filteredInvoices.map((invoice) => (
+                      <tr key={invoice.invoice_id} className="hover:bg-zinc-800/30 transition-all">
+                        <td className="px-6 py-4">
+                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-white hover:text-violet-400">
+                            #{invoice.invoice_number}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-white">{invoice.customer?.name || 'Ingen kund'}</p>
+                          <p className="text-sm text-zinc-500">{invoice.customer?.email || ''}</p>
+                        </td>
+                        <td className="px-6 py-4 text-zinc-400">
+                          {new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}
+                        </td>
+                        <td className="px-6 py-4 text-zinc-400">
+                          {new Date(invoice.due_date).toLocaleDateString('sv-SE')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-white font-medium">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+                          {invoice.rot_rut_type && (
+                            <p className="text-xs text-emerald-400">
+                              {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
+                            {getStatusIcon(invoice.status)}
+                            {getStatusText(invoice.status)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <a
+                              href={`/api/invoices/pdf?invoiceId=${invoice.invoice_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                              title="Visa PDF"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </a>
+
+                            {invoice.status === 'draft' && (
+                              <>
+                                <button
+                                  onClick={() => handleSend(invoice.invoice_id)}
+                                  disabled={sendingId === invoice.invoice_id}
+                                  className="p-2 text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-all disabled:opacity-50 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                  title="Skicka"
+                                >
+                                  <Send className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(invoice.invoice_id)}
+                                  className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                  title="Ta bort"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+
+                            {invoice.status === 'sent' && (
+                              <button
+                                onClick={() => handleMarkPaid(invoice.invoice_id)}
+                                className="px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg min-h-[36px]"
+                              >
+                                Markera betald
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

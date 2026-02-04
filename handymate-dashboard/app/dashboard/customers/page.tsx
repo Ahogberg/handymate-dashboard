@@ -248,8 +248,8 @@ export default function CustomersPage() {
 
       {/* Customer Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-white">
                 {editingCustomer ? 'Redigera kund' : 'Ny kund'}
@@ -326,93 +326,99 @@ export default function CustomersPage() {
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-            <button
-              onClick={() => setActiveTab('customers')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'customers'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              Kundlista
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-zinc-800 rounded-full">{customers.length}</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('campaigns')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                activeTab === 'campaigns'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <Megaphone className="w-4 h-4" />
-              Kampanjer
-              <span className="ml-1 px-1.5 py-0.5 text-xs bg-zinc-800 rounded-full">{campaigns.length}</span>
-            </button>
-          </div>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+              <button
+                onClick={() => setActiveTab('customers')}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
+                  activeTab === 'customers'
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Users className="w-4 h-4" />
+                <span className="hidden sm:inline">Kundlista</span>
+                <span className="sm:hidden">Kunder</span>
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-zinc-800/50 rounded-full">{customers.length}</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('campaigns')}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
+                  activeTab === 'campaigns'
+                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Megaphone className="w-4 h-4" />
+                Kampanjer
+                <span className="ml-1 px-1.5 py-0.5 text-xs bg-zinc-800/50 rounded-full">{campaigns.length}</span>
+              </button>
+            </div>
 
-          {/* Tab-specific controls */}
-          {activeTab === 'customers' && (
-            <>
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  type="text"
-                  placeholder="Sök kund..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-                />
-              </div>
-              <div className="flex items-center gap-2 ml-auto">
+            {/* Primary actions */}
+            {activeTab === 'customers' && (
+              <div className="flex items-center gap-2 sm:ml-auto">
                 <Link
                   href="/dashboard/customers/import"
-                  className="flex items-center justify-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700"
+                  className="flex items-center justify-center px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700 min-h-[44px]"
                 >
                   <Upload className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Importera</span>
                 </Link>
                 <button
                   onClick={openCreateModal}
-                  className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+                  className="flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
                 >
                   <Plus className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Ny kund</span>
                 </button>
               </div>
-            </>
-          )}
+            )}
 
-          {activeTab === 'campaigns' && (
-            <>
-              <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
-                {[
-                  { id: 'all', label: 'Alla' },
-                  { id: 'draft', label: 'Utkast' },
-                  { id: 'sent', label: 'Skickade' }
-                ].map((f) => (
-                  <button
-                    key={f.id}
-                    onClick={() => setCampaignFilter(f.id as 'all' | 'draft' | 'sent')}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                      campaignFilter === f.id ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
+            {activeTab === 'campaigns' && (
               <Link
                 href="/dashboard/campaigns/new"
-                className="ml-auto flex items-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+                className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Ny kampanj
               </Link>
-            </>
+            )}
+          </div>
+
+          {/* Search and filters on second row */}
+          {activeTab === 'customers' && (
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Sök kund..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 min-h-[44px]"
+              />
+            </div>
+          )}
+
+          {activeTab === 'campaigns' && (
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+              {[
+                { id: 'all', label: 'Alla' },
+                { id: 'draft', label: 'Utkast' },
+                { id: 'sent', label: 'Skickade' }
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setCampaignFilter(f.id as 'all' | 'draft' | 'sent')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap min-h-[40px] ${
+                    campaignFilter === f.id ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -492,13 +498,13 @@ export default function CustomersPage() {
                     <div className="flex space-x-1">
                       <button
                         onClick={(e) => openEditModal(customer, e)}
-                        className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+                        className="p-2.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <Edit className="w-4 h-4" />
                       </button>
                       <button
                         onClick={(e) => handleCustomerDelete(customer.customer_id, e)}
-                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                        className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

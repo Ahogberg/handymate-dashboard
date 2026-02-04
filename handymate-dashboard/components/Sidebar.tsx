@@ -15,7 +15,9 @@ import {
   Receipt,
   ChevronDown,
   Package,
-  Mic
+  Mic,
+  Menu,
+  X
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -56,6 +58,24 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Offerter & Fakturor'])
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setIsMobileOpen(false)
+  }, [pathname])
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (isMobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isMobileOpen])
 
   useEffect(() => {
     if (!businessId) return
@@ -109,10 +129,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     setPendingCount((aiCount || 0) + (recordingCount || 0))
   }
 
-  return (
-    <div className="fixed left-0 top-0 h-screen w-64 bg-zinc-900/50 backdrop-blur-xl border-r border-zinc-800 flex flex-col">
+  const sidebarContent = (
+    <>
       {/* Logo */}
-      <div className="p-6 border-b border-zinc-800">
+      <div className="p-4 sm:p-6 border-b border-zinc-800">
         <Link href="/dashboard" className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
             <Zap className="w-5 h-5 text-white" />
@@ -122,7 +142,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
           const hasSubItems = item.subItems && item.subItems.length > 0
@@ -149,7 +169,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                 >
                   <div className="flex items-center gap-3">
                     <item.icon className={`w-5 h-5 ${isSubItemActive ? 'text-violet-400' : ''}`} />
-                    {item.name}
+                    <span className="text-sm sm:text-base">{item.name}</span>
                   </div>
                   <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                 </button>
@@ -168,7 +188,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                           }`}
                         >
                           <sub.icon className="w-4 h-4" />
-                          {sub.name}
+                          <span className="text-sm">{sub.name}</span>
                         </Link>
                       )
                     })}
@@ -190,7 +210,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             >
               <div className="flex items-center gap-3">
                 <item.icon className={`w-5 h-5 ${isActive ? 'text-violet-400' : ''}`} />
-                {item.name}
+                <span className="text-sm sm:text-base">{item.name}</span>
               </div>
 
               {showBadge && (
@@ -216,13 +236,62 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           </div>
           <button
             onClick={onLogout}
-            className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
+            className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
             title="Logga ut"
           >
             <LogOut className="w-4 h-4" />
           </button>
         </div>
       </div>
-    </div>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile hamburger button */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="fixed top-4 left-4 z-40 p-3 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-xl text-white md:hidden min-w-[48px] min-h-[48px] flex items-center justify-center"
+        aria-label="Öppna meny"
+      >
+        <Menu className="w-5 h-5" />
+        {pendingCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full">
+            {pendingCount > 9 ? '9+' : pendingCount}
+          </span>
+        )}
+      </button>
+
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Mobile */}
+      <div
+        className={`fixed left-0 top-0 h-screen w-72 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 flex flex-col z-50 transition-transform duration-300 md:hidden ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setIsMobileOpen(false)}
+          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
+          aria-label="Stäng meny"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {sidebarContent}
+      </div>
+
+      {/* Sidebar - Desktop */}
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-zinc-900/50 backdrop-blur-xl border-r border-zinc-800 flex-col">
+        {sidebarContent}
+      </div>
+    </>
   )
 }
