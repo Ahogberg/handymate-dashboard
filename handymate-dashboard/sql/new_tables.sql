@@ -118,7 +118,7 @@ DROP POLICY IF EXISTS "ai_suggestion_all" ON ai_suggestion;
 CREATE POLICY "ai_suggestion_all" ON ai_suggestion FOR ALL USING (true) WITH CHECK (true);
 
 
--- 4. TELEFONI-KOLUMNER I BUSINESS_CONFIG
+-- 4. TELEFONI + FÖRETAGSINFO KOLUMNER I BUSINESS_CONFIG
 -- =========================================
 DO $$
 BEGIN
@@ -137,7 +137,71 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'business_config' AND column_name = 'elks_number_id') THEN
     ALTER TABLE business_config ADD COLUMN elks_number_id TEXT;
   END IF;
+  -- Organisationsnummer för offert-PDF
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'business_config' AND column_name = 'org_number') THEN
+    ALTER TABLE business_config ADD COLUMN org_number TEXT;
+  END IF;
+  -- Adress för företaget
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'business_config' AND column_name = 'address') THEN
+    ALTER TABLE business_config ADD COLUMN address TEXT;
+  END IF;
+  -- Bransch för AI-analys
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'business_config' AND column_name = 'industry') THEN
+    ALTER TABLE business_config ADD COLUMN industry TEXT DEFAULT 'hantverkare';
+  END IF;
 END $$;
+
+
+-- 5. SUPPLIER - Grossister/Leverantörer
+-- =========================================
+CREATE TABLE IF NOT EXISTS supplier (
+  supplier_id TEXT DEFAULT gen_random_uuid()::TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  customer_number TEXT,
+  contact_email TEXT,
+  contact_phone TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+DROP INDEX IF EXISTS idx_supplier_business;
+CREATE INDEX idx_supplier_business ON supplier(business_id);
+
+ALTER TABLE supplier ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "supplier_all" ON supplier;
+CREATE POLICY "supplier_all" ON supplier FOR ALL USING (true) WITH CHECK (true);
+
+
+-- 6. SUPPLIER_PRODUCT - Grossistprodukter/Prislista
+-- =========================================
+CREATE TABLE IF NOT EXISTS supplier_product (
+  product_id TEXT DEFAULT gen_random_uuid()::TEXT PRIMARY KEY,
+  supplier_id TEXT REFERENCES supplier(supplier_id) ON DELETE CASCADE,
+  business_id TEXT NOT NULL,
+  sku TEXT,
+  name TEXT NOT NULL,
+  category TEXT,
+  unit TEXT DEFAULT 'st',
+  purchase_price DECIMAL(10,2),
+  sell_price DECIMAL(10,2),
+  markup_percent DECIMAL(5,2) DEFAULT 20,
+  in_stock BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+DROP INDEX IF EXISTS idx_supplier_product_business;
+DROP INDEX IF EXISTS idx_supplier_product_supplier;
+DROP INDEX IF EXISTS idx_supplier_product_name;
+DROP INDEX IF EXISTS idx_supplier_product_sku;
+CREATE INDEX idx_supplier_product_business ON supplier_product(business_id);
+CREATE INDEX idx_supplier_product_supplier ON supplier_product(supplier_id);
+CREATE INDEX idx_supplier_product_name ON supplier_product(name);
+CREATE INDEX idx_supplier_product_sku ON supplier_product(sku);
+
+ALTER TABLE supplier_product ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "supplier_product_all" ON supplier_product;
+CREATE POLICY "supplier_product_all" ON supplier_product FOR ALL USING (true) WITH CHECK (true);
 
 
 -- KLART!

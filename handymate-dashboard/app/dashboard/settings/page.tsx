@@ -245,6 +245,7 @@ export default function SettingsPage() {
           service_area: config.service_area,
           working_hours: workingHours,
           greeting_script: config.greeting_script,
+          org_number: (config as any).org_number || null,
           updated_at: new Date().toISOString(),
         })
         .eq('business_id', business.business_id)
@@ -518,20 +519,53 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div>
-              <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
-                <MapPin className="w-4 h-4" />
-                Tjänsteområde
-              </label>
-              <input
-                type="text"
-                value={config.service_area || ''}
-                onChange={(e) => setConfig({ ...config, service_area: e.target.value })}
-                placeholder="T.ex. Stockholm, Solna, Sundbyberg"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
-              />
-              <p className="text-xs text-zinc-600 mt-1">AI-assistenten berättar för kunder var ni jobbar</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                  <MapPin className="w-4 h-4" />
+                  Tjänsteområde
+                </label>
+                <input
+                  type="text"
+                  value={config.service_area || ''}
+                  onChange={(e) => setConfig({ ...config, service_area: e.target.value })}
+                  placeholder="T.ex. Stockholm, Solna, Sundbyberg"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                />
+                <p className="text-xs text-zinc-600 mt-1">AI-assistenten berättar för kunder var ni jobbar</p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                  Organisationsnummer
+                </label>
+                <input
+                  type="text"
+                  value={(config as any).org_number || ''}
+                  onChange={(e) => setConfig({ ...config, org_number: e.target.value } as any)}
+                  placeholder="XXXXXX-XXXX"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                />
+                <p className="text-xs text-zinc-600 mt-1">Visas på offerter och fakturor</p>
+              </div>
             </div>
+
+            {/* Länk till prislista */}
+            <Link
+              href="/dashboard/settings/pricelist"
+              className="flex items-center justify-between p-4 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl border border-zinc-700 hover:border-violet-500/30 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30">
+                  <FileText className="w-5 h-5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-white">Grossistprislista</p>
+                  <p className="text-sm text-zinc-500">Hantera leverantörer och produktpriser</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+            </Link>
 
             <div>
               <label className="text-sm text-zinc-400 mb-2 block">Tjänster ni erbjuder</label>

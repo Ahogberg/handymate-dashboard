@@ -1,15 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { 
-  Calendar, 
-  Users, 
-  Phone, 
-  AlertTriangle,
+import {
+  Calendar,
+  Users,
+  Phone,
   TrendingUp,
+  TrendingDown,
   Clock,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  FileText,
+  Sparkles,
+  Mic,
+  DollarSign
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -28,104 +32,66 @@ interface Booking {
   }
 }
 
-interface Stats {
-  bookingsToday: number
-  bookingsWeek: number
-  totalCustomers: number
-  callsToday: number
-  urgentCases: number
-  smsThisMonth: number
+interface DashboardStats {
+  bookings: { week: number; month: number; trend: number }
+  customers: { new_this_month: number; total: number; trend: number }
+  calls: { week: number; month: number; trend: number }
+  quotes: { sent: number; accepted: number; acceptance_rate: number; total_value: number; accepted_value: number }
+  time: { week_hours: number; month_hours: number }
+  revenue: { month: number }
+  ai: { pending_suggestions: number }
+  bookings_per_day: { date: string; count: number }[]
 }
 
 export default function DashboardPage() {
   const business = useBusiness()
   const [bookings, setBookings] = useState<Booking[]>([])
-  const [stats, setStats] = useState<Stats>({ 
-    bookingsToday: 0, 
-    bookingsWeek: 0,
-    totalCustomers: 0, 
-    callsToday: 0, 
-    urgentCases: 0,
-    smsThisMonth: 0
-  })
+  const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchData() {
-      const today = new Date()
-      const todayStr = today.toISOString().split('T')[0]
-      
-      // Veckans start (måndag)
-      const weekStart = new Date(today)
-      weekStart.setDate(today.getDate() - today.getDay() + 1)
-      const weekStartStr = weekStart.toISOString().split('T')[0]
-
-      // Månadens start
-      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-
-      // Dagens bokningar
-      const { data: bookingsData } = await supabase
-        .from('booking')
-        .select(`
-          booking_id,
-          customer_id,
-          scheduled_start,
-          scheduled_end,
-          status,
-          notes,
-          customer (
-            name,
-            phone_number
-          )
-        `)
-        .eq('business_id', business.business_id)
-        .gte('scheduled_start', todayStr)
-        .lt('scheduled_start', todayStr + 'T23:59:59')
-        .order('scheduled_start', { ascending: true })
-
-      // Statistik
-      const { count: totalCustomers } = await supabase
-        .from('customer')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', business.business_id)
-
-      const { count: bookingsToday } = await supabase
-        .from('booking')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', business.business_id)
-        .gte('scheduled_start', todayStr)
-        .lt('scheduled_start', todayStr + 'T23:59:59')
-
-      const { count: bookingsWeek } = await supabase
-        .from('booking')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', business.business_id)
-        .gte('scheduled_start', weekStartStr)
-
-      // SMS denna månad
-      const { data: campaigns } = await supabase
-        .from('sms_campaign')
-        .select('recipient_count')
-        .eq('business_id', business.business_id)
-        .eq('status', 'sent')
-        .gte('sent_at', monthStart.toISOString())
-
-      const smsFromCampaigns = campaigns?.reduce((sum: number, c: any) => sum + (c.recipient_count || 0), 0) || 0
-
-      setBookings(bookingsData || [])
-      setStats({
-        bookingsToday: bookingsToday || 0,
-        bookingsWeek: bookingsWeek || 0,
-        totalCustomers: totalCustomers || 0,
-        callsToday: 0,
-        urgentCases: 0,
-        smsThisMonth: smsFromCampaigns
-      })
-      setLoading(false)
-    }
-
     fetchData()
   }, [business.business_id])
+
+  async function fetchData() {
+    const today = new Date()
+    const todayStr = today.toISOString().split('T')[0]
+
+    // Dagens bokningar
+    const { data: bookingsData } = await supabase
+      .from('booking')
+      .select(`
+        booking_id,
+        customer_id,
+        scheduled_start,
+        scheduled_end,
+        status,
+        notes,
+        customer (
+          name,
+          phone_number
+        )
+      `)
+      .eq('business_id', business.business_id)
+      .gte('scheduled_start', todayStr)
+      .lt('scheduled_start', todayStr + 'T23:59:59')
+      .order('scheduled_start', { ascending: true })
+
+    setBookings(bookingsData || [])
+
+    // Hämta statistik från API
+    try {
+      const response = await fetch(`/api/dashboard/stats?businessId=${business.business_id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error)
+    }
+
+    setLoading(false)
+  }
 
   const formatTime = (dateString: string) => {
     return new Date(dateString).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
@@ -147,6 +113,57 @@ export default function DashboardPage() {
     return business.contact_name?.split(' ')[0] || ''
   }
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
+  }
+
+  const TrendIndicator = ({ value }: { value: number }) => {
+    if (value === 0) return null
+    const isPositive = value > 0
+    return (
+      <span className={`flex items-center text-xs ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+        {isPositive ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
+        {Math.abs(value)}%
+      </span>
+    )
+  }
+
+  // Mini bar chart för bokningar per dag
+  const BookingsChart = ({ data }: { data: { date: string; count: number }[] }) => {
+    const maxCount = Math.max(...data.map(d => d.count), 1)
+    const dayNames = ['Sön', 'Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör']
+
+    return (
+      <div className="flex items-end justify-between h-20 gap-1">
+        {data.map((day, i) => {
+          const height = Math.max((day.count / maxCount) * 100, 5)
+          const date = new Date(day.date)
+          const dayName = dayNames[date.getDay()]
+          const isToday = day.date === new Date().toISOString().split('T')[0]
+
+          return (
+            <div key={i} className="flex flex-col items-center flex-1">
+              <div className="w-full flex flex-col items-center justify-end h-14">
+                <span className="text-xs text-zinc-500 mb-1">{day.count}</span>
+                <div
+                  className={`w-full rounded-t transition-all ${
+                    isToday
+                      ? 'bg-gradient-to-t from-violet-500 to-fuchsia-500'
+                      : 'bg-zinc-700'
+                  }`}
+                  style={{ height: `${height}%`, minHeight: '4px' }}
+                />
+              </div>
+              <span className={`text-xs mt-1 ${isToday ? 'text-violet-400' : 'text-zinc-500'}`}>
+                {dayName}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
@@ -155,9 +172,11 @@ export default function DashboardPage() {
     )
   }
 
+  const todaysBookingsCount = bookings.length
+
   return (
     <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
-      {/* Background - dold på mobil för prestanda */}
+      {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
@@ -167,105 +186,194 @@ export default function DashboardPage() {
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
-            {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}! 👋
+            {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}!
           </h1>
           <p className="text-sm sm:text-base text-zinc-400">
             Översikt för {business.business_name}
           </p>
         </div>
 
-        {/* Stat cards - 2x2 på mobil, 4 i rad på desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-zinc-800">
-            <div className="flex items-center justify-between mb-2 sm:mb-4">
-              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500">
-                <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+        {/* AI Inbox Banner - visa om det finns väntande förslag */}
+        {stats?.ai?.pending_suggestions && stats.ai.pending_suggestions > 0 && (
+          <Link href="/dashboard/ai-inbox">
+            <div className="mb-6 p-4 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30 rounded-xl hover:border-violet-500/50 transition-all cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-white">
+                      {stats.ai.pending_suggestions} AI-förslag väntar
+                    </p>
+                    <p className="text-sm text-zinc-400">
+                      Från samtalsanalys - granska och godkänn
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="w-5 h-5 text-violet-400" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white mb-0.5 sm:mb-1">{stats.bookingsToday}</p>
-            <p className="text-xs sm:text-sm text-zinc-500">Bokningar idag</p>
+          </Link>
+        )}
+
+        {/* Stat cards - huvudstatistik */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          {/* Bokningar denna vecka */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500">
+                <Calendar className="w-4 h-4 text-white" />
+              </div>
+              <TrendIndicator value={stats?.bookings?.trend || 0} />
+            </div>
+            <p className="text-2xl font-bold text-white">{stats?.bookings?.week || 0}</p>
+            <p className="text-xs text-zinc-500">Bokningar denna vecka</p>
           </div>
 
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-zinc-800">
-            <div className="flex items-center justify-between mb-2 sm:mb-4">
-              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500">
-                <Users className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          {/* Nya kunder */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500">
+                <Users className="w-4 h-4 text-white" />
               </div>
+              <TrendIndicator value={stats?.customers?.trend || 0} />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white mb-0.5 sm:mb-1">{stats.totalCustomers}</p>
-            <p className="text-xs sm:text-sm text-zinc-500">Aktiva kunder</p>
+            <p className="text-2xl font-bold text-white">{stats?.customers?.new_this_month || 0}</p>
+            <p className="text-xs text-zinc-500">Nya kunder i månad</p>
           </div>
 
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-zinc-800">
-            <div className="flex items-center justify-between mb-2 sm:mb-4">
-              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-emerald-500 to-green-500">
-                <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          {/* Samtal */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500">
+                <Mic className="w-4 h-4 text-white" />
               </div>
+              <TrendIndicator value={stats?.calls?.trend || 0} />
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white mb-0.5 sm:mb-1">{stats.smsThisMonth}</p>
-            <p className="text-xs sm:text-sm text-zinc-500">SMS denna månad</p>
+            <p className="text-2xl font-bold text-white">{stats?.calls?.week || 0}</p>
+            <p className="text-xs text-zinc-500">Samtal denna vecka</p>
           </div>
 
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-zinc-800">
-            <div className="flex items-center justify-between mb-2 sm:mb-4">
-              <div className="p-2 sm:p-3 rounded-lg sm:rounded-xl bg-gradient-to-br from-amber-500 to-orange-500">
-                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          {/* Timmar */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
+                <Clock className="w-4 h-4 text-white" />
               </div>
             </div>
-            <p className="text-2xl sm:text-3xl font-bold text-white mb-0.5 sm:mb-1">{stats.bookingsWeek}</p>
-            <p className="text-xs sm:text-sm text-zinc-500">Bokningar denna vecka</p>
+            <p className="text-2xl font-bold text-white">{stats?.time?.week_hours || 0}h</p>
+            <p className="text-xs text-zinc-500">Arbetad tid vecka</p>
+          </div>
+        </div>
+
+        {/* Sekundär statistik - offerter och intäkter */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+          {/* Offerter */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center gap-2 mb-3">
+              <FileText className="w-4 h-4 text-violet-400" />
+              <span className="text-sm text-zinc-400">Offerter</span>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <div>
+                <span className="text-xl font-bold text-white">{stats?.quotes?.accepted || 0}</span>
+                <span className="text-zinc-500 text-sm">/{stats?.quotes?.sent || 0}</span>
+              </div>
+              <span className="text-emerald-400 text-sm font-medium">
+                {stats?.quotes?.acceptance_rate || 0}% accept
+              </span>
+            </div>
+            <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full"
+                style={{ width: `${stats?.quotes?.acceptance_rate || 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Offertvärde */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center gap-2 mb-3">
+              <DollarSign className="w-4 h-4 text-emerald-400" />
+              <span className="text-sm text-zinc-400">Accepterat värde</span>
+            </div>
+            <p className="text-xl font-bold text-white">
+              {formatCurrency(stats?.quotes?.accepted_value || 0)} kr
+            </p>
+            <p className="text-xs text-zinc-500 mt-1">
+              Totalt skickat: {formatCurrency(stats?.quotes?.total_value || 0)} kr
+            </p>
+          </div>
+
+          {/* Intäkter från tid */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              <span className="text-sm text-zinc-400">Tidbaserade intäkter</span>
+            </div>
+            <p className="text-xl font-bold text-white">
+              {formatCurrency(stats?.revenue?.month || 0)} kr
+            </p>
+            <p className="text-xs text-zinc-500 mt-1">
+              {stats?.time?.month_hours || 0} timmar denna månad
+            </p>
           </div>
         </div>
 
         {/* Main content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Dagens bokningar */}
-          <div className="lg:col-span-2 bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-zinc-800">
-            <div className="p-4 sm:p-6 border-b border-zinc-800 flex items-center justify-between">
-              <h2 className="text-base sm:text-lg font-semibold text-white">Dagens bokningar</h2>
-              <Link 
-                href="/dashboard/bookings" 
-                className="text-xs sm:text-sm text-violet-400 hover:text-violet-300 flex items-center gap-1"
+          <div className="lg:col-span-2 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-white">
+                Dagens bokningar
+                <span className="ml-2 text-sm font-normal text-zinc-500">({todaysBookingsCount})</span>
+              </h2>
+              <Link
+                href="/dashboard/bookings"
+                className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
               >
                 Visa alla
-                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
             <div className="divide-y divide-zinc-800">
               {bookings.length === 0 ? (
-                <div className="p-6 sm:p-8 text-center">
-                  <Calendar className="w-10 h-10 sm:w-12 sm:h-12 text-zinc-700 mx-auto mb-3" />
-                  <p className="text-zinc-500 text-sm sm:text-base">Inga bokningar idag</p>
-                  <Link 
-                    href="/dashboard/bookings" 
+                <div className="p-6 text-center">
+                  <Calendar className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
+                  <p className="text-zinc-500 text-sm">Inga bokningar idag</p>
+                  <Link
+                    href="/dashboard/bookings"
                     className="inline-block mt-3 text-sm text-violet-400 hover:text-violet-300"
                   >
-                    Skapa en bokning →
+                    Skapa en bokning
                   </Link>
                 </div>
               ) : (
                 bookings.slice(0, 5).map((booking) => (
-                  <div key={booking.booking_id} className="p-3 sm:p-4 hover:bg-zinc-800/30 transition-all">
+                  <div key={booking.booking_id} className="p-3 hover:bg-zinc-800/30 transition-all">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center min-w-0">
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg sm:rounded-xl flex items-center justify-center border border-violet-500/30 flex-shrink-0">
-                          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+                        <div className="w-8 h-8 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg flex items-center justify-center border border-violet-500/30 flex-shrink-0">
+                          <Clock className="w-4 h-4 text-violet-400" />
                         </div>
-                        <div className="ml-3 sm:ml-4 min-w-0">
-                          <p className="font-medium text-white text-sm sm:text-base truncate">
+                        <div className="ml-3 min-w-0">
+                          <p className="font-medium text-white text-sm truncate">
                             {booking.customer?.name || 'Okänd kund'}
                           </p>
-                          <p className="text-xs sm:text-sm text-zinc-500 truncate">
+                          <p className="text-xs text-zinc-500 truncate">
                             {getServiceFromNotes(booking.notes)}
                           </p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
-                        <p className="font-medium text-white text-sm sm:text-base">
+                        <p className="font-medium text-white text-sm">
                           {formatTime(booking.scheduled_start)}
                         </p>
-                        <span className="inline-flex px-2 py-0.5 sm:px-2.5 sm:py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          {booking.status === 'confirmed' ? 'Bekräftad' : booking.status}
+                        <span className="inline-flex px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          {booking.status === 'confirmed' ? 'Bekräftad' :
+                           booking.status === 'pending' ? 'Väntar' : booking.status}
                         </span>
                       </div>
                     </div>
@@ -273,9 +381,9 @@ export default function DashboardPage() {
                 ))
               )}
               {bookings.length > 5 && (
-                <div className="p-3 sm:p-4 text-center">
-                  <Link 
-                    href="/dashboard/bookings" 
+                <div className="p-3 text-center">
+                  <Link
+                    href="/dashboard/bookings"
                     className="text-sm text-violet-400 hover:text-violet-300"
                   >
                     +{bookings.length - 5} fler bokningar
@@ -285,83 +393,76 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Snabblänkar & Insikter */}
-          <div className="space-y-4 sm:space-y-6">
+          {/* Höger kolumn */}
+          <div className="space-y-4">
+            {/* Bokningar senaste 7 dagarna */}
+            {stats?.bookings_per_day && stats.bookings_per_day.length > 0 && (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+                <h3 className="text-sm font-medium text-white mb-4">Bokningar senaste 7 dagarna</h3>
+                <BookingsChart data={stats.bookings_per_day} />
+              </div>
+            )}
+
             {/* Snabblänkar */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">Snabbåtgärder</h2>
-              <div className="space-y-2 sm:space-y-3">
-                <Link 
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+              <h2 className="text-sm font-semibold text-white mb-3">Snabbåtgärder</h2>
+              <div className="space-y-2">
+                <Link
                   href="/dashboard/bookings"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-all group"
+                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
                 >
-                  <div className="flex items-center gap-3">
-                    <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400" />
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-violet-400" />
                     <span className="text-sm text-white">Ny bokning</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-colors" />
                 </Link>
-                
-                <Link 
-                  href="/dashboard/customers"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-all group"
+
+                <Link
+                  href="/dashboard/quotes/new"
+                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
                 >
-                  <div className="flex items-center gap-3">
-                    <Users className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-400" />
-                    <span className="text-sm text-white">Lägg till kund</span>
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-fuchsia-400" />
+                    <span className="text-sm text-white">Ny offert</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-fuchsia-400 transition-colors" />
                 </Link>
-                
-                <Link 
-                  href="/dashboard/campaigns/new"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl transition-all group"
+
+                <Link
+                  href="/dashboard/time"
+                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
                 >
-                  <div className="flex items-center gap-3">
-                    <MessageSquare className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400" />
-                    <span className="text-sm text-white">Skicka kampanj</span>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-400" />
+                    <span className="text-sm text-white">Rapportera tid</span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors" />
+                </Link>
+
+                <Link
+                  href="/dashboard/campaigns/new"
+                  className="flex items-center justify-between p-2.5 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group"
+                >
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-4 h-4 text-emerald-400" />
+                    <span className="text-sm text-white">SMS-kampanj</span>
                   </div>
                   <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
                 </Link>
               </div>
             </div>
 
-            {/* AI Insikter */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl sm:rounded-2xl border border-zinc-800">
-              <div className="p-4 sm:p-6 border-b border-zinc-800">
-                <div className="flex items-center">
-                  <div className="p-1.5 sm:p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30 mr-2 sm:mr-3">
-                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-violet-400" />
-                  </div>
-                  <h2 className="text-base sm:text-lg font-semibold text-white">AI Insikter</h2>
+            {/* Totala kunder */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-2xl font-bold text-white">{stats?.customers?.total || 0}</p>
+                  <p className="text-xs text-zinc-500">Totalt antal kunder</p>
                 </div>
-              </div>
-              <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
-                {stats.bookingsToday === 0 && stats.totalCustomers === 0 ? (
-                  <div className="p-3 sm:p-4 rounded-xl border bg-violet-500/10 border-violet-500/30">
-                    <p className="font-medium text-white text-sm">Välkommen! 🎉</p>
-                    <p className="text-xs text-zinc-400 mt-1">
-                      Skapa din första kund och bokning för att komma igång.
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="p-3 sm:p-4 rounded-xl border bg-emerald-500/10 border-emerald-500/30">
-                      <p className="font-medium text-white text-sm">Allt under kontroll ✓</p>
-                      <p className="text-xs text-zinc-400 mt-1">
-                        Inga akuta ärenden just nu.
-                      </p>
-                    </div>
-                    {stats.totalCustomers > 10 && stats.smsThisMonth === 0 && (
-                      <div className="p-3 sm:p-4 rounded-xl border bg-amber-500/10 border-amber-500/30">
-                        <p className="font-medium text-white text-sm">Tips 💡</p>
-                        <p className="text-xs text-zinc-400 mt-1">
-                          Du har {stats.totalCustomers} kunder. Skicka en kampanj för att återaktivera dem!
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )}
+                <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30">
+                  <Users className="w-5 h-5 text-cyan-400" />
+                </div>
               </div>
             </div>
           </div>
