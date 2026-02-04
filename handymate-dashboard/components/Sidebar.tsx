@@ -13,7 +13,8 @@ import {
   LogOut,
   FileText,
   Receipt,
-  ChevronDown
+  ChevronDown,
+  Package
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -43,6 +44,7 @@ const menuItems: MenuItem[] = [
     subItems: [
       { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
       { name: 'Fakturor', href: '/dashboard/invoices', icon: Receipt },
+      { name: 'Beställningar', href: '/dashboard/orders', icon: Package },
     ]
   },
   { name: 'Inställningar', href: '/dashboard/settings', icon: Settings },
