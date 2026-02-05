@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 /**
  * GET - Hämta produkter
@@ -12,6 +14,7 @@ const supabase = createClient(
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const businessId = request.nextUrl.searchParams.get('businessId')
     const supplierId = request.nextUrl.searchParams.get('supplierId')
     const search = request.nextUrl.searchParams.get('search')
@@ -78,6 +81,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const body = await request.json()
     const {
       business_id,
@@ -132,6 +136,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const body = await request.json()
     const { product_id, ...updates } = body
 
@@ -168,6 +173,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const productId = request.nextUrl.searchParams.get('productId')
 
     if (!productId) {

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -16,6 +18,7 @@ const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const { recording_id } = await request.json()
 
     if (!recording_id) {

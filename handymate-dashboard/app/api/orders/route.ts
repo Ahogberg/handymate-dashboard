@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getServerSupabase } from '@/lib/supabase'
 
 interface OrderItem {
   product_id?: string
@@ -23,6 +18,7 @@ interface OrderItem {
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getServerSupabase()
     const businessId = request.nextUrl.searchParams.get('businessId')
     const status = request.nextUrl.searchParams.get('status')
     const supplierId = request.nextUrl.searchParams.get('supplierId')
@@ -76,6 +72,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServerSupabase()
     const body = await request.json()
     const {
       business_id,
@@ -135,6 +132,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = getServerSupabase()
     const body = await request.json()
     const { order_id, items, status, delivery_address, notes } = body
 
@@ -189,6 +187,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getServerSupabase()
     const orderId = request.nextUrl.searchParams.get('orderId')
 
     if (!orderId) {

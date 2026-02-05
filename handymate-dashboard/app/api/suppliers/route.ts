@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 /**
  * GET - Hämta alla leverantörer för ett företag
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const businessId = request.nextUrl.searchParams.get('businessId')
 
     if (!businessId) {
@@ -49,6 +52,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const body = await request.json()
     const { business_id, name, customer_number, contact_email, contact_phone } = body
 
@@ -83,6 +87,7 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const body = await request.json()
     const { supplier_id, name, customer_number, contact_email, contact_phone } = body
 
@@ -117,6 +122,7 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const supplierId = request.nextUrl.searchParams.get('supplierId')
 
     if (!supplierId) {

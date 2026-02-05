@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 /**
  * POST - Godkänn ett AI-förslag och utför åtgärden
@@ -12,6 +14,7 @@ const supabase = createClient(
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const { suggestion_id, action_data } = await request.json()
 
     if (!suggestion_id) {
@@ -55,18 +58,18 @@ export async function POST(request: NextRequest) {
 
     switch (suggestion.suggestion_type) {
       case 'booking':
-        result = await createBooking(suggestion, finalActionData)
+        result = await createBooking(supabase, suggestion, finalActionData)
         message = result.success ? 'Bokning skapad!' : result.error
         break
 
       case 'quote':
-        result = await createQuote(suggestion, finalActionData)
+        result = await createQuote(supabase, suggestion, finalActionData)
         message = result.success ? 'Offert skapad!' : result.error
         break
 
       case 'follow_up':
       case 'callback':
-        result = await createFollowUp(suggestion, finalActionData)
+        result = await createFollowUp(supabase, suggestion, finalActionData)
         message = result.success ? 'Uppföljning schemalagd!' : result.error
         break
 
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'reminder':
-        result = await createReminder(suggestion, finalActionData)
+        result = await createReminder(supabase, suggestion, finalActionData)
         message = result.success ? 'Påminnelse skapad!' : result.error
         break
 
@@ -115,7 +118,7 @@ export async function POST(request: NextRequest) {
 /**
  * Skapa en bokning
  */
-async function createBooking(suggestion: any, actionData: any) {
+async function createBooking(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     const businessId = suggestion.business_id
     let customerId = suggestion.customer_id
@@ -169,7 +172,7 @@ async function createBooking(suggestion: any, actionData: any) {
 /**
  * Skapa en offert
  */
-async function createQuote(suggestion: any, actionData: any) {
+async function createQuote(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     const businessId = suggestion.business_id
     let customerId = suggestion.customer_id
@@ -219,7 +222,7 @@ async function createQuote(suggestion: any, actionData: any) {
 /**
  * Skapa en uppföljning
  */
-async function createFollowUp(suggestion: any, actionData: any) {
+async function createFollowUp(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     const { error } = await supabase
       .from('human_followup_queue')
@@ -299,10 +302,10 @@ async function sendSMS(suggestion: any, actionData: any) {
 /**
  * Skapa påminnelse
  */
-async function createReminder(suggestion: any, actionData: any) {
+async function createReminder(supabase: SupabaseClient, suggestion: any, actionData: any) {
   try {
     // För nu, skapa som uppföljning
-    return await createFollowUp(suggestion, {
+    return await createFollowUp(supabase, suggestion, {
       ...actionData,
       reason: actionData.reason || `Påminnelse: ${suggestion.title}`
     })

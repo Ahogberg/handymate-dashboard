@@ -3,11 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 
-// Admin client för att skapa business_config
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Admin client för att skapa business_config (runtime initialization)
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +47,7 @@ if (action === 'register') {
   // 2. Skapa business_config
   const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
   
+  const supabaseAdmin = getSupabaseAdmin()
   const { error: businessError } = await supabaseAdmin
     .from('business_config')
     .insert({
@@ -61,7 +64,7 @@ if (action === 'register') {
 
   if (businessError) {
     console.error('Business error:', businessError)
-    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    await getSupabaseAdmin().auth.admin.deleteUser(authData.user.id)
     return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
   }
 
@@ -94,7 +97,7 @@ if (action === 'login') {
   }
 
   // Hämta business_config
-  const { data: business, error: businessError } = await supabaseAdmin
+  const { data: business, error: businessError } = await getSupabaseAdmin()
     .from('business_config')
     .select('business_id, business_name, contact_name')
     .eq('user_id', authData.user.id)
@@ -127,7 +130,7 @@ if (action === 'login') {
       }
 
       // Hämta business_config
-      const { data: business } = await supabaseAdmin
+      const { data: business } = await getSupabaseAdmin()
         .from('business_config')
         .select('business_id, business_name, contact_name, contact_email')
         .eq('user_id', session.user.id)

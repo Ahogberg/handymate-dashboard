@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -16,6 +18,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
  */
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const { business_id, forward_phone_number, country = 'se' } = await request.json()
 
     if (!business_id) {
@@ -134,6 +137,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const { searchParams } = new URL(request.url)
     const business_id = searchParams.get('business_id')
 

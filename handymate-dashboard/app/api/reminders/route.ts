@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -46,12 +48,13 @@ export async function POST(request: NextRequest) {
   // Verifiera att anropet kommer från en cron job (enkel API-nyckel)
   const authHeader = request.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET || 'handymate-cron-secret'
-  
+
   if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
+    const supabase = getSupabase()
     // Hitta bokningar som är 24h fram (med 1h marginal)
     const now = new Date()
     const in23Hours = new Date(now.getTime() + 23 * 60 * 60 * 1000)

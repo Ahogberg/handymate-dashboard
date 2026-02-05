@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
+function getAnthropic() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!,
+  })
+}
 
 // Demo-context (i verkligheten hämtar vi från Supabase)
 const demoContext = {
@@ -25,6 +27,7 @@ const demoContext = {
 
 export async function POST(request: NextRequest) {
   try {
+    const anthropic = getAnthropic()
     const { question } = await request.json()
 
     const response = await anthropic.messages.create({

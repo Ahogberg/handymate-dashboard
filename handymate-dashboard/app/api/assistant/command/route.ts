@@ -2,14 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!
-})
+function getAnthropic() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!
+  })
+}
 
 interface CommandResponse {
   action: 'create_quote' | 'create_booking' | 'send_reminder' | 'get_stats' | 'search_customer' | 'create_invoice' | 'unknown'
@@ -35,6 +39,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
     }
 
+    const supabase = getSupabase()
+    const anthropic = getAnthropic()
+
     // Hämta kontext om företaget och kunder
     const { data: business } = await supabase
       .from('business_config')
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
       .order('scheduled_start')
       .limit(10)
 
-    const customerList = customers?.map(c => `- ${c.name} (${c.phone_number})`).join('\n') || 'Inga kunder'
+    const customerList = customers?.map((c: { customer_id: string; name: string; phone_number: string }) => `- ${c.name} (${c.phone_number})`).join('\n') || 'Inga kunder'
 
     const prompt = `Du är en röstassistent för ${business?.business_name || 'ett hantverksföretag'} (bransch: ${business?.industry || 'hantverkare'}).
 
@@ -157,7 +164,7 @@ REGLER:
     // Om kund hittades, försök matcha mot kundlistan
     if (commandResponse.params.customer_search) {
       const searchTerm = commandResponse.params.customer_search.toLowerCase()
-      const matchedCustomer = customers?.find(c =>
+      const matchedCustomer = customers?.find((c: { customer_id: string; name: string; phone_number: string }) =>
         c.name.toLowerCase().includes(searchTerm)
       )
       if (matchedCustomer) {

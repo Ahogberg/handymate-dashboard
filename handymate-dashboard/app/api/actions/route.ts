@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { getServerSupabase } from '@/lib/supabase'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -21,6 +16,7 @@ async function getBusinessId(providedId?: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = getServerSupabase()
     const { action, data } = await request.json()
 
     switch (action) {

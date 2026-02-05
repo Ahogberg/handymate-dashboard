@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 interface InvoiceItem {
   description: string
@@ -20,6 +22,7 @@ interface InvoiceItem {
  */
 export async function GET(request: NextRequest) {
   try {
+    const supabase = getSupabase()
     const invoiceId = request.nextUrl.searchParams.get('invoiceId')
 
     if (!invoiceId) {

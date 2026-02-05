@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!
-})
+function getAnthropic() {
+  return new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY!
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
+    const anthropic = getAnthropic()
     const { prompt, priceList, pricingSettings } = await request.json()
 
     const systemPrompt = `Du är en expert på att skapa offerter för hantverkare i Sverige.
