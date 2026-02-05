@@ -186,7 +186,13 @@ export const RATE_LIMITS = {
   EMAIL_PER_DAY: { maxRequests: 100, windowMs: 24 * 60 * 60 * 1000 },
 
   // API generellt: 100 per minut
-  API_PER_MINUTE: { maxRequests: 100, windowMs: 60 * 1000 }
+  API_PER_MINUTE: { maxRequests: 100, windowMs: 60 * 1000 },
+
+  // Telefoni (46elks): 5 per minut
+  PHONE_API_PER_MINUTE: { maxRequests: 5, windowMs: 60 * 1000 },
+
+  // AI API: 20 per minut (kostar pengar)
+  AI_API_PER_MINUTE: { maxRequests: 20, windowMs: 60 * 1000 }
 }
 
 /**
@@ -241,6 +247,46 @@ export function checkEmailRateLimit(businessId: string): {
     return {
       allowed: false,
       error: `Daily email limit exceeded. Max ${RATE_LIMITS.EMAIL_PER_DAY.maxRequests} per day.`
+    }
+  }
+
+  return { allowed: true }
+}
+
+/**
+ * Helper för att kontrollera Phone API rate limits (46elks)
+ */
+export function checkPhoneApiRateLimit(businessId: string): {
+  allowed: boolean
+  error?: string
+} {
+  const key = `phone:minute:${businessId}`
+  const check = checkRateLimit(key, RATE_LIMITS.PHONE_API_PER_MINUTE)
+
+  if (!check.allowed) {
+    return {
+      allowed: false,
+      error: `Phone API rate limit exceeded. Max ${RATE_LIMITS.PHONE_API_PER_MINUTE.maxRequests} requests per minute.`
+    }
+  }
+
+  return { allowed: true }
+}
+
+/**
+ * Helper för att kontrollera AI API rate limits
+ */
+export function checkAiApiRateLimit(businessId: string): {
+  allowed: boolean
+  error?: string
+} {
+  const key = `ai:minute:${businessId}`
+  const check = checkRateLimit(key, RATE_LIMITS.AI_API_PER_MINUTE)
+
+  if (!check.allowed) {
+    return {
+      allowed: false,
+      error: `AI API rate limit exceeded. Max ${RATE_LIMITS.AI_API_PER_MINUTE.maxRequests} requests per minute.`
     }
   }
 

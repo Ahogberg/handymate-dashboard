@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 
 function getAnthropic() {
   return new Anthropic({
@@ -27,6 +28,18 @@ const demoContext = {
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit check (AI API costs money)
+    const rateLimit = checkAiApiRateLimit(authBusiness.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
     const anthropic = getAnthropic()
     const { question } = await request.json()
 

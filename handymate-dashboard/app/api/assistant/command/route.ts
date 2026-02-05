@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Anthropic from '@anthropic-ai/sdk'
+import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -28,15 +29,23 @@ interface CommandResponse {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit check (AI API costs money)
+    const rateLimit = checkAiApiRateLimit(authBusiness.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
     const body = await request.json()
-    const { text, businessId } = body
+    const { text } = body
 
     if (!text) {
       return NextResponse.json({ error: 'Missing text' }, { status: 400 })
-    }
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
     }
 
     const supabase = getSupabase()
@@ -46,20 +55,20 @@ export async function POST(request: NextRequest) {
     const { data: business } = await supabase
       .from('business_config')
       .select('business_name, services_offered, industry')
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
     const { data: customers } = await supabase
       .from('customer')
       .select('customer_id, name, phone_number')
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .order('name')
       .limit(50)
 
     const { data: recentBookings } = await supabase
       .from('booking')
       .select('booking_id, scheduled_start, customer:customer_id(name)')
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .gte('scheduled_start', new Date().toISOString())
       .order('scheduled_start')
       .limit(10)

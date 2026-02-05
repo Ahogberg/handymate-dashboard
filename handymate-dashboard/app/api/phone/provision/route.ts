@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -14,16 +15,24 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
 
 /**
  * POST - Köp och tilldela ett telefonnummer till ett företag
- * Body: { business_id: string, forward_phone_number: string, country?: string }
+ * Body: { forward_phone_number: string, country?: string }
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
-    const { business_id, forward_phone_number, country = 'se' } = await request.json()
-
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Rate limit check (46elks API)
+    const rateLimit = checkPhoneApiRateLimit(authBusiness.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const supabase = getSupabase()
+    const { forward_phone_number, country = 'se' } = await request.json()
 
     if (!forward_phone_number) {
       return NextResponse.json({ error: 'Missing forward_phone_number' }, { status: 400 })
@@ -33,7 +42,7 @@ export async function POST(request: NextRequest) {
     const { data: business, error: fetchError } = await supabase
       .from('business_config')
       .select('business_id, assigned_phone_number, business_name')
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
     if (fetchError || !business) {
@@ -97,7 +106,7 @@ export async function POST(request: NextRequest) {
         call_recording_enabled: true,
         call_recording_consent_message: 'Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål.'
       })
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
 
     if (updateError) {
       console.error('Database update error:', updateError)
@@ -133,23 +142,28 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE - Ta bort/avaktivera ett telefonnummer
- * Query: ?business_id=xxx
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = getSupabase()
-    const { searchParams } = new URL(request.url)
-    const business_id = searchParams.get('business_id')
-
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Rate limit check (46elks API)
+    const rateLimit = checkPhoneApiRateLimit(authBusiness.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const supabase = getSupabase()
 
     // Hämta numret
     const { data: business, error: fetchError } = await supabase
       .from('business_config')
       .select('elks_number_id, assigned_phone_number')
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
     if (fetchError || !business) {
@@ -181,7 +195,7 @@ export async function DELETE(request: NextRequest) {
         assigned_phone_number: null,
         elks_number_id: null
       })
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
 
     if (updateError) {
       return NextResponse.json({

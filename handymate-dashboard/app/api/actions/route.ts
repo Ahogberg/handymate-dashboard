@@ -1,28 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness, checkSmsRateLimit, checkPhoneApiRateLimit } from '@/lib/auth'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 const ELKS_PHONE_NUMBER = process.env.ELKS_PHONE_NUMBER || '+46766867337'
 
-async function getBusinessId(providedId?: string): Promise<string> {
-  if (providedId) return providedId
-  const cookieStore = await cookies()
-  const businessId = cookieStore.get('business_id')?.value
-  if (!businessId) throw new Error('Inte inloggad')
-  return businessId
-}
-
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const { action, data } = await request.json()
 
     switch (action) {
       case 'send_sms': {
+        // SMS rate limit check
+        const smsLimit = checkSmsRateLimit(authBusiness.business_id)
+        if (!smsLimit.allowed) {
+          return NextResponse.json({ error: smsLimit.error }, { status: 429 })
+        }
+
         const { to, message } = data
-        
+
         const response = await fetch('https://api.46elks.com/a1/sms', {
           method: 'POST',
           headers: {
@@ -42,8 +46,14 @@ export async function POST(request: NextRequest) {
       }
 
       case 'initiate_call': {
+        // Phone API rate limit check
+        const phoneLimit = checkPhoneApiRateLimit(authBusiness.business_id)
+        if (!phoneLimit.allowed) {
+          return NextResponse.json({ error: phoneLimit.error }, { status: 429 })
+        }
+
         const { to } = data
-        
+
         const response = await fetch('https://api.46elks.com/a1/calls', {
           method: 'POST',
           headers: {
@@ -93,16 +103,15 @@ export async function POST(request: NextRequest) {
       }
 
       case 'create_customer': {
-        const { name, phone_number, email, address_line, businessId } = data
-        const business_id = await getBusinessId(businessId)
-        
+        const { name, phone_number, email, address_line } = data
+
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
-        
+
         const { error } = await supabase
           .from('customer')
           .insert({
             customer_id: customerId,
-            business_id: business_id,
+            business_id: authBusiness.business_id,
             name,
             phone_number,
             email: email || null,
@@ -144,17 +153,22 @@ export async function POST(request: NextRequest) {
       }
 
 case 'create_booking': {
-  const { customerId, scheduledStart, scheduledEnd, notes, businessId } = data
-  const business_id = await getBusinessId(businessId)
-  
+  // SMS rate limit check (booking sends confirmation SMS)
+  const bookingSmsLimit = checkSmsRateLimit(authBusiness.business_id)
+  if (!bookingSmsLimit.allowed) {
+    return NextResponse.json({ error: bookingSmsLimit.error }, { status: 429 })
+  }
+
+  const { customerId, scheduledStart, scheduledEnd, notes } = data
+
   const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
-  
+
   // Skapa bokning
   const { error } = await supabase
     .from('booking')
     .insert({
       booking_id: bookingId,
-      business_id: business_id,
+      business_id: authBusiness.business_id,
       customer_id: customerId,
       scheduled_start: scheduledStart,
       scheduled_end: scheduledEnd,
@@ -175,7 +189,7 @@ case 'create_booking': {
   const { data: businessConfig } = await supabase
     .from('business_config')
     .select('business_name')
-    .eq('business_id', business_id)
+    .eq('business_id', authBusiness.business_id)
     .single()
 
   // Skicka bekräftelse-SMS

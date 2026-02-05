@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -10,21 +11,22 @@ function getSupabase() {
 
 /**
  * GET - Hämta produkter
- * Query params: businessId, supplierId (optional), search (optional), category (optional)
+ * Query params: supplierId (optional), search (optional), category (optional)
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
-    const businessId = request.nextUrl.searchParams.get('businessId')
     const supplierId = request.nextUrl.searchParams.get('supplierId')
     const search = request.nextUrl.searchParams.get('search')
     const category = request.nextUrl.searchParams.get('category')
     const limit = parseInt(request.nextUrl.searchParams.get('limit') || '100')
     const offset = parseInt(request.nextUrl.searchParams.get('offset') || '0')
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
-    }
 
     let query = supabase
       .from('supplier_product')
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
           name
         )
       `, { count: 'exact' })
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .order('name')
       .range(offset, offset + limit - 1)
 
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest) {
     const { data: categories } = await supabase
       .from('supplier_product')
       .select('category')
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .not('category', 'is', null)
 
     const uniqueCategories = Array.from(new Set(categories?.map((c: { category: string }) => c.category).filter(Boolean)))
@@ -81,10 +83,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
     const {
-      business_id,
       supplier_id,
       sku,
       name,
@@ -95,7 +102,7 @@ export async function POST(request: NextRequest) {
       markup_percent
     } = body
 
-    if (!business_id || !name) {
+    if (!name) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -108,7 +115,7 @@ export async function POST(request: NextRequest) {
     const { data, error } = await supabase
       .from('supplier_product')
       .insert({
-        business_id,
+        business_id: authBusiness.business_id,
         supplier_id,
         sku,
         name,
@@ -136,6 +143,12 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
     const { product_id, ...updates } = body
@@ -155,6 +168,7 @@ export async function PUT(request: NextRequest) {
       .from('supplier_product')
       .update(updates)
       .eq('product_id', product_id)
+      .eq('business_id', authBusiness.business_id)
       .select()
       .single()
 
@@ -173,6 +187,12 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const productId = request.nextUrl.searchParams.get('productId')
 
@@ -184,6 +204,7 @@ export async function DELETE(request: NextRequest) {
       .from('supplier_product')
       .delete()
       .eq('product_id', productId)
+      .eq('business_id', authBusiness.business_id)
 
     if (error) throw error
 

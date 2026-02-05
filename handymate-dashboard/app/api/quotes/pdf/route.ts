@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -10,25 +11,26 @@ function getSupabase() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { quoteId } = await request.json()
 
-    // Hämta offert med kundinfo
+    // Hämta offert med kundinfo och verifiera ägarskap
     const { data: quote } = await supabase
       .from('quotes')
       .select('*, customer(*)')
       .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (!quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
-
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', quote.business_id)
-      .single()
 
     // Generera HTML för PDF
     const html = generateQuoteHTML(quote, business)
@@ -49,36 +51,41 @@ export async function POST(request: NextRequest) {
 
 // GET method för att öppna i ny flik
 export async function GET(request: NextRequest) {
-  const supabase = getSupabase()
-  const quoteId = request.nextUrl.searchParams.get('id')
-
-  if (!quoteId) {
-    return NextResponse.json({ error: 'Missing quote ID' }, { status: 400 })
-  }
-
-  const { data: quote } = await supabase
-    .from('quotes')
-    .select('*, customer(*)')
-    .eq('quote_id', quoteId)
-    .single()
-
-  if (!quote) {
-    return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
-  }
-
-  const { data: business } = await supabase
-    .from('business_config')
-    .select('*')
-    .eq('business_id', quote.business_id)
-    .single()
-
-  const html = generateQuoteHTML(quote, business)
-
-  return new NextResponse(html, {
-    headers: {
-      'Content-Type': 'text/html; charset=utf-8',
+  try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-  })
+
+    const supabase = getSupabase()
+    const quoteId = request.nextUrl.searchParams.get('id')
+
+    if (!quoteId) {
+      return NextResponse.json({ error: 'Missing quote ID' }, { status: 400 })
+    }
+
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('*, customer(*)')
+      .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (!quote) {
+      return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
+    }
+
+    const html = generateQuoteHTML(quote, business)
+
+    return new NextResponse(html, {
+      headers: {
+        'Content-Type': 'text/html; charset=utf-8',
+      }
+    })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 }
 
 function generateQuoteHTML(quote: any, business: any): string {

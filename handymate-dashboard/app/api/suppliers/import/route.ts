@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -19,17 +20,25 @@ interface ImportedProduct {
 
 /**
  * POST - Importera produkter från CSV/JSON
- * Body: { business_id, supplier_id, products: ImportedProduct[], mode: 'preview' | 'import' }
+ * Body: { supplier_id, products: ImportedProduct[], mode: 'preview' | 'import' }
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
-    const { business_id, supplier_id, products, mode, default_markup } = body
+    const { supplier_id, products, mode, default_markup } = body
 
-    if (!business_id || !supplier_id || !products || !Array.isArray(products)) {
+    if (!supplier_id || !products || !Array.isArray(products)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
+
+    const business_id = authBusiness.business_id
 
     // Validera och formatera produkter
     const validProducts: any[] = []

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -14,6 +15,12 @@ function getSupabase() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { suggestion_id, action_data } = await request.json()
 
@@ -21,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing suggestion_id' }, { status: 400 })
     }
 
-    // Hämta förslaget
+    // Hämta förslaget och verifiera ägarskap
     const { data: suggestion, error: fetchError } = await supabase
       .from('ai_suggestion')
       .select(`
@@ -39,6 +46,7 @@ export async function POST(request: NextRequest) {
         )
       `)
       .eq('suggestion_id', suggestion_id)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
     if (fetchError || !suggestion) {
@@ -47,6 +55,14 @@ export async function POST(request: NextRequest) {
 
     if (suggestion.status !== 'pending') {
       return NextResponse.json({ error: 'Suggestion already processed' }, { status: 400 })
+    }
+
+    // Check SMS rate limit if the action involves sending SMS
+    if (suggestion.suggestion_type === 'sms' || suggestion.suggestion_type === 'reschedule') {
+      const smsLimit = checkSmsRateLimit(authBusiness.business_id)
+      if (!smsLimit.allowed) {
+        return NextResponse.json({ error: smsLimit.error }, { status: 429 })
+      }
     }
 
     // Merge action_data om det skickades med

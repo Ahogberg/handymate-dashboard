@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 interface OrderItem {
   product_id?: string
@@ -18,14 +19,15 @@ interface OrderItem {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
-    const businessId = request.nextUrl.searchParams.get('businessId')
     const status = request.nextUrl.searchParams.get('status')
     const supplierId = request.nextUrl.searchParams.get('supplierId')
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
-    }
 
     let query = supabase
       .from('material_order')
@@ -43,7 +45,7 @@ export async function GET(request: NextRequest) {
           customer_id
         )
       `)
-      .eq('business_id', businessId)
+      .eq('business_id', authBusiness.business_id)
       .order('created_at', { ascending: false })
 
     if (status) {
@@ -72,20 +74,21 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const {
-      business_id,
       supplier_id,
       quote_id,
       items,
       delivery_address,
       notes
     } = body
-
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
-    }
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'No items provided' }, { status: 400 })
@@ -97,7 +100,7 @@ export async function POST(request: NextRequest) {
     const { data: order, error: insertError } = await supabase
       .from('material_order')
       .insert({
-        business_id,
+        business_id: authBusiness.business_id,
         supplier_id,
         quote_id,
         items,
@@ -132,6 +135,12 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const { order_id, items, status, delivery_address, notes } = body
@@ -161,6 +170,7 @@ export async function PUT(request: NextRequest) {
       .from('material_order')
       .update(updates)
       .eq('order_id', order_id)
+      .eq('business_id', authBusiness.business_id)
       .select(`
         *,
         supplier:supplier_id (
@@ -187,6 +197,12 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const orderId = request.nextUrl.searchParams.get('orderId')
 
@@ -194,14 +210,19 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing orderId' }, { status: 400 })
     }
 
-    // Verifiera att beställningen är ett utkast
+    // Verifiera att beställningen är ett utkast och tillhör företaget
     const { data: existing } = await supabase
       .from('material_order')
       .select('status')
       .eq('order_id', orderId)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
-    if (existing?.status !== 'draft') {
+    if (!existing) {
+      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+    }
+
+    if (existing.status !== 'draft') {
       return NextResponse.json({ error: 'Only draft orders can be deleted' }, { status: 400 })
     }
 
@@ -209,6 +230,7 @@ export async function DELETE(request: NextRequest) {
       .from('material_order')
       .delete()
       .eq('order_id', orderId)
+      .eq('business_id', authBusiness.business_id)
 
     if (error) throw error
 

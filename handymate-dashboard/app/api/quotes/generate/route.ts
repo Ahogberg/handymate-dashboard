@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
+import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
 
 function getAnthropic() {
   return new Anthropic({
@@ -9,6 +10,18 @@ function getAnthropic() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit check (AI API costs money)
+    const rateLimit = checkAiApiRateLimit(business.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
     const anthropic = getAnthropic()
     const { prompt, priceList, pricingSettings } = await request.json()
 
@@ -18,8 +31,8 @@ Användarens prislista:
 ${JSON.stringify(priceList, null, 2)}
 
 Grundinställningar:
-- Timpris: ${pricingSettings.hourly_rate} kr/h
-- Moms: ${pricingSettings.vat_rate}%
+- Timpris: ${pricingSettings?.hourly_rate || 650} kr/h
+- Moms: ${pricingSettings?.vat_rate || 25}%
 
 Din uppgift:
 1. Analysera arbetsbeskrivningen
@@ -42,7 +55,7 @@ Svara ENDAST med JSON i detta format:
       "total": 1300
     },
     {
-      "id": "item_2", 
+      "id": "item_2",
       "type": "material",
       "name": "Materialnamn",
       "quantity": 3,
@@ -69,7 +82,7 @@ Tänk på:
     })
 
     const text = response.content[0].type === 'text' ? response.content[0].text : ''
-    
+
     // Parse JSON from response
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {

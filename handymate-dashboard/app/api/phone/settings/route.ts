@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -8,21 +9,18 @@ function getSupabase() {
   )
 }
 
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
-
 /**
  * GET - Hämta telefoninställningar för ett företag
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase()
-    const { searchParams } = new URL(request.url)
-    const business_id = searchParams.get('business_id')
-
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = getSupabase()
 
     const { data, error } = await supabase
       .from('business_config')
@@ -33,7 +31,7 @@ export async function GET(request: NextRequest) {
         call_recording_consent_message,
         elks_number_id
       `)
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
       .single()
 
     if (error || !data) {
@@ -49,22 +47,29 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH - Uppdatera telefoninställningar
- * Body: { business_id, forward_phone_number?, call_recording_enabled?, call_recording_consent_message? }
+ * Body: { forward_phone_number?, call_recording_enabled?, call_recording_consent_message? }
  */
 export async function PATCH(request: NextRequest) {
   try {
+    // Auth check
+    const authBusiness = await getAuthenticatedBusiness(request)
+    if (!authBusiness) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit check (46elks API may be called for updates)
+    const rateLimit = checkPhoneApiRateLimit(authBusiness.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
     const {
-      business_id,
       forward_phone_number,
       call_recording_enabled,
       call_recording_consent_message
     } = body
-
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
-    }
 
     // Bygg update-objekt med endast angivna fält
     const updateData: any = {}
@@ -88,7 +93,7 @@ export async function PATCH(request: NextRequest) {
     const { data, error } = await supabase
       .from('business_config')
       .update(updateData)
-      .eq('business_id', business_id)
+      .eq('business_id', authBusiness.business_id)
       .select(`
         assigned_phone_number,
         forward_phone_number,

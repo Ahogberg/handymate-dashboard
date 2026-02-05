@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 // Force dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,12 @@ interface InvoiceItem {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const invoiceId = request.nextUrl.searchParams.get('invoiceId')
 
@@ -32,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
     }
 
-    // Hämta faktura med kundinfo
+    // Hämta faktura med kundinfo och verifiera ägarskap
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoice')
       .select(`
@@ -45,17 +52,18 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('invoice_id', invoiceId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
-    // Hämta företagsinfo
-    const { data: business } = await supabase
+    // Hämta företagsinfo (för extra fält som kanske inte finns i auth business)
+    const { data: businessConfig } = await supabase
       .from('business_config')
       .select('*')
-      .eq('business_id', invoice.business_id)
+      .eq('business_id', business.business_id)
       .single()
 
     const items = (invoice.items || []) as InvoiceItem[]
@@ -309,11 +317,11 @@ export async function GET(request: NextRequest) {
 <body>
   <div class="header">
     <div>
-      <div class="company-name">${business?.business_name || 'Företag'}</div>
+      <div class="company-name">${businessConfig?.business_name || 'Företag'}</div>
       <div class="company-info">
-        ${business?.address || ''}<br>
-        ${business?.contact_email || ''} | ${business?.contact_phone || ''}<br>
-        Org.nr: ${business?.org_number || 'Ej angivet'}
+        ${businessConfig?.address || ''}<br>
+        ${businessConfig?.contact_email || ''} | ${businessConfig?.contact_phone || ''}<br>
+        Org.nr: ${businessConfig?.org_number || 'Ej angivet'}
       </div>
     </div>
     <div class="invoice-title">
@@ -412,7 +420,7 @@ export async function GET(request: NextRequest) {
     <div class="payment-grid">
       <div class="payment-item">
         <label>Bankgiro</label>
-        <span>${business?.bankgiro || 'Ej angivet'}</span>
+        <span>${businessConfig?.bankgiro || 'Ej angivet'}</span>
       </div>
       <div class="payment-item">
         <label>Att betala</label>
@@ -426,7 +434,7 @@ export async function GET(request: NextRequest) {
   </div>
 
   <div class="footer">
-    <p>${business?.business_name || ''} | Org.nr: ${business?.org_number || ''} | ${business?.contact_email || ''}</p>
+    <p>${businessConfig?.business_name || ''} | Org.nr: ${businessConfig?.org_number || ''} | ${businessConfig?.contact_email || ''}</p>
     <p style="margin-top: 8px;">Tack för att du anlitar oss!</p>
   </div>
 
