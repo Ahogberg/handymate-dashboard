@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
+interface OverdueInvoice {
+  invoice_id: string
+  invoice_number: string
+  due_date: string
+}
+
 function getSupabase() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,7 +52,7 @@ async function checkOverdueInvoices() {
     }
 
     // Update status to overdue
-    const invoiceIds = overdueInvoices.map(inv => inv.invoice_id)
+    const invoiceIds = (overdueInvoices as OverdueInvoice[]).map(inv => inv.invoice_id)
 
     const { error: updateError } = await supabase
       .from('invoice')
@@ -64,7 +70,7 @@ async function checkOverdueInvoices() {
       success: true,
       message: `${invoiceIds.length} fakturor markerade som förfallna`,
       updated: invoiceIds.length,
-      invoices: overdueInvoices.map(inv => ({
+      invoices: (overdueInvoices as OverdueInvoice[]).map(inv => ({
         invoice_id: inv.invoice_id,
         invoice_number: inv.invoice_number,
         due_date: inv.due_date
