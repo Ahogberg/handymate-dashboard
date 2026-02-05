@@ -46,7 +46,18 @@ if (action === 'register') {
 
   // 2. Skapa business_config
   const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
-  
+
+  // Default working hours
+  const defaultWorkingHours = {
+    monday: { active: true, start: '08:00', end: '17:00' },
+    tuesday: { active: true, start: '08:00', end: '17:00' },
+    wednesday: { active: true, start: '08:00', end: '17:00' },
+    thursday: { active: true, start: '08:00', end: '17:00' },
+    friday: { active: true, start: '08:00', end: '17:00' },
+    saturday: { active: false, start: '09:00', end: '14:00' },
+    sunday: { active: false, start: '10:00', end: '14:00' },
+  }
+
   const supabaseAdmin = getSupabaseAdmin()
   const { error: businessError } = await supabaseAdmin
     .from('business_config')
@@ -60,6 +71,11 @@ if (action === 'register') {
       phone_number: phone,
       branch: branch,
       service_area: serviceArea || null,
+      subscription_status: 'trial',
+      subscription_plan: 'starter',
+      trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      working_hours: defaultWorkingHours,
+      call_mode: 'human_first',
     })
 
   if (businessError) {
@@ -68,10 +84,16 @@ if (action === 'register') {
     return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
   }
 
-  return NextResponse.json({ 
+  // Kontrollera om email confirmation behövs
+  const emailConfirmationPending = !authData.session
+
+  return NextResponse.json({
     success: true,
-    message: 'Konto skapat!',
-    businessId
+    message: emailConfirmationPending
+      ? 'Konto skapat! Kolla din e-post för att verifiera kontot.'
+      : 'Konto skapat!',
+    businessId,
+    emailConfirmationPending
   })
 }
 
