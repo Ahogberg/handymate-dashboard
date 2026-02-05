@@ -161,14 +161,27 @@ export default function InvoicesPage() {
   })
 
   // Beräkna statistik
+  const unpaidInvoices = invoices.filter(i => i.status === 'sent' || i.status === 'overdue')
+  const overdueInvoices = invoices.filter(i => i.status === 'overdue')
+  const paidThisMonth = invoices.filter(i => {
+    if (i.status !== 'paid' || !i.paid_at) return false
+    const paidDate = new Date(i.paid_at)
+    const now = new Date()
+    return paidDate.getMonth() === now.getMonth() && paidDate.getFullYear() === now.getFullYear()
+  })
+
   const stats = {
     total: invoices.length,
     draft: invoices.filter(i => i.status === 'draft').length,
     sent: invoices.filter(i => i.status === 'sent').length,
     paid: invoices.filter(i => i.status === 'paid').length,
-    overdue: invoices.filter(i => i.status === 'overdue').length,
+    overdue: overdueInvoices.length,
     totalValue: invoices.reduce((sum, i) => sum + (i.total || 0), 0),
-    paidValue: invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0)
+    paidValue: invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + (i.total || 0), 0),
+    unpaidCount: unpaidInvoices.length,
+    unpaidValue: unpaidInvoices.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0),
+    overdueValue: overdueInvoices.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0),
+    paidThisMonthValue: paidThisMonth.reduce((sum, i) => sum + (i.customer_pays || i.total || 0), 0)
   }
 
   if (loading) {
@@ -216,23 +229,27 @@ export default function InvoicesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-violet-400" />
+              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.total}</p>
-                <p className="text-xs text-zinc-500">Totalt</p>
+                <p className="text-xl font-bold text-white">{stats.unpaidCount} st</p>
+                <p className="text-xs text-zinc-500">Obetalda</p>
+                <p className="text-xs text-blue-400">{stats.unpaidValue.toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className={`border rounded-xl p-4 ${stats.overdue > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-zinc-900/50 border-zinc-800'}`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                <Send className="w-5 h-5 text-blue-400" />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stats.overdue > 0 ? 'bg-red-500/20' : 'bg-zinc-800'}`}>
+                <AlertCircle className={`w-5 h-5 ${stats.overdue > 0 ? 'text-red-400' : 'text-zinc-500'}`} />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.sent}</p>
-                <p className="text-xs text-zinc-500">Skickade</p>
+                <p className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-400' : 'text-white'}`}>{stats.overdue} st</p>
+                <p className="text-xs text-zinc-500">Förfallna</p>
+                {stats.overdue > 0 && (
+                  <p className="text-xs text-red-400">{stats.overdueValue.toLocaleString('sv-SE')} kr</p>
+                )}
               </div>
             </div>
           </div>
@@ -243,7 +260,8 @@ export default function InvoicesPage() {
               </div>
               <div>
                 <p className="text-xl font-bold text-white">{stats.paid}</p>
-                <p className="text-xs text-zinc-500">Betalda</p>
+                <p className="text-xs text-zinc-500">Betalda totalt</p>
+                <p className="text-xs text-emerald-400">{stats.paidValue.toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
@@ -253,8 +271,9 @@ export default function InvoicesPage() {
                 <DollarSign className="w-5 h-5 text-emerald-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.paidValue.toLocaleString('sv-SE')}</p>
+                <p className="text-xl font-bold text-white">{stats.paidThisMonthValue.toLocaleString('sv-SE')}</p>
                 <p className="text-xs text-zinc-500">kr inbetalt</p>
+                <p className="text-xs text-zinc-400">denna månad</p>
               </div>
             </div>
           </div>

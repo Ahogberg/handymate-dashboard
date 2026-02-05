@@ -11,7 +11,14 @@ import {
   FileText,
   Mail,
   MessageSquare,
-  Loader2
+  Loader2,
+  AlertCircle,
+  X,
+  CreditCard,
+  Banknote,
+  Smartphone,
+  Building,
+  Bell
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
@@ -39,7 +46,13 @@ interface Invoice {
   customer_pays: number | null
   invoice_date: string
   due_date: string
+  sent_at: string | null
   paid_at: string | null
+  paid_amount: number | null
+  payment_method: string | null
+  reminder_sent_at: string | null
+  reminder_count: number
+  created_at: string
   customer?: {
     customer_id: string
     name: string
@@ -50,6 +63,13 @@ interface Invoice {
   business_id: string
 }
 
+const PAYMENT_METHODS = [
+  { value: 'swish', label: 'Swish', icon: Smartphone },
+  { value: 'bankgiro', label: 'Bankgiro', icon: Building },
+  { value: 'card', label: 'Kort', icon: CreditCard },
+  { value: 'cash', label: 'Kontant', icon: Banknote },
+]
+
 export default function InvoiceDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -58,11 +78,28 @@ export default function InvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [sendingReminder, setSendingReminder] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [paymentData, setPaymentData] = useState({
+    paid_at: new Date().toISOString().split('T')[0],
+    payment_method: 'swish',
+    paid_amount: 0
+  })
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   useEffect(() => {
     fetchInvoice()
   }, [invoiceId])
+
+  useEffect(() => {
+    if (invoice) {
+      setPaymentData(prev => ({
+        ...prev,
+        paid_amount: invoice.customer_pays || invoice.total
+      }))
+    }
+  }, [invoice])
 
   async function fetchInvoice() {
     const { data, error } = await supabase
@@ -121,19 +158,50 @@ export default function InvoiceDetailPage() {
   }
 
   const handleMarkPaid = async () => {
+    setUpdatingStatus(true)
     try {
-      const response = await fetch('/api/invoices', {
-        method: 'PUT',
+      const response = await fetch(`/api/invoices/${invoiceId}/status`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice_id: invoiceId, status: 'paid' })
+        body: JSON.stringify({
+          status: 'paid',
+          paid_at: paymentData.paid_at,
+          payment_method: paymentData.payment_method,
+          paid_amount: paymentData.paid_amount
+        })
       })
 
       if (!response.ok) throw new Error('Kunde inte uppdatera')
 
       showToast('Faktura markerad som betald!', 'success')
+      setShowPaymentModal(false)
       fetchInvoice()
     } catch {
       showToast('Något gick fel', 'error')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const handleSendReminder = async () => {
+    setSendingReminder(true)
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/reminder`, {
+        method: 'POST'
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Kunde inte skicka påminnelse')
+      }
+
+      showToast(`Påminnelse skickad! (${result.reminderCount} totalt)`, 'success')
+      fetchInvoice()
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
+    } finally {
+      setSendingReminder(false)
     }
   }
 
@@ -158,6 +226,20 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  const getPaymentMethodText = (method: string | null) => {
+    if (!method) return 'Okänd'
+    const found = PAYMENT_METHODS.find(m => m.value === method)
+    return found?.label || method
+  }
+
+  const isOverdue = () => {
+    if (!invoice) return false
+    const dueDate = new Date(invoice.due_date)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    return (invoice.status === 'sent' || invoice.status === 'overdue') && dueDate < today
+  }
+
   if (loading) {
     return (
       <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
@@ -177,6 +259,40 @@ export default function InvoiceDetailPage() {
   const items = invoice.items || []
   const ocrNumber = invoice.invoice_number?.replace('-', '') + '0'
 
+  // Build timeline events
+  const timelineEvents = [
+    { date: invoice.created_at, label: 'Skapad', icon: FileText, color: 'zinc' },
+  ]
+
+  if (invoice.sent_at) {
+    timelineEvents.push({ date: invoice.sent_at, label: 'Skickad', icon: Send, color: 'blue' })
+  }
+
+  if (isOverdue() && invoice.status !== 'paid') {
+    timelineEvents.push({ date: invoice.due_date, label: 'Förfallen', icon: AlertCircle, color: 'red' })
+  }
+
+  if (invoice.reminder_sent_at) {
+    timelineEvents.push({
+      date: invoice.reminder_sent_at,
+      label: `Påminnelse skickad${invoice.reminder_count > 1 ? ` (${invoice.reminder_count}x)` : ''}`,
+      icon: Bell,
+      color: 'amber'
+    })
+  }
+
+  if (invoice.paid_at) {
+    timelineEvents.push({
+      date: invoice.paid_at,
+      label: `Betald via ${getPaymentMethodText(invoice.payment_method)}`,
+      icon: CheckCircle,
+      color: 'emerald'
+    })
+  }
+
+  // Sort by date
+  timelineEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+
   return (
     <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
       {/* Background */}
@@ -191,6 +307,94 @@ export default function InvoiceDetailPage() {
           toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
         }`}>
           {toast.message}
+        </div>
+      )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-white">Markera som betald</h3>
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Betaldatum</label>
+                <input
+                  type="date"
+                  value={paymentData.paid_at}
+                  onChange={(e) => setPaymentData({ ...paymentData, paid_at: e.target.value })}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Betalningsmetod</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAYMENT_METHODS.map((method) => (
+                    <button
+                      key={method.value}
+                      onClick={() => setPaymentData({ ...paymentData, payment_method: method.value })}
+                      className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
+                        paymentData.payment_method === method.value
+                          ? 'bg-violet-500/20 border-violet-500 text-white'
+                          : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                      }`}
+                    >
+                      <method.icon className="w-4 h-4" />
+                      <span className="text-sm">{method.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Betalt belopp</label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={paymentData.paid_amount}
+                    onChange={(e) => setPaymentData({ ...paymentData, paid_amount: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-12"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">kr</span>
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">
+                  Att betala: {(invoice.customer_pays || invoice.total)?.toLocaleString('sv-SE')} kr
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowPaymentModal(false)}
+                className="flex-1 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleMarkPaid}
+                disabled={updatingStatus}
+                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {updatingStatus ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Bekräfta
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -214,7 +418,7 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <a
               href={`/api/invoices/pdf?invoiceId=${invoiceId}`}
               target="_blank"
@@ -265,15 +469,63 @@ export default function InvoiceDetailPage() {
               </div>
             )}
 
-            {invoice.status === 'sent' && (
-              <button
-                onClick={handleMarkPaid}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 hover:bg-emerald-500/30"
-              >
-                <CheckCircle className="w-4 h-4" />
-                Markera betald
-              </button>
+            {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+              <>
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 hover:bg-emerald-500/30"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Markera betald
+                </button>
+
+                {isOverdue() && (
+                  <button
+                    onClick={handleSendReminder}
+                    disabled={sendingReminder}
+                    className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-xl text-amber-400 hover:bg-amber-500/30 disabled:opacity-50"
+                  >
+                    {sendingReminder ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Bell className="w-4 h-4" />
+                    )}
+                    Skicka påminnelse
+                  </button>
+                )}
+              </>
             )}
+          </div>
+        </div>
+
+        {/* Status Timeline */}
+        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 mb-6">
+          <h3 className="text-sm font-medium text-zinc-400 mb-4">Historik</h3>
+          <div className="flex flex-wrap gap-4">
+            {timelineEvents.map((event, index) => {
+              const Icon = event.icon
+              const colorClasses: Record<string, string> = {
+                zinc: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+                red: 'bg-red-500/20 text-red-400 border-red-500/30',
+                amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+              }
+              return (
+                <div key={index} className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-lg border ${colorClasses[event.color]}`}>
+                    <Icon className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white">{event.label}</p>
+                    <p className="text-xs text-zinc-500">{new Date(event.date).toLocaleDateString('sv-SE')}</p>
+                  </div>
+                  {index < timelineEvents.length - 1 && (
+                    <div className="w-8 h-px bg-zinc-700 hidden sm:block" />
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
 
@@ -301,7 +553,10 @@ export default function InvoiceDetailPage() {
               </div>
               <div>
                 <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Förfallodatum</h3>
-                <p className="text-white">{new Date(invoice.due_date).toLocaleDateString('sv-SE')}</p>
+                <p className={isOverdue() ? 'text-red-400 font-medium' : 'text-white'}>
+                  {new Date(invoice.due_date).toLocaleDateString('sv-SE')}
+                  {isOverdue() && ' (förfallen)'}
+                </p>
               </div>
               <div>
                 <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">OCR-nummer</h3>
@@ -310,7 +565,14 @@ export default function InvoiceDetailPage() {
               {invoice.paid_at && (
                 <div>
                   <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Betald</h3>
-                  <p className="text-emerald-400">{new Date(invoice.paid_at).toLocaleDateString('sv-SE')}</p>
+                  <p className="text-emerald-400">
+                    {new Date(invoice.paid_at).toLocaleDateString('sv-SE')}
+                    {invoice.payment_method && (
+                      <span className="text-zinc-400 text-xs ml-1">
+                        ({getPaymentMethodText(invoice.payment_method)})
+                      </span>
+                    )}
+                  </p>
                 </div>
               )}
             </div>

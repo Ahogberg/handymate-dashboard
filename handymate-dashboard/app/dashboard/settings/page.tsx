@@ -17,7 +17,9 @@ import {
   MapPin,
   PhoneCall,
   Mic,
-  AlertTriangle
+  AlertTriangle,
+  Receipt,
+  Bell
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -40,6 +42,14 @@ interface BusinessConfig {
   forward_phone_number: string | null
   call_recording_enabled: boolean
   call_recording_consent_message: string | null
+  // Faktura
+  default_payment_days: number
+  bankgiro: string | null
+  swish_number: string | null
+  reminder_sms_template: string | null
+  auto_reminder_enabled: boolean
+  auto_reminder_days: number
+  late_fee_percent: number
 }
 
 const DEFAULT_HOURS = {
@@ -231,7 +241,7 @@ export default function SettingsPage() {
 
   const handleSave = async () => {
     if (!config) return
-    
+
     setSaving(true)
     try {
       const { error } = await supabase
@@ -246,6 +256,14 @@ export default function SettingsPage() {
           working_hours: workingHours,
           greeting_script: config.greeting_script,
           org_number: (config as any).org_number || null,
+          // Fakturainställningar
+          default_payment_days: config.default_payment_days || 30,
+          bankgiro: config.bankgiro || null,
+          swish_number: config.swish_number || null,
+          reminder_sms_template: config.reminder_sms_template || null,
+          auto_reminder_enabled: config.auto_reminder_enabled || false,
+          auto_reminder_days: config.auto_reminder_days || 7,
+          late_fee_percent: config.late_fee_percent || 8,
           updated_at: new Date().toISOString(),
         })
         .eq('business_id', business.business_id)
@@ -405,6 +423,7 @@ export default function SettingsPage() {
     { id: 'company', label: 'Företag', icon: Building2 },
     { id: 'hours', label: 'Öppettider', icon: Clock },
     { id: 'phone', label: 'Telefoni', icon: PhoneCall },
+    { id: 'invoice', label: 'Faktura', icon: Receipt },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
   ]
@@ -831,6 +850,145 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Invoice Tab */}
+        {activeTab === 'invoice' && (
+          <div className="space-y-6">
+            {/* Betalningsvillkor */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Betalningsvillkor</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Standard betalningsvillkor</label>
+                  <select
+                    value={config.default_payment_days || 30}
+                    onChange={(e) => setConfig({ ...config, default_payment_days: parseInt(e.target.value) })}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  >
+                    <option value={10}>10 dagar</option>
+                    <option value={15}>15 dagar</option>
+                    <option value={20}>20 dagar</option>
+                    <option value={30}>30 dagar</option>
+                  </select>
+                  <p className="text-xs text-zinc-600 mt-1">Förfallodatum räknas från fakturadatum</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Dröjsmålsränta</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={config.late_fee_percent || 8}
+                      onChange={(e) => setConfig({ ...config, late_fee_percent: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-12"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">%</span>
+                  </div>
+                  <p className="text-xs text-zinc-600 mt-1">Referensräntan (2024) + 8% = ca 11.5%</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Betalningsinformation */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Betalningsinformation</h2>
+              <p className="text-sm text-zinc-500 mb-4">Visas på fakturor och i påminnelser</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Bankgiro</label>
+                  <input
+                    type="text"
+                    value={config.bankgiro || ''}
+                    onChange={(e) => setConfig({ ...config, bankgiro: e.target.value })}
+                    placeholder="123-4567"
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Swish-nummer</label>
+                  <input
+                    type="text"
+                    value={config.swish_number || ''}
+                    onChange={(e) => setConfig({ ...config, swish_number: e.target.value })}
+                    placeholder="123 456 78 90"
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Påminnelser */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Bell className="w-5 h-5 text-violet-400" />
+                <h2 className="text-lg font-semibold text-white">Påminnelser</h2>
+              </div>
+
+              {/* Auto-påminnelse toggle */}
+              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl mb-4">
+                <div>
+                  <p className="font-medium text-white">Automatiska påminnelser</p>
+                  <p className="text-sm text-zinc-500">
+                    Skicka påminnelse automatiskt efter förfallodatum
+                  </p>
+                </div>
+                <button
+                  onClick={() => setConfig({
+                    ...config,
+                    auto_reminder_enabled: !config.auto_reminder_enabled
+                  })}
+                  className={`w-12 h-6 rounded-full transition-all ${
+                    config.auto_reminder_enabled
+                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+                      : 'bg-zinc-700'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    config.auto_reminder_enabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {config.auto_reminder_enabled && (
+                <div className="mb-4">
+                  <label className="block text-sm text-zinc-400 mb-2">Skicka påminnelse efter</label>
+                  <select
+                    value={config.auto_reminder_days || 7}
+                    onChange={(e) => setConfig({ ...config, auto_reminder_days: parseInt(e.target.value) })}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  >
+                    <option value={3}>3 dagar efter förfall</option>
+                    <option value={5}>5 dagar efter förfall</option>
+                    <option value={7}>7 dagar efter förfall</option>
+                    <option value={14}>14 dagar efter förfall</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-zinc-400 mb-2">Påminnelse-mall (SMS)</label>
+                <textarea
+                  value={config.reminder_sms_template || ''}
+                  onChange={(e) => setConfig({ ...config, reminder_sms_template: e.target.value })}
+                  placeholder="Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till bankgiro {bankgiro} eller Swish {swish}. //{business_name}"
+                  rows={4}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                />
+                <div className="mt-2 text-xs text-zinc-600">
+                  <p className="font-medium mb-1">Tillgängliga variabler:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {['{invoice_number}', '{amount}', '{due_date}', '{ocr}', '{business_name}', '{days_overdue}', '{late_fee_percent}'].map(v => (
+                      <code key={v} className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{v}</code>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
