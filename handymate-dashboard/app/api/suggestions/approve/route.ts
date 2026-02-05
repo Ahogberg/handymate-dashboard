@@ -83,6 +83,11 @@ export async function POST(request: NextRequest) {
         message = result.success ? 'Påminnelse skapad!' : result.error
         break
 
+      case 'reschedule':
+        result = await rescheduleBooking(supabase, suggestion, finalActionData)
+        message = result.success ? 'Bokning flyttad!' : result.error
+        break
+
       default:
         // Markera bara som godkänt
         break
@@ -312,6 +317,130 @@ async function createReminder(supabase: SupabaseClient, suggestion: any, actionD
 
   } catch (error: any) {
     console.error('Create reminder error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Flytta/omboka en bokning
+ */
+async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, actionData: any) {
+  try {
+    const businessId = suggestion.business_id
+    const customerId = suggestion.customer_id
+
+    // Hitta befintlig bokning för kunden
+    let bookingId = actionData.booking_id
+
+    if (!bookingId && customerId) {
+      // Hitta senaste aktiva bokning för denna kund
+      const { data: existingBooking } = await supabase
+        .from('booking')
+        .select('booking_id, scheduled_start')
+        .eq('business_id', businessId)
+        .eq('customer_id', customerId)
+        .in('status', ['pending', 'confirmed'])
+        .order('scheduled_start', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (existingBooking) {
+        bookingId = existingBooking.booking_id
+      }
+    }
+
+    if (!bookingId) {
+      return { success: false, error: 'Ingen bokning hittades att flytta' }
+    }
+
+    // Beräkna ny tid
+    const newDate = actionData.requested_date || actionData.date
+    const newTime = actionData.requested_time || actionData.time
+
+    if (!newDate && !newTime) {
+      return { success: false, error: 'Inget nytt datum/tid angivet' }
+    }
+
+    // Hämta befintlig bokning för att behålla duration
+    const { data: currentBooking } = await supabase
+      .from('booking')
+      .select('scheduled_start, scheduled_end')
+      .eq('booking_id', bookingId)
+      .single()
+
+    if (!currentBooking) {
+      return { success: false, error: 'Kunde inte hitta bokningen' }
+    }
+
+    const oldStart = new Date(currentBooking.scheduled_start)
+    const oldEnd = new Date(currentBooking.scheduled_end)
+    const durationMs = oldEnd.getTime() - oldStart.getTime()
+
+    // Bygg ny starttid
+    let newScheduledStart: Date
+    if (newDate && newTime) {
+      newScheduledStart = new Date(`${newDate}T${newTime}:00`)
+    } else if (newDate) {
+      // Behåll samma tid, nytt datum
+      newScheduledStart = new Date(newDate)
+      newScheduledStart.setHours(oldStart.getHours(), oldStart.getMinutes(), 0, 0)
+    } else {
+      // Behåll samma datum, ny tid
+      newScheduledStart = new Date(oldStart)
+      const [hours, minutes] = newTime!.split(':').map(Number)
+      newScheduledStart.setHours(hours, minutes, 0, 0)
+    }
+
+    const newScheduledEnd = new Date(newScheduledStart.getTime() + durationMs)
+
+    // Uppdatera bokningen
+    const { error: updateError } = await supabase
+      .from('booking')
+      .update({
+        scheduled_start: newScheduledStart.toISOString(),
+        scheduled_end: newScheduledEnd.toISOString(),
+        notes: `${actionData.reason ? `Ombokad: ${actionData.reason}` : 'Ombokad via AI-förslag'}`
+      })
+      .eq('booking_id', bookingId)
+
+    if (updateError) throw updateError
+
+    // Skicka bekräftelse-SMS om vi har telefonnummer
+    const phoneNumber = actionData.phone_number ||
+      suggestion.call_recording?.phone_number ||
+      suggestion.call_recording?.customer?.phone_number
+
+    if (phoneNumber) {
+      const ELKS_API_USER = process.env.ELKS_API_USER
+      const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
+
+      if (ELKS_API_USER && ELKS_API_PASSWORD) {
+        const formattedDate = newScheduledStart.toLocaleDateString('sv-SE')
+        const formattedTime = newScheduledStart.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+
+        await fetch('https://api.46elks.com/a1/sms', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: new URLSearchParams({
+            from: 'Handymate',
+            to: phoneNumber,
+            message: `Din bokning har flyttats till ${formattedDate} kl ${formattedTime}. Välkommen!`
+          }).toString()
+        })
+      }
+    }
+
+    return {
+      success: true,
+      booking_id: bookingId,
+      new_time: newScheduledStart.toISOString()
+    }
+
+  } catch (error: any) {
+    console.error('Reschedule booking error:', error)
     return { success: false, error: error.message }
   }
 }

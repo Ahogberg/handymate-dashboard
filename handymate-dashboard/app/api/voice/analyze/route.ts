@@ -16,7 +16,7 @@ function getAnthropic() {
 }
 
 interface AISuggestion {
-  type: 'booking' | 'follow_up' | 'quote' | 'reminder' | 'sms' | 'callback' | 'create_customer' | 'other'
+  type: 'booking' | 'follow_up' | 'quote' | 'reminder' | 'sms' | 'callback' | 'create_customer' | 'reschedule' | 'other'
   title: string
   description: string
   priority: 'low' | 'medium' | 'high' | 'urgent'
@@ -154,6 +154,8 @@ Baserat på analysen, skapa KONKRETA och ACTIONABLE förslag:
 - Om "skicka offert" nämndes → "quote" med hög prioritet
 - Om bekräftelse önskas → "sms" (skicka SMS)
 - Om uppföljning behövs → "follow_up"
+- Om kund vill flytta/ändra tid → "reschedule" (flytta bokning)
+  Triggerfraser: "kan vi flytta", "passar inte", "annan tid", "ändra tiden", "boka om", "flytta bokningen"
 
 === SVARSFORMAT ===
 
@@ -177,7 +179,7 @@ Svara ENDAST med JSON i följande format:
   },
   "suggestions": [
     {
-      "type": "booking|quote|callback|sms|follow_up|create_customer|reminder|other",
+      "type": "booking|quote|callback|sms|follow_up|create_customer|reminder|reschedule|other",
       "title": "Kort titel på svenska",
       "description": "Beskrivning av vad som ska göras",
       "priority": "low|medium|high|urgent",
