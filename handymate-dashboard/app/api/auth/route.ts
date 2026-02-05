@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 
 // Admin client för att skapa business_config (runtime initialization)
 function getSupabaseAdmin() {
@@ -58,6 +59,9 @@ if (action === 'register') {
     sunday: { active: false, start: '10:00', end: '14:00' },
   }
 
+  // Get branch-specific knowledge base defaults
+  const knowledgeBase = getKnowledgeForBranch(branch)
+
   const supabaseAdmin = getSupabaseAdmin()
   const { error: businessError } = await supabaseAdmin
     .from('business_config')
@@ -76,6 +80,7 @@ if (action === 'register') {
       trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       working_hours: defaultWorkingHours,
       call_mode: 'human_first',
+      knowledge_base: knowledgeBase,
     })
 
   if (businessError) {
