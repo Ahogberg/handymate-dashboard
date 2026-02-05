@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -18,6 +19,12 @@ function getResend() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const resend = getResend()
     const body = await request.json()
@@ -27,7 +34,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoice_id' }, { status: 400 })
     }
 
-    // Hämta faktura med kundinfo och företagsinfo
+    // Rate limit check
+    if (send_sms) {
+      const smsLimit = checkSmsRateLimit(business.business_id)
+      if (!smsLimit.allowed) {
+        return NextResponse.json({ error: smsLimit.error }, { status: 429 })
+      }
+    }
+    if (send_email) {
+      const emailLimit = checkEmailRateLimit(business.business_id)
+      if (!emailLimit.allowed) {
+        return NextResponse.json({ error: emailLimit.error }, { status: 429 })
+      }
+    }
+
+    // Hämta faktura med kundinfo och verifiera ägarskap
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoice')
       .select(`
@@ -39,17 +60,12 @@ export async function POST(request: NextRequest) {
         )
       `)
       .eq('invoice_id', invoice_id)
+      .eq('business_id', business.business_id)
       .single()
 
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
-
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', invoice.business_id)
-      .single()
 
     const results: { sms?: boolean; email?: boolean; errors: string[] } = { errors: [] }
 

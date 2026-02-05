@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 interface InvoiceItem {
   description: string
@@ -15,14 +16,16 @@ interface InvoiceItem {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
-    const businessId = request.nextUrl.searchParams.get('businessId')
+    const businessId = business.business_id
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
-    }
 
     let query = supabase
       .from('invoice')
@@ -65,10 +68,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const {
-      business_id,
       customer_id,
       quote_id,
       time_entry_ids,
@@ -78,9 +86,7 @@ export async function POST(request: NextRequest) {
       due_days = 30
     } = body
 
-    if (!business_id) {
-      return NextResponse.json({ error: 'Missing business_id' }, { status: 400 })
-    }
+    const business_id = business.business_id
 
     let items: InvoiceItem[] = providedItems || []
     let subtotal = 0
@@ -234,6 +240,12 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const { invoice_id, items, status, due_date, vat_rate, rot_rut_type } = body
@@ -266,6 +278,7 @@ export async function PUT(request: NextRequest) {
       .from('invoice')
       .update(updates)
       .eq('invoice_id', invoice_id)
+      .eq('business_id', business.business_id)
       .select(`
         *,
         customer:customer_id (
@@ -293,6 +306,12 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
     const invoiceId = request.nextUrl.searchParams.get('invoiceId')
 
@@ -300,11 +319,12 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
     }
 
-    // Verifiera att fakturan är ett utkast
+    // Verifiera att fakturan är ett utkast och ägs av användaren
     const { data: existing } = await supabase
       .from('invoice')
       .select('status')
       .eq('invoice_id', invoiceId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (existing?.status !== 'draft') {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -13,6 +14,12 @@ function getSupabase() {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { recording_id, transcript } = await request.json()
 
@@ -31,6 +38,7 @@ export async function PATCH(request: NextRequest) {
       .from('call_recording')
       .update(updateData)
       .eq('recording_id', recording_id)
+      .eq('business_id', business.business_id)
       .select()
       .single()
 
@@ -50,6 +58,12 @@ export async function PATCH(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { searchParams } = new URL(request.url)
     const recording_id = searchParams.get('recording_id')
@@ -69,6 +83,7 @@ export async function DELETE(request: NextRequest) {
       .from('call_recording')
       .delete()
       .eq('recording_id', recording_id)
+      .eq('business_id', business.business_id)
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

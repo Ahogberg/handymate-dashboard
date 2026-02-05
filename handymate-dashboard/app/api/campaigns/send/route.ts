@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -20,14 +21,14 @@ async function sendSMS(to: string, message: string, from: string): Promise<{ suc
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: from.substring(0, 11), // Max 11 tecken
+        from: from.substring(0, 11),
         to: to,
         message: message,
       }),
     })
 
     const result = await response.json()
-    
+
     if (!response.ok) {
       return { success: false, error: result.message || 'Unknown error' }
     }
@@ -40,14 +41,21 @@ async function sendSMS(to: string, message: string, from: string): Promise<{ suc
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { campaignId } = await request.json()
 
-    // Hämta kampanj
+    // Hämta kampanj och verifiera ägarskap
     const { data: campaign, error: campaignError } = await supabase
       .from('sms_campaign')
-      .select('*, business_config(business_name)')
+      .select('*')
       .eq('campaign_id', campaignId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (campaignError || !campaign) {
@@ -61,16 +69,37 @@ export async function POST(request: NextRequest) {
       .eq('campaign_id', campaignId)
       .eq('status', 'pending')
 
-    if (recipientsError || !recipients) {
+    if (recipientsError || !recipients || recipients.length === 0) {
       return NextResponse.json({ error: 'Inga mottagare hittades' }, { status: 404 })
     }
 
-    const senderName = campaign.business_config?.business_name || 'Handymate'
+    // Rate limit check - kontrollera att vi har tillräckligt med kvot för alla mottagare
+    const rateLimit = checkSmsRateLimit(business.business_id)
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    const senderName = business.business_name || 'Handymate'
     let deliveredCount = 0
     let failedCount = 0
 
     // Skicka SMS till varje mottagare
     for (const recipient of recipients) {
+      // Kontrollera rate limit för varje SMS
+      const smsRateLimit = checkSmsRateLimit(business.business_id)
+      if (!smsRateLimit.allowed) {
+        // Sluta skicka om rate limit nås
+        await supabase
+          .from('sms_campaign_recipient')
+          .update({
+            status: 'rate_limited',
+            error_message: 'Rate limit exceeded'
+          })
+          .eq('id', recipient.id)
+        failedCount++
+        continue
+      }
+
       const result = await sendSMS(recipient.phone_number, campaign.message, senderName)
 
       if (result.success) {
@@ -109,10 +138,10 @@ export async function POST(request: NextRequest) {
       })
       .eq('campaign_id', campaignId)
 
-    return NextResponse.json({ 
-      success: true, 
-      delivered: deliveredCount, 
-      failed: failedCount 
+    return NextResponse.json({
+      success: true,
+      delivered: deliveredCount,
+      failed: failedCount
     })
 
   } catch (error: any) {

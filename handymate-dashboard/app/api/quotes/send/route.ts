@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -183,6 +184,12 @@ function generateEmailHTML(quote: any, business: any): string {
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const { quoteId, method } = await request.json()
 
@@ -190,22 +197,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing quoteId' }, { status: 400 })
     }
 
-    // Hämta offert med kundinfo
+    // Rate limit check
+    if (method === 'sms' || method === 'both') {
+      const smsLimit = checkSmsRateLimit(business.business_id)
+      if (!smsLimit.allowed) {
+        return NextResponse.json({ error: smsLimit.error }, { status: 429 })
+      }
+    }
+    if (method === 'email' || method === 'both') {
+      const emailLimit = checkEmailRateLimit(business.business_id)
+      if (!emailLimit.allowed) {
+        return NextResponse.json({ error: emailLimit.error }, { status: 429 })
+      }
+    }
+
+    // Hämta offert med kundinfo och verifiera ägarskap
     const { data: quote } = await supabase
       .from('quotes')
       .select('*, customer(*)')
       .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (!quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
-
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', quote.business_id)
-      .single()
 
     if (!quote.customer) {
       return NextResponse.json({ error: 'No customer on quote' }, { status: 400 })
@@ -271,7 +287,7 @@ Frågor? Ring ${business.phone_number}
           emailSubject,
           emailHTML,
           business.business_name,
-          business.contact_email
+          business.contact_email || undefined
         )
 
         if (emailSent) {

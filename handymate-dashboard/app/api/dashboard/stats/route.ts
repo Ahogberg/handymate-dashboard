@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 // Force dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
@@ -16,12 +17,14 @@ function getSupabase() {
  */
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase()
-    const businessId = request.nextUrl.searchParams.get('businessId')
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const supabase = getSupabase()
+    const businessId = business.business_id
 
     // Datumgränser
     const now = new Date()

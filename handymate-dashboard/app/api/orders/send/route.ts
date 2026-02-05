@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
+import { getAuthenticatedBusiness, checkEmailRateLimit } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -27,6 +28,18 @@ interface OrderItem {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Rate limit check
+    const emailLimit = checkEmailRateLimit(business.business_id)
+    if (!emailLimit.allowed) {
+      return NextResponse.json({ error: emailLimit.error }, { status: 429 })
+    }
+
     const supabase = getSupabase()
     const resend = getResend()
     const body = await request.json()
@@ -36,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing order_id' }, { status: 400 })
     }
 
-    // Hämta beställning med leverantör och företagsinfo
+    // Hämta beställning och verifiera ägarskap
     const { data: order, error: orderError } = await supabase
       .from('material_order')
       .select(`
@@ -50,17 +63,12 @@ export async function POST(request: NextRequest) {
         )
       `)
       .eq('order_id', order_id)
+      .eq('business_id', business.business_id)
       .single()
 
     if (orderError || !order) {
       return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     }
-
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('*')
-      .eq('business_id', order.business_id)
-      .single()
 
     const items = (order.items || []) as OrderItem[]
 

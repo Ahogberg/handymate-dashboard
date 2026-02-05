@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 function getSupabase() {
   return createClient(
@@ -25,19 +26,21 @@ interface TimeEntry {
 
 /**
  * GET - Hämta tidsrapporter för ett företag
- * Query params: businessId, startDate (optional), endDate (optional), customerId (optional)
+ * Query params: startDate (optional), endDate (optional), customerId (optional)
  */
 export async function GET(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
-    const businessId = request.nextUrl.searchParams.get('businessId')
+    const businessId = business.business_id
     const startDate = request.nextUrl.searchParams.get('startDate')
     const endDate = request.nextUrl.searchParams.get('endDate')
     const customerId = request.nextUrl.searchParams.get('customerId')
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
-    }
 
     let query = supabase
       .from('time_entry')
@@ -101,10 +104,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
     const {
-      business_id,
       booking_id,
       customer_id,
       work_date,
@@ -116,14 +124,14 @@ export async function POST(request: NextRequest) {
       materials_cost
     } = body
 
-    if (!business_id || !work_date || !hours_worked) {
+    if (!work_date || !hours_worked) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     const { data, error } = await supabase
       .from('time_entry')
       .insert({
-        business_id,
+        business_id: business.business_id,
         booking_id,
         customer_id,
         work_date,
@@ -159,6 +167,12 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const body = await request.json()
     const { entry_id, ...updates } = body
@@ -170,7 +184,8 @@ export async function PUT(request: NextRequest) {
     const { data, error } = await supabase
       .from('time_entry')
       .update(updates)
-      .eq('entry_id', entry_id)
+      .eq('time_entry_id', entry_id)
+      .eq('business_id', business.business_id)
       .select(`
         *,
         customer:customer_id (
@@ -196,6 +211,12 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Auth check
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getSupabase()
     const entryId = request.nextUrl.searchParams.get('entryId')
 
@@ -206,7 +227,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabase
       .from('time_entry')
       .delete()
-      .eq('entry_id', entryId)
+      .eq('time_entry_id', entryId)
+      .eq('business_id', business.business_id)
 
     if (error) throw error
 
