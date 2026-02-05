@@ -1,6 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
 
+interface BusinessConfig {
+  business_id: string
+  user_id: string
+  business_name: string
+  contact_name: string
+  contact_email: string
+  phone_number: string
+  branch: string
+  service_area: string | null
+  assigned_phone_number: string | null
+  subscription_status: string | null
+  subscription_plan: string | null
+  trial_ends_at: string | null
+  is_pilot: boolean
+  created_at: string
+  onboarding_completed_at: string | null
+  call_mode: string | null
+  working_hours: Record<string, unknown> | null
+}
+
 /**
  * GET /api/admin/pilots
  * List all pilot businesses
@@ -45,7 +65,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Get user email addresses
-    const userIds = businesses?.map(b => b.user_id).filter(Boolean) || []
+    const typedBusinesses = businesses as BusinessConfig[] | null
+    const userIds = typedBusinesses?.map(b => b.user_id).filter(Boolean) || []
     const { data: usersData } = await supabase.auth.admin.listUsers()
 
     const userEmails: Record<string, string> = {}
@@ -54,7 +75,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Enrich business data with user info
-    const pilots = businesses?.map(business => ({
+    const pilots = typedBusinesses?.map(business => ({
       businessId: business.business_id,
       businessName: business.business_name,
       contactName: business.contact_name,
