@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
           *,
           customer:customer_id (name)
         `)
-        .in('entry_id', time_entry_ids)
+        .in('time_entry_id', time_entry_ids)
 
       if (timeError) throw timeError
 
@@ -218,7 +218,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('time_entry')
         .update({ invoice_id: invoice.invoice_id })
-        .in('entry_id', time_entry_ids)
+        .in('time_entry_id', time_entry_ids)
     }
 
     return NextResponse.json({ invoice })
