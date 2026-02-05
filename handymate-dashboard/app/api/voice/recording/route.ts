@@ -41,17 +41,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No recording URL' }, { status: 400 })
     }
 
-    // Hitta samtalet i databasen baserat på elks_call_id
-    const { data: call } = await supabase
-      .from('call')
-      .select('call_id, business_id, customer_id')
-      .eq('elks_call_id', callId)
+    // Hitta tidigare inspelning/samtal baserat på elks_recording_id
+    const { data: existingRecording } = await supabase
+      .from('call_recording')
+      .select('recording_id, business_id, customer_id')
+      .eq('elks_recording_id', callId)
       .single()
 
     // Om vi inte hittar samtalet, försök hitta business via telefonnummer
-    let businessId = call?.business_id
-    let customerId = call?.customer_id
-    let dbCallId = call?.call_id
+    let businessId = existingRecording?.business_id
+    let customerId = existingRecording?.customer_id
 
     if (!businessId) {
       // Försök hitta business baserat på to-nummer (inkommande samtal)
@@ -59,7 +58,7 @@ export async function POST(request: NextRequest) {
       const { data: business } = await supabase
         .from('business_config')
         .select('business_id')
-        .eq('phone_number', phoneToCheck)
+        .eq('assigned_phone_number', phoneToCheck)
         .single()
 
       businessId = business?.business_id
@@ -67,41 +66,49 @@ export async function POST(request: NextRequest) {
 
     if (!businessId) {
       console.error('Could not determine business for recording')
-      // Spara ändå för manuell hantering
+      return NextResponse.json({ error: 'Could not determine business' }, { status: 400 })
     }
 
-    // Spara inspelningen i databasen
-    const { data: recording, error } = await supabase
-      .from('call_recording')
-      .insert({
-        business_id: businessId,
-        call_id: dbCallId,
-        customer_id: customerId,
-        elks_recording_id: recordingId,
-        recording_url: recordingUrl,
-        duration_seconds: duration,
-        phone_number: direction === 'inbound' ? from : to,
-        direction: direction || 'inbound',
-        created_at: new Date().toISOString()
-      })
-      .select('recording_id')
-      .single()
+    let recording
+    let error
+
+    // Om vi har en befintlig inspelning, uppdatera den. Annars skapa ny.
+    if (existingRecording?.recording_id) {
+      const result = await supabase
+        .from('call_recording')
+        .update({
+          recording_url: recordingUrl,
+          duration_seconds: duration
+        })
+        .eq('recording_id', existingRecording.recording_id)
+        .select('recording_id')
+        .single()
+
+      recording = result.data
+      error = result.error
+    } else {
+      const result = await supabase
+        .from('call_recording')
+        .insert({
+          business_id: businessId,
+          customer_id: customerId,
+          elks_recording_id: recordingId,
+          recording_url: recordingUrl,
+          duration_seconds: duration,
+          phone_number: direction === 'inbound' ? from : to,
+          direction: direction || 'inbound',
+          created_at: new Date().toISOString()
+        })
+        .select('recording_id')
+        .single()
+
+      recording = result.data
+      error = result.error
+    }
 
     if (error) {
       console.error('Error saving recording:', error)
       return NextResponse.json({ error: 'Database error' }, { status: 500 })
-    }
-
-    // Uppdatera call-tabellen med recording status
-    if (dbCallId) {
-      await supabase
-        .from('call')
-        .update({
-          outcome: 'completed',
-          duration_seconds: duration,
-          ended_at: new Date().toISOString()
-        })
-        .eq('call_id', dbCallId)
     }
 
     // Trigga transkribering asynkront (fire and forget)

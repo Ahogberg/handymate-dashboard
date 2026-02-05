@@ -66,19 +66,18 @@ export async function POST(request: NextRequest) {
 
     customerId = customer?.customer_id || null
 
-    // Logga samtalet i databasen
+    // Logga samtalet i databasen (call_recording)
     const { data: callRecord } = await supabase
-      .from('call')
+      .from('call_recording')
       .insert({
         business_id: business.business_id,
         customer_id: customerId,
         phone_number: from,
         direction: direction,
-        elks_call_id: callId,
-        started_at: new Date().toISOString(),
-        outcome: 'in_progress'
+        elks_recording_id: callId,
+        created_at: new Date().toISOString()
       })
-      .select('call_id')
+      .select('recording_id')
       .single()
 
     // Bygg svaret till 46elks

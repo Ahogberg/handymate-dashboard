@@ -200,7 +200,7 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
 
     // Skapa offert
     const { data: quote, error } = await supabase
-      .from('quote')
+      .from('quotes')
       .insert({
         business_id: businessId,
         customer_id: customerId,

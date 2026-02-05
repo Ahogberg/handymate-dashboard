@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const { data: businessConfig } = await supabase
       .from('business_config')
       .select('business_id, business_name, services_offered, working_hours, greeting_script')
-      .eq('phone_number', to)
+      .eq('assigned_phone_number', to)
       .single()
 
     // Om vi inte hittar företag via nummer, försök hitta via kundens telefon
