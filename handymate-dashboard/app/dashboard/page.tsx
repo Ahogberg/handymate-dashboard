@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import OnboardingChecklist from '@/components/OnboardingChecklist'
 
 interface Booking {
   booking_id: string
@@ -43,11 +44,24 @@ interface DashboardStats {
   bookings_per_day: { date: string; count: number }[]
 }
 
+interface OnboardingData {
+  email_confirmed_at?: string | null
+  assigned_phone_number?: string | null
+  phone_setup_type?: string | null
+  forwarding_confirmed?: boolean
+  working_hours?: any
+  logo_url?: string | null
+  onboarding_dismissed?: boolean
+}
+
 export default function DashboardPage() {
   const business = useBusiness()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null)
+  const [callCount, setCallCount] = useState(0)
+  const [showOnboarding, setShowOnboarding] = useState(true)
 
   useEffect(() => {
     fetchData()
@@ -78,6 +92,34 @@ export default function DashboardPage() {
       .order('scheduled_start', { ascending: true })
 
     setBookings(bookingsData || [])
+
+    // Hämta onboarding-data
+    const { data: configData } = await supabase
+      .from('business_config')
+      .select(`
+        email_confirmed_at,
+        assigned_phone_number,
+        phone_setup_type,
+        forwarding_confirmed,
+        working_hours,
+        logo_url,
+        onboarding_dismissed
+      `)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (configData) {
+      setOnboardingData(configData)
+      setShowOnboarding(!configData.onboarding_dismissed)
+    }
+
+    // Hämta antal samtal
+    const { count: calls } = await supabase
+      .from('call_recording')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', business.business_id)
+
+    setCallCount(calls || 0)
 
     // Hämta statistik från API
     try {
@@ -192,6 +234,17 @@ export default function DashboardPage() {
             Översikt för {business.business_name}
           </p>
         </div>
+
+        {/* Onboarding Checklist */}
+        {showOnboarding && onboardingData && (
+          <OnboardingChecklist
+            businessId={business.business_id}
+            businessConfig={onboardingData}
+            callCount={callCount}
+            onDismiss={() => setShowOnboarding(false)}
+            onUpdate={fetchData}
+          />
+        )}
 
         {/* AI Inbox Banner - visa om det finns väntande förslag */}
         {stats?.ai?.pending_suggestions && stats.ai.pending_suggestions > 0 && (
