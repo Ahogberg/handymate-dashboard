@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ChevronRight, FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   Building2,
   Clock,
@@ -19,7 +20,11 @@ import {
   Mic,
   AlertTriangle,
   Receipt,
-  Bell
+  Bell,
+  Link2,
+  ExternalLink,
+  CheckCircle,
+  XCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -50,6 +55,13 @@ interface BusinessConfig {
   auto_reminder_enabled: boolean
   auto_reminder_days: number
   late_fee_percent: number
+}
+
+interface FortnoxStatus {
+  connected: boolean
+  companyName: string | null
+  connectedAt: string | null
+  expiresAt: string | null
 }
 
 const DEFAULT_HOURS = {
@@ -188,6 +200,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 
 export default function SettingsPage() {
   const business = useBusiness()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
@@ -202,9 +215,44 @@ export default function SettingsPage() {
   const [provisioning, setProvisioning] = useState(false)
   const [savingPhone, setSavingPhone] = useState(false)
 
+  // Fortnox integration state
+  const [fortnoxStatus, setFortnoxStatus] = useState<FortnoxStatus | null>(null)
+  const [fortnoxLoading, setFortnoxLoading] = useState(false)
+  const [disconnectingFortnox, setDisconnectingFortnox] = useState(false)
+
   useEffect(() => {
     fetchConfig()
+    fetchFortnoxStatus()
   }, [business.business_id])
+
+  // Handle Fortnox OAuth callback
+  useEffect(() => {
+    const fortnoxParam = searchParams.get('fortnox')
+    if (fortnoxParam === 'connected') {
+      setActiveTab('integrations')
+      showToast('Fortnox kopplat!', 'success')
+      fetchFortnoxStatus()
+      // Clean up URL
+      window.history.replaceState({}, '', '/dashboard/settings')
+    } else if (fortnoxParam === 'error') {
+      setActiveTab('integrations')
+      const message = searchParams.get('message') || 'Kunde inte koppla Fortnox'
+      showToast(message, 'error')
+      window.history.replaceState({}, '', '/dashboard/settings')
+    }
+  }, [searchParams])
+
+  async function fetchFortnoxStatus() {
+    try {
+      const response = await fetch('/api/fortnox/status')
+      if (response.ok) {
+        const data = await response.json()
+        setFortnoxStatus(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch Fortnox status:', error)
+    }
+  }
 
   async function fetchConfig() {
     const { data } = await supabase
@@ -393,6 +441,32 @@ export default function SettingsPage() {
     }
   }
 
+  const handleConnectFortnox = () => {
+    setFortnoxLoading(true)
+    window.location.href = '/api/fortnox/connect'
+  }
+
+  const handleDisconnectFortnox = async () => {
+    if (!confirm('Är du säker på att du vill koppla bort Fortnox? Synkroniserade data påverkas inte.')) {
+      return
+    }
+
+    setDisconnectingFortnox(true)
+    try {
+      const response = await fetch('/api/fortnox/disconnect', { method: 'POST' })
+      if (response.ok) {
+        setFortnoxStatus({ connected: false, companyName: null, connectedAt: null, expiresAt: null })
+        showToast('Fortnox bortkopplat', 'success')
+      } else {
+        throw new Error('Kunde inte koppla bort Fortnox')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setDisconnectingFortnox(false)
+    }
+  }
+
   const getTrialDaysLeft = () => {
     if (!config?.trial_ends_at) return null
     const trialEnd = new Date(config.trial_ends_at)
@@ -424,6 +498,7 @@ export default function SettingsPage() {
     { id: 'hours', label: 'Öppettider', icon: Clock },
     { id: 'phone', label: 'Telefoni', icon: PhoneCall },
     { id: 'invoice', label: 'Faktura', icon: Receipt },
+    { id: 'integrations', label: 'Integrationer', icon: Link2 },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
   ]
@@ -987,6 +1062,170 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Integrations Tab */}
+        {activeTab === 'integrations' && (
+          <div className="space-y-6">
+            {/* Fortnox Integration */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-[#1A3A32]">
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#4ADE80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Fortnox</h2>
+                  <p className="text-sm text-zinc-500">Bokföring och fakturering</p>
+                </div>
+              </div>
+
+              {fortnoxStatus?.connected ? (
+                // Kopplad
+                <div className="space-y-4">
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                        <div>
+                          <p className="font-medium text-white">Kopplad till Fortnox</p>
+                          <p className="text-sm text-zinc-400">{fortnoxStatus.companyName || 'Företag'}</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg">
+                        Aktiv
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-zinc-800/50 rounded-xl">
+                      <p className="text-xs text-zinc-500">Kopplad sedan</p>
+                      <p className="text-sm text-white">
+                        {fortnoxStatus.connectedAt
+                          ? new Date(fortnoxStatus.connectedAt).toLocaleDateString('sv-SE')
+                          : '-'
+                        }
+                      </p>
+                    </div>
+                    <div className="p-3 bg-zinc-800/50 rounded-xl">
+                      <p className="text-xs text-zinc-500">Token giltig till</p>
+                      <p className="text-sm text-white">
+                        {fortnoxStatus.expiresAt
+                          ? new Date(fortnoxStatus.expiresAt).toLocaleDateString('sv-SE')
+                          : '-'
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-3">Med Fortnox kopplat kan du:</p>
+                    <ul className="space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Synka kunder automatiskt
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Exportera fakturor till bokföringen
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Hämta artiklar och priser
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={handleDisconnectFortnox}
+                    disabled={disconnectingFortnox}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-red-400 hover:border-red-500/30 transition-colors"
+                  >
+                    {disconnectingFortnox ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <XCircle className="w-4 h-4" />
+                    )}
+                    Koppla bort Fortnox
+                  </button>
+                </div>
+              ) : (
+                // Ej kopplad
+                <div className="space-y-4">
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-3">Koppla Fortnox för att:</p>
+                    <ul className="space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        Synkronisera kunder mellan systemen
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        Exportera fakturor direkt till bokföringen
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        Importera artiklar och prislista
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        Automatisk bokföring av betalningar
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={handleConnectFortnox}
+                    disabled={fortnoxLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {fortnoxLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <ExternalLink className="w-5 h-5" />
+                    )}
+                    Koppla Fortnox-konto
+                  </button>
+
+                  <p className="text-xs text-zinc-600 text-center">
+                    Du kommer att omdirigeras till Fortnox för att godkänna kopplingen
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Fler integrationer kommer */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h3 className="text-lg font-semibold text-white mb-2">Fler integrationer</h3>
+              <p className="text-sm text-zinc-500 mb-4">Kommande integrationer för Handymate</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { name: 'Google Calendar', desc: 'Synka bokningar', soon: true },
+                  { name: 'Visma', desc: 'Bokföring', soon: true },
+                  { name: 'Björn Lundén', desc: 'Bokföring', soon: true },
+                  { name: 'Zapier', desc: 'Automatisering', soon: true },
+                ].map((integration) => (
+                  <div
+                    key={integration.name}
+                    className="p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-xl opacity-60"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white">{integration.name}</p>
+                        <p className="text-xs text-zinc-500">{integration.desc}</p>
+                      </div>
+                      <span className="px-2 py-1 bg-zinc-700 text-zinc-400 text-xs rounded">
+                        Kommer snart
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
