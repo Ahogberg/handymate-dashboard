@@ -15,10 +15,9 @@ function getSupabaseAdmin() {
 export async function POST(request: NextRequest) {
   try {
     const { action, data } = await request.json()
-    const cookieStore = await cookies()
-    
-    // Skapa Supabase client med cookies
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+    // Skapa Supabase client med cookies (pass function reference so cookies can be written)
+    const supabase = createRouteHandlerClient({ cookies })
 
 // ==================== REGISTER ====================
 if (action === 'register') {
