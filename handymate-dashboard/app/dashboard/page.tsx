@@ -4,16 +4,13 @@ import { useEffect, useState } from 'react'
 import {
   Calendar,
   Users,
-  Phone,
   TrendingUp,
   TrendingDown,
   Clock,
-  MessageSquare,
   ArrowRight,
   FileText,
   Sparkles,
-  Mic,
-  DollarSign
+  Mic
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -317,60 +314,6 @@ export default function DashboardPage() {
             </div>
             <p className="text-2xl font-bold text-white">{stats?.time?.week_hours || 0}h</p>
             <p className="text-xs text-zinc-500">Arbetad tid vecka</p>
-          </div>
-        </div>
-
-        {/* Sekundär statistik - offerter och intäkter */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
-          {/* Offerter */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 mb-3">
-              <FileText className="w-4 h-4 text-violet-400" />
-              <span className="text-sm text-zinc-400">Offerter</span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <div>
-                <span className="text-xl font-bold text-white">{stats?.quotes?.accepted || 0}</span>
-                <span className="text-zinc-500 text-sm">/{stats?.quotes?.sent || 0}</span>
-              </div>
-              <span className="text-emerald-400 text-sm font-medium">
-                {stats?.quotes?.acceptance_rate || 0}% accept
-              </span>
-            </div>
-            <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full"
-                style={{ width: `${stats?.quotes?.acceptance_rate || 0}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Offertvärde */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 mb-3">
-              <DollarSign className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm text-zinc-400">Accepterat värde</span>
-            </div>
-            <p className="text-xl font-bold text-white">
-              {formatCurrency(stats?.quotes?.accepted_value || 0)} kr
-            </p>
-            <p className="text-xs text-zinc-500 mt-1">
-              Totalt skickat: {formatCurrency(stats?.quotes?.total_value || 0)} kr
-            </p>
-          </div>
-
-          {/* Intäkter från tid */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="w-4 h-4 text-amber-400" />
-              <span className="text-sm text-zinc-400">Tidbaserade intäkter</span>
-            </div>
-            <p className="text-xl font-bold text-white">
-              {formatCurrency(stats?.revenue?.month || 0)} kr
-            </p>
-            <p className="text-xs text-zinc-500 mt-1">
-              {stats?.time?.month_hours || 0} timmar denna månad
-            </p>
           </div>
         </div>
 
