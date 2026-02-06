@@ -1,25 +1,39 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Zap, Loader2, Lock, Check, AlertTriangle } from 'lucide-react'
 
 function ResetPasswordForm() {
-  const searchParams = useSearchParams()
   const router = useRouter()
-  const token = searchParams.get('token')
 
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionValid, setSessionValid] = useState<boolean | null>(null)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
 
+  // Check if we have a valid recovery session (set by /auth/callback)
   useEffect(() => {
-    if (!token) {
-      setError('Ogiltig eller saknad återställningslänk')
+    async function checkSession() {
+      try {
+        const response = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'check' }),
+        })
+        setSessionValid(response.ok)
+        if (!response.ok) {
+          setError('Återställningslänken är ogiltig eller har gått ut. Begär en ny.')
+        }
+      } catch {
+        setSessionValid(false)
+        setError('Återställningslänken är ogiltig eller har gått ut. Begär en ny.')
+      }
     }
-  }, [token])
+    checkSession()
+  }, [])
 
   const handleSubmit = async () => {
     setError('')
@@ -47,7 +61,7 @@ function ResetPasswordForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'reset_password',
-          data: { token, password }
+          data: { password }
         }),
       })
 
@@ -94,7 +108,11 @@ function ResetPasswordForm() {
 
         {/* Form Card */}
         <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 p-8">
-          {!token ? (
+          {sessionValid === null ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
+            </div>
+          ) : sessionValid === false ? (
             <div className="text-center py-4">
               <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <AlertTriangle className="w-8 h-8 text-red-400" />
@@ -103,11 +121,11 @@ function ResetPasswordForm() {
               <p className="text-zinc-400 text-sm mb-6">
                 Återställningslänken är ogiltig eller har gått ut.
               </p>
-              <a 
+              <a
                 href="/forgot-password"
                 className="text-violet-400 hover:text-violet-300 text-sm"
               >
-                Begär en ny länk →
+                Begär en ny länk
               </a>
             </div>
           ) : success ? (
@@ -179,13 +197,5 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
-      </div>
-    }>
-      <ResetPasswordForm />
-    </Suspense>
-  )
+  return <ResetPasswordForm />
 }

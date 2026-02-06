@@ -106,13 +106,6 @@ if (action === 'register') {
 if (action === 'login') {
   const { email, password } = data
 
-  // Skapa en vanlig klient för login (inte admin)
-  const { createClient } = await import('@supabase/supabase-js')
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
-
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email,
     password
@@ -178,7 +171,7 @@ if (action === 'login') {
       const { email } = data
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'}/reset-password`
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'}/auth/callback?next=/reset-password`
       })
 
       if (error) {
