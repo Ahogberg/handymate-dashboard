@@ -273,3 +273,184 @@ export async function getFortnoxCompanyInfo(businessId: string): Promise<{ Compa
     return null
   }
 }
+
+// ============================================
+// CUSTOMER SYNC FUNCTIONS
+// ============================================
+
+export interface FortnoxCustomer {
+  CustomerNumber?: string
+  Name: string
+  Email?: string
+  Phone1?: string
+  Address1?: string
+  ZipCode?: string
+  City?: string
+}
+
+export interface FortnoxCustomerResponse {
+  Customer: FortnoxCustomer
+}
+
+export interface FortnoxCustomersListResponse {
+  Customers: FortnoxCustomer[]
+}
+
+/**
+ * Get all customers from Fortnox
+ */
+export async function getFortnoxCustomers(businessId: string): Promise<FortnoxCustomer[]> {
+  try {
+    const response = await fortnoxRequest<FortnoxCustomersListResponse>(
+      businessId,
+      'GET',
+      '/customers'
+    )
+    return response.Customers || []
+  } catch (error) {
+    console.error('Get Fortnox customers error:', error)
+    throw error
+  }
+}
+
+/**
+ * Create a customer in Fortnox
+ */
+export async function createFortnoxCustomer(
+  businessId: string,
+  customer: Omit<FortnoxCustomer, 'CustomerNumber'>
+): Promise<FortnoxCustomer> {
+  try {
+    const response = await fortnoxRequest<FortnoxCustomerResponse>(
+      businessId,
+      'POST',
+      '/customers',
+      { Customer: customer }
+    )
+    return response.Customer
+  } catch (error) {
+    console.error('Create Fortnox customer error:', error)
+    throw error
+  }
+}
+
+/**
+ * Update a customer in Fortnox
+ */
+export async function updateFortnoxCustomer(
+  businessId: string,
+  customerNumber: string,
+  customer: Partial<FortnoxCustomer>
+): Promise<FortnoxCustomer> {
+  try {
+    const response = await fortnoxRequest<FortnoxCustomerResponse>(
+      businessId,
+      'PUT',
+      `/customers/${customerNumber}`,
+      { Customer: customer }
+    )
+    return response.Customer
+  } catch (error) {
+    console.error('Update Fortnox customer error:', error)
+    throw error
+  }
+}
+
+/**
+ * Check if business has Fortnox connected
+ */
+export async function isFortnoxConnected(businessId: string): Promise<boolean> {
+  const config = await getFortnoxConfig(businessId)
+  return !!(config?.fortnox_access_token && config?.fortnox_connected_at)
+}
+
+/**
+ * Sync a single customer to Fortnox (fire-and-forget safe)
+ */
+export async function syncCustomerToFortnox(
+  businessId: string,
+  customerId: string
+): Promise<{ success: boolean; customerNumber?: string; error?: string }> {
+  const supabase = getSupabase()
+
+  try {
+    // Check if Fortnox is connected
+    const connected = await isFortnoxConnected(businessId)
+    if (!connected) {
+      return { success: false, error: 'Fortnox not connected' }
+    }
+
+    // Get customer data
+    const { data: customer, error: fetchError } = await supabase
+      .from('customer')
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('business_id', businessId)
+      .single()
+
+    if (fetchError || !customer) {
+      return { success: false, error: 'Customer not found' }
+    }
+
+    // Already synced?
+    if (customer.fortnox_customer_number) {
+      return { success: true, customerNumber: customer.fortnox_customer_number }
+    }
+
+    // Parse address if available
+    let address1 = ''
+    let zipCode = ''
+    let city = ''
+    if (customer.address_line) {
+      // Try to parse "Gatuadress, 12345 Stad"
+      const parts = customer.address_line.split(',').map((p: string) => p.trim())
+      if (parts.length >= 1) address1 = parts[0]
+      if (parts.length >= 2) {
+        const cityParts = parts[1].match(/(\d{5})\s*(.*)/)
+        if (cityParts) {
+          zipCode = cityParts[1]
+          city = cityParts[2] || ''
+        } else {
+          city = parts[1]
+        }
+      }
+    }
+
+    // Create in Fortnox
+    const fortnoxCustomer = await createFortnoxCustomer(businessId, {
+      Name: customer.name,
+      Email: customer.email || undefined,
+      Phone1: customer.phone_number || undefined,
+      Address1: address1 || undefined,
+      ZipCode: zipCode || undefined,
+      City: city || undefined
+    })
+
+    // Update customer in DB
+    const { error: updateError } = await supabase
+      .from('customer')
+      .update({
+        fortnox_customer_number: fortnoxCustomer.CustomerNumber,
+        fortnox_synced_at: new Date().toISOString(),
+        fortnox_sync_error: null
+      })
+      .eq('customer_id', customerId)
+
+    if (updateError) {
+      console.error('Failed to update customer after Fortnox sync:', updateError)
+    }
+
+    return { success: true, customerNumber: fortnoxCustomer.CustomerNumber }
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Sync failed'
+
+    // Log error to customer record
+    await supabase
+      .from('customer')
+      .update({ fortnox_sync_error: errorMessage })
+      .eq('customer_id', customerId)
+
+    return { success: false, error: errorMessage }
+  }
+}

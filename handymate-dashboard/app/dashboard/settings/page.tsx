@@ -24,7 +24,9 @@ import {
   Link2,
   ExternalLink,
   CheckCircle,
-  XCircle
+  XCircle,
+  Download,
+  Upload
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -219,6 +221,9 @@ export default function SettingsPage() {
   const [fortnoxStatus, setFortnoxStatus] = useState<FortnoxStatus | null>(null)
   const [fortnoxLoading, setFortnoxLoading] = useState(false)
   const [disconnectingFortnox, setDisconnectingFortnox] = useState(false)
+  const [syncingCustomers, setSyncingCustomers] = useState(false)
+  const [importingCustomers, setImportingCustomers] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ synced?: number; imported?: number; failed?: number } | null>(null)
 
   useEffect(() => {
     fetchConfig()
@@ -464,6 +469,52 @@ export default function SettingsPage() {
       showToast(error.message || 'Något gick fel', 'error')
     } finally {
       setDisconnectingFortnox(false)
+    }
+  }
+
+  const handleSyncCustomersToFortnox = async () => {
+    setSyncingCustomers(true)
+    setSyncResult(null)
+    try {
+      const response = await fetch('/api/fortnox/sync/customers', { method: 'POST' })
+      const data = await response.json()
+      if (response.ok) {
+        setSyncResult({ synced: data.synced, failed: data.failed })
+        if (data.synced > 0) {
+          showToast(`${data.synced} kunder synkade till Fortnox`, 'success')
+        } else {
+          showToast('Inga nya kunder att synka', 'success')
+        }
+      } else {
+        throw new Error(data.error || 'Synkronisering misslyckades')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSyncingCustomers(false)
+    }
+  }
+
+  const handleImportCustomersFromFortnox = async () => {
+    setImportingCustomers(true)
+    setSyncResult(null)
+    try {
+      const response = await fetch('/api/fortnox/import/customers', { method: 'POST' })
+      const data = await response.json()
+      if (response.ok) {
+        setSyncResult({ imported: data.imported })
+        if (data.imported > 0) {
+          showToast(`${data.imported} kunder importerade från Fortnox`, 'success')
+        } else {
+          showToast('Inga nya kunder att importera', 'success')
+        }
+      } else {
+        throw new Error(data.error || 'Import misslyckades')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setImportingCustomers(false)
     }
   }
 
@@ -1121,6 +1172,44 @@ export default function SettingsPage() {
                         }
                       </p>
                     </div>
+                  </div>
+
+                  {/* Kundsynkronisering */}
+                  <div className="p-4 bg-zinc-800/50 rounded-xl space-y-3">
+                    <p className="text-sm font-medium text-white">Kundsynkronisering</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={handleSyncCustomersToFortnox}
+                        disabled={syncingCustomers}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                      >
+                        {syncingCustomers ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        Synka till Fortnox
+                      </button>
+                      <button
+                        onClick={handleImportCustomersFromFortnox}
+                        disabled={importingCustomers}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-700/50 border border-zinc-600 rounded-xl text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                      >
+                        {importingCustomers ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Importera från Fortnox
+                      </button>
+                    </div>
+                    {syncResult && (
+                      <div className="text-xs text-zinc-500">
+                        {syncResult.synced !== undefined && `${syncResult.synced} kunder synkade`}
+                        {syncResult.imported !== undefined && `${syncResult.imported} kunder importerade`}
+                        {syncResult.failed !== undefined && syncResult.failed > 0 && ` (${syncResult.failed} misslyckades)`}
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-4 bg-zinc-800/50 rounded-xl">
