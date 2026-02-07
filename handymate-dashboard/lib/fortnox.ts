@@ -454,3 +454,170 @@ export async function syncCustomerToFortnox(
     return { success: false, error: errorMessage }
   }
 }
+
+// ============================================
+// INVOICE SYNC FUNCTIONS
+// ============================================
+
+export interface FortnoxInvoiceRow {
+  ArticleNumber?: string
+  Description: string
+  DeliveredQuantity: number
+  Price: number
+  Unit?: string
+}
+
+export interface FortnoxInvoice {
+  DocumentNumber?: string
+  InvoiceNumber?: string
+  CustomerNumber: string
+  InvoiceDate: string
+  DueDate: string
+  YourReference?: string
+  OurReference?: string
+  InvoiceRows: FortnoxInvoiceRow[]
+  Balance?: number
+  FullyPaid?: boolean
+  Booked?: boolean
+  Cancelled?: boolean
+}
+
+export interface FortnoxInvoiceResponse {
+  Invoice: FortnoxInvoice
+}
+
+/**
+ * Create an invoice in Fortnox
+ */
+export async function createFortnoxInvoice(
+  businessId: string,
+  invoice: Omit<FortnoxInvoice, 'DocumentNumber' | 'InvoiceNumber' | 'Balance' | 'FullyPaid' | 'Booked' | 'Cancelled'>
+): Promise<FortnoxInvoice> {
+  const response = await fortnoxRequest<FortnoxInvoiceResponse>(
+    businessId,
+    'POST',
+    '/invoices',
+    { Invoice: invoice }
+  )
+  return response.Invoice
+}
+
+/**
+ * Get invoice from Fortnox by document number
+ */
+export async function getFortnoxInvoice(
+  businessId: string,
+  documentNumber: string
+): Promise<FortnoxInvoice> {
+  const response = await fortnoxRequest<FortnoxInvoiceResponse>(
+    businessId,
+    'GET',
+    `/invoices/${documentNumber}`
+  )
+  return response.Invoice
+}
+
+/**
+ * Sync a single Handymate invoice to Fortnox
+ */
+export async function syncInvoiceToFortnox(
+  businessId: string,
+  invoiceId: string
+): Promise<{ success: boolean; fortnoxInvoiceNumber?: string; fortnoxDocumentNumber?: string; error?: string }> {
+  const supabase = getSupabase()
+
+  try {
+    const connected = await isFortnoxConnected(businessId)
+    if (!connected) {
+      return { success: false, error: 'Fortnox not connected' }
+    }
+
+    // Get invoice with customer
+    const { data: invoice, error: fetchError } = await supabase
+      .from('invoice')
+      .select('*, customer(customer_id, name, email, phone_number, address_line, fortnox_customer_number)')
+      .eq('invoice_id', invoiceId)
+      .eq('business_id', businessId)
+      .single()
+
+    if (fetchError || !invoice) {
+      return { success: false, error: 'Invoice not found' }
+    }
+
+    // Already synced?
+    if (invoice.fortnox_invoice_number) {
+      return { success: true, fortnoxInvoiceNumber: invoice.fortnox_invoice_number, fortnoxDocumentNumber: invoice.fortnox_document_number }
+    }
+
+    // Ensure customer exists in Fortnox
+    let customerNumber = invoice.customer?.fortnox_customer_number
+    if (!customerNumber && invoice.customer) {
+      const syncResult = await syncCustomerToFortnox(businessId, invoice.customer.customer_id)
+      if (!syncResult.success) {
+        return { success: false, error: `Could not sync customer: ${syncResult.error}` }
+      }
+      customerNumber = syncResult.customerNumber
+    }
+
+    if (!customerNumber) {
+      return { success: false, error: 'No customer linked to invoice' }
+    }
+
+    // Get business info for OurReference
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('business_name, contact_name')
+      .eq('business_id', businessId)
+      .single()
+
+    // Build invoice rows
+    const items = invoice.items || []
+    const invoiceRows: FortnoxInvoiceRow[] = items.map((item: { description: string; quantity: number; unit?: string; unit_price: number }) => ({
+      Description: item.description,
+      DeliveredQuantity: item.quantity,
+      Price: item.unit_price,
+      Unit: item.unit === 'timmar' ? 'h' : item.unit === 'st' ? 'st' : undefined
+    }))
+
+    // Create in Fortnox
+    const fortnoxInvoice = await createFortnoxInvoice(businessId, {
+      CustomerNumber: customerNumber,
+      InvoiceDate: invoice.invoice_date?.split('T')[0] || new Date().toISOString().split('T')[0],
+      DueDate: invoice.due_date?.split('T')[0] || '',
+      YourReference: invoice.customer?.name || undefined,
+      OurReference: config?.contact_name || config?.business_name || undefined,
+      InvoiceRows: invoiceRows
+    })
+
+    // Update invoice in DB
+    const { error: updateError } = await supabase
+      .from('invoice')
+      .update({
+        fortnox_invoice_number: fortnoxInvoice.InvoiceNumber,
+        fortnox_document_number: fortnoxInvoice.DocumentNumber,
+        fortnox_synced_at: new Date().toISOString(),
+        fortnox_sync_error: null
+      })
+      .eq('invoice_id', invoiceId)
+
+    if (updateError) {
+      console.error('Failed to update invoice after Fortnox sync:', updateError)
+    }
+
+    return {
+      success: true,
+      fortnoxInvoiceNumber: fortnoxInvoice.InvoiceNumber,
+      fortnoxDocumentNumber: fortnoxInvoice.DocumentNumber
+    }
+
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Sync failed'
+
+    await supabase
+      .from('invoice')
+      .update({ fortnox_sync_error: errorMessage })
+      .eq('invoice_id', invoiceId)
+
+    return { success: false, error: errorMessage }
+  }
+}

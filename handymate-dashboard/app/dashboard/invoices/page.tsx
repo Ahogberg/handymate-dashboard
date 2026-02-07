@@ -12,7 +12,9 @@ import {
   Clock,
   AlertCircle,
   DollarSign,
-  Download
+  Download,
+  RefreshCw,
+  Loader2
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
@@ -30,6 +32,9 @@ interface Invoice {
   invoice_date: string
   due_date: string
   paid_at: string | null
+  fortnox_invoice_number: string | null
+  fortnox_synced_at: string | null
+  fortnox_sync_error: string | null
   customer?: {
     customer_id: string
     name: string
@@ -45,6 +50,7 @@ export default function InvoicesPage() {
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'paid' | 'overdue'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [sendingId, setSendingId] = useState<string | null>(null)
+  const [syncingId, setSyncingId] = useState<string | null>(null)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   useEffect(() => {
@@ -116,6 +122,27 @@ export default function InvoicesPage() {
       fetchInvoices()
     } catch {
       showToast('Något gick fel', 'error')
+    }
+  }
+
+  const handleSyncToFortnox = async (invoiceId: string) => {
+    setSyncingId(invoiceId)
+    try {
+      const response = await fetch('/api/fortnox/sync/invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId })
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Synk misslyckades')
+
+      showToast(`Synkad till Fortnox (${data.fortnoxInvoiceNumber})`, 'success')
+      fetchInvoices()
+    } catch (error: any) {
+      showToast(error.message || 'Kunde inte synka till Fortnox', 'error')
+    } finally {
+      setSyncingId(null)
     }
   }
 
@@ -342,6 +369,16 @@ export default function InvoicesPage() {
                             {getStatusIcon(invoice.status)}
                             {getStatusText(invoice.status)}
                           </span>
+                          {invoice.fortnox_invoice_number ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              FN:{invoice.fortnox_invoice_number}
+                            </span>
+                          ) : invoice.fortnox_sync_error ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-500/10 text-red-400 border border-red-500/20" title={invoice.fortnox_sync_error}>
+                              <AlertCircle className="w-3 h-3" />
+                              Synkfel
+                            </span>
+                          ) : null}
                         </div>
                         <p className="text-sm text-zinc-400 mt-1">{invoice.customer?.name || 'Ingen kund'}</p>
                         <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
@@ -394,6 +431,20 @@ export default function InvoicesPage() {
                           Betald
                         </button>
                       )}
+                      {invoice.status !== 'draft' && !invoice.fortnox_invoice_number && (
+                        <button
+                          onClick={() => handleSyncToFortnox(invoice.invoice_id)}
+                          disabled={syncingId === invoice.invoice_id}
+                          className="p-2.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
+                          title="Synka till Fortnox"
+                        >
+                          {syncingId === invoice.invoice_id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -410,6 +461,7 @@ export default function InvoicesPage() {
                       <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Förfaller</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Belopp</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Fortnox</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärder</th>
                     </tr>
                   </thead>
@@ -444,6 +496,34 @@ export default function InvoicesPage() {
                             {getStatusIcon(invoice.status)}
                             {getStatusText(invoice.status)}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {invoice.fortnox_invoice_number ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <CheckCircle className="w-3 h-3" />
+                              {invoice.fortnox_invoice_number}
+                            </span>
+                          ) : invoice.fortnox_sync_error ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-red-500/10 text-red-400 border border-red-500/20 cursor-help" title={invoice.fortnox_sync_error}>
+                              <AlertCircle className="w-3 h-3" />
+                              Fel
+                            </span>
+                          ) : invoice.status !== 'draft' ? (
+                            <button
+                              onClick={() => handleSyncToFortnox(invoice.invoice_id)}
+                              disabled={syncingId === invoice.invoice_id}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-zinc-800 text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10 border border-zinc-700 hover:border-violet-500/30 transition-colors disabled:opacity-50"
+                            >
+                              {syncingId === invoice.invoice_id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <RefreshCw className="w-3 h-3" />
+                              )}
+                              Synka
+                            </button>
+                          ) : (
+                            <span className="text-xs text-zinc-600">-</span>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">

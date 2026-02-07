@@ -224,6 +224,9 @@ export default function SettingsPage() {
   const [syncingCustomers, setSyncingCustomers] = useState(false)
   const [importingCustomers, setImportingCustomers] = useState(false)
   const [syncResult, setSyncResult] = useState<{ synced?: number; imported?: number; failed?: number } | null>(null)
+  const [syncingInvoices, setSyncingInvoices] = useState(false)
+  const [syncingPayments, setSyncingPayments] = useState(false)
+  const [invoiceSyncResult, setInvoiceSyncResult] = useState<{ synced?: number; failed?: number; updated?: number; unchanged?: number } | null>(null)
 
   useEffect(() => {
     fetchConfig()
@@ -515,6 +518,52 @@ export default function SettingsPage() {
       showToast(error.message || 'Något gick fel', 'error')
     } finally {
       setImportingCustomers(false)
+    }
+  }
+
+  const handleSyncInvoicesToFortnox = async () => {
+    setSyncingInvoices(true)
+    setInvoiceSyncResult(null)
+    try {
+      const response = await fetch('/api/fortnox/sync/invoices', { method: 'POST' })
+      const data = await response.json()
+      if (response.ok) {
+        setInvoiceSyncResult({ synced: data.synced, failed: data.failed })
+        if (data.synced > 0) {
+          showToast(`${data.synced} fakturor synkade till Fortnox`, 'success')
+        } else {
+          showToast('Inga nya fakturor att synka', 'success')
+        }
+      } else {
+        throw new Error(data.error || 'Synkronisering misslyckades')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSyncingInvoices(false)
+    }
+  }
+
+  const handleSyncPayments = async () => {
+    setSyncingPayments(true)
+    setInvoiceSyncResult(null)
+    try {
+      const response = await fetch('/api/fortnox/sync/payments', { method: 'POST' })
+      const data = await response.json()
+      if (response.ok) {
+        setInvoiceSyncResult({ updated: data.updated, unchanged: data.unchanged })
+        if (data.updated > 0) {
+          showToast(`${data.updated} betalningar uppdaterade`, 'success')
+        } else {
+          showToast('Inga nya betalningar att hämta', 'success')
+        }
+      } else {
+        throw new Error(data.error || 'Synkronisering misslyckades')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSyncingPayments(false)
     }
   }
 
@@ -1208,6 +1257,45 @@ export default function SettingsPage() {
                         {syncResult.synced !== undefined && `${syncResult.synced} kunder synkade`}
                         {syncResult.imported !== undefined && `${syncResult.imported} kunder importerade`}
                         {syncResult.failed !== undefined && syncResult.failed > 0 && ` (${syncResult.failed} misslyckades)`}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Fakturasynkronisering */}
+                  <div className="p-4 bg-zinc-800/50 rounded-xl space-y-3">
+                    <p className="text-sm font-medium text-white">Fakturasynkronisering</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={handleSyncInvoicesToFortnox}
+                        disabled={syncingInvoices}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                      >
+                        {syncingInvoices ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        Synka fakturor
+                      </button>
+                      <button
+                        onClick={handleSyncPayments}
+                        disabled={syncingPayments}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-700/50 border border-zinc-600 rounded-xl text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                      >
+                        {syncingPayments ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Download className="w-4 h-4" />
+                        )}
+                        Hämta betalningar
+                      </button>
+                    </div>
+                    {invoiceSyncResult && (
+                      <div className="text-xs text-zinc-500">
+                        {invoiceSyncResult.synced !== undefined && `${invoiceSyncResult.synced} fakturor synkade`}
+                        {invoiceSyncResult.updated !== undefined && `${invoiceSyncResult.updated} betalningar uppdaterade`}
+                        {invoiceSyncResult.unchanged !== undefined && `, ${invoiceSyncResult.unchanged} oförändrade`}
+                        {invoiceSyncResult.failed !== undefined && invoiceSyncResult.failed > 0 && ` (${invoiceSyncResult.failed} misslyckades)`}
                       </div>
                     )}
                   </div>
