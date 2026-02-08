@@ -105,26 +105,16 @@ export async function POST(request: NextRequest) {
 
       // Gruppera tidrapporter per dag/beskrivning
       for (const entry of timeEntries || []) {
-        const laborCost = (entry.hours_worked || 0) * (entry.hourly_rate || 0)
+        const hours = (entry.duration_minutes || 0) / 60
+        const laborCost = hours * (entry.hourly_rate || 0)
         items.push({
           description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
-          quantity: entry.hours_worked || 0,
+          quantity: Math.round(hours * 100) / 100,
           unit: 'timmar',
           unit_price: entry.hourly_rate || 0,
           total: laborCost,
           type: 'labor'
         })
-
-        if (entry.materials_cost && entry.materials_cost > 0) {
-          items.push({
-            description: `Material (${new Date(entry.work_date).toLocaleDateString('sv-SE')})`,
-            quantity: 1,
-            unit: 'st',
-            unit_price: entry.materials_cost,
-            total: entry.materials_cost,
-            type: 'material'
-          })
-        }
       }
     }
 
@@ -223,7 +213,7 @@ export async function POST(request: NextRequest) {
     if (time_entry_ids && time_entry_ids.length > 0) {
       await supabase
         .from('time_entry')
-        .update({ invoice_id: invoice.invoice_id })
+        .update({ invoice_id: invoice.invoice_id, invoiced: true })
         .in('time_entry_id', time_entry_ids)
     }
 

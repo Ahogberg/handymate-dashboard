@@ -26,7 +26,9 @@ import {
   CheckCircle,
   XCircle,
   Download,
-  Upload
+  Upload,
+  Trash2,
+  Pencil
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -57,6 +59,10 @@ interface BusinessConfig {
   auto_reminder_enabled: boolean
   auto_reminder_days: number
   late_fee_percent: number
+  // Tidrapport
+  default_hourly_rate: number
+  time_rounding_minutes: number
+  time_require_description: boolean
 }
 
 interface FortnoxStatus {
@@ -64,6 +70,14 @@ interface FortnoxStatus {
   companyName: string | null
   connectedAt: string | null
   expiresAt: string | null
+}
+
+interface WorkType {
+  work_type_id: string
+  name: string
+  multiplier: number
+  billable_default: boolean
+  sort_order: number
 }
 
 const DEFAULT_HOURS = {
@@ -228,9 +242,17 @@ export default function SettingsPage() {
   const [syncingPayments, setSyncingPayments] = useState(false)
   const [invoiceSyncResult, setInvoiceSyncResult] = useState<{ synced?: number; failed?: number; updated?: number; unchanged?: number } | null>(null)
 
+  // Time tracking state
+  const [workTypes, setWorkTypes] = useState<WorkType[]>([])
+  const [editingWorkType, setEditingWorkType] = useState<WorkType | null>(null)
+  const [newWorkType, setNewWorkType] = useState({ name: '', multiplier: 1.0, billable_default: true })
+  const [showAddWorkType, setShowAddWorkType] = useState(false)
+  const [savingWorkType, setSavingWorkType] = useState(false)
+
   useEffect(() => {
     fetchConfig()
     fetchFortnoxStatus()
+    fetchWorkTypes()
   }, [business.business_id])
 
   // Handle Fortnox OAuth callback
@@ -320,6 +342,10 @@ export default function SettingsPage() {
           auto_reminder_enabled: config.auto_reminder_enabled || false,
           auto_reminder_days: config.auto_reminder_days || 7,
           late_fee_percent: config.late_fee_percent || 8,
+          // Tidrapport-inställningar
+          default_hourly_rate: config.default_hourly_rate || 500,
+          time_rounding_minutes: config.time_rounding_minutes || 15,
+          time_require_description: config.time_require_description || false,
           updated_at: new Date().toISOString(),
         })
         .eq('business_id', business.business_id)
@@ -567,6 +593,87 @@ export default function SettingsPage() {
     }
   }
 
+  async function fetchWorkTypes() {
+    try {
+      const response = await fetch('/api/work-types')
+      if (response.ok) {
+        const data = await response.json()
+        setWorkTypes(data.workTypes || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch work types:', error)
+    }
+  }
+
+  const handleAddWorkType = async () => {
+    if (!newWorkType.name.trim()) return
+    setSavingWorkType(true)
+    try {
+      const response = await fetch('/api/work-types', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newWorkType)
+      })
+      if (response.ok) {
+        showToast('Arbetstyp tillagd', 'success')
+        setNewWorkType({ name: '', multiplier: 1.0, billable_default: true })
+        setShowAddWorkType(false)
+        fetchWorkTypes()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Kunde inte skapa arbetstyp')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSavingWorkType(false)
+    }
+  }
+
+  const handleUpdateWorkType = async (wt: WorkType) => {
+    setSavingWorkType(true)
+    try {
+      const response = await fetch('/api/work-types', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          work_type_id: wt.work_type_id,
+          name: wt.name,
+          multiplier: wt.multiplier,
+          billable_default: wt.billable_default
+        })
+      })
+      if (response.ok) {
+        showToast('Arbetstyp uppdaterad', 'success')
+        setEditingWorkType(null)
+        fetchWorkTypes()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Kunde inte uppdatera')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setSavingWorkType(false)
+    }
+  }
+
+  const handleDeleteWorkType = async (id: string) => {
+    if (!confirm('Är du säker? Arbetstypen kan inte tas bort om den används.')) return
+    try {
+      const response = await fetch(`/api/work-types?workTypeId=${id}`, { method: 'DELETE' })
+      if (response.ok) {
+        showToast('Arbetstyp borttagen', 'success')
+        fetchWorkTypes()
+      } else {
+        const data = await response.json()
+        throw new Error(data.error || 'Kunde inte ta bort')
+      }
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    }
+  }
+
   const getTrialDaysLeft = () => {
     if (!config?.trial_ends_at) return null
     const trialEnd = new Date(config.trial_ends_at)
@@ -598,6 +705,7 @@ export default function SettingsPage() {
     { id: 'hours', label: 'Öppettider', icon: Clock },
     { id: 'phone', label: 'Telefoni', icon: PhoneCall },
     { id: 'invoice', label: 'Faktura', icon: Receipt },
+    { id: 'time', label: 'Tidrapport', icon: Clock },
     { id: 'integrations', label: 'Integrationer', icon: Link2 },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
@@ -1162,6 +1270,233 @@ export default function SettingsPage() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Time Tracking Tab */}
+        {activeTab === 'time' && (
+          <div className="space-y-6">
+            {/* Grundinställningar */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Tidrapportering</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Standard timpris</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={config.default_hourly_rate || 500}
+                      onChange={(e) => setConfig({ ...config, default_hourly_rate: parseFloat(e.target.value) || 0 })}
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-16"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">kr/tim</span>
+                  </div>
+                  <p className="text-xs text-zinc-600 mt-1">Används som standard för nya tidrapporter</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Tidsavrundning</label>
+                  <select
+                    value={config.time_rounding_minutes || 15}
+                    onChange={(e) => setConfig({ ...config, time_rounding_minutes: parseInt(e.target.value) })}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  >
+                    <option value={1}>1 minut (ingen avrundning)</option>
+                    <option value={5}>5 minuter</option>
+                    <option value={15}>15 minuter</option>
+                    <option value={30}>30 minuter</option>
+                    <option value={60}>60 minuter</option>
+                  </select>
+                  <p className="text-xs text-zinc-600 mt-1">Tid avrundas uppåt till närmaste intervall</p>
+                </div>
+              </div>
+
+              {/* Kräv beskrivning toggle */}
+              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl mt-6">
+                <div>
+                  <p className="font-medium text-white">Kräv beskrivning</p>
+                  <p className="text-sm text-zinc-500">Tidrapporter måste ha en beskrivning</p>
+                </div>
+                <button
+                  onClick={() => setConfig({
+                    ...config,
+                    time_require_description: !config.time_require_description
+                  })}
+                  className={`w-12 h-6 rounded-full transition-all ${
+                    config.time_require_description
+                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+                      : 'bg-zinc-700'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    config.time_require_description ? 'translate-x-6' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Arbetstyper */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Arbetstyper</h2>
+                  <p className="text-sm text-zinc-500">Kategorisera tid med multiplikatorer</p>
+                </div>
+                <button
+                  onClick={() => setShowAddWorkType(!showAddWorkType)}
+                  className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30"
+                >
+                  <Plus className="w-4 h-4" />
+                  Lägg till
+                </button>
+              </div>
+
+              {/* Add form */}
+              {showAddWorkType && (
+                <div className="p-4 bg-zinc-800/50 rounded-xl mb-4 space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      value={newWorkType.name}
+                      onChange={(e) => setNewWorkType({ ...newWorkType, name: e.target.value })}
+                      placeholder="Namn på arbetstyp"
+                      className="px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    />
+                    <div className="relative">
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={newWorkType.multiplier}
+                        onChange={(e) => setNewWorkType({ ...newWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
+                        className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-8"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">x</span>
+                    </div>
+                    <label className="flex items-center gap-2 px-4 py-2.5">
+                      <input
+                        type="checkbox"
+                        checked={newWorkType.billable_default}
+                        onChange={(e) => setNewWorkType({ ...newWorkType, billable_default: e.target.checked })}
+                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-violet-500"
+                      />
+                      <span className="text-sm text-zinc-300">Fakturerbar</span>
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddWorkType}
+                      disabled={!newWorkType.name.trim() || savingWorkType}
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-sm text-white hover:opacity-90 disabled:opacity-50"
+                    >
+                      {savingWorkType ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Spara
+                    </button>
+                    <button
+                      onClick={() => { setShowAddWorkType(false); setNewWorkType({ name: '', multiplier: 1.0, billable_default: true }) }}
+                      className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-400 hover:text-white"
+                    >
+                      Avbryt
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Work types list */}
+              <div className="space-y-2">
+                {workTypes.map((wt) => (
+                  <div key={wt.work_type_id} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+                    {editingWorkType?.work_type_id === wt.work_type_id ? (
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
+                        <input
+                          type="text"
+                          value={editingWorkType.name}
+                          onChange={(e) => setEditingWorkType({ ...editingWorkType, name: e.target.value })}
+                          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={editingWorkType.multiplier}
+                            onChange={(e) => setEditingWorkType({ ...editingWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-8"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">x</span>
+                        </div>
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={editingWorkType.billable_default}
+                            onChange={(e) => setEditingWorkType({ ...editingWorkType, billable_default: e.target.checked })}
+                            className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-violet-500"
+                          />
+                          <span className="text-xs text-zinc-300">Fakturerbar</span>
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleUpdateWorkType(editingWorkType)}
+                            disabled={savingWorkType}
+                            className="px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-lg text-xs text-violet-300 hover:bg-violet-500/30 disabled:opacity-50"
+                          >
+                            Spara
+                          </button>
+                          <button
+                            onClick={() => setEditingWorkType(null)}
+                            className="px-3 py-1.5 bg-zinc-700 rounded-lg text-xs text-zinc-400 hover:text-white"
+                          >
+                            Avbryt
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-3">
+                          <div>
+                            <p className="font-medium text-white">{wt.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 text-xs rounded-lg">
+                                {wt.multiplier}x
+                              </span>
+                              {wt.billable_default ? (
+                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-lg">
+                                  Fakturerbar
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-zinc-700 text-zinc-400 text-xs rounded-lg">
+                                  Ej fakturerbar
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditingWorkType(wt)}
+                            className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                          >
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteWorkType(wt.work_type_id)}
+                            className="p-2 hover:bg-red-500/10 rounded-lg text-zinc-400 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+                {workTypes.length === 0 && (
+                  <div className="text-center py-8 text-zinc-500">
+                    <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Inga arbetstyper ännu</p>
+                    <p className="text-xs mt-1">Kör SQL-migrationen för att skapa standardtyper</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

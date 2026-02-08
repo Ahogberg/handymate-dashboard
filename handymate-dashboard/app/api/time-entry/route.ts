@@ -9,28 +9,12 @@ function getSupabase() {
   )
 }
 
-interface TimeEntry {
-  entry_id: string
-  business_id: string
-  booking_id: string | null
-  customer_id: string | null
-  work_date: string
-  start_time: string | null
-  end_time: string | null
-  hours_worked: number
-  description: string | null
-  hourly_rate: number | null
-  materials_cost: number | null
-  created_at: string
-}
-
 /**
  * GET - Hämta tidsrapporter för ett företag
- * Query params: startDate (optional), endDate (optional), customerId (optional)
+ * Query params: startDate, endDate, customerId, invoiced, workTypeId
  */
 export async function GET(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,6 +25,8 @@ export async function GET(request: NextRequest) {
     const startDate = request.nextUrl.searchParams.get('startDate')
     const endDate = request.nextUrl.searchParams.get('endDate')
     const customerId = request.nextUrl.searchParams.get('customerId')
+    const invoiced = request.nextUrl.searchParams.get('invoiced')
+    const workTypeId = request.nextUrl.searchParams.get('workTypeId')
 
     let query = supabase
       .from('time_entry')
@@ -55,47 +41,51 @@ export async function GET(request: NextRequest) {
           booking_id,
           scheduled_start,
           notes
+        ),
+        work_type:work_type_id (
+          work_type_id,
+          name,
+          multiplier
         )
       `)
       .eq('business_id', businessId)
       .order('work_date', { ascending: false })
-      .order('start_time', { ascending: false })
+      .order('created_at', { ascending: false })
 
-    if (startDate) {
-      query = query.gte('work_date', startDate)
-    }
-
-    if (endDate) {
-      query = query.lte('work_date', endDate)
-    }
-
-    if (customerId) {
-      query = query.eq('customer_id', customerId)
-    }
+    if (startDate) query = query.gte('work_date', startDate)
+    if (endDate) query = query.lte('work_date', endDate)
+    if (customerId) query = query.eq('customer_id', customerId)
+    if (workTypeId) query = query.eq('work_type_id', workTypeId)
+    if (invoiced === 'true') query = query.eq('invoiced', true)
+    if (invoiced === 'false') query = query.eq('invoiced', false)
 
     const { data: entries, error } = await query
 
     if (error) throw error
 
-    // Calculate totals
-    const totalHours = entries?.reduce((sum: number, e: TimeEntry) => sum + (e.hours_worked || 0), 0) || 0
-    const totalRevenue = entries?.reduce((sum: number, e: TimeEntry) => {
-      const labor = (e.hours_worked || 0) * (e.hourly_rate || 0)
-      return sum + labor + (e.materials_cost || 0)
+    // Calculate totals using duration_minutes
+    const totalMinutes = entries?.reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0) || 0
+    const billableMinutes = entries?.filter((e: any) => e.is_billable).reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0) || 0
+    const totalRevenue = entries?.reduce((sum: number, e: any) => {
+      const hours = (e.duration_minutes || 0) / 60
+      return sum + (hours * (e.hourly_rate || 0))
     }, 0) || 0
 
     return NextResponse.json({
       entries,
       totals: {
-        hours: totalHours,
-        revenue: totalRevenue,
+        minutes: totalMinutes,
+        hours: Math.round((totalMinutes / 60) * 10) / 10,
+        billable_minutes: billableMinutes,
+        revenue: Math.round(totalRevenue),
         count: entries?.length || 0
       }
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get time entries error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to fetch'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -104,7 +94,6 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -115,40 +104,64 @@ export async function POST(request: NextRequest) {
     const {
       booking_id,
       customer_id,
+      work_type_id,
       work_date,
       start_time,
       end_time,
-      hours_worked,
+      duration_minutes,
       description,
       hourly_rate,
-      materials_cost
+      is_billable
     } = body
 
-    if (!work_date || !hours_worked) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (!work_date || !duration_minutes) {
+      return NextResponse.json({ error: 'work_date och duration_minutes krävs' }, { status: 400 })
+    }
+
+    // Get default hourly rate from business config if not provided
+    let effectiveRate = hourly_rate
+    if (!effectiveRate) {
+      const { data: config } = await supabase
+        .from('business_config')
+        .select('default_hourly_rate')
+        .eq('business_id', business.business_id)
+        .single()
+      effectiveRate = config?.default_hourly_rate || 500
+    }
+
+    // Apply work type multiplier if provided
+    if (work_type_id) {
+      const { data: workType } = await supabase
+        .from('work_type')
+        .select('multiplier, billable_default')
+        .eq('work_type_id', work_type_id)
+        .eq('business_id', business.business_id)
+        .single()
+
+      if (workType) {
+        effectiveRate = effectiveRate * workType.multiplier
+      }
     }
 
     const { data, error } = await supabase
       .from('time_entry')
       .insert({
         business_id: business.business_id,
-        booking_id,
-        customer_id,
+        booking_id: booking_id || null,
+        customer_id: customer_id || null,
+        work_type_id: work_type_id || null,
         work_date,
-        start_time,
-        end_time,
-        hours_worked,
-        description,
-        hourly_rate: hourly_rate || 500, // Default 500 kr/h
-        materials_cost: materials_cost || 0
+        start_time: start_time || null,
+        end_time: end_time || null,
+        duration_minutes,
+        description: description || null,
+        hourly_rate: effectiveRate,
+        is_billable: is_billable ?? true
       })
       .select(`
         *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number
-        )
+        customer:customer_id (customer_id, name, phone_number),
+        work_type:work_type_id (work_type_id, name, multiplier)
       `)
       .single()
 
@@ -156,9 +169,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ entry: data })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Create time entry error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to create'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -167,7 +181,6 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -178,7 +191,19 @@ export async function PUT(request: NextRequest) {
     const { entry_id, ...updates } = body
 
     if (!entry_id) {
-      return NextResponse.json({ error: 'Missing entry_id' }, { status: 400 })
+      return NextResponse.json({ error: 'entry_id krävs' }, { status: 400 })
+    }
+
+    // Block update if invoiced
+    const { data: existing } = await supabase
+      .from('time_entry')
+      .select('invoiced')
+      .eq('time_entry_id', entry_id)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (existing?.invoiced) {
+      return NextResponse.json({ error: 'Kan inte ändra fakturerade tidposter' }, { status: 400 })
     }
 
     const { data, error } = await supabase
@@ -188,11 +213,8 @@ export async function PUT(request: NextRequest) {
       .eq('business_id', business.business_id)
       .select(`
         *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number
-        )
+        customer:customer_id (customer_id, name, phone_number),
+        work_type:work_type_id (work_type_id, name, multiplier)
       `)
       .single()
 
@@ -200,9 +222,10 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ entry: data })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Update time entry error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to update'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -211,7 +234,6 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -221,7 +243,19 @@ export async function DELETE(request: NextRequest) {
     const entryId = request.nextUrl.searchParams.get('entryId')
 
     if (!entryId) {
-      return NextResponse.json({ error: 'Missing entryId' }, { status: 400 })
+      return NextResponse.json({ error: 'entryId krävs' }, { status: 400 })
+    }
+
+    // Block delete if invoiced
+    const { data: existing } = await supabase
+      .from('time_entry')
+      .select('invoiced')
+      .eq('time_entry_id', entryId)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (existing?.invoiced) {
+      return NextResponse.json({ error: 'Kan inte ta bort fakturerade tidposter' }, { status: 400 })
     }
 
     const { error } = await supabase
@@ -234,8 +268,9 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Delete time entry error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Failed to delete'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
