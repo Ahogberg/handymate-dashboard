@@ -94,6 +94,7 @@ export default function TimePage() {
   const [workTypes, setWorkTypes] = useState<WorkType[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [projects, setProjects] = useState<{ project_id: string; name: string; customer_id: string | null }[]>([])
   const [stats, setStats] = useState<Stats>({
     totalMinutesWeek: 0, billableMinutesWeek: 0, totalMinutesMonth: 0,
     entriesThisWeek: 0, uninvoicedMinutes: 0, uninvoicedRevenue: 0
@@ -116,6 +117,7 @@ export default function TimePage() {
     customer_id: '',
     booking_id: '',
     work_type_id: '',
+    project_id: '',
     description: '',
     work_date: format(new Date(), 'yyyy-MM-dd'),
     duration_hours: 0,
@@ -220,8 +222,16 @@ export default function TimePage() {
       .order('scheduled_start', { ascending: false })
       .limit(50)
 
+    const { data: p } = await supabase
+      .from('project')
+      .select('project_id, name, customer_id')
+      .eq('business_id', business.business_id)
+      .in('status', ['planning', 'active'])
+      .order('name')
+
     setCustomers(c || [])
     setBookings(b || [])
+    setProjects(p || [])
   }
 
   async function fetchStats() {
@@ -290,6 +300,7 @@ export default function TimePage() {
       customer_id: prefillCustomer || '',
       booking_id: '',
       work_type_id: '',
+      project_id: '',
       description: '',
       work_date: prefillDate || format(new Date(), 'yyyy-MM-dd'),
       duration_hours: 0,
@@ -307,6 +318,7 @@ export default function TimePage() {
       customer_id: entry.customer_id || '',
       booking_id: entry.booking_id || '',
       work_type_id: entry.work_type_id || '',
+      project_id: (entry as any).project_id || '',
       description: entry.description || '',
       work_date: entry.work_date,
       duration_hours: Math.floor(total / 60),
@@ -433,6 +445,7 @@ export default function TimePage() {
       customer_id: '',
       booking_id: '',
       work_type_id: '',
+      project_id: '',
       description: '',
       work_date: format(new Date(), 'yyyy-MM-dd'),
       duration_hours: Math.floor(minutes / 60),
@@ -593,6 +606,19 @@ export default function TimePage() {
                   ))}
                 </select>
               </div>
+
+              {/* Projekt */}
+              {projects.length > 0 && (
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Projekt</label>
+                  <select value={formData.project_id}
+                    onChange={e => setFormData({ ...formData, project_id: e.target.value })}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                    <option value="">Inget projekt</option>
+                    {projects.map(p => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Arbetstyp */}
               {workTypes.length > 0 && (

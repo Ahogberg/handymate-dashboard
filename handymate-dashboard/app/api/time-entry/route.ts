@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const customerId = request.nextUrl.searchParams.get('customerId')
     const invoiced = request.nextUrl.searchParams.get('invoiced')
     const workTypeId = request.nextUrl.searchParams.get('workTypeId')
+    const projectId = request.nextUrl.searchParams.get('projectId')
 
     let query = supabase
       .from('time_entry')
@@ -58,6 +59,7 @@ export async function GET(request: NextRequest) {
     if (workTypeId) query = query.eq('work_type_id', workTypeId)
     if (invoiced === 'true') query = query.eq('invoiced', true)
     if (invoiced === 'false') query = query.eq('invoiced', false)
+    if (projectId) query = query.eq('project_id', projectId)
 
     const { data: entries, error } = await query
 
@@ -105,6 +107,8 @@ export async function POST(request: NextRequest) {
       booking_id,
       customer_id,
       work_type_id,
+      project_id,
+      milestone_id,
       work_date,
       start_time,
       end_time,
@@ -150,6 +154,8 @@ export async function POST(request: NextRequest) {
         booking_id: booking_id || null,
         customer_id: customer_id || null,
         work_type_id: work_type_id || null,
+        project_id: project_id || null,
+        milestone_id: milestone_id || null,
         work_date,
         start_time: start_time || null,
         end_time: end_time || null,

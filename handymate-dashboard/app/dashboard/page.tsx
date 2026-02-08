@@ -10,7 +10,8 @@ import {
   ArrowRight,
   FileText,
   Sparkles,
-  Mic
+  Mic,
+  FolderKanban
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -59,6 +60,7 @@ export default function DashboardPage() {
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null)
   const [callCount, setCallCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
+  const [activeProjects, setActiveProjects] = useState(0)
 
   useEffect(() => {
     fetchData()
@@ -117,6 +119,15 @@ export default function DashboardPage() {
       .eq('business_id', business.business_id)
 
     setCallCount(calls || 0)
+
+    // Hämta aktiva projekt
+    const { count: projectCount } = await supabase
+      .from('project')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', business.business_id)
+      .in('status', ['planning', 'active', 'paused'])
+
+    setActiveProjects(projectCount || 0)
 
     // Hämta statistik från API
     try {
@@ -268,7 +279,7 @@ export default function DashboardPage() {
         )}
 
         {/* Stat cards - huvudstatistik */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           {/* Bokningar denna vecka */}
           <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
             <div className="flex items-center justify-between mb-3">
@@ -315,6 +326,18 @@ export default function DashboardPage() {
             <p className="text-2xl font-bold text-white">{stats?.time?.week_hours || 0}h</p>
             <p className="text-xs text-zinc-500">Arbetad tid vecka</p>
           </div>
+
+          {/* Aktiva projekt */}
+          <Link href="/dashboard/projects" className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800 hover:border-violet-500/30 transition-all">
+            <div className="flex items-center justify-between mb-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500">
+                <FolderKanban className="w-4 h-4 text-white" />
+              </div>
+              <ArrowRight className="w-3 h-3 text-zinc-600" />
+            </div>
+            <p className="text-2xl font-bold text-white">{activeProjects}</p>
+            <p className="text-xs text-zinc-500">Aktiva projekt</p>
+          </Link>
         </div>
 
         {/* Main content */}

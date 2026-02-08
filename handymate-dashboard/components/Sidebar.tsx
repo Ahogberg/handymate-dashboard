@@ -17,7 +17,8 @@ import {
   Package,
   Mic,
   Menu,
-  X
+  X,
+  FolderKanban
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -47,6 +48,7 @@ const menuItems: MenuItem[] = [
     icon: FileText,
     subItems: [
       { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
+      { name: 'Projekt', href: '/dashboard/projects', icon: FolderKanban },
       { name: 'Fakturor', href: '/dashboard/invoices', icon: Receipt },
       { name: 'Beställningar', href: '/dashboard/orders', icon: Package },
     ]

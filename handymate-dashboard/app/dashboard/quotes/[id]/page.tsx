@@ -19,7 +19,8 @@ import {
   User,
   Calendar,
   RefreshCw,
-  Receipt
+  Receipt,
+  FolderKanban
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -76,6 +77,7 @@ export default function QuoteDetailPage() {
   const [sendMethod, setSendMethod] = useState<'sms' | 'email' | 'both'>('sms')
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
   const [creatingInvoice, setCreatingInvoice] = useState(false)
+  const [creatingProject, setCreatingProject] = useState(false)
 
   useEffect(() => {
     fetchQuote()
@@ -202,6 +204,32 @@ export default function QuoteDetailPage() {
     }
   }
 
+  const createProjectFromQuote = async () => {
+    if (!quote) return
+    setCreatingProject(true)
+
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_quote_id: quote.quote_id,
+          name: quote.title || `Projekt från offert`
+        })
+      })
+
+      if (!response.ok) throw new Error('Kunde inte skapa projekt')
+
+      const data = await response.json()
+      showToast('Projekt skapat!', 'success')
+      router.push(`/dashboard/projects/${data.project.project_id}`)
+    } catch {
+      showToast('Något gick fel', 'error')
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
   }
@@ -303,14 +331,24 @@ export default function QuoteDetailPage() {
             </button>
           )}
           {quote.status === 'accepted' && (
-            <button
-              onClick={createInvoiceFromQuote}
-              disabled={creatingInvoice}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-            >
-              {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
-              Skapa faktura
-            </button>
+            <>
+              <button
+                onClick={createProjectFromQuote}
+                disabled={creatingProject}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderKanban className="w-4 h-4" />}
+                Skapa projekt
+              </button>
+              <button
+                onClick={createInvoiceFromQuote}
+                disabled={creatingInvoice}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+                Skapa faktura
+              </button>
+            </>
           )}
           <button
             onClick={generatePDF}
