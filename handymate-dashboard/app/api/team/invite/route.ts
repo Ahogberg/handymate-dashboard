@@ -8,6 +8,11 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
+const TEAM_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#06B6D4', '#EF4444', '#6366F1']
+function randomColor() {
+  return TEAM_COLORS[Math.floor(Math.random() * TEAM_COLORS.length)]
+}
+
 /**
  * POST /api/team/invite - Bjud in teammedlem
  */
@@ -51,13 +56,18 @@ export async function POST(request: NextRequest) {
           name: body.name,
           role: body.role || 'employee',
           title: body.title || null,
+          phone: body.phone || null,
           hourly_rate: body.hourly_rate || null,
+          can_see_all_projects: body.can_see_all_projects || false,
+          can_see_financials: body.can_see_financials || false,
+          can_manage_users: body.can_manage_users || false,
+          can_approve_time: body.can_approve_time || false,
+          can_create_invoices: body.can_create_invoices || false,
           invite_token: token,
           invite_expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           invited_at: new Date().toISOString(),
           accepted_at: null,
           user_id: null,
-          ...(body.permissions || {})
         })
         .eq('id', existing.id)
         .select()
@@ -65,7 +75,7 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error
 
-      await sendInviteEmail(business, currentUser.name, body.email, body.name, token)
+      await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
       return NextResponse.json({ member })
     }
 
@@ -90,7 +100,7 @@ export async function POST(request: NextRequest) {
         title: body.title || null,
         hourly_cost: body.hourly_cost || null,
         hourly_rate: body.hourly_rate || null,
-        color: body.color || '#3B82F6',
+        color: body.color || randomColor(),
         can_see_all_projects: body.can_see_all_projects || false,
         can_see_financials: body.can_see_financials || false,
         can_manage_users: body.can_manage_users || false,
@@ -106,13 +116,30 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     // Skicka email
-    await sendInviteEmail(business, currentUser.name, body.email, body.name, token)
+    await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
 
     return NextResponse.json({ member })
 
   } catch (error: any) {
     console.error('Invite team member error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+async function trySendInviteEmail(
+  business: any,
+  inviterName: string,
+  toEmail: string,
+  toName: string,
+  token: string
+) {
+  try {
+    await sendInviteEmail(business, inviterName, toEmail, toName, token)
+  } catch (error) {
+    // Log but don't fail - the invite was already created in DB
+    console.error('Failed to send invite email (Resend may not be configured):', error)
+    console.log(`[INVITE] Token for ${toEmail}: ${token}`)
+    console.log(`[INVITE] Invite URL: ${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/invite/${token}`)
   }
 }
 
