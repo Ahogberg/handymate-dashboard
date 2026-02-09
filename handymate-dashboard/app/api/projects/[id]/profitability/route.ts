@@ -93,10 +93,27 @@ export async function GET(
       invoicedAmount = (invoices || []).reduce((sum: number, i: any) => sum + (i.total || 0), 0)
     }
 
-    // Calculate profitability
-    const totalRevenue = quoteAmount + ataAdditions - ataRemovals
+    // Fetch project materials
+    const { data: materials } = await supabase
+      .from('project_material')
+      .select('total_purchase, total_sell, invoiced')
+      .eq('project_id', projectId)
+
+    const mats = materials || []
+    const materialPurchaseTotal = mats.reduce((sum: number, m: any) => sum + (m.total_purchase || 0), 0)
+    const materialSellTotal = mats.reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
+    const invoicedMaterialSell = mats
+      .filter((m: any) => m.invoiced)
+      .reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
+    const uninvoicedMaterialSell = mats
+      .filter((m: any) => !m.invoiced)
+      .reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
+
+    // Calculate profitability (including materials)
+    const totalRevenue = quoteAmount + ataAdditions - ataRemovals + materialSellTotal
+    const totalCosts = actualCost + materialPurchaseTotal
     const totalBudgetHours = (project.budget_hours || 0) + ataHours
-    const marginAmount = totalRevenue - actualCost
+    const marginAmount = totalRevenue - totalCosts
     const marginPercent = totalRevenue > 0 ? (marginAmount / totalRevenue) * 100 : 0
 
     return NextResponse.json({
@@ -104,11 +121,14 @@ export async function GET(
         quote_amount: Math.round(quoteAmount),
         ata_additions: Math.round(ataAdditions),
         ata_removals: Math.round(ataRemovals),
+        material_sell: Math.round(materialSellTotal),
         total: Math.round(totalRevenue)
       },
       costs: {
         actual_hours: Math.round(actualMinutes / 60 * 100) / 100,
-        actual_amount: Math.round(actualCost)
+        actual_amount: Math.round(actualCost),
+        material_purchase: Math.round(materialPurchaseTotal),
+        total: Math.round(totalCosts)
       },
       budget: {
         hours: project.budget_hours || 0,
@@ -119,14 +139,16 @@ export async function GET(
           ? Math.round((actualMinutes / 60) / totalBudgetHours * 100)
           : 0,
         amount_usage_percent: totalRevenue > 0
-          ? Math.round(actualCost / totalRevenue * 100)
+          ? Math.round(totalCosts / totalRevenue * 100)
           : 0
       },
       invoicing: {
         invoiced_amount: Math.round(invoicedAmount),
         invoiced_hours: Math.round(invoicedMinutes / 60 * 100) / 100,
         uninvoiced_hours: Math.round(uninvoicedMinutes / 60 * 100) / 100,
-        uninvoiced_amount: Math.round(uninvoicedRevenue)
+        uninvoiced_amount: Math.round(uninvoicedRevenue),
+        invoiced_material: Math.round(invoicedMaterialSell),
+        uninvoiced_material: Math.round(uninvoicedMaterialSell)
       },
       margin: {
         amount: Math.round(marginAmount),

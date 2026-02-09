@@ -28,7 +28,8 @@ import {
   Download,
   Upload,
   Trash2,
-  Pencil
+  Pencil,
+  Package
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -249,10 +250,18 @@ export default function SettingsPage() {
   const [showAddWorkType, setShowAddWorkType] = useState(false)
   const [savingWorkType, setSavingWorkType] = useState(false)
 
+  // Grossist state
+  const [grossistSuppliers, setGrossistSuppliers] = useState<any[]>([])
+  const [connectingSupplier, setConnectingSupplier] = useState<string | null>(null)
+  const [credentialForm, setCredentialForm] = useState<Record<string, string>>({})
+  const [connectLoading, setConnectLoading] = useState(false)
+  const [syncLoading, setSyncLoading] = useState<string | null>(null)
+
   useEffect(() => {
     fetchConfig()
     fetchFortnoxStatus()
     fetchWorkTypes()
+    fetchGrossistStatus()
   }, [business.business_id])
 
   // Handle Fortnox OAuth callback
@@ -591,6 +600,70 @@ export default function SettingsPage() {
     } finally {
       setSyncingPayments(false)
     }
+  }
+
+  async function fetchGrossistStatus() {
+    try {
+      const res = await fetch(`/api/grossist?businessId=${business.business_id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setGrossistSuppliers(data.suppliers || [])
+      }
+    } catch (e) { console.error(e) }
+  }
+
+  async function handleConnectGrossist() {
+    if (!connectingSupplier) return
+    setConnectLoading(true)
+    try {
+      const res = await fetch('/api/grossist/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          supplier_key: connectingSupplier,
+          credentials: credentialForm
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast('Grossist ansluten!', 'success')
+      setConnectingSupplier(null)
+      setCredentialForm({})
+      fetchGrossistStatus()
+    } catch (e: any) {
+      showToast(e.message, 'error')
+    }
+    setConnectLoading(false)
+  }
+
+  async function handleDisconnectGrossist(supplierKey: string) {
+    if (!confirm('Vill du koppla bort denna grossist?')) return
+    try {
+      const res = await fetch(`/api/grossist/connect?supplierKey=${supplierKey}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed')
+      showToast('Grossist bortkopplad', 'success')
+      fetchGrossistStatus()
+    } catch (e: any) {
+      showToast(e.message, 'error')
+    }
+  }
+
+  async function handleSyncPrices(supplierKey: string) {
+    setSyncLoading(supplierKey)
+    try {
+      const res = await fetch('/api/grossist/sync-prices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplier_key: supplierKey })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(`${data.synced} priser uppdaterade`, 'success')
+      fetchGrossistStatus()
+    } catch (e: any) {
+      showToast(e.message, 'error')
+    }
+    setSyncLoading(null)
   }
 
   async function fetchWorkTypes() {
@@ -1710,6 +1783,123 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+
+            {/* Grossist-kopplingar */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500">
+                  <Package className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Grossister</h3>
+                  <p className="text-sm text-zinc-500">Koppla grossistkonton för produktsök och prisuppdatering</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {grossistSuppliers.map(supplier => (
+                  <div key={supplier.key} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center">
+                        <span className="text-sm font-bold text-zinc-300">{supplier.name.charAt(0)}</span>
+                      </div>
+                      <div>
+                        <p className="font-medium text-white">{supplier.name}</p>
+                        <p className="text-xs text-zinc-500">{supplier.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {supplier.connected ? (
+                        <>
+                          <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            Kopplad
+                          </span>
+                          {supplier.last_sync_at && (
+                            <span className="text-xs text-zinc-500">
+                              Synkad {new Date(supplier.last_sync_at).toLocaleDateString('sv-SE')}
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleSyncPrices(supplier.key)}
+                            disabled={syncLoading === supplier.key}
+                            className="px-3 py-1.5 text-xs bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded-lg hover:bg-violet-500/30 disabled:opacity-50"
+                          >
+                            {syncLoading === supplier.key ? 'Synkar...' : 'Synka priser'}
+                          </button>
+                          <button
+                            onClick={() => handleDisconnectGrossist(supplier.key)}
+                            className="px-3 py-1.5 text-xs bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30"
+                          >
+                            Koppla bort
+                          </button>
+                        </>
+                      ) : supplier.available ? (
+                        <button
+                          onClick={() => {
+                            setConnectingSupplier(supplier.key)
+                            setCredentialForm({})
+                          }}
+                          className="px-3 py-1.5 text-xs bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90"
+                        >
+                          Anslut
+                        </button>
+                      ) : (
+                        <span className="px-2 py-1 text-xs rounded-full bg-zinc-700 text-zinc-400">
+                          Kommer snart
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Connect modal */}
+            {connectingSupplier && (() => {
+              const supplier = grossistSuppliers.find((s: any) => s.key === connectingSupplier)
+              if (!supplier) return null
+              return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-white">Anslut {supplier.name}</h3>
+                      <button onClick={() => setConnectingSupplier(null)} className="text-zinc-500 hover:text-white">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-4">
+                      {supplier.credentialFields?.map((field: any) => (
+                        <div key={field.key}>
+                          <label className="block text-sm font-medium text-zinc-400 mb-1">{field.label}</label>
+                          <input
+                            type={field.type}
+                            value={credentialForm[field.key] || ''}
+                            onChange={e => setCredentialForm(prev => ({ ...prev, [field.key]: e.target.value }))}
+                            placeholder={field.placeholder}
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 mt-6">
+                      <button
+                        onClick={() => setConnectingSupplier(null)}
+                        className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700"
+                      >
+                        Avbryt
+                      </button>
+                      <button
+                        onClick={handleConnectGrossist}
+                        disabled={connectLoading}
+                        className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                      >
+                        {connectLoading ? 'Ansluter...' : 'Testa & Anslut'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Fler integrationer kommer */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">

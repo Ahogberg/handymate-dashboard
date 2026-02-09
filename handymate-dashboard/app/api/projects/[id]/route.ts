@@ -58,6 +58,13 @@ export async function GET(
       .eq('project_id', projectId)
       .order('work_date', { ascending: false })
 
+    // Fetch project materials
+    const { data: materials } = await supabase
+      .from('project_material')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false })
+
     // Fetch linked quote if exists
     let quote = null
     if (project.quote_id) {
@@ -99,12 +106,21 @@ export async function GET(
       .reduce((sum: number, c: any) => sum + Math.abs(c.amount || 0), 0)
     const ataHours = approvedChanges.reduce((sum: number, c: any) => sum + (c.hours || 0), 0)
 
+    // Compute material summary
+    const mats = materials || []
+    const materialPurchaseTotal = mats.reduce((sum: number, m: any) => sum + (m.total_purchase || 0), 0)
+    const materialSellTotal = mats.reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
+    const uninvoicedMaterialSell = mats
+      .filter((m: any) => !m.invoiced)
+      .reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
+
     return NextResponse.json({
       project,
       quote,
       milestones: milestones || [],
       changes: changes || [],
       time_entries: entries,
+      materials: mats,
       summary: {
         total_hours: Math.round(totalMinutes / 60 * 100) / 100,
         billable_hours: Math.round(billableMinutes / 60 * 100) / 100,
@@ -114,7 +130,10 @@ export async function GET(
         ata_additions: Math.round(ataAdditions),
         ata_removals: Math.round(ataRemovals),
         ata_net: Math.round(ataAdditions - ataRemovals),
-        ata_hours: Math.round(ataHours * 100) / 100
+        ata_hours: Math.round(ataHours * 100) / 100,
+        material_purchase_total: Math.round(materialPurchaseTotal),
+        material_sell_total: Math.round(materialSellTotal),
+        uninvoiced_material_sell: Math.round(uninvoicedMaterialSell)
       }
     })
 

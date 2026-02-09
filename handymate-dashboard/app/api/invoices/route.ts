@@ -80,6 +80,7 @@ export async function POST(request: NextRequest) {
       customer_id,
       quote_id,
       time_entry_ids,
+      project_material_ids,
       items: providedItems,
       vat_rate = 25,
       rot_rut_type,
@@ -114,6 +115,29 @@ export async function POST(request: NextRequest) {
           unit_price: entry.hourly_rate || 0,
           total: laborCost,
           type: 'labor'
+        })
+      }
+    }
+
+    // Om vi skapar från projektmaterial
+    if (project_material_ids && project_material_ids.length > 0) {
+      const { data: matRows, error: matError } = await supabase
+        .from('project_material')
+        .select('*')
+        .in('material_id', project_material_ids)
+        .eq('business_id', business_id)
+        .eq('invoiced', false)
+
+      if (matError) throw matError
+
+      for (const mat of matRows || []) {
+        items.push({
+          description: mat.name + (mat.sku ? ` (${mat.sku})` : ''),
+          quantity: mat.quantity,
+          unit: mat.unit || 'st',
+          unit_price: mat.sell_price || 0,
+          total: mat.total_sell || 0,
+          type: 'material' as const
         })
       }
     }
@@ -215,6 +239,14 @@ export async function POST(request: NextRequest) {
         .from('time_entry')
         .update({ invoice_id: invoice.invoice_id, invoiced: true })
         .in('time_entry_id', time_entry_ids)
+    }
+
+    // Markera material som fakturerat
+    if (project_material_ids && project_material_ids.length > 0) {
+      await supabase
+        .from('project_material')
+        .update({ invoice_id: invoice.invoice_id, invoiced: true })
+        .in('material_id', project_material_ids)
     }
 
     return NextResponse.json({ invoice })

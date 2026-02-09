@@ -12,11 +12,14 @@ import {
   FileText,
   User,
   Calculator,
-  Loader2
+  Loader2,
+  Search
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import ProductSearchModal from '@/components/ProductSearchModal'
+import { SelectedProduct } from '@/lib/suppliers/types'
 
 interface Customer {
   customer_id: string
@@ -77,6 +80,7 @@ export default function NewQuotePage() {
   const [rotRutType, setRotRutType] = useState<'rot' | 'rut' | ''>('')
   const [discountPercent, setDiscountPercent] = useState(0)
   const [validDays, setValidDays] = useState(30)
+  const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
   // AI prompt
   const [aiPrompt, setAiPrompt] = useState('')
@@ -163,6 +167,21 @@ export default function NewQuotePage() {
 
   const removeItem = (id: string) => {
     setItems(items.filter(item => item.id !== id))
+  }
+
+  const addFromGrossist = (product: SelectedProduct) => {
+    const newItem: QuoteItem = {
+      id: 'item_' + Math.random().toString(36).substr(2, 9),
+      type: 'material',
+      name: product.name,
+      description: product.sku ? `Art.nr: ${product.sku}` : undefined,
+      quantity: 1,
+      unit: product.unit,
+      unit_price: product.sell_price,
+      total: product.sell_price
+    }
+    setItems([...items, newItem])
+    setShowGrossistSearch(false)
   }
 
   const addFromPriceList = (priceItem: PriceItem) => {
@@ -382,6 +401,9 @@ export default function NewQuotePage() {
                   <button onClick={() => addItem('material')} className="px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm hover:bg-emerald-500/30">
                     + Material
                   </button>
+                  <button onClick={() => setShowGrossistSearch(true)} className="px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-lg text-violet-400 text-sm hover:bg-violet-500/30 flex items-center gap-1">
+                    <Search className="w-3.5 h-3.5" /> Sök grossist
+                  </button>
                 </div>
               </div>
 
@@ -564,6 +586,14 @@ export default function NewQuotePage() {
           </div>
         </div>
       </div>
+
+      {/* Grossist produktsök */}
+      <ProductSearchModal
+        isOpen={showGrossistSearch}
+        onClose={() => setShowGrossistSearch(false)}
+        onSelect={addFromGrossist}
+        businessId={business.business_id}
+      />
     </div>
   )
 }

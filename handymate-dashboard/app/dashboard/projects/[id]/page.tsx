@@ -26,10 +26,14 @@ import {
   ExternalLink,
   Target,
   CircleDot,
-  X
+  X,
+  Package,
+  Search
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import ProductSearchModal from '@/components/ProductSearchModal'
+import { SelectedProduct } from '@/lib/suppliers/types'
 import Link from 'next/link'
 
 // --- Types ---
@@ -131,7 +135,37 @@ interface Profitability {
   margin: { amount: number; percent: number }
 }
 
-type TabKey = 'overview' | 'milestones' | 'changes' | 'time' | 'economy'
+type TabKey = 'overview' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+
+interface ProjectMaterial {
+  material_id: string
+  project_id: string
+  grossist_product_id: string | null
+  supplier_product_id: string | null
+  name: string
+  sku: string | null
+  supplier_name: string | null
+  quantity: number
+  unit: string
+  purchase_price: number | null
+  sell_price: number | null
+  markup_percent: number
+  total_purchase: number | null
+  total_sell: number | null
+  invoiced: boolean
+  invoice_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+interface MaterialSummary {
+  total_purchase: number
+  total_sell: number
+  margin_amount: number
+  margin_percent: number
+  uninvoiced_count: number
+  uninvoiced_sell: number
+}
 
 // --- Helpers ---
 
@@ -190,6 +224,11 @@ export default function ProjectDetailPage() {
   const [changes, setChanges] = useState<Change[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
+  const [materials, setMaterials] = useState<ProjectMaterial[]>([])
+  const [materialSummary, setMaterialSummary] = useState<MaterialSummary | null>(null)
+  const [showProductSearch, setShowProductSearch] = useState(false)
+  const [editingMaterial, setEditingMaterial] = useState<string | null>(null)
+  const [editValues, setEditValues] = useState<{ quantity: number; markup_percent: number }>({ quantity: 1, markup_percent: 20 })
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -227,6 +266,20 @@ export default function ProjectDetailPage() {
       setChanges(data.changes)
       setTimeEntries(data.time_entries)
       setSummary(data.summary)
+      setMaterials(data.materials || [])
+      // Compute material summary from response
+      const mats = data.materials || []
+      const totalPurchase = mats.reduce((s: number, m: any) => s + (m.total_purchase || 0), 0)
+      const totalSell = mats.reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
+      const uninvoicedMats = mats.filter((m: any) => !m.invoiced)
+      setMaterialSummary({
+        total_purchase: totalPurchase,
+        total_sell: totalSell,
+        margin_amount: totalSell - totalPurchase,
+        margin_percent: totalSell > 0 ? ((totalSell - totalPurchase) / totalSell) * 100 : 0,
+        uninvoiced_count: uninvoicedMats.length,
+        uninvoiced_sell: uninvoicedMats.reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
+      })
     } catch {
       setProject(null)
     } finally {
@@ -381,6 +434,84 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleAddMaterial = async (product: SelectedProduct) => {
+    try {
+      const res = await fetch(`/api/projects/${project?.project_id}/materials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grossist_product_id: product.grossist_product_id,
+          supplier_product_id: product.supplier_product_id,
+          name: product.name,
+          sku: product.sku,
+          supplier_name: product.supplier_name,
+          unit: product.unit,
+          purchase_price: product.purchase_price,
+          markup_percent: product.markup_percent,
+          sell_price: product.sell_price
+        })
+      })
+      if (!res.ok) throw new Error('Failed')
+      setShowProductSearch(false)
+      fetchProjectData()
+      setToast({ show: true, message: 'Material tillagt', type: 'success' })
+    } catch {
+      setToast({ show: true, message: 'Kunde inte lägga till material', type: 'error' })
+    }
+  }
+
+  const handleUpdateMaterial = async (materialId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${project?.project_id}/materials`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          material_id: materialId,
+          quantity: editValues.quantity,
+          markup_percent: editValues.markup_percent
+        })
+      })
+      if (!res.ok) throw new Error('Failed')
+      setEditingMaterial(null)
+      fetchProjectData()
+    } catch {
+      setToast({ show: true, message: 'Kunde inte uppdatera', type: 'error' })
+    }
+  }
+
+  const handleDeleteMaterial = async (materialId: string) => {
+    if (!confirm('Ta bort material?')) return
+    try {
+      const res = await fetch(`/api/projects/${project?.project_id}/materials?materialId=${materialId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Failed')
+      fetchProjectData()
+      setToast({ show: true, message: 'Material borttaget', type: 'success' })
+    } catch {
+      setToast({ show: true, message: 'Kunde inte ta bort', type: 'error' })
+    }
+  }
+
+  const handleInvoiceMaterials = async () => {
+    const uninvoiced = materials.filter(m => !m.invoiced)
+    if (uninvoiced.length === 0) return
+    try {
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: project?.customer_id,
+          project_material_ids: uninvoiced.map(m => m.material_id)
+        })
+      })
+      if (!res.ok) throw new Error('Failed')
+      const data = await res.json()
+      fetchProjectData()
+      setToast({ show: true, message: `Faktura ${data.invoice?.invoice_number} skapad`, type: 'success' })
+    } catch {
+      setToast({ show: true, message: 'Kunde inte skapa faktura', type: 'error' })
+    }
+  }
+
   // --- Loading / Not Found ---
 
   if (loading) {
@@ -415,6 +546,7 @@ export default function ProjectDetailPage() {
     { key: 'milestones', label: 'Delmoment' },
     { key: 'changes', label: 'ATA' },
     { key: 'time', label: 'Tidrapporter' },
+    { key: 'material', label: 'Material' },
     { key: 'economy', label: 'Ekonomi' }
   ]
 
@@ -960,6 +1092,170 @@ export default function ProjectDetailPage() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* === TAB: Material === */}
+        {activeTab === 'material' && (
+          <div className="space-y-6">
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+                <p className="text-xs text-zinc-500 mb-1">Inköpskostnad</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(materialSummary?.total_purchase || 0)}</p>
+              </div>
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+                <p className="text-xs text-zinc-500 mb-1">Kundpris</p>
+                <p className="text-xl font-bold text-white">{formatCurrency(materialSummary?.total_sell || 0)}</p>
+              </div>
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+                <p className="text-xs text-zinc-500 mb-1">Marginal</p>
+                <p className="text-xl font-bold text-emerald-400">
+                  {formatCurrency(materialSummary?.margin_amount || 0)}
+                  <span className="text-sm ml-1">({Math.round(materialSummary?.margin_percent || 0)}%)</span>
+                </p>
+              </div>
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+                <p className="text-xs text-zinc-500 mb-1">Ofakturerat</p>
+                <p className="text-xl font-bold text-amber-400">{formatCurrency(materialSummary?.uninvoiced_sell || 0)}</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Material ({materials.length})</h3>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowProductSearch(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl text-sm hover:opacity-90"
+                >
+                  <Plus className="w-4 h-4" /> Lägg till material
+                </button>
+                {(materialSummary?.uninvoiced_count || 0) > 0 && (
+                  <button
+                    onClick={handleInvoiceMaterials}
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm hover:bg-emerald-500/30"
+                  >
+                    <Receipt className="w-4 h-4" /> Fakturera ({formatCurrency(materialSummary?.uninvoiced_sell || 0)})
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Material list */}
+            {materials.length === 0 ? (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                <Package className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                <p className="text-zinc-400 mb-1">Inga material tillagda</p>
+                <p className="text-sm text-zinc-600">Sök och lägg till material från grossister</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 overflow-hidden">
+                {/* Table header */}
+                <div className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-zinc-800 text-xs text-zinc-500 font-medium">
+                  <div className="col-span-3">Produkt</div>
+                  <div className="col-span-2">Leverantör</div>
+                  <div className="col-span-1 text-right">Antal</div>
+                  <div className="col-span-1 text-right">Inköp</div>
+                  <div className="col-span-1 text-right">Påslag</div>
+                  <div className="col-span-1 text-right">Kundpris</div>
+                  <div className="col-span-1 text-right">Totalt</div>
+                  <div className="col-span-2 text-right">Status</div>
+                </div>
+                {/* Rows */}
+                {materials.map(mat => (
+                  <div key={mat.material_id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-zinc-800/50 items-center hover:bg-zinc-800/30">
+                    <div className="col-span-3">
+                      <p className="text-sm font-medium text-white truncate">{mat.name}</p>
+                      {mat.sku && <p className="text-xs text-zinc-500">Art: {mat.sku}</p>}
+                    </div>
+                    <div className="col-span-2 text-sm text-zinc-400 truncate">{mat.supplier_name || '-'}</div>
+                    {editingMaterial === mat.material_id ? (
+                      <>
+                        <div className="col-span-1">
+                          <input
+                            type="number"
+                            value={editValues.quantity}
+                            onChange={e => setEditValues(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-white text-right"
+                          />
+                        </div>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1">
+                          <input
+                            type="number"
+                            value={editValues.markup_percent}
+                            onChange={e => setEditValues(prev => ({ ...prev, markup_percent: parseFloat(e.target.value) || 0 }))}
+                            className="w-full px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-white text-right"
+                          />
+                        </div>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">
+                          {Math.round((mat.purchase_price || 0) * (1 + editValues.markup_percent / 100))} kr
+                        </div>
+                        <div className="col-span-1 text-sm text-white text-right font-medium">
+                          {formatCurrency(Math.round(editValues.quantity * (mat.purchase_price || 0) * (1 + editValues.markup_percent / 100)))}
+                        </div>
+                        <div className="col-span-2 flex justify-end gap-1">
+                          <button
+                            onClick={() => handleUpdateMaterial(mat.material_id)}
+                            className="p-1 text-emerald-400 hover:text-emerald-300"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => setEditingMaterial(null)}
+                            className="p-1 text-zinc-500 hover:text-zinc-300"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.quantity} {mat.unit}</div>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.markup_percent}%</div>
+                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.sell_price} kr</div>
+                        <div className="col-span-1 text-sm text-white text-right font-medium">{formatCurrency(mat.total_sell || 0)}</div>
+                        <div className="col-span-2 flex items-center justify-end gap-1">
+                          {mat.invoiced ? (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              Fakturerad
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingMaterial(mat.material_id)
+                                  setEditValues({ quantity: mat.quantity, markup_percent: mat.markup_percent })
+                                }}
+                                className="p-1 text-zinc-500 hover:text-violet-400"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteMaterial(mat.material_id)}
+                                className="p-1 text-zinc-500 hover:text-red-400"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Product search modal */}
+            <ProductSearchModal
+              isOpen={showProductSearch}
+              onClose={() => setShowProductSearch(false)}
+              onSelect={handleAddMaterial}
+              businessId={business.business_id}
+            />
           </div>
         )}
 
