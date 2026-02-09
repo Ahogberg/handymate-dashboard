@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Calendar,
   Users,
+  UsersRound,
   Inbox,
   Settings,
   Zap,
@@ -18,9 +19,11 @@ import {
   Mic,
   Menu,
   X,
-  FolderKanban
+  FolderKanban,
+  User
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 
 interface SidebarProps {
   businessName: string
@@ -54,18 +57,40 @@ const menuItems: MenuItem[] = [
     ]
   },
   { name: 'Inställningar', href: '/dashboard/settings', icon: Settings },
+  { name: 'Team', href: '/dashboard/team', icon: UsersRound },
 ]
+
+function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+}
 
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
   const [expandedMenus, setExpandedMenus] = useState<string[]>(['Offerter & Fakturor'])
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  const { user: currentUser } = useCurrentUser()
 
-  // Close mobile menu on route change
+  // Close mobile menu and user menu on route change
   useEffect(() => {
     setIsMobileOpen(false)
+    setUserMenuOpen(false)
   }, [pathname])
+
+  // Close user menu on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [userMenuOpen])
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -146,6 +171,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       {/* Menu */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {menuItems.map((item) => {
+          // Hide Team for employees without manage_users
+          if (item.name === 'Team' && currentUser && currentUser.role === 'employee' && !currentUser.can_manage_users) {
+            return null
+          }
           const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
           const hasSubItems = item.subItems && item.subItems.length > 0
           const isExpanded = expandedMenus.includes(item.name)
@@ -225,24 +254,47 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         })}
       </nav>
 
-      {/* Company Badge + Logout */}
+      {/* User Menu */}
       <div className="p-4 border-t border-zinc-800">
-        <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-lg flex items-center justify-center flex-shrink-0">
+        <div className="relative" ref={userMenuRef}>
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-all"
+          >
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: currentUser?.color || '#8B5CF6' }}
+            >
               <span className="text-white text-xs font-bold">
-                {businessName.substring(0, 2).toUpperCase()}
+                {currentUser ? getInitials(currentUser.name) : businessName.substring(0, 2).toUpperCase()}
               </span>
             </div>
-            <span className="text-sm text-zinc-300 truncate">{businessName}</span>
-          </div>
-          <button
-            onClick={onLogout}
-            className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
-            title="Logga ut"
-          >
-            <LogOut className="w-4 h-4" />
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-sm text-white truncate">{currentUser?.name || businessName}</p>
+              <p className="text-xs text-zinc-500 truncate">{currentUser?.email || ''}</p>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
           </button>
+
+          {userMenuOpen && (
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden">
+              <Link
+                href="/dashboard/profile"
+                className="flex items-center gap-2 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 transition-all"
+              >
+                <User className="w-4 h-4" />
+                Min profil
+              </Link>
+              <div className="border-t border-zinc-800" />
+              <button
+                onClick={onLogout}
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-all"
+              >
+                <LogOut className="w-4 h-4" />
+                Logga ut
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

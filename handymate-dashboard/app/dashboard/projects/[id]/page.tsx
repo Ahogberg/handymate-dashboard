@@ -28,10 +28,13 @@ import {
   CircleDot,
   X,
   Package,
-  Search
+  Search,
+  Users,
+  UserPlus
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import Link from 'next/link'
@@ -135,7 +138,33 @@ interface Profitability {
   margin: { amount: number; percent: number }
 }
 
-type TabKey = 'overview' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+type TabKey = 'overview' | 'team' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+
+interface ProjectAssignment {
+  id: string
+  business_user_id: string
+  role: string
+  assigned_at: string
+  business_user: {
+    id: string
+    name: string
+    email: string
+    role: string
+    title: string | null
+    color: string
+    avatar_url: string | null
+    is_active: boolean
+  }
+}
+
+interface TeamMemberOption {
+  id: string
+  name: string
+  email: string
+  role: string
+  title: string | null
+  color: string
+}
 
 interface ProjectMaterial {
   material_id: string
@@ -215,6 +244,7 @@ export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
   const business = useBusiness()
+  const { can } = useCurrentUser()
   const projectId = params.id as string
 
   // Core data
@@ -229,6 +259,12 @@ export default function ProjectDetailPage() {
   const [showProductSearch, setShowProductSearch] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{ quantity: number; markup_percent: number }>({ quantity: 1, markup_percent: 20 })
+
+  // Team state
+  const [projectTeam, setProjectTeam] = useState<ProjectAssignment[]>([])
+  const [allTeamMembers, setAllTeamMembers] = useState<TeamMemberOption[]>([])
+  const [assignLoading, setAssignLoading] = useState(false)
+  const [showAddMember, setShowAddMember] = useState(false)
 
   // UI state
   const [loading, setLoading] = useState(true)
@@ -312,6 +348,67 @@ export default function ProjectDetailPage() {
       fetchProfitability()
     }
   }, [activeTab, fetchProfitability])
+
+  const fetchProjectTeam = useCallback(async () => {
+    try {
+      const [teamRes, membersRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/team`),
+        fetch('/api/team')
+      ])
+      if (teamRes.ok) {
+        const data = await teamRes.json()
+        setProjectTeam(data.assignments || [])
+      }
+      if (membersRes.ok) {
+        const data = await membersRes.json()
+        setAllTeamMembers(
+          (data.members || [])
+            .filter((m: any) => m.is_active && m.accepted_at)
+            .map((m: any) => ({ id: m.id, name: m.name, email: m.email, role: m.role, title: m.title, color: m.color }))
+        )
+      }
+    } catch { /* ignore */ }
+  }, [projectId])
+
+  useEffect(() => {
+    if (activeTab === 'team') {
+      fetchProjectTeam()
+    }
+  }, [activeTab, fetchProjectTeam])
+
+  const handleAssignMember = async (businessUserId: string) => {
+    setAssignLoading(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessUserId, role: 'member' })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error)
+      }
+      showToast('Teammedlem tillagd', 'success')
+      setShowAddMember(false)
+      fetchProjectTeam()
+    } catch (err: any) {
+      showToast(err.message || 'Kunde inte tilldela', 'error')
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  const handleRemoveMember = async (businessUserId: string) => {
+    if (!confirm('Ta bort denna person från projektet?')) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team?userId=${businessUserId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      showToast('Tilldelning borttagen', 'success')
+      fetchProjectTeam()
+    } catch {
+      showToast('Kunde inte ta bort tilldelning', 'error')
+    }
+  }
 
   // --- Actions ---
 
@@ -543,6 +640,7 @@ export default function ProjectDetailPage() {
 
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'overview', label: 'Oversikt' },
+    { key: 'team', label: 'Team' },
     { key: 'milestones', label: 'Delmoment' },
     { key: 'changes', label: 'ATA' },
     { key: 'time', label: 'Tidrapporter' },
@@ -1256,6 +1354,99 @@ export default function ProjectDetailPage() {
               onSelect={handleAddMaterial}
               businessId={business.business_id}
             />
+          </div>
+        )}
+
+        {/* === TAB: Team === */}
+        {activeTab === 'team' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Users className="w-5 h-5 text-violet-400" />
+                Tilldelade ({projectTeam.length})
+              </h2>
+              {can('see_all_projects') && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAddMember(!showAddMember)}
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Lagg till
+                  </button>
+                  {showAddMember && (
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-30 overflow-hidden">
+                      {allTeamMembers
+                        .filter(m => !projectTeam.some(a => a.business_user_id === m.id))
+                        .map(member => (
+                          <button
+                            key={member.id}
+                            onClick={() => handleAssignMember(member.id)}
+                            disabled={assignLoading}
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800 transition-all disabled:opacity-50"
+                          >
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: member.color }}
+                            >
+                              <span className="text-white text-xs font-bold">
+                                {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm text-white truncate">{member.name}</p>
+                              <p className="text-xs text-zinc-500 truncate">{member.title || member.role}</p>
+                            </div>
+                          </button>
+                        ))}
+                      {allTeamMembers.filter(m => !projectTeam.some(a => a.business_user_id === m.id)).length === 0 && (
+                        <p className="px-4 py-3 text-sm text-zinc-500">Alla teammedlemmar ar redan tillagda</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {projectTeam.length === 0 ? (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                <Users className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                <p className="text-zinc-400 font-medium">Ingen tilldelad annu</p>
+                <p className="text-zinc-600 text-sm mt-1">Lagg till teammedlemmar for att tilldela dem detta projekt</p>
+              </div>
+            ) : (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+                {projectTeam.map(assignment => (
+                  <div key={assignment.id} className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: assignment.business_user.color }}
+                      >
+                        <span className="text-white text-sm font-bold">
+                          {assignment.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{assignment.business_user.name}</p>
+                        <p className="text-xs text-zinc-500">{assignment.business_user.title || assignment.business_user.role}</p>
+                      </div>
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+                        {assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}
+                      </span>
+                    </div>
+                    {can('see_all_projects') && (
+                      <button
+                        onClick={() => handleRemoveMember(assignment.business_user_id)}
+                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import {
   format,
   startOfWeek,
@@ -44,6 +45,7 @@ interface TimeEntry {
   booking_id: string | null
   customer_id: string | null
   work_type_id: string | null
+  business_user_id: string | null
   description: string | null
   work_date: string
   start_time: string | null
@@ -57,6 +59,13 @@ interface TimeEntry {
   customer?: { customer_id: string; name: string }
   booking?: { booking_id: string; notes: string }
   work_type?: { work_type_id: string; name: string; multiplier: number }
+  business_user?: { id: string; name: string; color: string } | null
+}
+
+interface TeamMemberBasic {
+  id: string
+  name: string
+  color: string
 }
 
 interface WorkType {
@@ -90,11 +99,15 @@ interface Stats {
 
 export default function TimePage() {
   const business = useBusiness()
+  const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
   const [entries, setEntries] = useState<TimeEntry[]>([])
   const [workTypes, setWorkTypes] = useState<WorkType[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [projects, setProjects] = useState<{ project_id: string; name: string; customer_id: string | null }[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMemberBasic[]>([])
+  const [filterPerson, setFilterPerson] = useState<string>('')
+  const [formPersonId, setFormPersonId] = useState<string>('')
   const [stats, setStats] = useState<Stats>({
     totalMinutesWeek: 0, billableMinutesWeek: 0, totalMinutesMonth: 0,
     entriesThisWeek: 0, uninvoicedMinutes: 0, uninvoicedRevenue: 0
@@ -158,7 +171,7 @@ export default function TimePage() {
     if (business.business_id) {
       fetchEntries()
     }
-  }, [currentWeek, business.business_id])
+  }, [currentWeek, business.business_id, filterPerson])
 
   // Timer tick
   useEffect(() => {
@@ -172,21 +185,36 @@ export default function TimePage() {
   }, [activeTimer, timerStart])
 
   async function fetchAll() {
-    await Promise.all([fetchEntries(), fetchWorkTypes(), fetchCustomersAndBookings(), fetchStats()])
+    await Promise.all([fetchEntries(), fetchWorkTypes(), fetchCustomersAndBookings(), fetchStats(), fetchTeamMembers()])
     setLoading(false)
+  }
+
+  async function fetchTeamMembers() {
+    try {
+      const res = await fetch('/api/team')
+      if (res.ok) {
+        const data = await res.json()
+        setTeamMembers(
+          (data.members || [])
+            .filter((m: any) => m.is_active && m.accepted_at)
+            .map((m: any) => ({ id: m.id, name: m.name, color: m.color }))
+        )
+      }
+    } catch { /* ignore */ }
   }
 
   async function fetchEntries() {
     const ws = format(startOfWeek(currentWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd')
     const we = format(endOfWeek(currentWeek, { weekStartsOn: 1 }), 'yyyy-MM-dd')
 
-    const { data } = await supabase
+    let query = supabase
       .from('time_entry')
       .select(`
         *,
         customer:customer_id (customer_id, name),
         booking:booking_id (booking_id, notes),
-        work_type:work_type_id (work_type_id, name, multiplier)
+        work_type:work_type_id (work_type_id, name, multiplier),
+        business_user:business_user_id (id, name, color)
       `)
       .eq('business_id', business.business_id)
       .gte('work_date', ws)
@@ -194,6 +222,15 @@ export default function TimePage() {
       .order('work_date', { ascending: false })
       .order('created_at', { ascending: false })
 
+    // Person filter
+    if (!isOwnerOrAdmin && currentUser) {
+      // Employee only sees own entries
+      query = query.eq('business_user_id', currentUser.id)
+    } else if (filterPerson) {
+      query = query.eq('business_user_id', filterPerson)
+    }
+
+    const { data } = await query
     setEntries(data || [])
   }
 
@@ -308,6 +345,7 @@ export default function TimePage() {
       hourly_rate: '',
       is_billable: true
     })
+    setFormPersonId(currentUser?.id || '')
     setShowModal(true)
   }
 
@@ -326,6 +364,7 @@ export default function TimePage() {
       hourly_rate: entry.hourly_rate?.toString() || '',
       is_billable: entry.is_billable
     })
+    setFormPersonId(entry.business_user_id || currentUser?.id || '')
     setShowModal(true)
   }
 
@@ -335,11 +374,15 @@ export default function TimePage() {
       const totalMins = (formData.duration_hours * 60) + formData.duration_minutes
       if (totalMins <= 0) { showToast('Ange en tid längre än 0', 'error'); setSaving(false); return }
 
+      // Determine which user to assign the entry to
+      const assignToUser = isOwnerOrAdmin && formPersonId ? formPersonId : currentUser?.id || null
+
       const entryData = {
         business_id: business.business_id,
         customer_id: formData.customer_id || null,
         booking_id: formData.booking_id || null,
         work_type_id: formData.work_type_id || null,
+        business_user_id: assignToUser,
         description: formData.description || null,
         work_date: formData.work_date,
         duration_minutes: totalMins,
@@ -542,6 +585,22 @@ export default function TimePage() {
             </div>
 
             <div className="space-y-4">
+              {/* Registrera för (admin/owner only) */}
+              {isOwnerOrAdmin && teamMembers.length > 1 && (
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Registrera för</label>
+                  <select
+                    value={formPersonId}
+                    onChange={e => setFormPersonId(e.target.value)}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  >
+                    {teamMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}{m.id === currentUser?.id ? ' (dig)' : ''}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Datum */}
               <div>
                 <label className="block text-sm text-zinc-400 mb-2">Datum</label>
@@ -694,6 +753,20 @@ export default function TimePage() {
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Person filter for admin/owner */}
+            {isOwnerOrAdmin && teamMembers.length > 1 && (
+              <select
+                value={filterPerson}
+                onChange={e => setFilterPerson(e.target.value)}
+                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              >
+                <option value="">Alla i teamet</option>
+                {teamMembers.map(m => (
+                  <option key={m.id} value={m.id}>{m.name}</option>
+                ))}
+              </select>
+            )}
+
             {activeTimer ? (
               <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
@@ -983,6 +1056,12 @@ export default function TimePage() {
                             <Calendar className="w-3 h-3" />
                             {format(parseISO(entry.work_date), 'EEE d MMM', { locale: sv })}
                           </span>
+                          {isOwnerOrAdmin && entry.business_user && (
+                            <span className="flex items-center gap-1">
+                              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: entry.business_user.color }} />
+                              {entry.business_user.name}
+                            </span>
+                          )}
                           {entry.customer && (
                             <span className="flex items-center gap-1">
                               <User className="w-3 h-3" />

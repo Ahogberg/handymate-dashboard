@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
 
 interface Project {
@@ -48,8 +49,10 @@ interface Customer {
 
 export default function ProjectsPage() {
   const business = useBusiness()
+  const { user: currentUser, can } = useCurrentUser()
   const [projects, setProjects] = useState<Project[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [projectAssignments, setProjectAssignments] = useState<Record<string, { id: string; name: string; color: string }[]>>({})
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('active')
   const [searchTerm, setSearchTerm] = useState('')
@@ -71,8 +74,24 @@ export default function ProjectsPage() {
     if (business.business_id) {
       fetchProjects()
       fetchCustomers()
+      fetchProjectAssignments()
     }
   }, [business.business_id, filter])
+
+  async function fetchProjectAssignments() {
+    const { data } = await supabase
+      .from('project_assignment')
+      .select('project_id, business_user:business_user_id (id, name, color)')
+      .eq('business_id', business.business_id)
+
+    const map: Record<string, { id: string; name: string; color: string }[]> = {}
+    for (const a of (data || [])) {
+      if (!map[a.project_id]) map[a.project_id] = []
+      const bu = a.business_user as any
+      if (bu) map[a.project_id].push({ id: bu.id, name: bu.name, color: bu.color })
+    }
+    setProjectAssignments(map)
+  }
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -190,7 +209,16 @@ export default function ProjectsPage() {
     return 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
   }
 
-  const filteredProjects = projects.filter(p =>
+  const visibleProjects = projects.filter(p => {
+    // Employee without can_see_all_projects: only show assigned projects
+    if (currentUser && !can('see_all_projects')) {
+      const assignees = projectAssignments[p.project_id] || []
+      if (!assignees.some(a => a.id === currentUser.id)) return false
+    }
+    return true
+  })
+
+  const filteredProjects = visibleProjects.filter(p =>
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -331,6 +359,26 @@ export default function ProjectsPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-4 text-sm text-zinc-500">
+                        {/* Avatar stack */}
+                        {projectAssignments[project.project_id]?.length > 0 && (
+                          <div className="flex -space-x-1.5">
+                            {projectAssignments[project.project_id].slice(0, 3).map((user, i) => (
+                              <div
+                                key={i}
+                                className="w-5 h-5 rounded-full border border-[#09090b] flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: user.color }}
+                                title={user.name}
+                              >
+                                <span className="text-white text-[8px] font-bold">{user.name[0]}</span>
+                              </div>
+                            ))}
+                            {projectAssignments[project.project_id].length > 3 && (
+                              <div className="w-5 h-5 rounded-full border border-[#09090b] bg-zinc-700 flex items-center justify-center flex-shrink-0">
+                                <span className="text-white text-[8px]">+{projectAssignments[project.project_id].length - 3}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {project.customer && (
                           <span className="flex items-center gap-1">
                             <User className="w-3 h-3" />
