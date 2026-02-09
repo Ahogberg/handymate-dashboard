@@ -138,7 +138,19 @@ interface Profitability {
   margin: { amount: number; percent: number }
 }
 
-type TabKey = 'overview' | 'team' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+
+interface ScheduleEntry {
+  id: string
+  title: string
+  start_datetime: string
+  end_datetime: string
+  all_day: boolean
+  type: string
+  status: string
+  color: string | null
+  business_user?: { id: string; name: string; color: string }
+}
 
 interface ProjectAssignment {
   id: string
@@ -266,6 +278,9 @@ export default function ProjectDetailPage() {
   const [assignLoading, setAssignLoading] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
 
+  // Schedule state
+  const [projectSchedule, setProjectSchedule] = useState<ScheduleEntry[]>([])
+
   // UI state
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -374,7 +389,23 @@ export default function ProjectDetailPage() {
     if (activeTab === 'team') {
       fetchProjectTeam()
     }
+    if (activeTab === 'schedule') {
+      fetchProjectSchedule()
+    }
   }, [activeTab, fetchProjectTeam])
+
+  const fetchProjectSchedule = useCallback(async () => {
+    try {
+      const now = new Date()
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0]
+      const end = new Date(now.getFullYear(), now.getMonth() + 3, 0).toISOString().split('T')[0]
+      const res = await fetch(`/api/schedule?start_date=${start}&end_date=${end}&project_id=${projectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProjectSchedule(data.entries || [])
+      }
+    } catch { /* ignore */ }
+  }, [projectId])
 
   const handleAssignMember = async (businessUserId: string) => {
     setAssignLoading(true)
@@ -641,6 +672,7 @@ export default function ProjectDetailPage() {
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'overview', label: 'Oversikt' },
     { key: 'team', label: 'Team' },
+    { key: 'schedule', label: 'Schema' },
     { key: 'milestones', label: 'Delmoment' },
     { key: 'changes', label: 'ATA' },
     { key: 'time', label: 'Tidrapporter' },
@@ -877,6 +909,79 @@ export default function ProjectDetailPage() {
                 <span className="text-sm text-zinc-300">Fakturera</span>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* === TAB: Schema === */}
+        {activeTab === 'schedule' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-violet-400" />
+                Planerade arbetstillfällen ({projectSchedule.length})
+              </h2>
+              <Link
+                href={`/dashboard/schedule?project=${projectId}`}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+              >
+                <Plus className="w-4 h-4" />
+                Planera arbete
+              </Link>
+            </div>
+
+            {projectSchedule.length === 0 ? (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                <Calendar className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                <p className="text-zinc-400 mb-2">Inga schemalagda tillfällen ännu</p>
+                <p className="text-zinc-600 text-sm">Planera arbete via resursplaneringen</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {projectSchedule.map(entry => {
+                  const startDate = new Date(entry.start_datetime)
+                  const endDate = new Date(entry.end_datetime)
+                  const isPast = endDate < new Date()
+                  const dateStr = startDate.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })
+                  const timeStr = entry.all_day
+                    ? 'Heldag'
+                    : `${startDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className={`bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
+                    >
+                      <div className="w-1 h-12 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.business_user?.color || '#8B5CF6' }} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{entry.title}</p>
+                        <div className="flex items-center gap-3 text-sm text-zinc-400 mt-0.5">
+                          <span>{dateStr}</span>
+                          <span>{timeStr}</span>
+                        </div>
+                      </div>
+                      {entry.business_user && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                            style={{ backgroundColor: entry.business_user.color }}
+                          >
+                            {entry.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                          </div>
+                          <span className="text-sm text-zinc-400 hidden sm:block">{entry.business_user.name}</span>
+                        </div>
+                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full border shrink-0 ${
+                        entry.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : entry.status === 'cancelled' ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                          : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                      }`}>
+                        {entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 

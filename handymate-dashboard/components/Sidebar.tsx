@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   Users,
   UsersRound,
   Inbox,
@@ -44,6 +45,7 @@ const menuItems: MenuItem[] = [
   { name: 'Assistent', href: '/dashboard/assistant', icon: Mic },
   { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox, badge: true },
   { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
+  { name: 'Resurser', href: '/dashboard/schedule', icon: CalendarDays },
   { name: 'Kunder', href: '/dashboard/customers', icon: Users },
   {
     name: 'Offerter & Fakturor',

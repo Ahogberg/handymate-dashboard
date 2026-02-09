@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import {
   Calendar,
+  CalendarDays,
   Users,
   TrendingUp,
   TrendingDown,
@@ -61,6 +62,7 @@ export default function DashboardPage() {
   const [callCount, setCallCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [activeProjects, setActiveProjects] = useState(0)
+  const [scheduleToday, setScheduleToday] = useState<{ count: number; people: number; entries: { title: string; color: string; time: string }[] }>({ count: 0, people: 0, entries: [] })
 
   useEffect(() => {
     fetchData()
@@ -128,6 +130,25 @@ export default function DashboardPage() {
       .in('status', ['planning', 'active', 'paused'])
 
     setActiveProjects(projectCount || 0)
+
+    // Hämta dagens schema
+    try {
+      const schedRes = await fetch(`/api/schedule?start_date=${todayStr}&end_date=${todayStr}`)
+      if (schedRes.ok) {
+        const schedData = await schedRes.json()
+        const entries = schedData.entries || []
+        const uniquePeople = new Set(entries.map((e: any) => e.business_user_id))
+        setScheduleToday({
+          count: entries.length,
+          people: uniquePeople.size,
+          entries: entries.slice(0, 3).map((e: any) => ({
+            title: e.title,
+            color: e.color || e.business_user?.color || '#8B5CF6',
+            time: e.all_day ? 'Heldag' : new Date(e.start_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          }))
+        })
+      }
+    } catch { /* ignore */ }
 
     // Hämta statistik från API
     try {
@@ -421,6 +442,38 @@ export default function DashboardPage() {
                 <BookingsChart data={stats.bookings_per_day} />
               </div>
             )}
+
+            {/* Dagens schema */}
+            <Link href="/dashboard/schedule" className="block bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition-all group">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-violet-400" />
+                  Dagens schema
+                </h3>
+                <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+              </div>
+              {scheduleToday.count === 0 ? (
+                <p className="text-zinc-500 text-sm">Inga schemalagda aktiviteter idag</p>
+              ) : (
+                <>
+                  <p className="text-xs text-zinc-400 mb-2">
+                    {scheduleToday.count} aktiviteter · {scheduleToday.people} {scheduleToday.people === 1 ? 'person' : 'personer'}
+                  </p>
+                  <div className="space-y-1.5">
+                    {scheduleToday.entries.map((entry, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                        <span className="text-sm text-zinc-300 truncate flex-1">{entry.title}</span>
+                        <span className="text-xs text-zinc-500 shrink-0">{entry.time}</span>
+                      </div>
+                    ))}
+                    {scheduleToday.count > 3 && (
+                      <p className="text-xs text-violet-400">+{scheduleToday.count - 3} fler</p>
+                    )}
+                  </div>
+                </>
+              )}
+            </Link>
 
             {/* Snabblänkar */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
