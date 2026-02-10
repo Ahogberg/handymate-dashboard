@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
-import { User, Mail, Phone, Save, Loader2, Calendar, Clock, Shield } from 'lucide-react'
+import { User, Mail, Phone, Save, Loader2, Calendar, Clock, Shield, CalendarDays, ExternalLink, XCircle } from 'lucide-react'
 
 function getInitials(name: string): string {
   return name
@@ -51,6 +51,7 @@ export default function ProfilePage() {
     type: 'success' | 'error'
   }>({ show: false, message: '', type: 'success' })
   const [initialized, setInitialized] = useState(false)
+  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null; syncDirection: string; lastSyncAt: string | null } | null>(null)
 
   useEffect(() => {
     if (user && !initialized) {
@@ -62,6 +63,10 @@ export default function ProfilePage() {
       setInitialized(true)
     }
   }, [user, initialized])
+
+  useEffect(() => {
+    fetch('/api/google/status').then(r => r.json()).then(d => setGoogleStatus(d)).catch(() => {})
+  }, [])
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -285,6 +290,61 @@ export default function ProfilePage() {
               Senast inloggad
             </p>
             <p className="text-white text-sm font-medium">{formatDate(lastLoginAt)}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Connected Calendars */}
+      <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-6 mt-6">
+        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-violet-400" />
+          Anslutna kalendrar
+        </h3>
+
+        <div className="space-y-3">
+          {/* Google Calendar */}
+          <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <CalendarDays className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Google Calendar</p>
+                <p className="text-xs text-zinc-500">
+                  {googleStatus?.connected ? googleStatus.email : 'Ej ansluten'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {googleStatus?.connected ? (
+                <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  Ansluten
+                </span>
+              ) : (
+                <a
+                  href="/api/google/connect"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30"
+                >
+                  <ExternalLink className="w-3 h-3" /> Anslut
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Outlook placeholder */}
+          <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl opacity-60">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-600/20">
+                <CalendarDays className="w-5 h-5 text-blue-300" />
+              </div>
+              <div>
+                <p className="font-medium text-white">Microsoft Outlook</p>
+                <p className="text-xs text-zinc-500">Kommer snart</p>
+              </div>
+            </div>
+            <span className="px-2 py-1 text-xs rounded-full bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+              Kommande
+            </span>
           </div>
         </div>
       </div>

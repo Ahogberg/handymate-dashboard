@@ -29,7 +29,8 @@ import {
   Upload,
   Trash2,
   Pencil,
-  Package
+  Package,
+  CalendarDays
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -243,6 +244,12 @@ export default function SettingsPage() {
   const [syncingPayments, setSyncingPayments] = useState(false)
   const [invoiceSyncResult, setInvoiceSyncResult] = useState<{ synced?: number; failed?: number; updated?: number; unchanged?: number } | null>(null)
 
+  // Google Calendar integration state
+  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null; calendarId: string | null; syncDirection: string; lastSyncAt: string | null; syncError: string | null } | null>(null)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [googleSyncing, setGoogleSyncing] = useState(false)
+  const [googleSyncResult, setGoogleSyncResult] = useState<any>(null)
+
   // Time tracking state
   const [workTypes, setWorkTypes] = useState<WorkType[]>([])
   const [editingWorkType, setEditingWorkType] = useState<WorkType | null>(null)
@@ -260,6 +267,7 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchConfig()
     fetchFortnoxStatus()
+    fetchGoogleStatus()
     fetchWorkTypes()
     fetchGrossistStatus()
   }, [business.business_id])
@@ -279,6 +287,20 @@ export default function SettingsPage() {
       showToast(message, 'error')
       window.history.replaceState({}, '', '/dashboard/settings')
     }
+
+    // Handle Google Calendar OAuth callback
+    const googleParam = searchParams.get('google')
+    if (googleParam === 'connected') {
+      setActiveTab('integrations')
+      showToast('Google Calendar kopplat!', 'success')
+      fetchGoogleStatus()
+      window.history.replaceState({}, '', '/dashboard/settings')
+    } else if (googleParam === 'error') {
+      setActiveTab('integrations')
+      const message = searchParams.get('message') || 'Kunde inte koppla Google Calendar'
+      showToast(message, 'error')
+      window.history.replaceState({}, '', '/dashboard/settings')
+    }
   }, [searchParams])
 
   async function fetchFortnoxStatus() {
@@ -290,6 +312,18 @@ export default function SettingsPage() {
       }
     } catch (error) {
       console.error('Failed to fetch Fortnox status:', error)
+    }
+  }
+
+  async function fetchGoogleStatus() {
+    try {
+      const response = await fetch('/api/google/status')
+      if (response.ok) {
+        const data = await response.json()
+        setGoogleStatus(data)
+      }
+    } catch (error) {
+      console.error('Failed to fetch Google Calendar status:', error)
     }
   }
 
@@ -602,6 +636,55 @@ export default function SettingsPage() {
     } finally {
       setSyncingPayments(false)
     }
+  }
+
+  // Google Calendar handlers
+  const handleConnectGoogle = () => {
+    setGoogleLoading(true)
+    window.location.href = '/api/google/connect'
+  }
+
+  const handleDisconnectGoogle = async () => {
+    try {
+      const res = await fetch('/api/google/disconnect', { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setGoogleStatus(null)
+      showToast('Google Calendar bortkopplad', 'success')
+    } catch {
+      showToast('Kunde inte koppla bort', 'error')
+    }
+  }
+
+  const handleGoogleSync = async () => {
+    setGoogleSyncing(true)
+    setGoogleSyncResult(null)
+    try {
+      const res = await fetch('/api/google/sync', { method: 'POST' })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setGoogleSyncResult(data)
+      // Refresh status
+      const statusRes = await fetch('/api/google/status')
+      if (statusRes.ok) setGoogleStatus(await statusRes.json())
+      showToast('Kalendersynk klar!', 'success')
+    } catch {
+      showToast('Synkning misslyckades', 'error')
+    } finally {
+      setGoogleSyncing(false)
+    }
+  }
+
+  const handleChangeSyncDirection = async (direction: string) => {
+    if (!googleStatus?.connected) return
+    try {
+      const { error } = await supabase
+        .from('calendar_connection')
+        .update({ sync_direction: direction })
+        .eq('account_email', googleStatus.email)
+      if (!error) {
+        setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)
+      }
+    } catch { /* ignore */ }
   }
 
   async function fetchGrossistStatus() {
@@ -1617,6 +1700,170 @@ export default function SettingsPage() {
         {/* Integrations Tab */}
         {activeTab === 'integrations' && (
           <div className="space-y-6">
+            {/* Google Calendar Integration */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-blue-500/20">
+                  <CalendarDays className="w-6 h-6 text-blue-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Google Calendar</h2>
+                  <p className="text-sm text-zinc-500">Tvåvägssynk med Google Calendar</p>
+                </div>
+              </div>
+
+              {googleStatus?.connected ? (
+                <div className="space-y-4">
+                  {/* Connected status */}
+                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                        <div>
+                          <p className="font-medium text-white">Ansluten</p>
+                          <p className="text-sm text-zinc-400">{googleStatus.email}</p>
+                        </div>
+                      </div>
+                      <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg">Aktiv</span>
+                    </div>
+                  </div>
+
+                  {/* Sync direction */}
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <label className="text-sm font-medium text-white block mb-2">Synk-riktning</label>
+                    <select
+                      value={googleStatus.syncDirection || 'both'}
+                      onChange={(e) => handleChangeSyncDirection(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    >
+                      <option value="both">Båda riktningar</option>
+                      <option value="export">Endast export (Handymate &rarr; Google)</option>
+                      <option value="import">Endast import (Google &rarr; Handymate)</option>
+                    </select>
+                  </div>
+
+                  {/* Last sync + manual sync */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-zinc-800/50 rounded-xl">
+                      <p className="text-xs text-zinc-500">Senaste synk</p>
+                      <p className="text-sm text-white">
+                        {googleStatus.lastSyncAt
+                          ? new Date(googleStatus.lastSyncAt).toLocaleString('sv-SE')
+                          : 'Aldrig'}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-zinc-800/50 rounded-xl">
+                      <p className="text-xs text-zinc-500">Ansluten sedan</p>
+                      <p className="text-sm text-white">
+                        Ansluten
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Sync error */}
+                  {googleStatus.syncError && (
+                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
+                      <p className="text-sm text-red-400">Synkfel: {googleStatus.syncError}</p>
+                    </div>
+                  )}
+
+                  {/* Sync button */}
+                  <button
+                    onClick={handleGoogleSync}
+                    disabled={googleSyncing}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                  >
+                    {googleSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
+                    Synka nu
+                  </button>
+
+                  {/* Sync result */}
+                  {googleSyncResult && (
+                    <div className="text-xs text-zinc-500">
+                      {googleSyncResult.imported > 0 && `${googleSyncResult.imported} importerade`}
+                      {googleSyncResult.exported > 0 && `, ${googleSyncResult.exported} exporterade`}
+                      {googleSyncResult.updated > 0 && `, ${googleSyncResult.updated} uppdaterade`}
+                    </div>
+                  )}
+
+                  {/* Features list */}
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-3">Med Google Calendar kopplat kan du:</p>
+                    <ul className="space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Se dina Google-events i Handymate-kalendern
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Synka Handymate-schema till Google Calendar
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        Automatisk synk var 2:a timme
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Disconnect */}
+                  <button
+                    onClick={handleDisconnectGoogle}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-red-400 hover:border-red-500/30 transition-colors"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Koppla bort Google Calendar
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-4 bg-zinc-800/50 rounded-xl">
+                    <p className="text-sm text-zinc-400 mb-3">Koppla Google Calendar för att:</p>
+                    <ul className="space-y-2 text-sm text-zinc-300">
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                        Synka ditt schema med Google Calendar
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                        Se externa events som upptagen tid
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
+                        Automatisk tvåvägssynk
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={handleConnectGoogle}
+                    disabled={googleLoading}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ExternalLink className="w-5 h-5" />}
+                    Anslut Google Calendar
+                  </button>
+
+                  <p className="text-xs text-zinc-600 text-center">
+                    Du omdirigeras till Google för att godkänna åtkomst till din kalender
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Outlook Calendar (placeholder) */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 opacity-60">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-blue-600/20">
+                  <CalendarDays className="w-6 h-6 text-blue-300" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Microsoft Outlook</h2>
+                  <p className="text-sm text-zinc-500">Kommer snart</p>
+                </div>
+              </div>
+              <p className="text-sm text-zinc-500">Outlook-kalender integration är under utveckling.</p>
+            </div>
+
             {/* Fortnox Integration */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
               <div className="flex items-center gap-3 mb-4">

@@ -20,7 +20,8 @@ import {
   Palmtree,
   AlertTriangle,
   ChevronDown,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -65,7 +66,7 @@ interface ScheduleEntry {
   start_datetime: string
   end_datetime: string
   all_day: boolean
-  type: 'project' | 'internal' | 'time_off' | 'travel'
+  type: 'project' | 'internal' | 'time_off' | 'travel' | 'external'
   status: 'scheduled' | 'completed' | 'cancelled'
   color: string | null
   business_user?: { id: string; name: string; color: string }
@@ -166,6 +167,8 @@ function getTypeIcon(type: string) {
       return <Car className="w-3 h-3" />
     case 'time_off':
       return <Palmtree className="w-3 h-3" />
+    case 'external':
+      return <CalendarDays className="w-3 h-3" />
     default:
       return null
   }
@@ -188,6 +191,7 @@ function getEntryPosition(entry: ScheduleEntry): { top: number; height: number }
 }
 
 function getEntryColor(entry: ScheduleEntry, members: TeamMember[]): string {
+  if (entry.type === 'external') return '#6b7280'
   if (entry.color) return entry.color
   if (entry.type === 'time_off') return '#6b7280'
   const member = members.find((m) => m.id === entry.business_user_id)
@@ -225,6 +229,10 @@ export default function SchedulePage() {
   const [timeOffModalOpen, setTimeOffModalOpen] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+
+  // Google Calendar sync
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   // Conflict warning
   const [conflicts, setConflicts] = useState<ScheduleEntry[]>([])
@@ -404,6 +412,13 @@ export default function SchedulePage() {
     fetchTimeOff()
   }, [fetchTimeOff])
 
+  // Fetch Google Calendar connection status
+  useEffect(() => {
+    fetch('/api/google/status').then(r => r.json()).then(d => {
+      setGoogleConnected(d.connected === true)
+    }).catch(() => {})
+  }, [])
+
   // ---------------------------------------------------------------------------
   // Navigation
   // ---------------------------------------------------------------------------
@@ -535,6 +550,8 @@ export default function SchedulePage() {
   }
 
   const openEditModal = (entry: ScheduleEntry) => {
+    // External entries (e.g. Google Calendar) are read-only
+    if (entry.type === 'external') return
     setEditingEntry(entry)
     setConflicts([])
     const start = parseISO(entry.start_datetime)
@@ -547,7 +564,7 @@ export default function SchedulePage() {
       all_day: entry.all_day,
       start_time: format(start, 'HH:mm'),
       end_time: format(end, 'HH:mm'),
-      type: entry.type === 'time_off' ? 'internal' : entry.type,
+      type: entry.type === 'time_off' ? 'internal' : entry.type as 'project' | 'internal' | 'travel',
       description: entry.description || '',
       color: entry.color || ''
     })
@@ -817,30 +834,36 @@ export default function SchedulePage() {
 
   function renderEntryBlock(entry: ScheduleEntry) {
     const { top, height } = getEntryPosition(entry)
-    const color = getEntryColor(entry, teamMembers)
+    const color = entry.type === 'external' ? '#6b7280' : getEntryColor(entry, teamMembers)
     const memberName = entry.business_user?.name || teamMembers.find((m) => m.id === entry.business_user_id)?.name || ''
     const startTime = format(parseISO(entry.start_datetime), 'HH:mm')
     const endTime = format(parseISO(entry.end_datetime), 'HH:mm')
+    const isExternal = entry.type === 'external'
 
     return (
       <button
         key={entry.id}
         onClick={(e) => {
           e.stopPropagation()
-          openEditModal(entry)
+          if (!isExternal) openEditModal(entry)
         }}
-        className="absolute left-1 right-1 rounded-lg px-2 py-1 text-left overflow-hidden cursor-pointer transition-opacity hover:opacity-90 z-10"
+        className={`absolute left-1 right-1 rounded-lg px-2 py-1 text-left overflow-hidden transition-opacity z-10 ${
+          isExternal ? 'opacity-75 cursor-default border border-dashed border-zinc-600' : 'cursor-pointer hover:opacity-90'
+        }`}
         style={{
           top: `${top}px`,
           height: `${height}px`,
           backgroundColor: `${color}20`,
           borderLeft: `3px solid ${color}`
         }}
-        title={`${entry.title} (${startTime}-${endTime})`}
+        title={isExternal ? `${entry.title} (Google Calendar)` : `${entry.title} (${startTime}-${endTime})`}
       >
         <div className="flex items-center gap-1 text-xs font-medium text-white truncate">
           {getTypeIcon(entry.type)}
           <span className="truncate">{entry.title}</span>
+          {isExternal && (
+            <span className="ml-auto text-[9px] text-blue-400 bg-blue-500/10 px-1 rounded flex-shrink-0">Google</span>
+          )}
         </div>
         {height > 36 && (
           <p className="text-[10px] text-zinc-400 mt-0.5 truncate">
@@ -874,14 +897,18 @@ export default function SchedulePage() {
             return (
               <div key={day.toISOString()} className="border-l border-zinc-800 min-h-[28px] p-0.5 flex flex-col gap-0.5">
                 {allDay.map((entry) => {
-                  const color = getEntryColor(entry, teamMembers)
+                  const color = entry.type === 'external' ? '#6b7280' : getEntryColor(entry, teamMembers)
+                  const isExternal = entry.type === 'external'
                   return (
                     <button
                       key={entry.id}
-                      onClick={() => openEditModal(entry)}
-                      className="text-[10px] px-1.5 py-0.5 rounded truncate text-left"
+                      onClick={() => { if (!isExternal) openEditModal(entry) }}
+                      className={`text-[10px] px-1.5 py-0.5 rounded truncate text-left ${
+                        isExternal ? 'opacity-75 border border-dashed border-zinc-600 cursor-default' : ''
+                      }`}
                       style={{ backgroundColor: `${color}30`, color: color }}
                     >
+                      {isExternal && <CalendarDays className="w-2.5 h-2.5 inline mr-0.5" />}
                       {entry.title}
                     </button>
                   )
@@ -994,17 +1021,22 @@ export default function SchedulePage() {
                 </div>
                 <div className="space-y-0.5">
                   {visibleEntries.map((entry) => {
-                    const color = getEntryColor(entry, teamMembers)
+                    const color = entry.type === 'external' ? '#6b7280' : getEntryColor(entry, teamMembers)
+                    const isExternal = entry.type === 'external'
                     return (
                       <button
                         key={entry.id}
                         onClick={(e) => {
                           e.stopPropagation()
-                          openEditModal(entry)
+                          if (!isExternal) openEditModal(entry)
                         }}
-                        className="flex items-center gap-1 w-full text-left"
+                        className={`flex items-center gap-1 w-full text-left ${isExternal ? 'opacity-75' : ''}`}
                       >
-                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        {isExternal ? (
+                          <CalendarDays className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                        ) : (
+                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+                        )}
                         <span className="text-[10px] text-zinc-300 truncate">{entry.title}</span>
                       </button>
                     )
@@ -1645,13 +1677,32 @@ export default function SchedulePage() {
               <p className="text-sm text-zinc-500 hidden sm:block">Planera och overblicka teamets schema</p>
             </div>
           </div>
-          <button
-            onClick={() => openCreateModal()}
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
-          >
-            <Plus className="w-4 h-4" />
-            Ny post
-          </button>
+          <div className="flex items-center gap-2">
+            {googleConnected && (
+              <button
+                onClick={async () => {
+                  setSyncing(true)
+                  try {
+                    await fetch('/api/google/sync', { method: 'POST' })
+                    fetchEntries()
+                  } catch {}
+                  setSyncing(false)
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-300 hover:border-violet-500/50 transition"
+                title="Synka med Google Calendar"
+              >
+                {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                <span className="hidden sm:inline">Synka</span>
+              </button>
+            )}
+            <button
+              onClick={() => openCreateModal()}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
+            >
+              <Plus className="w-4 h-4" />
+              Ny post
+            </button>
+          </div>
         </div>
 
         {/* Controls row */}
