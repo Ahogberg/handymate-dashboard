@@ -20,7 +20,9 @@ import {
   Calendar,
   RefreshCw,
   Receipt,
-  FolderKanban
+  FolderKanban,
+  Link2,
+  PenTool
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -78,6 +80,7 @@ export default function QuoteDetailPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
+  const [generatingSignLink, setGeneratingSignLink] = useState(false)
 
   useEffect(() => {
     fetchQuote()
@@ -230,6 +233,25 @@ export default function QuoteDetailPage() {
     }
   }
 
+  const generateSignLink = async () => {
+    if (!quote) return
+    setGeneratingSignLink(true)
+    try {
+      const response = await fetch(`/api/quotes/${quote.quote_id}/sign-link`, {
+        method: 'POST',
+      })
+      if (!response.ok) throw new Error('Kunde inte generera länk')
+      const data = await response.json()
+      await navigator.clipboard.writeText(data.url)
+      showToast('Signeringslänk kopierad till urklipp!', 'success')
+      fetchQuote()
+    } catch {
+      showToast('Något gick fel', 'error')
+    } finally {
+      setGeneratingSignLink(false)
+    }
+  }
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(amount)
   }
@@ -319,6 +341,16 @@ export default function QuoteDetailPage() {
             >
               <Send className="w-4 h-4" />
               Skicka offert
+            </button>
+          )}
+          {['draft', 'sent', 'opened'].includes(quote.status) && (
+            <button
+              onClick={generateSignLink}
+              disabled={generatingSignLink}
+              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 disabled:opacity-50"
+            >
+              {generatingSignLink ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+              Signeringslänk
             </button>
           )}
           {['sent', 'opened'].includes(quote.status) && (
@@ -562,6 +594,12 @@ export default function QuoteDetailPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
                     <span className="text-zinc-400">Accepterad {formatDate(quote.accepted_at)}</span>
+                  </div>
+                )}
+                {(quote as any).signed_at && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <span className="text-zinc-400">Signerad av {(quote as any).signed_by_name} {formatDate((quote as any).signed_at)}</span>
                   </div>
                 )}
                 {quote.declined_at && (
