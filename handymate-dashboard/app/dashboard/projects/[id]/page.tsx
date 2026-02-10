@@ -30,7 +30,16 @@ import {
   Package,
   Search,
   Users,
-  UserPlus
+  UserPlus,
+  Upload,
+  Download,
+  Image,
+  FolderOpen,
+  CloudSun,
+  BookOpen,
+  ClipboardCheck,
+  ClipboardList,
+  PenTool
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -138,7 +147,7 @@ interface Profitability {
   margin: { amount: number; percent: number }
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists'
 
 interface ScheduleEntry {
   id: string
@@ -281,6 +290,18 @@ export default function ProjectDetailPage() {
   // Schedule state
   const [projectSchedule, setProjectSchedule] = useState<ScheduleEntry[]>([])
 
+  // DEL 3-5: Documents, Logs, Checklists
+  const [documents, setDocuments] = useState<any[]>([])
+  const [docCategory, setDocCategory] = useState('all')
+  const [uploading, setUploading] = useState(false)
+  const [logs, setLogs] = useState<any[]>([])
+  const [showLogModal, setShowLogModal] = useState(false)
+  const [editingLog, setEditingLog] = useState<any>(null)
+  const [checklists, setChecklists] = useState<any[]>([])
+  const [checklistTemplates, setChecklistTemplates] = useState<any[]>([])
+  const [showChecklistCreate, setShowChecklistCreate] = useState(false)
+  const [activeChecklist, setActiveChecklist] = useState<any>(null)
+
   // UI state
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -392,6 +413,16 @@ export default function ProjectDetailPage() {
     if (activeTab === 'schedule') {
       fetchProjectSchedule()
     }
+    if (activeTab === 'documents') {
+      fetchDocuments()
+    }
+    if (activeTab === 'log') {
+      fetchLogs()
+    }
+    if (activeTab === 'checklists') {
+      fetchChecklists()
+      fetchChecklistTemplates()
+    }
   }, [activeTab, fetchProjectTeam])
 
   const fetchProjectSchedule = useCallback(async () => {
@@ -406,6 +437,169 @@ export default function ProjectDetailPage() {
       }
     } catch { /* ignore */ }
   }, [projectId])
+
+  // --- DEL 3-5: Fetch functions ---
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/documents${docCategory !== 'all' ? `?category=${docCategory}` : ''}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDocuments(data.documents || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchLogs = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/logs`)
+      if (res.ok) {
+        const data = await res.json()
+        setLogs(data.logs || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchChecklists = async () => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/checklists`)
+      if (res.ok) {
+        const data = await res.json()
+        setChecklists(data.checklists || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchChecklistTemplates = async () => {
+    try {
+      const res = await fetch('/api/checklists/templates')
+      if (res.ok) {
+        const data = await res.json()
+        setChecklistTemplates(data.templates || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('category', docCategory === 'all' ? 'other' : docCategory)
+      const res = await fetch(`/api/projects/${projectId}/documents`, { method: 'POST', body: formData })
+      if (!res.ok) throw new Error()
+      showToast('Dokument uppladdat!', 'success')
+      fetchDocuments()
+    } catch {
+      showToast('Kunde inte ladda upp fil', 'error')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDocDelete = async (docId: string) => {
+    if (!confirm('Ta bort detta dokument?')) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/documents/${docId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      showToast('Dokument borttaget', 'success')
+      fetchDocuments()
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
+  const handleDocDownload = async (docId: string) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/documents/${docId}`)
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      window.open(data.url, '_blank')
+    } catch {
+      showToast('Kunde inte hämta fil', 'error')
+    }
+  }
+
+  const handleSaveLog = async (logData: any) => {
+    try {
+      const method = editingLog ? 'PATCH' : 'POST'
+      const url = editingLog
+        ? `/api/projects/${projectId}/logs/${editingLog.id}`
+        : `/api/projects/${projectId}/logs`
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData),
+      })
+      if (!res.ok) throw new Error()
+      showToast(editingLog ? 'Anteckning uppdaterad!' : 'Anteckning skapad!', 'success')
+      setShowLogModal(false)
+      setEditingLog(null)
+      fetchLogs()
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+  }
+
+  const handleDeleteLog = async (logId: string) => {
+    if (!confirm('Ta bort denna dagboksanteckning?')) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/logs/${logId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      showToast('Anteckning borttagen', 'success')
+      fetchLogs()
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
+  const handleCreateChecklist = async (templateId: string, name: string, items: any[]) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/checklists`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, template_id: templateId, items }),
+      })
+      if (!res.ok) throw new Error()
+      showToast('Checklista skapad!', 'success')
+      setShowChecklistCreate(false)
+      fetchChecklists()
+    } catch {
+      showToast('Kunde inte skapa checklista', 'error')
+    }
+  }
+
+  const handleToggleChecklistItem = async (checklistId: string, itemIndex: number) => {
+    const cl = checklists.find((c: any) => c.id === checklistId)
+    if (!cl) return
+    const updatedItems = [...cl.items]
+    updatedItems[itemIndex] = { ...updatedItems[itemIndex], checked: !updatedItems[itemIndex].checked }
+    try {
+      const res = await fetch(`/api/projects/${projectId}/checklists/${checklistId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: updatedItems }),
+      })
+      if (!res.ok) throw new Error()
+      fetchChecklists()
+    } catch {
+      showToast('Kunde inte uppdatera', 'error')
+    }
+  }
+
+  const handleDeleteChecklist = async (checklistId: string) => {
+    if (!confirm('Ta bort denna checklista?')) return
+    try {
+      const res = await fetch(`/api/projects/${projectId}/checklists/${checklistId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      showToast('Checklista borttagen', 'success')
+      setActiveChecklist(null)
+      fetchChecklists()
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
 
   const handleAssignMember = async (businessUserId: string) => {
     setAssignLoading(true)
@@ -677,6 +871,9 @@ export default function ProjectDetailPage() {
     { key: 'changes', label: 'ATA' },
     { key: 'time', label: 'Tidrapporter' },
     { key: 'material', label: 'Material' },
+    { key: 'documents', label: 'Dokument' },
+    { key: 'log', label: 'Dagbok' },
+    { key: 'checklists', label: 'Checklistor' },
     { key: 'economy', label: 'Ekonomi' }
   ]
 
@@ -1555,6 +1752,308 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
+        {/* === TAB: Dokument === */}
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            {/* Upload + Filter */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                {['all', 'photo', 'drawing', 'contract', 'other'].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => { setDocCategory(cat); setTimeout(fetchDocuments, 50) }}
+                    className={`px-3 py-1.5 text-xs rounded-lg border transition ${
+                      docCategory === cat
+                        ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
+                        : 'bg-zinc-900/50 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                    }`}
+                  >
+                    {cat === 'all' ? 'Alla' : cat === 'photo' ? 'Foton' : cat === 'drawing' ? 'Ritningar' : cat === 'contract' ? 'Kontrakt' : 'Övrigt'}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                Ladda upp
+                <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploading} />
+              </label>
+            </div>
+
+            {/* Document Grid */}
+            {documents.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {documents.map((doc: any) => {
+                  const isImage = doc.mime_type?.startsWith('image/')
+                  return (
+                    <div key={doc.id} className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 transition">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-cyan-500/20' : 'bg-violet-500/20'}`}>
+                          {isImage ? <Image className="w-5 h-5 text-cyan-400" /> : <FileText className="w-5 h-5 text-violet-400" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{doc.name}</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : ''} · {formatDate(doc.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800">
+                        <button
+                          onClick={() => handleDocDownload(doc.id)}
+                          className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Ladda ner
+                        </button>
+                        <button
+                          onClick={() => handleDocDelete(doc.id)}
+                          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 ml-auto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Ta bort
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                <FolderOpen className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                <p className="text-zinc-500">Inga dokument uppladdade</p>
+                <p className="text-xs text-zinc-600 mt-1">Ladda upp foton, ritningar eller kontrakt</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === TAB: Byggdagbok === */}
+        {activeTab === 'log' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <BookOpen className="w-5 h-5 text-amber-400" />
+                Byggdagbok
+              </h2>
+              <button
+                onClick={() => { setEditingLog(null); setShowLogModal(true) }}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+              >
+                <Plus className="w-4 h-4" /> Ny anteckning
+              </button>
+            </div>
+
+            {logs.length > 0 ? (
+              <div className="space-y-4">
+                {logs.map((log: any) => (
+                  <div key={log.id} className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-white font-medium">{formatDate(log.log_date)}</p>
+                        {log.business_user && (
+                          <p className="text-xs text-zinc-500 mt-0.5">{log.business_user.name}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-zinc-500">
+                        {log.weather && (
+                          <span className="flex items-center gap-1">
+                            <CloudSun className="w-3.5 h-3.5" />
+                            {log.weather}{log.temperature != null ? `, ${log.temperature}°C` : ''}
+                          </span>
+                        )}
+                        {log.hours_worked && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" />
+                            {log.hours_worked} tim
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {log.work_description && (
+                      <p className="text-sm text-zinc-300 mb-2">{log.work_description}</p>
+                    )}
+                    {log.materials_used && (
+                      <p className="text-xs text-zinc-500 mb-2">
+                        <span className="text-zinc-400 font-medium">Material:</span> {log.materials_used}
+                      </p>
+                    )}
+                    {log.notes && (
+                      <p className="text-xs text-zinc-500 italic">{log.notes}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800">
+                      <button
+                        onClick={() => { setEditingLog(log); setShowLogModal(true) }}
+                        className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+                      >
+                        <Edit className="w-3.5 h-3.5" /> Redigera
+                      </button>
+                      <button
+                        onClick={() => handleDeleteLog(log.id)}
+                        className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 ml-auto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Ta bort
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                <BookOpen className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                <p className="text-zinc-500">Inga dagboksanteckningar ännu</p>
+                <p className="text-xs text-zinc-600 mt-1">Dokumentera arbetet dag för dag</p>
+              </div>
+            )}
+
+            {/* Log Modal */}
+            {showLogModal && (
+              <LogModal
+                editing={editingLog}
+                onClose={() => { setShowLogModal(false); setEditingLog(null) }}
+                onSave={handleSaveLog}
+              />
+            )}
+          </div>
+        )}
+
+        {/* === TAB: Checklistor === */}
+        {activeTab === 'checklists' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-emerald-400" />
+                Checklistor
+              </h2>
+              <button
+                onClick={() => setShowChecklistCreate(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+              >
+                <Plus className="w-4 h-4" /> Ny checklista
+              </button>
+            </div>
+
+            {activeChecklist ? (
+              /* Active checklist detail view */
+              <div className="space-y-4">
+                <button
+                  onClick={() => setActiveChecklist(null)}
+                  className="flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
+                </button>
+                <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-semibold">{activeChecklist.name}</h3>
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      activeChecklist.status === 'completed'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : 'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {activeChecklist.status === 'completed' ? 'Klar' : 'Pågår'}
+                    </span>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                      <span>{activeChecklist.progress?.checked || 0} av {activeChecklist.progress?.total || 0} klara</span>
+                      <span>{activeChecklist.progress?.percent || 0}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+                        style={{ width: `${activeChecklist.progress?.percent || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                  {/* Checklist items */}
+                  <div className="space-y-2">
+                    {(activeChecklist.items || []).map((item: any, idx: number) => (
+                      <label
+                        key={item.id || idx}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/50 cursor-pointer transition"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.checked || false}
+                          onChange={() => handleToggleChecklistItem(activeChecklist.id, idx)}
+                          className="w-4 h-4 rounded border-zinc-600 text-violet-500 bg-zinc-800 focus:ring-violet-500"
+                        />
+                        <span className={`text-sm ${item.checked ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>
+                          {item.text}
+                          {item.required && <span className="text-red-400 ml-1">*</span>}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {/* Notes */}
+                  {activeChecklist.notes && (
+                    <div className="mt-4 pt-4 border-t border-zinc-800">
+                      <p className="text-xs text-zinc-500">{activeChecklist.notes}</p>
+                    </div>
+                  )}
+                  {/* Delete */}
+                  <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-end">
+                    <button
+                      onClick={() => handleDeleteChecklist(activeChecklist.id)}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Ta bort checklista
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Checklist list view */
+              <>
+                {checklists.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {checklists.map((cl: any) => (
+                      <button
+                        key={cl.id}
+                        onClick={() => setActiveChecklist(cl)}
+                        className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 text-left hover:border-violet-500/30 transition"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-medium text-white">{cl.name}</h3>
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            cl.status === 'completed'
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {cl.status === 'completed' ? 'Klar' : 'Pågår'}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all"
+                            style={{ width: `${cl.progress?.percent || 0}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-zinc-500 mt-1.5">
+                          {cl.progress?.checked || 0}/{cl.progress?.total || 0} punkter klara
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
+                    <ClipboardList className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
+                    <p className="text-zinc-500">Inga checklistor skapade</p>
+                    <p className="text-xs text-zinc-600 mt-1">Skapa en checklista från en mall eller bygg en egen</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Create Checklist Modal */}
+            {showChecklistCreate && (
+              <ChecklistCreateModal
+                templates={checklistTemplates}
+                onClose={() => setShowChecklistCreate(false)}
+                onCreate={handleCreateChecklist}
+              />
+            )}
+          </div>
+        )}
+
         {/* === TAB: Ekonomi === */}
         {activeTab === 'economy' && (
           <div className="space-y-6">
@@ -2013,6 +2512,272 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Skapa
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Log Modal (Byggdagbok) ---
+
+function LogModal({ editing, onClose, onSave }: {
+  editing: any
+  onClose: () => void
+  onSave: (data: any) => void
+}) {
+  const [logDate, setLogDate] = useState(editing?.log_date || new Date().toISOString().split('T')[0])
+  const [weather, setWeather] = useState(editing?.weather || '')
+  const [temperature, setTemperature] = useState(editing?.temperature?.toString() || '')
+  const [workDescription, setWorkDescription] = useState(editing?.work_description || '')
+  const [materialsUsed, setMaterialsUsed] = useState(editing?.materials_used || '')
+  const [hoursWorked, setHoursWorked] = useState(editing?.hours_worked?.toString() || '')
+  const [notes, setNotes] = useState(editing?.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  const weatherOptions = [
+    { value: 'sunny', label: 'Sol' },
+    { value: 'cloudy', label: 'Mulet' },
+    { value: 'rainy', label: 'Regn' },
+    { value: 'snowy', label: 'Snö' },
+    { value: 'windy', label: 'Blåsigt' },
+  ]
+
+  const handleSubmit = () => {
+    if (!workDescription.trim()) return
+    setSaving(true)
+    onSave({
+      log_date: logDate,
+      weather: weather || null,
+      temperature: temperature ? parseFloat(temperature) : null,
+      work_description: workDescription.trim(),
+      materials_used: materialsUsed.trim() || null,
+      hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
+      notes: notes.trim() || null,
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">
+            {editing ? 'Redigera dagboksanteckning' : 'Ny dagboksanteckning'}
+          </h2>
+          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-zinc-400 mb-2 block">Datum *</label>
+              <input
+                type="date"
+                value={logDate}
+                onChange={e => setLogDate(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 mb-2 block">Timmar</label>
+              <input
+                type="number"
+                value={hoursWorked}
+                onChange={e => setHoursWorked(e.target.value)}
+                placeholder="0"
+                min="0"
+                step="0.5"
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-zinc-400 mb-2 block">Väder</label>
+              <select
+                value={weather}
+                onChange={e => setWeather(e.target.value)}
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              >
+                <option value="">Välj...</option>
+                {weatherOptions.map(w => (
+                  <option key={w.value} value={w.value}>{w.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm text-zinc-400 mb-2 block">Temperatur (°C)</label>
+              <input
+                type="number"
+                value={temperature}
+                onChange={e => setTemperature(e.target.value)}
+                placeholder="0"
+                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-zinc-400 mb-2 block">Arbetsbeskrivning *</label>
+            <textarea
+              value={workDescription}
+              onChange={e => setWorkDescription(e.target.value)}
+              rows={3}
+              placeholder="Beskriv dagens arbete..."
+              autoFocus
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-zinc-400 mb-2 block">Använt material</label>
+            <input
+              type="text"
+              value={materialsUsed}
+              onChange={e => setMaterialsUsed(e.target.value)}
+              placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-zinc-400 mb-2 block">Anteckningar</label>
+            <textarea
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={2}
+              placeholder="Övriga anteckningar..."
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving || !workDescription.trim()}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {editing ? 'Spara' : 'Skapa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Checklist Create Modal ---
+
+function ChecklistCreateModal({ templates, onClose, onCreate }: {
+  templates: any[]
+  onClose: () => void
+  onCreate: (templateId: string, name: string, items: any[]) => void
+}) {
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
+  const [customName, setCustomName] = useState('')
+  const [customItems, setCustomItems] = useState('')
+
+  const handleCreate = () => {
+    if (selectedTemplate) {
+      onCreate(selectedTemplate.id, selectedTemplate.name, selectedTemplate.items)
+    } else if (customName.trim() && customItems.trim()) {
+      const items = customItems.split('\n').filter(l => l.trim()).map((text, i) => ({
+        id: `custom-${i}`,
+        text: text.trim(),
+        required: false,
+        checked: false,
+      }))
+      onCreate('', customName.trim(), items)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Ny checklista</h2>
+          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Template selection */}
+        {templates.length > 0 && (
+          <div className="mb-6">
+            <label className="text-sm text-zinc-400 mb-3 block">Välj mall</label>
+            <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
+              {templates.map((t: any) => (
+                <button
+                  key={t.id}
+                  onClick={() => { setSelectedTemplate(t); setCustomName(''); setCustomItems('') }}
+                  className={`p-3 rounded-xl text-left text-sm border transition ${
+                    selectedTemplate?.id === t.id
+                      ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
+                      : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                  }`}
+                >
+                  <span className="font-medium">{t.name}</span>
+                  <span className="text-xs text-zinc-500 ml-2">({(t.items || []).length} punkter)</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Or custom */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-px flex-1 bg-zinc-800" />
+            <span className="text-xs text-zinc-600">eller skapa egen</span>
+            <div className="h-px flex-1 bg-zinc-800" />
+          </div>
+
+          <div>
+            <label className="text-sm text-zinc-400 mb-2 block">Namn</label>
+            <input
+              type="text"
+              value={customName}
+              onChange={e => { setCustomName(e.target.value); setSelectedTemplate(null) }}
+              placeholder="T.ex. Slutbesiktning badrum"
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm text-zinc-400 mb-2 block">Punkter (en per rad)</label>
+            <textarea
+              value={customItems}
+              onChange={e => { setCustomItems(e.target.value); setSelectedTemplate(null) }}
+              rows={5}
+              placeholder={"Kontrollera tätskikt\nTesta golvvärme\nKontrollera fall mot brunn"}
+              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={!selectedTemplate && (!customName.trim() || !customItems.trim())}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            Skapa checklista
           </button>
         </div>
       </div>
