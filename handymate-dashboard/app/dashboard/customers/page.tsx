@@ -53,7 +53,7 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
-  const [form, setForm] = useState({ name: '', phone_number: '', email: '', address_line: '' })
+  const [form, setForm] = useState({ name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '' })
 
   // Campaigns state
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -100,7 +100,7 @@ export default function CustomersPage() {
   // === CUSTOMER FUNCTIONS ===
   const openCreateModal = () => {
     setEditingCustomer(null)
-    setForm({ name: '', phone_number: '', email: '', address_line: '' })
+    setForm({ name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '' })
     setModalOpen(true)
   }
 
@@ -113,6 +113,8 @@ export default function CustomersPage() {
       phone_number: customer.phone_number || '',
       email: customer.email || '',
       address_line: customer.address_line || '',
+      personal_number: (customer as any).personal_number || '',
+      property_designation: (customer as any).property_designation || '',
     })
     setModalOpen(true)
   }
@@ -296,6 +298,28 @@ export default function CustomersPage() {
                   onChange={(e) => setForm({ ...form, address_line: e.target.value })}
                   className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                 />
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Personnummer</label>
+                <input
+                  type="text"
+                  value={form.personal_number}
+                  onChange={(e) => setForm({ ...form, personal_number: e.target.value })}
+                  placeholder="YYYYMMDD-XXXX"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                />
+                <p className="text-xs text-zinc-600 mt-1">Krävs för ROT/RUT-avdrag</p>
+              </div>
+              <div>
+                <label className="block text-sm text-zinc-400 mb-1">Fastighetsbeteckning</label>
+                <input
+                  type="text"
+                  value={form.property_designation}
+                  onChange={(e) => setForm({ ...form, property_designation: e.target.value })}
+                  placeholder="T.ex. Stockholm Söder 1:23"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                />
+                <p className="text-xs text-zinc-600 mt-1">Krävs för ROT-avdrag</p>
               </div>
             </div>
 

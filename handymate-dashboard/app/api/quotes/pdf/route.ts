@@ -490,6 +490,8 @@ function generateQuoteHTML(quote: any, business: any): string {
         ${quote.customer?.address_line || ''}<br>
         Tel: ${quote.customer?.phone_number || ''}<br>
         ${quote.customer?.email || ''}
+        ${quote.personnummer ? `<br>Personnummer: ${quote.personnummer}` : ''}
+        ${quote.fastighetsbeteckning ? `<br>Fastighet: ${quote.fastighetsbeteckning}` : ''}
       </div>
     </div>
   </div>
@@ -665,6 +667,7 @@ function generateQuoteHTML(quote: any, business: any): string {
     <div class="footer-right">
       ${business?.phone_number || ''} | ${business?.contact_email || ''}
       ${business?.org_number ? ` | Org.nr: ${business.org_number}` : ''}
+      ${business?.f_skatt_registered ? ' | Godkänd för F-skatt' : ''}
     </div>
   </div>
 </body>

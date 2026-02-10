@@ -27,6 +27,8 @@ interface Customer {
   phone_number: string
   email: string
   address_line: string
+  personal_number?: string
+  property_designation?: string
 }
 
 interface PriceItem {
@@ -81,6 +83,8 @@ export default function NewQuotePage() {
   const [discountPercent, setDiscountPercent] = useState(0)
   const [validDays, setValidDays] = useState(30)
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
+  const [personnummer, setPersonnummer] = useState('')
+  const [fastighetsbeteckning, setFastighetsbeteckning] = useState('')
 
   // AI prompt
   const [aiPrompt, setAiPrompt] = useState('')
@@ -112,6 +116,17 @@ export default function NewQuotePage() {
     })
     setLoading(false)
   }
+
+  // Auto-fill personnummer/fastighetsbeteckning from customer
+  useEffect(() => {
+    if (selectedCustomer && rotRutType) {
+      const customer = customers.find(c => c.customer_id === selectedCustomer)
+      if (customer) {
+        if (customer.personal_number && !personnummer) setPersonnummer(customer.personal_number)
+        if (customer.property_designation && !fastighetsbeteckning) setFastighetsbeteckning(customer.property_designation)
+      }
+    }
+  }, [selectedCustomer, rotRutType])
 
   const generateWithAI = async () => {
     if (!aiPrompt.trim()) return
@@ -244,6 +259,8 @@ export default function NewQuotePage() {
       rot_rut_eligible: rotRutEligible,
       rot_rut_deduction: rotRutDeduction,
       customer_pays: customerPays,
+      personnummer: rotRutType ? personnummer || null : null,
+      fastighetsbeteckning: rotRutType ? fastighetsbeteckning || null : null,
       valid_until: validUntil.toISOString().split('T')[0],
       sent_at: send ? new Date().toISOString() : null
     })
@@ -564,22 +581,52 @@ export default function NewQuotePage() {
                 </div>
 
                 {rotRutType && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-emerald-400">Arbetskostnad</span>
-                      <span className="text-white">{formatCurrency(rotRutEligible)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-emerald-400">{rotRutType.toUpperCase()}-avdrag ({rotRutPercent}%)</span>
-                      <span className="text-emerald-400">-{formatCurrency(rotRutDeduction)}</span>
-                    </div>
-                    <div className="border-t border-emerald-500/30 pt-2">
-                      <div className="flex justify-between font-semibold">
-                        <span className="text-white">Kund betalar</span>
-                        <span className="text-emerald-400">{formatCurrency(customerPays)}</span>
+                  <>
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-emerald-400">Arbetskostnad</span>
+                        <span className="text-white">{formatCurrency(rotRutEligible)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-emerald-400">{rotRutType.toUpperCase()}-avdrag ({rotRutPercent}%)</span>
+                        <span className="text-emerald-400">-{formatCurrency(rotRutDeduction)}</span>
+                      </div>
+                      <div className="border-t border-emerald-500/30 pt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span className="text-white">Kund betalar</span>
+                          <span className="text-emerald-400">{formatCurrency(customerPays)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="block text-xs text-zinc-400 mb-1">Personnummer *</label>
+                        <input
+                          type="text"
+                          value={personnummer}
+                          onChange={(e) => setPersonnummer(e.target.value)}
+                          placeholder="YYYYMMDD-XXXX"
+                          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        />
+                      </div>
+                      {rotRutType === 'rot' && (
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Fastighetsbeteckning *</label>
+                          <input
+                            type="text"
+                            value={fastighetsbeteckning}
+                            onChange={(e) => setFastighetsbeteckning(e.target.value)}
+                            placeholder="T.ex. Stockholm Söder 1:23"
+                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                          />
+                        </div>
+                      )}
+                      {!personnummer && (
+                        <p className="text-xs text-amber-400">Personnummer krävs för {rotRutType.toUpperCase()}-avdrag</p>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

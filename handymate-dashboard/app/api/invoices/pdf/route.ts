@@ -337,6 +337,8 @@ export async function GET(request: NextRequest) {
       <p>${invoice.customer?.address_line || ''}</p>
       <p>${invoice.customer?.email || ''}</p>
       <p>${invoice.customer?.phone_number || ''}</p>
+      ${invoice.personnummer ? `<p>Personnummer: ${invoice.personnummer}</p>` : ''}
+      ${invoice.fastighetsbeteckning ? `<p>Fastighet: ${invoice.fastighetsbeteckning}</p>` : ''}
     </div>
   </div>
 
@@ -360,8 +362,10 @@ export async function GET(request: NextRequest) {
   ${invoice.rot_rut_type ? `
   <div class="rot-rut-notice">
     <strong>${invoice.rot_rut_type.toUpperCase()}-avdrag tillämpas.</strong>
-    Avdraget på ${invoice.rot_rut_deduction?.toLocaleString('sv-SE')} kr dras automatiskt via Skatteverket.
-    Du betalar endast ${invoice.customer_pays?.toLocaleString('sv-SE')} kr.
+    Avdraget på ${invoice.rot_rut_deduction?.toLocaleString('sv-SE')} kr begärs av utföraren hos Skatteverket.
+    Du betalar endast ${invoice.customer_pays?.toLocaleString('sv-SE')} kr till utföraren.
+    ${invoice.personnummer ? `<br>Personnummer: ${invoice.personnummer}` : ''}
+    ${invoice.fastighetsbeteckning ? ` | Fastighet: ${invoice.fastighetsbeteckning}` : ''}
   </div>
   ` : ''}
 
@@ -434,7 +438,7 @@ export async function GET(request: NextRequest) {
   </div>
 
   <div class="footer">
-    <p>${businessConfig?.business_name || ''} | Org.nr: ${businessConfig?.org_number || ''} | ${businessConfig?.contact_email || ''}</p>
+    <p>${businessConfig?.business_name || ''} | Org.nr: ${businessConfig?.org_number || ''} | ${businessConfig?.contact_email || ''}${businessConfig?.f_skatt_registered ? ' | Godkänd för F-skatt' : ''}</p>
     <p style="margin-top: 8px;">Tack för att du anlitar oss!</p>
   </div>
 

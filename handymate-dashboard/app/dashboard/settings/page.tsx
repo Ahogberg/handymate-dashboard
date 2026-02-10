@@ -346,6 +346,8 @@ export default function SettingsPage() {
           // Fakturainställningar
           default_payment_days: config.default_payment_days || 30,
           bankgiro: config.bankgiro || null,
+          plusgiro: (config as any).plusgiro || null,
+          f_skatt_registered: (config as any).f_skatt_registered || false,
           swish_number: config.swish_number || null,
           reminder_sms_template: config.reminder_sms_template || null,
           auto_reminder_enabled: config.auto_reminder_enabled || false,
@@ -1248,6 +1250,32 @@ export default function SettingsPage() {
               </div>
             </div>
 
+            {/* F-skatt */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <h2 className="text-lg font-semibold text-white mb-4">Skatteuppgifter</h2>
+              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+                <div>
+                  <p className="font-medium text-white">Godkänd för F-skatt</p>
+                  <p className="text-sm text-zinc-500">Visas på offerter och fakturor</p>
+                </div>
+                <button
+                  onClick={() => setConfig({
+                    ...config!,
+                    ...(({ f_skatt_registered: !(config as any).f_skatt_registered }) as any)
+                  } as any)}
+                  className={`w-12 h-6 rounded-full transition-all ${
+                    (config as any).f_skatt_registered
+                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+                      : 'bg-zinc-700'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    (config as any).f_skatt_registered ? 'translate-x-6' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+            </div>
+
             {/* Betalningsinformation */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
               <h2 className="text-lg font-semibold text-white mb-4">Betalningsinformation</h2>
@@ -1261,6 +1289,17 @@ export default function SettingsPage() {
                     value={config.bankgiro || ''}
                     onChange={(e) => setConfig({ ...config, bankgiro: e.target.value })}
                     placeholder="123-4567"
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-zinc-400 mb-2">Plusgiro</label>
+                  <input
+                    type="text"
+                    value={(config as any).plusgiro || ''}
+                    onChange={(e) => setConfig({ ...config, ...(({ plusgiro: e.target.value }) as any) } as any)}
+                    placeholder="12 34 56-7"
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
                   />
                 </div>
