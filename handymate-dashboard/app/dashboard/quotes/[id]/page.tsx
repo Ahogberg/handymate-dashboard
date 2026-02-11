@@ -22,7 +22,8 @@ import {
   Receipt,
   FolderKanban,
   Link2,
-  PenTool
+  PenTool,
+  Bookmark
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -81,6 +82,38 @@ export default function QuoteDetailPage() {
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
   const [generatingSignLink, setGeneratingSignLink] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
+
+  const saveAsTemplate = async () => {
+    if (!quote || !templateName.trim()) return
+    setSavingTemplate(true)
+    try {
+      const laborItems = (quote.items || []).filter((i: any) => i.type === 'labor')
+      const materialItems = (quote.items || []).filter((i: any) => i.type === 'material')
+      const totalHours = laborItems.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
+
+      await fetch('/api/quotes/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateName,
+          description: quote.description,
+          estimatedHours: totalHours,
+          laborCost: quote.labor_total,
+          materials: materialItems.map((i: any) => ({ name: i.name, quantity: i.quantity, unit: i.unit, unitPrice: i.unit_price })),
+          totalEstimate: quote.subtotal
+        })
+      })
+      showToast('Mall sparad!', 'success')
+      setShowSaveTemplate(false)
+      setTemplateName('')
+    } catch {
+      showToast('Kunde inte spara mall', 'error')
+    }
+    setSavingTemplate(false)
+  }
 
   useEffect(() => {
     fetchQuote()
@@ -390,6 +423,13 @@ export default function QuoteDetailPage() {
             {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Ladda ner PDF
           </button>
+          <button
+            onClick={() => { setTemplateName(quote.title || ''); setShowSaveTemplate(true) }}
+            className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+          >
+            <Bookmark className="w-4 h-4" />
+            Spara mall
+          </button>
           {quote.status === 'draft' && (
             <>
               <Link
@@ -692,6 +732,41 @@ export default function QuoteDetailPage() {
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Skicka
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save as Template Modal */}
+      {showSaveTemplate && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSaveTemplate(false)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-white mb-4">Spara som mall</h3>
+            <div className="mb-4">
+              <label className="block text-sm text-zinc-400 mb-1">Mallnamn</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="T.ex. Byte elcentral"
+                autoFocus
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSaveTemplate(false)}
+                className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={saveAsTemplate}
+                disabled={!templateName.trim() || savingTemplate}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
               </button>
             </div>
           </div>
