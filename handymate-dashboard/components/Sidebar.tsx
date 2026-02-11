@@ -4,23 +4,21 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutDashboard,
+  LayoutGrid,
+  Phone,
   Calendar,
-  CalendarDays,
   Users,
-  UsersRound,
-  Inbox,
+  Briefcase,
+  Clock,
   Settings,
   Zap,
   LogOut,
   FileText,
   Receipt,
   ChevronDown,
-  Package,
-  Mic,
+  FolderKanban,
   Menu,
   X,
-  FolderKanban,
   User
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -32,36 +30,6 @@ interface SidebarProps {
   onLogout: () => void
 }
 
-interface MenuItem {
-  name: string
-  href: string
-  icon: any
-  badge?: boolean
-  subItems?: { name: string; href: string; icon: any }[]
-}
-
-const menuItems: MenuItem[] = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Assistent', href: '/dashboard/assistant', icon: Mic },
-  { name: 'Inbox', href: '/dashboard/inbox', icon: Inbox, badge: true },
-  { name: 'Kalender', href: '/dashboard/calendar', icon: Calendar },
-  { name: 'Resurser', href: '/dashboard/schedule', icon: CalendarDays },
-  { name: 'Kunder', href: '/dashboard/customers', icon: Users },
-  {
-    name: 'Offerter & Fakturor',
-    href: '/dashboard/quotes',
-    icon: FileText,
-    subItems: [
-      { name: 'Offerter', href: '/dashboard/quotes', icon: FileText },
-      { name: 'Projekt', href: '/dashboard/projects', icon: FolderKanban },
-      { name: 'Fakturor', href: '/dashboard/invoices', icon: Receipt },
-      { name: 'Beställningar', href: '/dashboard/orders', icon: Package },
-    ]
-  },
-  { name: 'Inställningar', href: '/dashboard/settings', icon: Settings },
-  { name: 'Team', href: '/dashboard/team', icon: UsersRound },
-]
-
 function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 }
@@ -69,7 +37,7 @@ function getInitials(name: string): string {
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
-  const [expandedMenus, setExpandedMenus] = useState<string[]>(['Offerter & Fakturor'])
+  const [jobbOpen, setJobbOpen] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -101,18 +69,15 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     } else {
       document.body.style.overflow = ''
     }
-    return () => {
-      document.body.style.overflow = ''
-    }
+    return () => { document.body.style.overflow = '' }
   }, [isMobileOpen])
 
+  // Fetch pending count for badge
   useEffect(() => {
     if (!businessId) return
 
-    // Initial fetch
     fetchPendingCount()
 
-    // Set up realtime subscription for AI suggestions
     const channel = supabase
       .channel('inbox_changes')
       .on(
@@ -123,13 +88,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           table: 'ai_suggestion',
           filter: `business_id=eq.${businessId}`
         },
-        () => {
-          fetchPendingCount()
-        }
+        () => { fetchPendingCount() }
       )
       .subscribe()
 
-    // Poll every 30 seconds as backup
     const interval = setInterval(fetchPendingCount, 30000)
 
     return () => {
@@ -141,14 +103,12 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   async function fetchPendingCount() {
     if (!businessId) return
 
-    // Count pending AI suggestions
     const { count: aiCount } = await supabase
       .from('ai_suggestion')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .eq('status', 'pending')
 
-    // Count unprocessed recordings (no transcript yet)
     const { count: recordingCount } = await supabase
       .from('call_recording')
       .select('*', { count: 'exact', head: true })
@@ -156,6 +116,34 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       .is('transcript', null)
 
     setPendingCount((aiCount || 0) + (recordingCount || 0))
+  }
+
+  // Auto-expand Jobb dropdown if a child route is active
+  const jobbPaths = ['/dashboard/projects', '/dashboard/quotes', '/dashboard/invoices']
+  const isJobbActive = jobbPaths.some(p => pathname === p || pathname?.startsWith(p + '/'))
+
+  useEffect(() => {
+    if (isJobbActive) setJobbOpen(true)
+  }, [isJobbActive])
+
+  function isActive(href: string) {
+    return pathname === href || pathname?.startsWith(href + '/')
+  }
+
+  function navClass(active: boolean) {
+    return `flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+      active
+        ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
+        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+    }`
+  }
+
+  function subNavClass(active: boolean) {
+    return `flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+      active
+        ? 'text-violet-400 bg-violet-500/10'
+        : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
+    }`
   }
 
   const sidebarContent = (
@@ -170,90 +158,90 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         </Link>
       </div>
 
-      {/* Menu */}
+      {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {menuItems.map((item) => {
-          // Hide Team for employees without manage_users
-          if (item.name === 'Team' && currentUser && currentUser.role === 'employee' && !currentUser.can_manage_users) {
-            return null
-          }
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
-          const hasSubItems = item.subItems && item.subItems.length > 0
-          const isExpanded = expandedMenus.includes(item.name)
-          const isSubItemActive = hasSubItems && item.subItems?.some(sub => pathname === sub.href || pathname?.startsWith(sub.href + '/'))
-          const showBadge = item.badge && pendingCount > 0
+        {/* Dashboard */}
+        <Link href="/dashboard" className={navClass(pathname === '/dashboard')}>
+          <div className="flex items-center gap-3">
+            <LayoutGrid className={`w-5 h-5 ${pathname === '/dashboard' ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Dashboard</span>
+          </div>
+        </Link>
 
-          if (hasSubItems) {
-            return (
-              <div key={item.name}>
-                <button
-                  onClick={() => {
-                    if (isExpanded) {
-                      setExpandedMenus(expandedMenus.filter(m => m !== item.name))
-                    } else {
-                      setExpandedMenus([...expandedMenus, item.name])
-                    }
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
-                    isSubItemActive
-                      ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
-                      : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className={`w-5 h-5 ${isSubItemActive ? 'text-violet-400' : ''}`} />
-                    <span className="text-sm sm:text-base">{item.name}</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-                {isExpanded && (
-                  <div className="ml-4 mt-1 space-y-1">
-                    {item.subItems?.map((sub) => {
-                      const isSubActive = pathname === sub.href || pathname?.startsWith(sub.href + '/')
-                      return (
-                        <Link
-                          key={sub.name}
-                          href={sub.href}
-                          className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
-                            isSubActive
-                              ? 'text-violet-400 bg-violet-500/10'
-                              : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
-                          }`}
-                        >
-                          <sub.icon className="w-4 h-4" />
-                          <span className="text-sm">{sub.name}</span>
-                        </Link>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )
-          }
+        {/* Samtal */}
+        <Link href="/dashboard/calls" className={navClass(isActive('/dashboard/calls') || isActive('/dashboard/inbox') || isActive('/dashboard/assistant') || isActive('/dashboard/recordings'))}>
+          <div className="flex items-center gap-3">
+            <Phone className={`w-5 h-5 ${isActive('/dashboard/calls') || isActive('/dashboard/inbox') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Samtal</span>
+          </div>
+          {pendingCount > 0 && (
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full animate-pulse">
+              {pendingCount > 99 ? '99+' : pendingCount}
+            </span>
+          )}
+        </Link>
 
-          return (
-            <Link
-              key={item.name}
-              href={item.href}
-              className={`flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
-                isActive
-                  ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <item.icon className={`w-5 h-5 ${isActive ? 'text-violet-400' : ''}`} />
-                <span className="text-sm sm:text-base">{item.name}</span>
-              </div>
+        {/* Schema */}
+        <Link href="/dashboard/schedule" className={navClass(isActive('/dashboard/schedule') || isActive('/dashboard/calendar'))}>
+          <div className="flex items-center gap-3">
+            <Calendar className={`w-5 h-5 ${isActive('/dashboard/schedule') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Schema</span>
+          </div>
+        </Link>
 
-              {showBadge && (
-                <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full animate-pulse">
-                  {pendingCount > 99 ? '99+' : pendingCount}
-                </span>
-              )}
-            </Link>
-          )
-        })}
+        {/* Kunder */}
+        <Link href="/dashboard/customers" className={navClass(isActive('/dashboard/customers'))}>
+          <div className="flex items-center gap-3">
+            <Users className={`w-5 h-5 ${isActive('/dashboard/customers') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Kunder</span>
+          </div>
+        </Link>
+
+        {/* Jobb (dropdown) */}
+        <div>
+          <button
+            onClick={() => setJobbOpen(!jobbOpen)}
+            className={`w-full ${navClass(isJobbActive)}`}
+          >
+            <div className="flex items-center gap-3">
+              <Briefcase className={`w-5 h-5 ${isJobbActive ? 'text-violet-400' : ''}`} />
+              <span className="text-sm sm:text-base">Jobb</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${jobbOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {jobbOpen && (
+            <div className="ml-4 mt-1 space-y-1">
+              <Link href="/dashboard/projects" className={subNavClass(isActive('/dashboard/projects'))}>
+                <FolderKanban className="w-4 h-4" />
+                <span className="text-sm">Projekt</span>
+              </Link>
+              <Link href="/dashboard/quotes" className={subNavClass(isActive('/dashboard/quotes'))}>
+                <FileText className="w-4 h-4" />
+                <span className="text-sm">Offerter</span>
+              </Link>
+              <Link href="/dashboard/invoices" className={subNavClass(isActive('/dashboard/invoices'))}>
+                <Receipt className="w-4 h-4" />
+                <span className="text-sm">Fakturor</span>
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Tid */}
+        <Link href="/dashboard/time" className={navClass(isActive('/dashboard/time'))}>
+          <div className="flex items-center gap-3">
+            <Clock className={`w-5 h-5 ${isActive('/dashboard/time') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Tid</span>
+          </div>
+        </Link>
+
+        {/* Inställningar */}
+        <Link href="/dashboard/settings" className={navClass(isActive('/dashboard/settings') || isActive('/dashboard/team'))}>
+          <div className="flex items-center gap-3">
+            <Settings className={`w-5 h-5 ${isActive('/dashboard/settings') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Inställningar</span>
+          </div>
+        </Link>
       </nav>
 
       {/* User Menu */}
@@ -332,7 +320,6 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Close button */}
         <button
           onClick={() => setIsMobileOpen(false)}
           className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
@@ -340,7 +327,6 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         >
           <X className="w-5 h-5" />
         </button>
-
         {sidebarContent}
       </div>
 

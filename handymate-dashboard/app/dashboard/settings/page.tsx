@@ -30,10 +30,19 @@ import {
   Trash2,
   Pencil,
   Package,
-  CalendarDays
+  CalendarDays,
+  UsersRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import dynamic from 'next/dynamic'
+const TeamPageContent = dynamic(() => import('@/app/dashboard/team/page'), {
+  loading: () => (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+    </div>
+  ),
+})
 
 interface BusinessConfig {
   business_id: string
@@ -286,6 +295,12 @@ export default function SettingsPage() {
       const message = searchParams.get('message') || 'Kunde inte koppla Fortnox'
       showToast(message, 'error')
       window.history.replaceState({}, '', '/dashboard/settings')
+    }
+
+    // Handle tab param
+    const tabParam = searchParams.get('tab')
+    if (tabParam === 'team') {
+      setActiveTab('team')
     }
 
     // Handle Google Calendar OAuth callback
@@ -864,6 +879,7 @@ export default function SettingsPage() {
     { id: 'phone', label: 'Telefoni', icon: PhoneCall },
     { id: 'invoice', label: 'Faktura', icon: Receipt },
     { id: 'time', label: 'Tidrapport', icon: Clock },
+    { id: 'team', label: 'Team', icon: UsersRound },
     { id: 'integrations', label: 'Integrationer', icon: Link2 },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
@@ -1695,6 +1711,11 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Team Tab */}
+        {activeTab === 'team' && (
+          <TeamPageContent />
         )}
 
         {/* Integrations Tab */}
