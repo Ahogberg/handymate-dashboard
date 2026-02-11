@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Sparkles,
@@ -13,13 +13,19 @@ import {
   User,
   Calculator,
   Loader2,
-  Search
+  Search,
+  Bookmark
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
+import InputSelector, { InputMethod } from '@/components/quotes/InputSelector'
+import PhotoCapture from '@/components/quotes/PhotoCapture'
+import VoiceRecorder from '@/components/quotes/VoiceRecorder'
+import AIQuotePreview from '@/components/quotes/AIQuotePreview'
+import TemplateSelector from '@/components/quotes/TemplateSelector'
 
 interface Customer {
   customer_id: string
@@ -63,8 +69,11 @@ interface PricingSettings {
   warranty_years: number
 }
 
+type WizardStep = 'select' | 'photo' | 'voice' | 'text' | 'template' | 'ai-preview' | 'form'
+
 export default function NewQuotePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const business = useBusiness()
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -73,6 +82,16 @@ export default function NewQuotePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+
+  // Wizard state
+  const [wizardStep, setWizardStep] = useState<WizardStep>('select')
+  const [aiResult, setAiResult] = useState<any>(null)
+  const [priceComparison, setPriceComparison] = useState<any>(null)
+  const [transcribing, setTranscribing] = useState(false)
+  const [voiceTranscript, setVoiceTranscript] = useState('')
+  const [sourceImageBase64, setSourceImageBase64] = useState<string | null>(null)
+  const [sourceTranscript, setSourceTranscript] = useState<string | null>(null)
+  const [aiGenerated, setAiGenerated] = useState(false)
 
   // Form state
   const [selectedCustomer, setSelectedCustomer] = useState<string>('')
@@ -85,12 +104,30 @@ export default function NewQuotePage() {
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
   const [personnummer, setPersonnummer] = useState('')
   const [fastighetsbeteckning, setFastighetsbeteckning] = useState('')
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
 
-  // AI prompt
-  const [aiPrompt, setAiPrompt] = useState('')
+  // AI text prompt (for text input method)
+  const [aiTextInput, setAiTextInput] = useState('')
 
   useEffect(() => {
     fetchData()
+    // Check if coming from a call transcript
+    const transcript = searchParams.get('transcript')
+    const customerId = searchParams.get('customerId')
+    if (transcript) {
+      setSourceTranscript(transcript)
+      setAiTextInput(transcript)
+      setWizardStep('text')
+    }
+    if (customerId) {
+      setSelectedCustomer(customerId)
+    }
+    // Check if skip wizard (direct to form)
+    if (searchParams.get('mode') === 'manual') {
+      setWizardStep('form')
+    }
   }, [business.business_id])
 
   async function fetchData() {
@@ -128,33 +165,152 @@ export default function NewQuotePage() {
     }
   }, [selectedCustomer, rotRutType])
 
-  const generateWithAI = async () => {
-    if (!aiPrompt.trim()) return
+  // --- Wizard handlers ---
 
+  function handleInputSelect(method: InputMethod) {
+    if (method === 'text') {
+      setWizardStep('text')
+    } else if (method === 'photo') {
+      setWizardStep('photo')
+    } else if (method === 'voice') {
+      setWizardStep('voice')
+    } else if (method === 'template') {
+      setWizardStep('template')
+    } else if (method === 'call') {
+      setWizardStep('text')
+    }
+  }
+
+  async function handlePhotoCapture(base64: string) {
+    setSourceImageBase64(base64)
     setGenerating(true)
     try {
-      const response = await fetch('/api/quotes/generate', {
+      const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: aiPrompt,
-          priceList,
-          pricingSettings,
-          businessId: business.business_id
-        })
+        body: JSON.stringify({ imageBase64: base64 })
       })
-
       const data = await response.json()
-      if (data.items) {
-        setItems(data.items)
-        if (data.title) setTitle(data.title)
-        if (data.description) setDescription(data.description)
+      if (data.success) {
+        setAiResult(data.quote)
+        setPriceComparison(data.priceComparison)
+        setAiGenerated(true)
+        setWizardStep('ai-preview')
+      } else {
+        alert(data.error || 'AI-generering misslyckades')
+        setWizardStep('select')
       }
-    } catch (error) {
-      console.error('AI generation failed:', error)
+    } catch (err) {
+      console.error('AI generation failed:', err)
+      alert('Nätverksfel vid AI-generering')
+      setWizardStep('select')
     }
     setGenerating(false)
   }
+
+  function handleVoiceTranscript(transcript: string) {
+    setVoiceTranscript(transcript)
+    setSourceTranscript(transcript)
+    setAiTextInput(transcript)
+    setTranscribing(false)
+    // Auto-generate from transcript
+    generateFromText(transcript)
+  }
+
+  async function generateFromText(text?: string) {
+    const inputText = text || aiTextInput
+    if (!inputText.trim()) return
+
+    setGenerating(true)
+    setWizardStep('ai-preview')
+    try {
+      const body: any = { textDescription: inputText }
+      if (voiceTranscript) body.voiceTranscript = voiceTranscript
+      if (sourceImageBase64) body.imageBase64 = sourceImageBase64
+
+      const response = await fetch('/api/quotes/ai-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await response.json()
+      if (data.success) {
+        setAiResult(data.quote)
+        setPriceComparison(data.priceComparison)
+        setAiGenerated(true)
+      } else {
+        alert(data.error || 'AI-generering misslyckades')
+        setWizardStep('text')
+      }
+    } catch (err) {
+      console.error('AI generation failed:', err)
+      alert('Nätverksfel vid AI-generering')
+      setWizardStep('text')
+    }
+    setGenerating(false)
+  }
+
+  function handleTemplateSelect(template: any) {
+    // Pre-fill form from template
+    setTitle(template.name)
+    setDescription(template.description || '')
+    const templateItems: QuoteItem[] = []
+
+    // Add labor item from template
+    if (template.estimated_hours && template.labor_cost) {
+      const hourlyRate = pricingSettings?.hourly_rate || 650
+      templateItems.push({
+        id: 'item_' + Math.random().toString(36).substr(2, 9),
+        type: 'labor',
+        name: template.name,
+        quantity: template.estimated_hours,
+        unit: 'hour',
+        unit_price: hourlyRate,
+        total: template.estimated_hours * hourlyRate
+      })
+    }
+
+    // Add material items from template
+    if (template.materials && Array.isArray(template.materials)) {
+      template.materials.forEach((mat: any) => {
+        templateItems.push({
+          id: 'item_' + Math.random().toString(36).substr(2, 9),
+          type: 'material',
+          name: mat.name || mat.description || 'Material',
+          quantity: mat.quantity || 1,
+          unit: mat.unit || 'piece',
+          unit_price: mat.unitPrice || mat.unit_price || 0,
+          total: (mat.quantity || 1) * (mat.unitPrice || mat.unit_price || 0)
+        })
+      })
+    }
+
+    setItems(templateItems)
+
+    // Increment usage count
+    fetch('/api/quotes/templates', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...template, incrementUsage: true })
+    }).catch(() => {})
+
+    setWizardStep('form')
+  }
+
+  function handleAIAccept(data: {
+    title: string
+    description: string
+    items: Array<{ id: string; type: 'labor' | 'material' | 'service'; name: string; quantity: number; unit: string; unit_price: number; total: number }>
+    rotRutType: '' | 'rot' | 'rut'
+  }) {
+    setTitle(data.title)
+    setDescription(data.description)
+    setItems(data.items)
+    setRotRutType(data.rotRutType)
+    setWizardStep('form')
+  }
+
+  // --- Form handlers ---
 
   const addItem = (type: 'labor' | 'material' | 'service') => {
     const newItem: QuoteItem = {
@@ -224,7 +380,7 @@ export default function NewQuotePage() {
 
   // ROT/RUT
   const rotRutPercent = rotRutType === 'rot' ? (pricingSettings?.rot_percent || 30) : rotRutType === 'rut' ? (pricingSettings?.rut_percent || 50) : 0
-  const rotRutEligible = laborTotal // Only labor is eligible
+  const rotRutEligible = laborTotal
   const rotRutDeduction = rotRutEligible * (rotRutPercent / 100)
   const customerPays = total - rotRutDeduction
 
@@ -262,19 +418,55 @@ export default function NewQuotePage() {
       personnummer: rotRutType ? personnummer || null : null,
       fastighetsbeteckning: rotRutType ? fastighetsbeteckning || null : null,
       valid_until: validUntil.toISOString().split('T')[0],
-      sent_at: send ? new Date().toISOString() : null
+      sent_at: send ? new Date().toISOString() : null,
+      ai_generated: aiGenerated || null,
+      ai_confidence: aiResult?.confidence || null,
+      source_image_url: null,
+      source_transcript: sourceTranscript || null
     })
 
     if (error) {
       console.error('Save failed:', error)
       alert('Kunde inte spara offerten')
     } else {
-      if (send) {
-        // TODO: Send SMS/Email
-      }
       router.push('/dashboard/quotes')
     }
     setSaving(false)
+  }
+
+  async function saveAsTemplate() {
+    if (!templateName.trim()) return
+    setSavingTemplate(true)
+
+    const materialItems = items.filter(i => i.type === 'material').map(i => ({
+      name: i.name,
+      quantity: i.quantity,
+      unit: i.unit,
+      unitPrice: i.unit_price
+    }))
+
+    const laborItems = items.filter(i => i.type === 'labor')
+    const totalHours = laborItems.reduce((sum, i) => sum + i.quantity, 0)
+
+    try {
+      await fetch('/api/quotes/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: templateName,
+          description,
+          estimatedHours: totalHours,
+          laborCost: laborTotal,
+          materials: materialItems,
+          totalEstimate: subtotal
+        })
+      })
+      setShowSaveTemplateModal(false)
+      setTemplateName('')
+    } catch (err) {
+      console.error('Failed to save template:', err)
+    }
+    setSavingTemplate(false)
   }
 
   const formatCurrency = (amount: number) => {
@@ -289,6 +481,141 @@ export default function NewQuotePage() {
     )
   }
 
+  // --- Wizard Steps ---
+  if (wizardStep !== 'form') {
+    return (
+      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+        <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
+          <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
+          <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        </div>
+
+        <div className="relative max-w-2xl mx-auto">
+          {/* Header */}
+          <div className="flex items-center gap-4 mb-6">
+            <button
+              onClick={() => {
+                if (wizardStep === 'select') {
+                  router.push('/dashboard/quotes')
+                } else if (wizardStep === 'ai-preview') {
+                  setAiResult(null)
+                  setWizardStep('select')
+                } else {
+                  setWizardStep('select')
+                }
+              }}
+              className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-white">Ny offert</h1>
+            </div>
+            <button
+              onClick={() => setWizardStep('form')}
+              className="text-sm text-zinc-500 hover:text-white transition-all"
+            >
+              Hoppa till formulär
+            </button>
+          </div>
+
+          {/* Wizard content */}
+          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+            {wizardStep === 'select' && (
+              <InputSelector onSelect={handleInputSelect} />
+            )}
+
+            {wizardStep === 'photo' && (
+              <PhotoCapture
+                onCapture={handlePhotoCapture}
+                onBack={() => setWizardStep('select')}
+                analyzing={generating}
+              />
+            )}
+
+            {wizardStep === 'voice' && (
+              <VoiceRecorder
+                onTranscript={handleVoiceTranscript}
+                onBack={() => setWizardStep('select')}
+                transcribing={transcribing}
+              />
+            )}
+
+            {wizardStep === 'text' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-violet-400" />
+                    <h2 className="text-lg font-semibold text-white">Beskriv jobbet</h2>
+                  </div>
+                </div>
+                <textarea
+                  value={aiTextInput}
+                  onChange={(e) => setAiTextInput(e.target.value)}
+                  placeholder="Beskriv jobbet... t.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
+                  rows={5}
+                  autoFocus
+                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none mb-4"
+                />
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setWizardStep('select')}
+                    className="px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 min-h-[48px]"
+                  >
+                    Tillbaka
+                  </button>
+                  <button
+                    onClick={() => generateFromText()}
+                    disabled={generating || !aiTextInput.trim()}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 min-h-[48px]"
+                  >
+                    {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    {generating ? 'Genererar...' : 'Generera offertförslag'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 'template' && (
+              <TemplateSelector
+                onSelect={handleTemplateSelect}
+                onBack={() => setWizardStep('select')}
+              />
+            )}
+
+            {wizardStep === 'ai-preview' && generating && (
+              <div className="text-center py-12">
+                <Loader2 className="w-10 h-10 text-violet-400 animate-spin mx-auto mb-4" />
+                <p className="text-white font-medium">Genererar offertförslag...</p>
+                <div className="space-y-1 mt-3 text-sm text-zinc-500">
+                  <p>Analyserar beskrivning...</p>
+                  <p>Hämtar din prishistorik...</p>
+                  <p>Beräknar material och arbete...</p>
+                </div>
+              </div>
+            )}
+
+            {wizardStep === 'ai-preview' && !generating && aiResult && (
+              <AIQuotePreview
+                jobTitle={aiResult.jobTitle}
+                jobDescription={aiResult.jobDescription}
+                items={aiResult.items}
+                confidence={aiResult.confidence}
+                reasoning={aiResult.reasoning}
+                suggestedDeductionType={aiResult.suggestedDeductionType}
+                priceComparison={priceComparison || { average: 0, min: 0, max: 0, count: 0 }}
+                similarQuotes={aiResult.similarHistoricalQuotes || []}
+                onAccept={handleAIAccept}
+                onRegenerate={() => generateFromText()}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // --- Full Form (step: 'form') ---
   return (
     <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
@@ -303,8 +630,22 @@ export default function NewQuotePage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-white">Ny offert</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white">
+              Ny offert
+              {aiGenerated && (
+                <span className="ml-2 text-xs font-normal px-2 py-0.5 bg-violet-500/20 text-violet-400 rounded-full">AI-genererad</span>
+              )}
+            </h1>
           </div>
+          {items.length > 0 && (
+            <button
+              onClick={() => { setTemplateName(title); setShowSaveTemplateModal(true) }}
+              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-700 text-sm"
+            >
+              <Bookmark className="w-4 h-4" />
+              <span className="hidden sm:inline">Spara mall</span>
+            </button>
+          )}
           <button
             onClick={() => saveQuote(false)}
             disabled={saving}
@@ -326,29 +667,6 @@ export default function NewQuotePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* AI Generator */}
-            <div className="bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10 backdrop-blur-xl rounded-xl border border-violet-500/30 p-4 sm:p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-violet-400" />
-                <h2 className="font-semibold text-white">AI-generera offert</h2>
-              </div>
-              <textarea
-                value={aiPrompt}
-                onChange={(e) => setAiPrompt(e.target.value)}
-                placeholder="Beskriv jobbet... t.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
-                rows={3}
-                className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none mb-3"
-              />
-              <button
-                onClick={generateWithAI}
-                disabled={generating || !aiPrompt.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-500 rounded-lg text-white font-medium hover:bg-violet-600 disabled:opacity-50"
-              >
-                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                {generating ? 'Genererar...' : 'Generera förslag'}
-              </button>
-            </div>
-
             {/* Customer & Basic Info */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
               <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
@@ -426,7 +744,7 @@ export default function NewQuotePage() {
 
               {items.length === 0 ? (
                 <div className="text-center py-8 text-zinc-500">
-                  <p>Inga rader ännu. Använd AI-generatorn eller lägg till manuellt.</p>
+                  <p>Inga rader ännu. Lägg till arbete eller material ovan.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -641,6 +959,41 @@ export default function NewQuotePage() {
         onSelect={addFromGrossist}
         businessId={business.business_id}
       />
+
+      {/* Save as Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSaveTemplateModal(false)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-white mb-4">Spara som mall</h3>
+            <div className="mb-4">
+              <label className="block text-sm text-zinc-400 mb-1">Mallnamn</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                placeholder="T.ex. Byte elcentral"
+                autoFocus
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSaveTemplateModal(false)}
+                className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={saveAsTemplate}
+                disabled={!templateName.trim() || savingTemplate}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
