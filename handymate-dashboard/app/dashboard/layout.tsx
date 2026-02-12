@@ -15,8 +15,8 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
@@ -28,7 +28,7 @@ export default function DashboardLayout({
   return (
     <BusinessContext.Provider value={business}>
       <CurrentUserProvider>
-        <div className="flex min-h-screen bg-[#09090b]">
+        <div className="flex min-h-screen bg-slate-50">
           <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
           <main className="flex-1 md:ml-64">
             {children}

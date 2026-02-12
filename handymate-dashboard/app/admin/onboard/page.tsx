@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -269,7 +269,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
 
     if (pilot.subscriptionStatus === 'active') {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-500/30">
           <CheckCircle className="w-3 h-3" />
           Aktiv
         </span>
@@ -278,7 +278,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
 
     if (trialEnd && trialEnd < now) {
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-100 text-red-600 border border-red-500/30">
           <XCircle className="w-3 h-3" />
           Trial utgången
         </span>
@@ -305,7 +305,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
     }
 
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-300">
         {pilot.subscriptionStatus}
       </span>
     )
@@ -313,71 +313,71 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-white mb-2">Åtkomst nekad</h1>
-          <p className="text-zinc-400">Du har inte admin-behörighet.</p>
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-gray-900 mb-2">Åtkomst nekad</h1>
+          <p className="text-gray-500">Du har inte admin-behörighet.</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] p-4 sm:p-8">
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-white">Admin - Pilot Onboarding</h1>
-              <p className="text-zinc-400">Skapa och hantera pilotkonton</p>
+              <h1 className="text-2xl font-bold text-gray-900">Admin - Pilot Onboarding</h1>
+              <p className="text-gray-500">Skapa och hantera pilotkonton</p>
             </div>
           </div>
 
           {stats && (
             <div className="hidden sm:flex items-center gap-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-white">{stats.total}</p>
-                <p className="text-xs text-zinc-500">Totalt</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-xs text-gray-400">Totalt</p>
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-blue-400">{stats.trial}</p>
-                <p className="text-xs text-zinc-500">Trial</p>
+                <p className="text-xs text-gray-400">Trial</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-emerald-400">{stats.active}</p>
-                <p className="text-xs text-zinc-500">Aktiva</p>
+                <p className="text-2xl font-bold text-emerald-600">{stats.active}</p>
+                <p className="text-xs text-gray-400">Aktiva</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-violet-400">{stats.withPhone}</p>
-                <p className="text-xs text-zinc-500">Med nummer</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.withPhone}</p>
+                <p className="text-xs text-gray-400">Med nummer</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Create Form */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-violet-400" />
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <Plus className="w-5 h-5 text-blue-600" />
             Onboarda ny pilot
           </h2>
 
@@ -385,16 +385,16 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
           {createResult && createResult.success && (
             <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
               <div className="flex items-start gap-3 mb-4">
-                <div className="p-2 bg-emerald-500/20 rounded-lg">
-                  <Check className="w-5 h-5 text-emerald-400" />
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <Check className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-emerald-400">Konto skapat!</p>
+                  <p className="font-medium text-emerald-600">Konto skapat!</p>
                   <div className="mt-2 space-y-1 text-sm">
-                    <p className="text-zinc-300">E-post: <code className="text-white bg-zinc-800 px-1 rounded">{createResult.email}</code></p>
-                    <p className="text-zinc-300">Lösenord: <code className="text-white bg-zinc-800 px-1 rounded">{createResult.password}</code></p>
+                    <p className="text-gray-700">E-post: <code className="text-gray-900 bg-gray-100 px-1 rounded">{createResult.email}</code></p>
+                    <p className="text-gray-700">Lösenord: <code className="text-gray-900 bg-gray-100 px-1 rounded">{createResult.password}</code></p>
                     {createResult.assignedPhoneNumber && (
-                      <p className="text-zinc-300">Telefonnummer: <code className="text-white bg-zinc-800 px-1 rounded">{createResult.assignedPhoneNumber}</code></p>
+                      <p className="text-gray-700">Telefonnummer: <code className="text-gray-900 bg-gray-100 px-1 rounded">{createResult.assignedPhoneNumber}</code></p>
                     )}
                     {createResult.phoneError && (
                       <p className="text-amber-400">OBS: {createResult.phoneError}</p>
@@ -404,12 +404,12 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
               </div>
 
               {/* Copy message block */}
-              <div className="bg-zinc-800/50 rounded-lg p-4">
+              <div className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm text-zinc-400">Meddelande till piloten:</p>
+                  <p className="text-sm text-gray-500">Meddelande till piloten:</p>
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                   >
                     {copied ? (
                       <>
@@ -424,14 +424,14 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                     )}
                   </button>
                 </div>
-                <pre className="text-xs text-zinc-300 whitespace-pre-wrap font-mono bg-zinc-900 rounded p-3 max-h-48 overflow-y-auto">
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white rounded p-3 max-h-48 overflow-y-auto">
                   {generatePilotMessage()}
                 </pre>
               </div>
 
               <button
                 onClick={() => setCreateResult(null)}
-                className="mt-4 text-sm text-zinc-400 hover:text-white"
+                className="mt-4 text-sm text-gray-500 hover:text-gray-900"
               >
                 Skapa en till →
               </button>
@@ -442,7 +442,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
           {!createResult && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Building2 className="w-4 h-4" />
                   Företagsnamn *
                 </label>
@@ -451,12 +451,12 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.businessName}
                   onChange={(e) => setForm({ ...form, businessName: e.target.value })}
                   placeholder="Elexperten Stockholm AB"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <User className="w-4 h-4" />
                   Kontaktperson *
                 </label>
@@ -465,12 +465,12 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.contactName}
                   onChange={(e) => setForm({ ...form, contactName: e.target.value })}
                   placeholder="Johan Svensson"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Phone className="w-4 h-4" />
                   Mobilnummer *
                 </label>
@@ -479,12 +479,12 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: formatPhoneNumber(e.target.value) })}
                   placeholder="+46 70 123 45 67"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Mail className="w-4 h-4" />
                   E-post *
                 </label>
@@ -493,18 +493,18 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="johan@foretag.se"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="text-sm text-zinc-400 mb-2 block">
+                <label className="text-sm text-gray-500 mb-2 block">
                   Bransch *
                 </label>
                 <select
                   value={form.branch}
                   onChange={(e) => setForm({ ...form, branch: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   {BRANCHES.map(b => (
                     <option key={b.value} value={b.value}>{b.label}</option>
@@ -513,7 +513,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <MapPin className="w-4 h-4" />
                   Tjänsteområde
                 </label>
@@ -522,7 +522,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.serviceArea}
                   onChange={(e) => setForm({ ...form, serviceArea: e.target.value })}
                   placeholder="Stockholm, Solna, Sundbyberg"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
@@ -530,7 +530,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <button
                   onClick={handleCreate}
                   disabled={creating}
-                  className="w-full py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {creating ? (
                     <>
@@ -547,7 +547,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
               </div>
 
               {error && (
-                <div className="md:col-span-2 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+                <div className="md:col-span-2 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-sm">
                   {error}
                 </div>
               )}
@@ -556,13 +556,13 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
         </div>
 
         {/* Pilots List */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Alla piloter ({pilots.length})</h2>
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Alla piloter ({pilots.length})</h2>
             <button
               onClick={fetchPilots}
               disabled={refreshing}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               Uppdatera
@@ -571,60 +571,60 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
 
           {pilots.length === 0 ? (
             <div className="p-12 text-center">
-              <Building2 className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-400">Inga piloter ännu</p>
+              <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">Inga piloter ännu</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-800/30">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Företag</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Kontakt</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Mobil</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">AI-nummer</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Skapad</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärd</th>
+                  <tr className="border-b border-gray-200 bg-gray-100/30">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Företag</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Kontakt</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Mobil</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">AI-nummer</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Skapad</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800">
+                <tbody className="divide-y divide-gray-200">
                   {pilots.map((pilot) => (
-                    <tr key={pilot.businessId} className="hover:bg-zinc-800/30 transition-colors">
+                    <tr key={pilot.businessId} className="hover:bg-gray-100/30 transition-colors">
                       <td className="px-4 py-3">
                         <div>
-                          <p className="font-medium text-white">{pilot.businessName}</p>
-                          <p className="text-xs text-zinc-500">{pilot.branch}</p>
+                          <p className="font-medium text-gray-900">{pilot.businessName}</p>
+                          <p className="text-xs text-gray-400">{pilot.branch}</p>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div>
-                          <p className="text-white">{pilot.contactName}</p>
-                          <p className="text-xs text-zinc-500">{pilot.contactEmail}</p>
+                          <p className="text-gray-900">{pilot.contactName}</p>
+                          <p className="text-xs text-gray-400">{pilot.contactEmail}</p>
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-zinc-400 text-sm">
+                      <td className="px-4 py-3 text-gray-500 text-sm">
                         {pilot.phone}
                       </td>
                       <td className="px-4 py-3">
                         {pilot.assignedPhoneNumber ? (
-                          <code className="text-sm text-violet-400 bg-violet-500/10 px-2 py-1 rounded">
+                          <code className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
                             {pilot.assignedPhoneNumber}
                           </code>
                         ) : (
-                          <span className="text-zinc-500 text-sm">-</span>
+                          <span className="text-gray-400 text-sm">-</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
                         {getStatusBadge(pilot)}
                       </td>
-                      <td className="px-4 py-3 text-zinc-400 text-sm">
+                      <td className="px-4 py-3 text-gray-500 text-sm">
                         {new Date(pilot.createdAt).toLocaleDateString('sv-SE')}
                       </td>
                       <td className="px-4 py-3">
                         <button
                           onClick={() => handleImpersonate(pilot.businessId)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                         >
                           <LogIn className="w-3 h-3" />
                           Logga in som

@@ -134,25 +134,25 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   function navClass(active: boolean) {
     return `flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
       active
-        ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
-        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+        ? 'bg-white/10 text-white border border-white/20'
+        : 'text-blue-200/70 hover:text-white hover:bg-white/5'
     }`
   }
 
   function subNavClass(active: boolean) {
     return `flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
       active
-        ? 'text-violet-400 bg-violet-500/10'
-        : 'text-zinc-500 hover:text-white hover:bg-zinc-800/50'
+        ? 'text-cyan-300 bg-white/10'
+        : 'text-blue-300/50 hover:text-white hover:bg-white/5'
     }`
   }
 
   const sidebarContent = (
     <>
       {/* Logo */}
-      <div className="p-4 sm:p-6 border-b border-zinc-800">
+      <div className="p-4 sm:p-6 border-b border-white/10">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/25">
+          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold text-white">Handymate</span>
@@ -164,7 +164,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Dashboard */}
         <Link href="/dashboard" className={navClass(pathname === '/dashboard')}>
           <div className="flex items-center gap-3">
-            <LayoutGrid className={`w-5 h-5 ${pathname === '/dashboard' ? 'text-violet-400' : ''}`} />
+            <LayoutGrid className={`w-5 h-5 ${pathname === '/dashboard' ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Dashboard</span>
           </div>
         </Link>
@@ -172,11 +172,11 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Samtal */}
         <Link href="/dashboard/calls" className={navClass(isActive('/dashboard/calls') || isActive('/dashboard/inbox') || isActive('/dashboard/assistant') || isActive('/dashboard/recordings'))}>
           <div className="flex items-center gap-3">
-            <Phone className={`w-5 h-5 ${isActive('/dashboard/calls') || isActive('/dashboard/inbox') ? 'text-violet-400' : ''}`} />
+            <Phone className={`w-5 h-5 ${isActive('/dashboard/calls') || isActive('/dashboard/inbox') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Samtal</span>
           </div>
           {pendingCount > 0 && (
-            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full animate-pulse">
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full animate-pulse">
               {pendingCount > 99 ? '99+' : pendingCount}
             </span>
           )}
@@ -185,7 +185,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Schema */}
         <Link href="/dashboard/schedule" className={navClass(isActive('/dashboard/schedule') || isActive('/dashboard/calendar'))}>
           <div className="flex items-center gap-3">
-            <Calendar className={`w-5 h-5 ${isActive('/dashboard/schedule') ? 'text-violet-400' : ''}`} />
+            <Calendar className={`w-5 h-5 ${isActive('/dashboard/schedule') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Schema</span>
           </div>
         </Link>
@@ -193,7 +193,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Kunder */}
         <Link href="/dashboard/customers" className={navClass(isActive('/dashboard/customers'))}>
           <div className="flex items-center gap-3">
-            <Users className={`w-5 h-5 ${isActive('/dashboard/customers') ? 'text-violet-400' : ''}`} />
+            <Users className={`w-5 h-5 ${isActive('/dashboard/customers') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Kunder</span>
           </div>
         </Link>
@@ -201,7 +201,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Pipeline */}
         <Link href="/dashboard/pipeline" className={navClass(isActive('/dashboard/pipeline'))}>
           <div className="flex items-center gap-3">
-            <TrendingUp className={`w-5 h-5 ${isActive('/dashboard/pipeline') ? 'text-violet-400' : ''}`} />
+            <TrendingUp className={`w-5 h-5 ${isActive('/dashboard/pipeline') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Pipeline</span>
           </div>
         </Link>
@@ -213,7 +213,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             className={`w-full ${navClass(isJobbActive)}`}
           >
             <div className="flex items-center gap-3">
-              <Briefcase className={`w-5 h-5 ${isJobbActive ? 'text-violet-400' : ''}`} />
+              <Briefcase className={`w-5 h-5 ${isJobbActive ? 'text-cyan-300' : ''}`} />
               <span className="text-sm sm:text-base">Jobb</span>
             </div>
             <ChevronDown className={`w-4 h-4 transition-transform ${jobbOpen ? 'rotate-180' : ''}`} />
@@ -243,7 +243,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Tid */}
         <Link href="/dashboard/time" className={navClass(isActive('/dashboard/time'))}>
           <div className="flex items-center gap-3">
-            <Clock className={`w-5 h-5 ${isActive('/dashboard/time') ? 'text-violet-400' : ''}`} />
+            <Clock className={`w-5 h-5 ${isActive('/dashboard/time') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Tid</span>
           </div>
         </Link>
@@ -251,22 +251,22 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         {/* Inställningar */}
         <Link href="/dashboard/settings" className={navClass(isActive('/dashboard/settings') || isActive('/dashboard/team'))}>
           <div className="flex items-center gap-3">
-            <Settings className={`w-5 h-5 ${isActive('/dashboard/settings') ? 'text-violet-400' : ''}`} />
+            <Settings className={`w-5 h-5 ${isActive('/dashboard/settings') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Inställningar</span>
           </div>
         </Link>
       </nav>
 
       {/* User Menu */}
-      <div className="p-4 border-t border-zinc-800">
+      <div className="p-4 border-t border-white/10">
         <div className="relative" ref={userMenuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-all"
+            className="w-full flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all"
           >
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: currentUser?.color || '#8B5CF6' }}
+              style={{ backgroundColor: currentUser?.color || '#3b82f6' }}
             >
               <span className="text-white text-xs font-bold">
                 {currentUser ? getInitials(currentUser.name) : businessName.substring(0, 2).toUpperCase()}
@@ -274,24 +274,24 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="text-sm text-white truncate">{currentUser?.name || businessName}</p>
-              <p className="text-xs text-zinc-500 truncate">{currentUser?.email || ''}</p>
+              <p className="text-xs text-blue-300/50 truncate">{currentUser?.email || ''}</p>
             </div>
-            <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-blue-300/50 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {userMenuOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-50 overflow-hidden">
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#0f2744] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
               <Link
                 href="/dashboard/profile"
-                className="flex items-center gap-2 px-4 py-3 text-sm text-zinc-300 hover:bg-zinc-800 transition-all"
+                className="flex items-center gap-2 px-4 py-3 text-sm text-blue-200 hover:bg-white/10 transition-all"
               >
                 <User className="w-4 h-4" />
                 Min profil
               </Link>
-              <div className="border-t border-zinc-800" />
+              <div className="border-t border-white/10" />
               <button
                 onClick={onLogout}
-                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-all"
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-blue-300/50 hover:text-red-400 hover:bg-white/10 transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 Logga ut
@@ -308,12 +308,12 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       {/* Mobile hamburger button */}
       <button
         onClick={() => setIsMobileOpen(true)}
-        className="fixed top-4 left-4 z-40 p-3 bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-xl text-white md:hidden min-w-[48px] min-h-[48px] flex items-center justify-center"
+        className="fixed top-4 left-4 z-40 p-3 bg-white/90 backdrop-blur-xl border border-gray-200 rounded-xl text-gray-700 md:hidden min-w-[48px] min-h-[48px] flex items-center justify-center shadow-sm"
         aria-label="Öppna meny"
       >
         <Menu className="w-5 h-5" />
         {pendingCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full">
+          <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full">
             {pendingCount > 9 ? '9+' : pendingCount}
           </span>
         )}
@@ -322,20 +322,20 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       {/* Mobile overlay */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
       {/* Sidebar - Mobile */}
       <div
-        className={`fixed left-0 top-0 h-screen w-72 bg-zinc-900/95 backdrop-blur-xl border-r border-zinc-800 flex flex-col z-50 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-screen w-72 bg-gradient-to-b from-[#1e3a5f] to-[#0f2744] border-r border-white/10 flex flex-col z-50 transition-transform duration-300 md:hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <button
           onClick={() => setIsMobileOpen(false)}
-          className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
+          className="absolute top-4 right-4 p-2 text-blue-200/70 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
           aria-label="Stäng meny"
         >
           <X className="w-5 h-5" />
@@ -344,7 +344,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-zinc-900/50 backdrop-blur-xl border-r border-zinc-800 flex-col">
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-[#1e3a5f] to-[#0f2744] border-r border-white/10 flex-col">
         {sidebarContent}
       </div>
     </>

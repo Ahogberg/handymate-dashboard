@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import {
@@ -185,11 +185,11 @@ function getPriorityLabel(p: string): string {
 
 function getPriorityBadgeStyle(p: string): string {
   switch (p) {
-    case 'urgent': return 'bg-red-500/20 text-red-400 border-red-500/30'
-    case 'high': return 'bg-orange-500/20 text-orange-400 border-orange-500/30'
-    case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-    case 'low': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-    default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+    case 'urgent': return 'bg-red-100 text-red-600 border-red-200'
+    case 'high': return 'bg-orange-100 text-orange-600 border-orange-500/30'
+    case 'medium': return 'bg-yellow-100 text-yellow-400 border-yellow-500/30'
+    case 'low': return 'bg-gray-100 text-gray-500 border-gray-300'
+    default: return 'bg-gray-100 text-gray-500 border-gray-300'
   }
 }
 
@@ -204,10 +204,10 @@ function getTriggeredByLabel(t: string): string {
 
 function getTriggeredByStyle(t: string): string {
   switch (t) {
-    case 'ai': return 'bg-violet-500/20 text-violet-400 border-violet-500/30'
-    case 'user': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-    case 'system': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-    default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+    case 'ai': return 'bg-blue-100 text-blue-600 border-blue-300'
+    case 'user': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+    case 'system': return 'bg-gray-100 text-gray-500 border-gray-300'
+    default: return 'bg-gray-100 text-gray-500 border-gray-300'
   }
 }
 
@@ -600,37 +600,37 @@ export default function PipelinePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
-          <div className="absolute top-1/4 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[128px]" />
-          <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-[128px]" />
+          <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-50 rounded-full blur-[128px]" />
+          <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-50 rounded-full blur-[128px]" />
         </div>
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] relative">
+    <div className="min-h-screen bg-slate-50 relative">
       {/* Decorative background blobs */}
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-fuchsia-500/10 rounded-full blur-[128px]" />
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative z-10 flex flex-col h-screen">
         {/* ============================================================== */}
         {/* Header */}
         {/* ============================================================== */}
-        <header className="flex-shrink-0 px-4 lg:px-6 py-4 border-b border-zinc-800">
+        <header className="flex-shrink-0 px-4 lg:px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center">
-                <FolderKanban className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                <FolderKanban className="w-5 h-5 text-gray-900" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Pipeline</h1>
-                <p className="text-sm text-zinc-400 hidden sm:block">
+                <h1 className="text-xl font-bold text-gray-900">Pipeline</h1>
+                <p className="text-sm text-gray-500 hidden sm:block">
                   {stats ? `${stats.totalDeals} aktiva deals` : 'Hantera dina affärer'}
                 </p>
               </div>
@@ -645,44 +645,44 @@ export default function PipelinePage() {
                   }}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                     hasActiveFilters
-                      ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
-                      : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                      ? 'bg-blue-100 border-blue-300 text-blue-500'
+                      : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'
                   }`}
                 >
                   <Filter className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">Filter</span>
                   {hasActiveFilters && (
-                    <span className="w-2 h-2 rounded-full bg-violet-400" />
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
                   )}
                 </button>
 
                 {/* Filter dropdown */}
                 {showFilter && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-xl z-50">
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-4 shadow-xl z-50">
                     <div className="space-y-3">
                       <div>
-                        <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                           Sök
                         </label>
                         <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input
                             type="text"
                             placeholder="Sök deals..."
                             value={filterSearch}
                             onChange={e => setFilterSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500/50"
+                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300"
                           />
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                           Prioritet
                         </label>
                         <select
                           value={filterPriority}
                           onChange={e => setFilterPriority(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-violet-500/50"
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-blue-300"
                         >
                           <option value="all">Alla</option>
                           <option value="urgent">Brådskande</option>
@@ -697,7 +697,7 @@ export default function PipelinePage() {
                             setFilterSearch('')
                             setFilterPriority('all')
                           }}
-                          className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                          className="text-xs text-blue-600 hover:text-blue-500 transition-colors"
                         >
                           Rensa filter
                         </button>
@@ -713,7 +713,7 @@ export default function PipelinePage() {
                   setShowNewDeal(true)
                   fetchCustomers()
                 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium hover:from-violet-600 hover:to-fuchsia-600 transition-all shadow-lg shadow-violet-500/20"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium hover:from-blue-600 hover:to-cyan-600 transition-all shadow-lg shadow-blue-500/10"
               >
                 <Plus className="w-4 h-4" />
                 <span className="hidden sm:inline">Ny deal</span>
@@ -729,8 +729,8 @@ export default function PipelinePage() {
                 onClick={() => setMobileStageIndex(idx)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   mobileStageIndex === idx
-                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                    : 'bg-zinc-800/50 text-zinc-400 hover:text-white'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'bg-gray-50 text-gray-500 hover:text-white'
                 }`}
               >
                 <span
@@ -762,29 +762,29 @@ export default function PipelinePage() {
                   key={stage.id}
                   className={`flex-shrink-0 w-[300px] flex flex-col rounded-xl border transition-all duration-200 ${
                     isDropTarget
-                      ? 'border-dashed border-violet-500 bg-violet-500/10'
-                      : 'border-zinc-800 bg-zinc-900/30'
+                      ? 'border-dashed border-blue-500 bg-blue-50'
+                      : 'border-gray-200 bg-white/30'
                   }`}
                   onDragOver={e => handleDragOver(e, stage.id)}
                   onDragLeave={handleDragLeave}
                   onDrop={e => handleDrop(e, stage)}
                 >
                   {/* Column header */}
-                  <div className="flex-shrink-0 px-4 py-3 border-b border-zinc-800/50">
+                  <div className="flex-shrink-0 px-4 py-3 border-b border-gray-200/50">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
                           className="w-3 h-3 rounded-full flex-shrink-0"
                           style={{ backgroundColor: stage.color }}
                         />
-                        <h3 className="text-sm font-semibold text-white truncate">
+                        <h3 className="text-sm font-semibold text-gray-900 truncate">
                           {stage.name}
                         </h3>
-                        <span className="text-xs text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                        <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
                           {stageDeals.length}
                         </span>
                       </div>
-                      <span className="text-xs text-zinc-500">
+                      <span className="text-xs text-gray-400">
                         {formatColumnValue(total)}
                       </span>
                     </div>
@@ -793,7 +793,7 @@ export default function PipelinePage() {
                   {/* Cards */}
                   <div className="flex-1 overflow-y-auto p-2 space-y-2 scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                     {stageDeals.length === 0 && (
-                      <div className="flex items-center justify-center py-8 text-zinc-600 text-xs">
+                      <div className="flex items-center justify-center py-8 text-gray-400 text-xs">
                         {isDropTarget ? 'Släpp här' : 'Inga deals'}
                       </div>
                     )}
@@ -828,20 +828,20 @@ export default function PipelinePage() {
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: stages[mobileStageIndex].color }}
                     />
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold text-gray-900">
                       {stages[mobileStageIndex].name}
                     </h3>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-gray-400">
                       {dealsForStage(stages[mobileStageIndex].id).length} deals
                     </span>
                   </div>
-                  <span className="text-xs text-zinc-500">
+                  <span className="text-xs text-gray-400">
                     {formatColumnValue(stageValue(stages[mobileStageIndex].id))}
                   </span>
                 </div>
 
                 {dealsForStage(stages[mobileStageIndex].id).length === 0 && (
-                  <div className="flex items-center justify-center py-12 text-zinc-600 text-sm">
+                  <div className="flex items-center justify-center py-12 text-gray-400 text-sm">
                     Inga deals i detta steg
                   </div>
                 )}
@@ -865,22 +865,22 @@ export default function PipelinePage() {
         {/* AI Activity Panel (collapsible bottom) */}
         {/* ============================================================== */}
         {aiActivities.length > 0 && (
-          <div className="flex-shrink-0 border-t border-zinc-800">
+          <div className="flex-shrink-0 border-t border-gray-200">
             <button
               onClick={() => setAiPanelOpen(!aiPanelOpen)}
-              className="w-full flex items-center justify-between px-4 lg:px-6 py-3 hover:bg-zinc-900/50 transition-colors"
+              className="w-full flex items-center justify-between px-4 lg:px-6 py-3 hover:bg-white transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-violet-400" />
-                <span className="text-sm font-medium text-white">AI-aktivitet</span>
-                <span className="text-xs text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded-full">
+                <Bot className="w-4 h-4 text-blue-600" />
+                <span className="text-sm font-medium text-gray-900">AI-aktivitet</span>
+                <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">
                   {aiActivities.length}
                 </span>
               </div>
               {aiPanelOpen ? (
-                <ChevronDown className="w-4 h-4 text-zinc-500" />
+                <ChevronDown className="w-4 h-4 text-gray-400" />
               ) : (
-                <ChevronUp className="w-4 h-4 text-zinc-500" />
+                <ChevronUp className="w-4 h-4 text-gray-400" />
               )}
             </button>
 
@@ -891,31 +891,31 @@ export default function PipelinePage() {
                     key={activity.id}
                     className={`flex items-start gap-3 p-3 rounded-lg border ${
                       activity.undone_at
-                        ? 'bg-zinc-900/30 border-zinc-800/50 opacity-60'
-                        : 'bg-zinc-900/50 border-zinc-800'
+                        ? 'bg-white/30 border-gray-200/50 opacity-60'
+                        : 'bg-white border-gray-200'
                     }`}
                   >
-                    <Bot className="w-4 h-4 text-violet-400 mt-0.5 flex-shrink-0" />
+                    <Bot className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm text-white">
+                        <span className="text-sm text-gray-900">
                           {activity.description || 'AI-åtgärd'}
                         </span>
                         {activity.deal_title && (
-                          <span className="text-xs text-zinc-500">
+                          <span className="text-xs text-gray-400">
                             ({activity.deal_title})
                           </span>
                         )}
                       </div>
                       {activity.ai_reason && (
-                        <p className="text-xs text-zinc-500 mt-1">{activity.ai_reason}</p>
+                        <p className="text-xs text-gray-400 mt-1">{activity.ai_reason}</p>
                       )}
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-zinc-600">
+                        <span className="text-xs text-gray-400">
                           {timeAgo(activity.created_at)}
                         </span>
                         {activity.ai_confidence != null && (
-                          <span className="text-xs text-violet-400/70">
+                          <span className="text-xs text-blue-600/70">
                             {Math.round(activity.ai_confidence * 100)}% konfidens
                           </span>
                         )}
@@ -924,14 +924,14 @@ export default function PipelinePage() {
                     {!activity.undone_at && (
                       <button
                         onClick={() => undoActivity(activity.id)}
-                        className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-xs text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+                        className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 border border-gray-300 text-xs text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
                       >
                         <Undo2 className="w-3 h-3" />
                         Ångra
                       </button>
                     )}
                     {activity.undone_at && (
-                      <span className="flex-shrink-0 text-xs text-zinc-600 italic">Ångrad</span>
+                      <span className="flex-shrink-0 text-xs text-gray-400 italic">Ångrad</span>
                     )}
                   </div>
                 ))}
@@ -944,30 +944,30 @@ export default function PipelinePage() {
         {/* Statistics Footer */}
         {/* ============================================================== */}
         {stats && (
-          <div className="flex-shrink-0 border-t border-zinc-800 px-4 lg:px-6 py-3 bg-zinc-900/30">
+          <div className="flex-shrink-0 border-t border-gray-200 px-4 lg:px-6 py-3 bg-white/30">
             <div className="flex items-center gap-4 lg:gap-8 overflow-x-auto text-xs">
               <div className="flex items-center gap-2 flex-shrink-0">
-                <div className="w-2 h-2 rounded-full bg-violet-400" />
-                <span className="text-zinc-400">Aktiva deals:</span>
-                <span className="text-white font-medium">{stats.totalDeals}</span>
-                <span className="text-zinc-500">({formatValueCompact(stats.totalValue)})</span>
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-gray-500">Aktiva deals:</span>
+                <span className="text-gray-900 font-medium">{stats.totalDeals}</span>
+                <span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                <span className="text-zinc-400">Vunna denna månad:</span>
-                <span className="text-white font-medium">
+                <span className="text-gray-500">Vunna denna månad:</span>
+                <span className="text-gray-900 font-medium">
                   {formatValueCompact(stats.wonValueThisMonth)}
                 </span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="w-2 h-2 rounded-full bg-blue-400" />
-                <span className="text-zinc-400">Nya leads idag:</span>
-                <span className="text-white font-medium">{stats.newLeadsToday}</span>
+                <span className="text-gray-500">Nya leads idag:</span>
+                <span className="text-gray-900 font-medium">{stats.newLeadsToday}</span>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="w-2 h-2 rounded-full bg-amber-400" />
-                <span className="text-zinc-400">Behöver uppföljning:</span>
-                <span className="text-white font-medium">{stats.needsFollowUp}</span>
+                <span className="text-gray-500">Behöver uppföljning:</span>
+                <span className="text-gray-900 font-medium">{stats.needsFollowUp}</span>
               </div>
             </div>
           </div>
@@ -985,15 +985,15 @@ export default function PipelinePage() {
             onClick={closeDealDetail}
           />
           {/* Panel */}
-          <div className="fixed inset-y-0 right-0 z-50 w-full lg:w-[480px] bg-zinc-900 border-l border-zinc-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+          <div className="fixed inset-y-0 right-0 z-50 w-full lg:w-[480px] bg-white border-l border-gray-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
             {/* Panel header */}
-            <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+            <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <div className="flex items-center gap-3 min-w-0">
                 {(() => {
                   const stage = getStageForDeal(selectedDeal)
                   return stage ? (
                     <span
-                      className="px-2 py-0.5 rounded-full text-xs font-medium text-white flex-shrink-0"
+                      className="px-2 py-0.5 rounded-full text-xs font-medium text-gray-900 flex-shrink-0"
                       style={{ backgroundColor: stage.color + '33', color: stage.color, border: `1px solid ${stage.color}55` }}
                     >
                       {stage.name}
@@ -1006,7 +1006,7 @@ export default function PipelinePage() {
               </div>
               <button
                 onClick={closeDealDetail}
-                className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1023,7 +1023,7 @@ export default function PipelinePage() {
                         type="text"
                         value={editTitleValue}
                         onChange={e => setEditTitleValue(e.target.value)}
-                        className="flex-1 bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white text-lg font-bold focus:outline-none focus:border-violet-500/50"
+                        className="flex-1 bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-gray-900 text-lg font-bold focus:outline-none focus:border-blue-300"
                         autoFocus
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
@@ -1041,7 +1041,7 @@ export default function PipelinePage() {
                           updateDealField(selectedDeal.id, 'title', editTitleValue)
                           setEditingTitle(false)
                         }}
-                        className="p-2 rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-colors"
+                        className="p-2 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-500/30 transition-colors"
                       >
                         <Save className="w-4 h-4" />
                       </button>
@@ -1054,25 +1054,25 @@ export default function PipelinePage() {
                       }}
                       className="group flex items-center gap-2 text-left w-full"
                     >
-                      <h2 className="text-lg font-bold text-white">{selectedDeal.title}</h2>
-                      <Edit3 className="w-3.5 h-3.5 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <h2 className="text-lg font-bold text-gray-900">{selectedDeal.title}</h2>
+                      <Edit3 className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   )}
                   {selectedDeal.description && (
-                    <p className="text-sm text-zinc-400 mt-1">{selectedDeal.description}</p>
+                    <p className="text-sm text-gray-500 mt-1">{selectedDeal.description}</p>
                   )}
                 </div>
 
                 {/* Value */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-500">Värde</span>
+                  <span className="text-sm text-gray-400">Värde</span>
                   {editingValue ? (
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         value={editValueInput}
                         onChange={e => setEditValueInput(e.target.value)}
-                        className="w-32 bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-sm text-right focus:outline-none focus:border-violet-500/50"
+                        className="w-32 bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-blue-300"
                         autoFocus
                         onKeyDown={e => {
                           if (e.key === 'Enter') {
@@ -1092,7 +1092,7 @@ export default function PipelinePage() {
                           updateDealField(selectedDeal.id, 'value', v)
                           setEditingValue(false)
                         }}
-                        className="p-1.5 rounded-lg bg-violet-500/20 text-violet-400 hover:bg-violet-500/30 transition-colors"
+                        className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-500/30 transition-colors"
                       >
                         <Save className="w-3.5 h-3.5" />
                       </button>
@@ -1103,17 +1103,17 @@ export default function PipelinePage() {
                         setEditValueInput(selectedDeal.value?.toString() || '')
                         setEditingValue(true)
                       }}
-                      className="group flex items-center gap-1.5 text-white font-medium text-sm"
+                      className="group flex items-center gap-1.5 text-gray-900 font-medium text-sm"
                     >
                       {formatValue(selectedDeal.value)}
-                      <Edit3 className="w-3 h-3 text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      <Edit3 className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   )}
                 </div>
 
                 {/* Priority */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-zinc-500">Prioritet</span>
+                  <span className="text-sm text-gray-400">Prioritet</span>
                   {editingPriority ? (
                     <select
                       value={selectedDeal.priority}
@@ -1123,7 +1123,7 @@ export default function PipelinePage() {
                       }}
                       onBlur={() => setEditingPriority(false)}
                       autoFocus
-                      className="bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-1.5 text-white text-sm focus:outline-none focus:border-violet-500/50"
+                      className="bg-gray-50 border border-gray-300 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-blue-300"
                     >
                       <option value="low">Låg</option>
                       <option value="medium">Medium</option>
@@ -1144,46 +1144,46 @@ export default function PipelinePage() {
                 {/* Source */}
                 {selectedDeal.source && (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-zinc-500">Källa</span>
+                    <span className="text-sm text-gray-400">Källa</span>
                     <div className="flex items-center gap-1.5">
-                      {selectedDeal.source === 'ai' && <Bot className="w-3.5 h-3.5 text-violet-400" />}
-                      <span className="text-sm text-white capitalize">{selectedDeal.source}</span>
+                      {selectedDeal.source === 'ai' && <Bot className="w-3.5 h-3.5 text-blue-600" />}
+                      <span className="text-sm text-gray-900 capitalize">{selectedDeal.source}</span>
                     </div>
                   </div>
                 )}
 
                 {/* Timestamps */}
-                <div className="flex items-center justify-between text-xs text-zinc-500">
+                <div className="flex items-center justify-between text-xs text-gray-400">
                   <span>Skapad {timeAgo(selectedDeal.created_at)}</span>
                   <span>Uppdaterad {timeAgo(selectedDeal.updated_at)}</span>
                 </div>
 
                 {/* Customer info */}
                 {selectedDeal.customer && (
-                  <div className="p-4 rounded-lg border border-zinc-800 bg-zinc-800/30 space-y-2">
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-100/30 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-zinc-500 uppercase tracking-wider">Kund</span>
+                      <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
                       <Link
                         href={`/dashboard/customers?id=${selectedDeal.customer.customer_id}`}
-                        className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1 transition-colors"
+                        className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1 transition-colors"
                       >
                         Visa <ExternalLink className="w-3 h-3" />
                       </Link>
                     </div>
                     <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-zinc-500" />
-                      <span className="text-sm text-white">{selectedDeal.customer.name}</span>
+                      <User className="w-4 h-4 text-gray-400" />
+                      <span className="text-sm text-gray-900">{selectedDeal.customer.name}</span>
                     </div>
                     {selectedDeal.customer.phone_number && (
                       <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4 text-zinc-500" />
-                        <span className="text-sm text-zinc-400">{selectedDeal.customer.phone_number}</span>
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span>
                       </div>
                     )}
                     {selectedDeal.customer.email && (
                       <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-zinc-500" />
-                        <span className="text-sm text-zinc-400">{selectedDeal.customer.email}</span>
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="text-sm text-gray-500">{selectedDeal.customer.email}</span>
                       </div>
                     )}
                   </div>
@@ -1191,30 +1191,30 @@ export default function PipelinePage() {
 
                 {/* Quick actions */}
                 <div className="space-y-2">
-                  <h4 className="text-xs text-zinc-500 uppercase tracking-wider">Snabbåtgärder</h4>
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
                   <div className="flex flex-wrap gap-2">
                     {selectedDeal.customer_id && (
                       <Link
                         href={`/dashboard/quotes/new?customerId=${selectedDeal.customer_id}`}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 text-sm text-white hover:border-violet-500/50 hover:bg-violet-500/10 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                       >
-                        <FileText className="w-4 h-4 text-violet-400" />
+                        <FileText className="w-4 h-4 text-blue-600" />
                         Skapa offert
                       </Link>
                     )}
                     {!selectedDeal.customer_id && (
                       <Link
                         href="/dashboard/quotes/new"
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 text-sm text-white hover:border-violet-500/50 hover:bg-violet-500/10 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                       >
-                        <FileText className="w-4 h-4 text-violet-400" />
+                        <FileText className="w-4 h-4 text-blue-600" />
                         Skapa offert
                       </Link>
                     )}
                     {!getStageForDeal(selectedDeal)?.is_lost && (
                       <button
                         onClick={() => markDealLost(selectedDeal.id)}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 text-sm text-red-400 hover:border-red-500/50 hover:bg-red-500/10 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-red-600 hover:border-red-500/50 hover:bg-red-50 transition-colors"
                       >
                         <XCircle className="w-4 h-4" />
                         Markera förlorad
@@ -1223,9 +1223,9 @@ export default function PipelinePage() {
                     {selectedDeal.quote_id && (
                       <Link
                         href={`/dashboard/quotes/${selectedDeal.quote_id}`}
-                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700 text-sm text-white hover:border-violet-500/50 hover:bg-violet-500/10 transition-colors"
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-300 text-sm text-gray-900 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                       >
-                        <FileText className="w-4 h-4 text-emerald-400" />
+                        <FileText className="w-4 h-4 text-emerald-600" />
                         Visa offert
                       </Link>
                     )}
@@ -1234,15 +1234,15 @@ export default function PipelinePage() {
 
                 {/* Activity log */}
                 <div>
-                  <h4 className="text-xs text-zinc-500 uppercase tracking-wider mb-3">
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">
                     Aktivitetslogg
                   </h4>
                   {detailLoading ? (
                     <div className="flex items-center justify-center py-6">
-                      <Loader2 className="w-5 h-5 text-violet-400 animate-spin" />
+                      <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
                     </div>
                   ) : detailActivities.length === 0 ? (
-                    <p className="text-sm text-zinc-600 text-center py-4">Ingen aktivitet ännu</p>
+                    <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
                   ) : (
                     <div className="space-y-2">
                       {detailActivities.map(act => (
@@ -1250,22 +1250,22 @@ export default function PipelinePage() {
                           key={act.id}
                           className={`flex items-start gap-3 p-3 rounded-lg border ${
                             act.undone_at
-                              ? 'bg-zinc-900/30 border-zinc-800/50 opacity-50'
-                              : 'bg-zinc-800/30 border-zinc-800'
+                              ? 'bg-white/30 border-gray-200/50 opacity-50'
+                              : 'bg-gray-100/30 border-gray-200'
                           }`}
                         >
                           <div className="mt-0.5">
                             {act.triggered_by === 'ai' ? (
-                              <Bot className="w-4 h-4 text-violet-400" />
+                              <Bot className="w-4 h-4 text-blue-600" />
                             ) : act.triggered_by === 'system' ? (
-                              <Sparkles className="w-4 h-4 text-zinc-500" />
+                              <Sparkles className="w-4 h-4 text-gray-400" />
                             ) : (
                               <User className="w-4 h-4 text-blue-400" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm text-white">
+                              <span className="text-sm text-gray-900">
                                 {act.description || act.activity_type}
                               </span>
                               <span
@@ -1275,30 +1275,30 @@ export default function PipelinePage() {
                               </span>
                             </div>
                             {act.from_stage_name && act.to_stage_name && (
-                              <div className="flex items-center gap-1 mt-1 text-xs text-zinc-500">
+                              <div className="flex items-center gap-1 mt-1 text-xs text-gray-400">
                                 <span>{act.from_stage_name}</span>
                                 <ArrowRight className="w-3 h-3" />
                                 <span>{act.to_stage_name}</span>
                               </div>
                             )}
                             {act.ai_reason && (
-                              <p className="text-xs text-zinc-500 mt-1">{act.ai_reason}</p>
+                              <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>
                             )}
-                            <span className="text-xs text-zinc-600 mt-1 block">
+                            <span className="text-xs text-gray-400 mt-1 block">
                               {timeAgo(act.created_at)}
                             </span>
                           </div>
                           {act.triggered_by === 'ai' && !act.undone_at && (
                             <button
                               onClick={() => undoActivity(act.id)}
-                              className="flex-shrink-0 p-1.5 rounded-md bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+                              className="flex-shrink-0 p-1.5 rounded-md bg-gray-100 border border-gray-300 text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
                               title="Ångra"
                             >
                               <Undo2 className="w-3.5 h-3.5" />
                             </button>
                           )}
                           {act.undone_at && (
-                            <span className="text-[10px] text-zinc-600 italic flex-shrink-0">
+                            <span className="text-[10px] text-gray-400 italic flex-shrink-0">
                               Ångrad
                             </span>
                           )}
@@ -1323,13 +1323,13 @@ export default function PipelinePage() {
             onClick={() => setShowNewDeal(false)}
           />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-lg">
               {/* Modal header */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-                <h2 className="text-lg font-bold text-white">Ny deal</h2>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">Ny deal</h2>
                 <button
                   onClick={() => setShowNewDeal(false)}
-                  className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1339,7 +1339,7 @@ export default function PipelinePage() {
               <div className="p-6 space-y-4">
                 {/* Title */}
                 <div>
-                  <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                     Titel *
                   </label>
                   <input
@@ -1349,44 +1349,44 @@ export default function PipelinePage() {
                       setNewDealForm(prev => ({ ...prev, title: e.target.value }))
                     }
                     placeholder="T.ex. Badrumsrenovering Andersson"
-                    className="w-full px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500/50"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300"
                   />
                 </div>
 
                 {/* Customer */}
                 <div>
-                  <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                     Kund
                   </label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input
                       type="text"
                       value={customerSearch}
                       onChange={e => setCustomerSearch(e.target.value)}
                       placeholder="Sök kund..."
-                      className="w-full pl-9 pr-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500/50"
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300"
                     />
                   </div>
                   {newDealForm.customer_id && (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <span className="text-xs text-violet-400">
+                      <span className="text-xs text-blue-600">
                         Vald: {customers.find(c => c.customer_id === newDealForm.customer_id)?.name || 'Okänd'}
                       </span>
                       <button
                         onClick={() =>
                           setNewDealForm(prev => ({ ...prev, customer_id: '' }))
                         }
-                        className="text-xs text-zinc-500 hover:text-white"
+                        className="text-xs text-gray-400 hover:text-gray-900"
                       >
                         <X className="w-3 h-3" />
                       </button>
                     </div>
                   )}
                   {customerSearch && !newDealForm.customer_id && (
-                    <div className="mt-1 max-h-32 overflow-y-auto bg-zinc-800 border border-zinc-700 rounded-lg">
+                    <div className="mt-1 max-h-32 overflow-y-auto bg-gray-100 border border-gray-300 rounded-lg">
                       {filteredCustomers.length === 0 && (
-                        <div className="px-3 py-2 text-xs text-zinc-500">Inga kunder hittades</div>
+                        <div className="px-3 py-2 text-xs text-gray-400">Inga kunder hittades</div>
                       )}
                       {filteredCustomers.slice(0, 8).map(c => (
                         <button
@@ -1398,10 +1398,10 @@ export default function PipelinePage() {
                             }))
                             setCustomerSearch('')
                           }}
-                          className="w-full text-left px-3 py-2 text-sm text-white hover:bg-zinc-700/50 transition-colors flex items-center justify-between"
+                          className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-200/50 transition-colors flex items-center justify-between"
                         >
                           <span>{c.name}</span>
-                          <span className="text-xs text-zinc-500">{c.phone_number}</span>
+                          <span className="text-xs text-gray-400">{c.phone_number}</span>
                         </button>
                       ))}
                     </div>
@@ -1410,7 +1410,7 @@ export default function PipelinePage() {
 
                 {/* Value */}
                 <div>
-                  <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                     Värde (kr)
                   </label>
                   <input
@@ -1420,13 +1420,13 @@ export default function PipelinePage() {
                       setNewDealForm(prev => ({ ...prev, value: e.target.value }))
                     }
                     placeholder="0"
-                    className="w-full px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500/50"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300"
                   />
                 </div>
 
                 {/* Priority */}
                 <div>
-                  <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                     Prioritet
                   </label>
                   <select
@@ -1434,7 +1434,7 @@ export default function PipelinePage() {
                     onChange={e =>
                       setNewDealForm(prev => ({ ...prev, priority: e.target.value }))
                     }
-                    className="w-full px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:border-violet-500/50"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-blue-300"
                   >
                     <option value="low">Låg</option>
                     <option value="medium">Medium</option>
@@ -1445,7 +1445,7 @@ export default function PipelinePage() {
 
                 {/* Description */}
                 <div>
-                  <label className="text-xs text-zinc-500 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">
                     Beskrivning
                   </label>
                   <textarea
@@ -1455,23 +1455,23 @@ export default function PipelinePage() {
                     }
                     placeholder="Kort beskrivning av dealen..."
                     rows={3}
-                    className="w-full px-3 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500/50 resize-none"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-300 resize-none"
                   />
                 </div>
               </div>
 
               {/* Modal footer */}
-              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-zinc-800">
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowNewDeal(false)}
-                  className="px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-sm text-zinc-400 hover:text-white hover:border-zinc-600 transition-colors"
+                  className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-300 text-sm text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
                 >
                   Avbryt
                 </button>
                 <button
                   onClick={createDeal}
                   disabled={newDealSubmitting || !newDealForm.title.trim()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-sm font-medium hover:from-violet-600 hover:to-fuchsia-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium hover:from-blue-600 hover:to-cyan-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {newDealSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -1494,10 +1494,10 @@ export default function PipelinePage() {
           <div
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border shadow-xl text-sm font-medium ${
               toast.type === 'success'
-                ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+                ? 'bg-emerald-100 border-emerald-200 text-emerald-700'
                 : toast.type === 'error'
-                ? 'bg-red-500/20 border-red-500/30 text-red-300'
-                : 'bg-zinc-800 border-zinc-700 text-white'
+                ? 'bg-red-100 border-red-200 text-red-700'
+                : 'bg-gray-100 border-gray-300 text-gray-900'
             }`}
           >
             {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
@@ -1529,32 +1529,32 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
       onDragStart={e => onDragStart(e, deal.id)}
       onDragEnd={onDragEnd}
       onClick={onClick}
-      className={`group p-3 rounded-lg border-l-[3px] border border-zinc-800 bg-zinc-900/50 backdrop-blur-xl cursor-pointer transition-all hover:border-zinc-700 hover:bg-zinc-800/50 ${
+      className={`group p-3 rounded-lg border-l-[3px] border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:border-gray-300 hover:bg-gray-50 ${
         getPriorityColor(deal.priority)
       } ${isDragging ? 'opacity-40 scale-95' : ''}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <h4 className="text-sm font-medium text-white truncate">{deal.title}</h4>
+            <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>
             {deal.source === 'ai' && (
-              <Bot className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+              <Bot className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
             )}
           </div>
           {deal.customer?.name && (
-            <p className="text-xs text-zinc-400 mt-0.5 truncate">{deal.customer.name}</p>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{deal.customer.name}</p>
           )}
         </div>
-        <GripVertical className="w-4 h-4 text-zinc-700 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+        <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
       </div>
 
       <div className="flex items-center justify-between mt-2">
-        <span className="text-xs font-medium text-zinc-300">
+        <span className="text-xs font-medium text-gray-700">
           {deal.value != null && deal.value > 0
             ? formatValueCompact(deal.value)
             : ''}
         </span>
-        <span className="text-[10px] text-zinc-600 flex items-center gap-1">
+        <span className="text-[10px] text-gray-400 flex items-center gap-1">
           <Clock className="w-3 h-3" />
           {timeAgo(deal.updated_at)}
         </span>

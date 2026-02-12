@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -229,10 +229,10 @@ const STATUS_MAP: Record<string, string> = {
 
 const STATUS_STYLES: Record<string, string> = {
   planning: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-  active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+  active: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
   paused: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-  completed: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
-  cancelled: 'bg-red-500/20 text-red-400 border-red-500/30'
+  completed: 'bg-gray-100 text-gray-500 border-gray-300',
+  cancelled: 'bg-red-100 text-red-600 border-red-500/30'
 }
 
 const PROJECT_TYPE_LABELS: Record<string, string> = {
@@ -855,16 +855,16 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   if (!project) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Projektet hittades inte</div>
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Projektet hittades inte</div>
       </div>
     )
   }
@@ -897,19 +897,19 @@ export default function ProjectDetailPage() {
   // --- Render ---
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
           toast.type === 'success'
-            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-            : 'bg-red-500/20 border-red-500/30 text-red-400'
+            ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
+            : 'bg-red-100 border-red-500/30 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -919,13 +919,13 @@ export default function ProjectDetailPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/projects" className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all">
+            <Link href="/dashboard/projects" className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">{project.name}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{project.name}</h1>
               {project.customer && (
-                <p className="text-sm text-zinc-400">{project.customer.name}</p>
+                <p className="text-sm text-gray-500">{project.customer.name}</p>
               )}
             </div>
           </div>
@@ -935,7 +935,7 @@ export default function ProjectDetailPage() {
             <button
               onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
               disabled={savingStatus}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all ${STATUS_STYLES[project.status] || 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}
+              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all ${STATUS_STYLES[project.status] || 'bg-gray-100 text-gray-500 border-gray-300'}`}
             >
               {savingStatus ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -945,13 +945,13 @@ export default function ProjectDetailPage() {
             </button>
 
             {statusDropdownOpen && (
-              <div className="absolute top-full right-0 mt-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-20 w-44 overflow-hidden">
+              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-44 overflow-hidden">
                 {Object.entries(STATUS_MAP).map(([key, label]) => (
                   <button
                     key={key}
                     onClick={() => updateProjectStatus(key)}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-zinc-800 transition-all ${
-                      key === project.status ? 'text-violet-400 bg-zinc-800/50' : 'text-zinc-300'
+                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-all ${
+                      key === project.status ? 'text-blue-600 bg-gray-50' : 'text-gray-700'
                     }`}
                   >
                     {label}
@@ -975,8 +975,8 @@ export default function ProjectDetailPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  : 'bg-gray-100 text-gray-500 hover:text-white'
               }`}
             >
               {tab.label}
@@ -988,63 +988,63 @@ export default function ProjectDetailPage() {
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Project info card */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-violet-400" />
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-blue-600" />
                 Projektinfo
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-sm text-zinc-500">Typ</p>
-                  <p className="text-white">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</p>
+                  <p className="text-sm text-gray-400">Typ</p>
+                  <p className="text-gray-900">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-zinc-500">Startdatum</p>
-                  <p className="text-white">{project.start_date ? formatDate(project.start_date) : '-'}</p>
+                  <p className="text-sm text-gray-400">Startdatum</p>
+                  <p className="text-gray-900">{project.start_date ? formatDate(project.start_date) : '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-zinc-500">Slutdatum</p>
-                  <p className="text-white">{project.end_date ? formatDate(project.end_date) : '-'}</p>
+                  <p className="text-sm text-gray-400">Slutdatum</p>
+                  <p className="text-gray-900">{project.end_date ? formatDate(project.end_date) : '-'}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-zinc-500">Kund</p>
+                  <p className="text-sm text-gray-400">Kund</p>
                   {project.customer ? (
-                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-violet-400 hover:text-violet-300">
+                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-blue-600 hover:text-blue-500">
                       {project.customer.name}
                     </Link>
                   ) : (
-                    <p className="text-zinc-400">-</p>
+                    <p className="text-gray-500">-</p>
                   )}
                 </div>
                 {quote && (
                   <div>
-                    <p className="text-sm text-zinc-500">Kopplad offert</p>
-                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-violet-400 hover:text-violet-300 flex items-center gap-1">
+                    <p className="text-sm text-gray-400">Kopplad offert</p>
+                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-blue-600 hover:text-blue-500 flex items-center gap-1">
                       {quote.title || 'Offert'} <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 )}
                 {project.description && (
                   <div className="sm:col-span-2 lg:col-span-4">
-                    <p className="text-sm text-zinc-500">Beskrivning</p>
-                    <p className="text-zinc-300">{project.description}</p>
+                    <p className="text-sm text-gray-400">Beskrivning</p>
+                    <p className="text-gray-700">{project.description}</p>
                   </div>
                 )}
               </div>
             </div>
 
             {/* Progress bar */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-white flex items-center gap-2">
-                  <Target className="w-5 h-5 text-fuchsia-400" />
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Target className="w-5 h-5 text-cyan-600" />
                   Framsteg
                 </h2>
-                <span className="text-2xl font-bold text-white">{project.progress_percent}%</span>
+                <span className="text-2xl font-bold text-gray-900">{project.progress_percent}%</span>
               </div>
-              <div className="w-full h-4 bg-zinc-800 rounded-full overflow-hidden">
+              <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(project.progress_percent, 100)}%` }}
                 />
               </div>
@@ -1052,8 +1052,8 @@ export default function ProjectDetailPage() {
 
             {/* Budget vs Actual */}
             {(project.budget_hours || project.budget_amount) && summary && (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-                <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-cyan-400" />
                   Budget vs Utfall
                 </h2>
@@ -1061,31 +1061,31 @@ export default function ProjectDetailPage() {
                   {project.budget_hours != null && project.budget_hours > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-zinc-400">Timmar</span>
-                        <span className="text-sm text-white">{formatHours(summary.total_hours)} / {formatHours(project.budget_hours)}</span>
+                        <span className="text-sm text-gray-500">Timmar</span>
+                        <span className="text-sm text-gray-900">{formatHours(summary.total_hours)} / {formatHours(project.budget_hours)}</span>
                       </div>
-                      <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(budgetHoursPercent)}`}
                           style={{ width: `${Math.min(budgetHoursPercent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">{budgetHoursPercent}% anvant</p>
+                      <p className="text-xs text-gray-400 mt-1">{budgetHoursPercent}% anvant</p>
                     </div>
                   )}
                   {project.budget_amount != null && project.budget_amount > 0 && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-zinc-400">Belopp</span>
-                        <span className="text-sm text-white">{formatCurrency(summary.total_revenue)} / {formatCurrency(project.budget_amount)}</span>
+                        <span className="text-sm text-gray-500">Belopp</span>
+                        <span className="text-sm text-gray-900">{formatCurrency(summary.total_revenue)} / {formatCurrency(project.budget_amount)}</span>
                       </div>
-                      <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(budgetAmountPercent)}`}
                           style={{ width: `${Math.min(budgetAmountPercent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">{budgetAmountPercent}% anvant</p>
+                      <p className="text-xs text-gray-400 mt-1">{budgetAmountPercent}% anvant</p>
                     </div>
                   )}
                 </div>
@@ -1096,31 +1096,31 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Link
                 href="/dashboard/time"
-                className="flex flex-col items-center gap-2 p-4 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 hover:border-violet-500/50 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
               >
-                <Timer className="w-5 h-5 text-violet-400" />
-                <span className="text-sm text-zinc-300">Lagg till tid</span>
+                <Timer className="w-5 h-5 text-blue-600" />
+                <span className="text-sm text-gray-700">Lagg till tid</span>
               </Link>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 hover:border-violet-500/50 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
               >
                 <Layers className="w-5 h-5 text-cyan-400" />
-                <span className="text-sm text-zinc-300">Nytt delmoment</span>
+                <span className="text-sm text-gray-700">Nytt delmoment</span>
               </button>
               <button
                 onClick={() => { setActiveTab('changes'); setChangeModal(true) }}
-                className="flex flex-col items-center gap-2 p-4 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 hover:border-violet-500/50 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
               >
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
-                <span className="text-sm text-zinc-300">Ny ATA</span>
+                <span className="text-sm text-gray-700">Ny ATA</span>
               </button>
               <button
                 onClick={() => setActiveTab('economy')}
-                className="flex flex-col items-center gap-2 p-4 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 hover:border-violet-500/50 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
               >
-                <Receipt className="w-5 h-5 text-emerald-400" />
-                <span className="text-sm text-zinc-300">Fakturera</span>
+                <Receipt className="w-5 h-5 text-emerald-600" />
+                <span className="text-sm text-gray-700">Fakturera</span>
               </button>
             </div>
           </div>
@@ -1130,13 +1130,13 @@ export default function ProjectDetailPage() {
         {activeTab === 'schedule' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-violet-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-blue-600" />
                 Planerade arbetstillfällen ({projectSchedule.length})
               </h2>
               <Link
                 href={`/dashboard/schedule?project=${projectId}`}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Planera arbete
@@ -1144,10 +1144,10 @@ export default function ProjectDetailPage() {
             </div>
 
             {projectSchedule.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <Calendar className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-400 mb-2">Inga schemalagda tillfällen ännu</p>
-                <p className="text-zinc-600 text-sm">Planera arbete via resursplaneringen</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-2">Inga schemalagda tillfällen ännu</p>
+                <p className="text-gray-400 text-sm">Planera arbete via resursplaneringen</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1163,12 +1163,12 @@ export default function ProjectDetailPage() {
                   return (
                     <div
                       key={entry.id}
-                      className={`bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
+                      className={`bg-white shadow-sm rounded-xl border border-gray-200 p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
                     >
                       <div className="w-1 h-12 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.business_user?.color || '#8B5CF6' }} />
                       <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{entry.title}</p>
-                        <div className="flex items-center gap-3 text-sm text-zinc-400 mt-0.5">
+                        <p className="text-gray-900 font-medium truncate">{entry.title}</p>
+                        <div className="flex items-center gap-3 text-sm text-gray-500 mt-0.5">
                           <span>{dateStr}</span>
                           <span>{timeStr}</span>
                         </div>
@@ -1176,17 +1176,17 @@ export default function ProjectDetailPage() {
                       {entry.business_user && (
                         <div className="flex items-center gap-2 shrink-0">
                           <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-gray-900 text-xs font-bold"
                             style={{ backgroundColor: entry.business_user.color }}
                           >
                             {entry.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                           </div>
-                          <span className="text-sm text-zinc-400 hidden sm:block">{entry.business_user.name}</span>
+                          <span className="text-sm text-gray-500 hidden sm:block">{entry.business_user.name}</span>
                         </div>
                       )}
                       <span className={`text-xs px-2 py-1 rounded-full border shrink-0 ${
-                        entry.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                          : entry.status === 'cancelled' ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                        entry.status === 'completed' ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+                          : entry.status === 'cancelled' ? 'bg-red-100 text-red-600 border-red-500/30'
                           : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
                       }`}>
                         {entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat'}
@@ -1203,10 +1203,10 @@ export default function ProjectDetailPage() {
         {activeTab === 'milestones' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Delmoment</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Delmoment</h2>
               <button
                 onClick={() => setMilestoneModal({ open: true, editing: null })}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lagg till delmoment
@@ -1214,15 +1214,15 @@ export default function ProjectDetailPage() {
             </div>
 
             {milestones.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <Layers className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Inga delmoment annu</p>
-                <p className="text-xs text-zinc-600 mt-1">Lagg till delmoment for att spara framsteg</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Inga delmoment annu</p>
+                <p className="text-xs text-gray-400 mt-1">Lagg till delmoment for att spara framsteg</p>
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
                 {milestones.map(ms => (
-                  <div key={ms.milestone_id} className="p-4 hover:bg-zinc-800/30 transition-all">
+                  <div key={ms.milestone_id} className="p-4 hover:bg-gray-100/30 transition-all">
                     <div className="flex items-center gap-4">
                       <button
                         onClick={() => cycleMilestoneStatus(ms)}
@@ -1230,30 +1230,30 @@ export default function ProjectDetailPage() {
                         title="Byt status"
                       >
                         {ms.status === 'completed' ? (
-                          <CheckCircle className="w-6 h-6 text-emerald-400" />
+                          <CheckCircle className="w-6 h-6 text-emerald-600" />
                         ) : ms.status === 'in_progress' ? (
                           <CircleDot className="w-6 h-6 text-blue-400" />
                         ) : (
-                          <div className="w-6 h-6 rounded-full border-2 border-zinc-600" />
+                          <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                         )}
                       </button>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <p className={`font-medium text-sm ${ms.status === 'completed' ? 'text-zinc-500 line-through' : 'text-white'}`}>
+                          <p className={`font-medium text-sm ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
                             {ms.name}
                           </p>
                           <span className={`px-2 py-0.5 text-xs rounded-full border ${
                             ms.status === 'completed'
-                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                               : ms.status === 'in_progress'
                               ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                              : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+                              : 'bg-gray-100 text-gray-500 border-gray-300'
                           }`}>
                             {ms.status === 'completed' ? 'Klart' : ms.status === 'in_progress' ? 'Pagaende' : 'Vantande'}
                           </span>
                         </div>
-                        <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+                        <div className="flex flex-wrap gap-3 text-xs text-gray-400">
                           {ms.due_date && (
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
@@ -1272,13 +1272,13 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                           onClick={() => setMilestoneModal({ open: true, editing: ms })}
-                          className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+                          className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => deleteMilestone(ms.milestone_id)}
-                          className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1295,10 +1295,10 @@ export default function ProjectDetailPage() {
         {activeTab === 'changes' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">ATA (Andring/Tillagg/Avgaende)</h2>
+              <h2 className="text-lg font-semibold text-gray-900">ATA (Andring/Tillagg/Avgaende)</h2>
               <button
                 onClick={() => setChangeModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Ny ATA
@@ -1309,16 +1309,16 @@ export default function ProjectDetailPage() {
             {summary && (summary.ata_additions > 0 || summary.ata_removals > 0) && (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
-                  <p className="text-xs text-emerald-400 mb-1">Tillagg</p>
-                  <p className="text-lg font-bold text-emerald-400">+{formatCurrency(summary.ata_additions)}</p>
+                  <p className="text-xs text-emerald-600 mb-1">Tillagg</p>
+                  <p className="text-lg font-bold text-emerald-600">+{formatCurrency(summary.ata_additions)}</p>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
-                  <p className="text-xs text-red-400 mb-1">Avgaende</p>
-                  <p className="text-lg font-bold text-red-400">-{formatCurrency(summary.ata_removals)}</p>
+                  <p className="text-xs text-red-600 mb-1">Avgaende</p>
+                  <p className="text-lg font-bold text-red-600">-{formatCurrency(summary.ata_removals)}</p>
                 </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                  <p className="text-xs text-zinc-400 mb-1">Netto</p>
-                  <p className={`text-lg font-bold ${summary.ata_net >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-xs text-gray-500 mb-1">Netto</p>
+                  <p className={`text-lg font-bold ${summary.ata_net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {summary.ata_net >= 0 ? '+' : ''}{formatCurrency(summary.ata_net)}
                   </p>
                 </div>
@@ -1326,39 +1326,39 @@ export default function ProjectDetailPage() {
             )}
 
             {changes.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <AlertTriangle className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Inga ATA annu</p>
-                <p className="text-xs text-zinc-600 mt-1">Registrera tillagg, andringar eller avgaende arbeten</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Inga ATA annu</p>
+                <p className="text-xs text-gray-400 mt-1">Registrera tillagg, andringar eller avgaende arbeten</p>
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
                 {changes.map(change => (
-                  <div key={change.change_id} className="p-4 hover:bg-zinc-800/30 transition-all">
+                  <div key={change.change_id} className="p-4 hover:bg-gray-100/30 transition-all">
                     <div className="flex items-start gap-4">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`px-2 py-0.5 text-xs rounded-full border ${
                             change.change_type === 'addition'
-                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                               : change.change_type === 'change'
                               ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                              : 'bg-red-500/20 text-red-400 border-red-500/30'
+                              : 'bg-red-100 text-red-600 border-red-500/30'
                           }`}>
                             {change.change_type === 'addition' ? 'Tillagg' : change.change_type === 'change' ? 'Andring' : 'Avgaende'}
                           </span>
                           <span className={`px-2 py-0.5 text-xs rounded-full border ${
                             change.status === 'approved'
-                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                               : change.status === 'rejected'
-                              ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                              : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+                              ? 'bg-red-100 text-red-600 border-red-500/30'
+                              : 'bg-gray-100 text-gray-500 border-gray-300'
                           }`}>
                             {change.status === 'approved' ? 'Godkand' : change.status === 'rejected' ? 'Avslagen' : 'Vantande'}
                           </span>
                         </div>
-                        <p className="text-white text-sm mb-1">{change.description}</p>
-                        <div className="flex gap-3 text-xs text-zinc-500">
+                        <p className="text-gray-900 text-sm mb-1">{change.description}</p>
+                        <div className="flex gap-3 text-xs text-gray-400">
                           {change.amount > 0 && <span>{formatCurrency(change.amount)}</span>}
                           {change.hours > 0 && <span>{formatHours(change.hours)}</span>}
                           <span>{formatDate(change.created_at)}</span>
@@ -1370,21 +1370,21 @@ export default function ProjectDetailPage() {
                           <>
                             <button
                               onClick={() => updateChangeStatus(change.change_id, 'approved')}
-                              className="p-1.5 text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition-all"
+                              className="p-1.5 text-emerald-600 hover:bg-emerald-500/10 rounded-lg transition-all"
                               title="Godkann"
                             >
                               <CheckCircle className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => updateChangeStatus(change.change_id, 'rejected')}
-                              className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
                               title="Avsla"
                             >
                               <XCircle className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => deleteChange(change.change_id)}
-                              className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
                             >
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -1403,10 +1403,10 @@ export default function ProjectDetailPage() {
         {activeTab === 'time' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white">Tidrapporter</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Tidrapporter</h2>
               <Link
                 href="/dashboard/time"
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lagg till tid
@@ -1416,33 +1416,33 @@ export default function ProjectDetailPage() {
             {/* Time summary */}
             {summary && (
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                  <p className="text-xs text-zinc-500 mb-1">Totalt</p>
-                  <p className="text-lg font-bold text-white">{formatHours(summary.total_hours)}</p>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Totalt</p>
+                  <p className="text-lg font-bold text-gray-900">{formatHours(summary.total_hours)}</p>
                 </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                  <p className="text-xs text-zinc-500 mb-1">Debiterbart</p>
-                  <p className="text-lg font-bold text-white">{formatHours(summary.billable_hours)}</p>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Debiterbart</p>
+                  <p className="text-lg font-bold text-gray-900">{formatHours(summary.billable_hours)}</p>
                 </div>
-                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-center">
-                  <p className="text-xs text-zinc-500 mb-1">Ofakturerat</p>
+                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                  <p className="text-xs text-gray-400 mb-1">Ofakturerat</p>
                   <p className="text-lg font-bold text-amber-400">{formatHours(summary.uninvoiced_hours)}</p>
                 </div>
               </div>
             )}
 
             {timeEntries.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <Clock className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Inga tidrapporter annu</p>
-                <Link href="/dashboard/time" className="text-sm text-violet-400 hover:text-violet-300 mt-2 inline-block">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Inga tidrapporter annu</p>
+                <Link href="/dashboard/time" className="text-sm text-blue-600 hover:text-blue-500 mt-2 inline-block">
                   Lagg till din forsta tidrapport
                 </Link>
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
                 {/* Table header */}
-                <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-xs text-zinc-500 font-medium">
+                <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-xs text-gray-400 font-medium">
                   <div className="col-span-2">Datum</div>
                   <div className="col-span-3">Beskrivning</div>
                   <div className="col-span-1 text-right">Tid</div>
@@ -1455,28 +1455,28 @@ export default function ProjectDetailPage() {
                   const hours = (entry.duration_minutes || 0) / 60
                   const total = hours * (entry.hourly_rate || 0)
                   return (
-                    <div key={entry.time_entry_id} className="p-4 hover:bg-zinc-800/30 transition-all">
+                    <div key={entry.time_entry_id} className="p-4 hover:bg-gray-100/30 transition-all">
                       {/* Mobile layout */}
                       <div className="sm:hidden space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-white">{formatDate(entry.work_date)}</span>
+                          <span className="text-sm text-gray-900">{formatDate(entry.work_date)}</span>
                           <div className="flex items-center gap-2">
                             {entry.work_type?.name && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-600 border border-blue-300">
                                 {entry.work_type.name}
                               </span>
                             )}
                             <span className={`px-2 py-0.5 text-xs rounded-full border ${
                               entry.invoiced
-                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                                : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+                                ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+                                : 'bg-gray-100 text-gray-500 border-gray-300'
                             }`}>
                               {entry.invoiced ? 'Fakturerad' : 'Ofakturerad'}
                             </span>
                           </div>
                         </div>
-                        {entry.description && <p className="text-sm text-zinc-400">{entry.description}</p>}
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                        {entry.description && <p className="text-sm text-gray-500">{entry.description}</p>}
+                        <div className="flex items-center justify-between text-xs text-gray-400">
                           <span>{formatHours(hours)}</span>
                           <span>{formatCurrency(Math.round(total))}</span>
                         </div>
@@ -1484,21 +1484,21 @@ export default function ProjectDetailPage() {
 
                       {/* Desktop layout */}
                       <div className="hidden sm:grid grid-cols-12 gap-4 items-center">
-                        <div className="col-span-2 text-sm text-white">{formatDate(entry.work_date)}</div>
-                        <div className="col-span-3 text-sm text-zinc-400 truncate">{entry.description || '-'}</div>
-                        <div className="col-span-1 text-sm text-white text-right">{formatHours(hours)}</div>
-                        <div className="col-span-2 text-sm text-zinc-400 text-right">{formatCurrency(entry.hourly_rate)}/tim</div>
-                        <div className="col-span-2 text-sm text-white text-right font-medium">{formatCurrency(Math.round(total))}</div>
+                        <div className="col-span-2 text-sm text-gray-900">{formatDate(entry.work_date)}</div>
+                        <div className="col-span-3 text-sm text-gray-500 truncate">{entry.description || '-'}</div>
+                        <div className="col-span-1 text-sm text-gray-900 text-right">{formatHours(hours)}</div>
+                        <div className="col-span-2 text-sm text-gray-500 text-right">{formatCurrency(entry.hourly_rate)}/tim</div>
+                        <div className="col-span-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-600 border border-blue-300">
                               {entry.work_type.name}
                             </span>
                           )}
                           <span className={`px-2 py-0.5 text-xs rounded-full border ${
                             entry.invoiced
-                              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                              : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+                              : 'bg-gray-100 text-gray-500 border-gray-300'
                           }`}>
                             {entry.invoiced ? 'Fakturerad' : 'Ofakturerad'}
                           </span>
@@ -1517,41 +1517,41 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 mb-1">Inköpskostnad</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(materialSummary?.total_purchase || 0)}</p>
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-400 mb-1">Inköpskostnad</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(materialSummary?.total_purchase || 0)}</p>
               </div>
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 mb-1">Kundpris</p>
-                <p className="text-xl font-bold text-white">{formatCurrency(materialSummary?.total_sell || 0)}</p>
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-400 mb-1">Kundpris</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(materialSummary?.total_sell || 0)}</p>
               </div>
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 mb-1">Marginal</p>
-                <p className="text-xl font-bold text-emerald-400">
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-400 mb-1">Marginal</p>
+                <p className="text-xl font-bold text-emerald-600">
                   {formatCurrency(materialSummary?.margin_amount || 0)}
                   <span className="text-sm ml-1">({Math.round(materialSummary?.margin_percent || 0)}%)</span>
                 </p>
               </div>
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
-                <p className="text-xs text-zinc-500 mb-1">Ofakturerat</p>
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <p className="text-xs text-gray-400 mb-1">Ofakturerat</p>
                 <p className="text-xl font-bold text-amber-400">{formatCurrency(materialSummary?.uninvoiced_sell || 0)}</p>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">Material ({materials.length})</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Material ({materials.length})</h3>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowProductSearch(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-xl text-sm hover:opacity-90"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl text-sm hover:opacity-90"
                 >
                   <Plus className="w-4 h-4" /> Lägg till material
                 </button>
                 {(materialSummary?.uninvoiced_count || 0) > 0 && (
                   <button
                     onClick={handleInvoiceMaterials}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl text-sm hover:bg-emerald-500/30"
+                    className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-600 border border-emerald-500/30 rounded-xl text-sm hover:bg-emerald-500/30"
                   >
                     <Receipt className="w-4 h-4" /> Fakturera ({formatCurrency(materialSummary?.uninvoiced_sell || 0)})
                   </button>
@@ -1561,15 +1561,15 @@ export default function ProjectDetailPage() {
 
             {/* Material list */}
             {materials.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <Package className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-400 mb-1">Inga material tillagda</p>
-                <p className="text-sm text-zinc-600">Sök och lägg till material från grossister</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 mb-1">Inga material tillagda</p>
+                <p className="text-sm text-gray-400">Sök och lägg till material från grossister</p>
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 overflow-hidden">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
                 {/* Table header */}
-                <div className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-zinc-800 text-xs text-zinc-500 font-medium">
+                <div className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-200 text-xs text-gray-400 font-medium">
                   <div className="col-span-3">Produkt</div>
                   <div className="col-span-2">Leverantör</div>
                   <div className="col-span-1 text-right">Antal</div>
@@ -1581,12 +1581,12 @@ export default function ProjectDetailPage() {
                 </div>
                 {/* Rows */}
                 {materials.map(mat => (
-                  <div key={mat.material_id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-zinc-800/50 items-center hover:bg-zinc-800/30">
+                  <div key={mat.material_id} className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-200/50 items-center hover:bg-gray-100/30">
                     <div className="col-span-3">
-                      <p className="text-sm font-medium text-white truncate">{mat.name}</p>
-                      {mat.sku && <p className="text-xs text-zinc-500">Art: {mat.sku}</p>}
+                      <p className="text-sm font-medium text-gray-900 truncate">{mat.name}</p>
+                      {mat.sku && <p className="text-xs text-gray-400">Art: {mat.sku}</p>}
                     </div>
-                    <div className="col-span-2 text-sm text-zinc-400 truncate">{mat.supplier_name || '-'}</div>
+                    <div className="col-span-2 text-sm text-gray-500 truncate">{mat.supplier_name || '-'}</div>
                     {editingMaterial === mat.material_id ? (
                       <>
                         <div className="col-span-1">
@@ -1594,34 +1594,34 @@ export default function ProjectDetailPage() {
                             type="number"
                             value={editValues.quantity}
                             onChange={e => setEditValues(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
-                            className="w-full px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-white text-right"
+                            className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm text-gray-900 text-right"
                           />
                         </div>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.purchase_price} kr</div>
                         <div className="col-span-1">
                           <input
                             type="number"
                             value={editValues.markup_percent}
                             onChange={e => setEditValues(prev => ({ ...prev, markup_percent: parseFloat(e.target.value) || 0 }))}
-                            className="w-full px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-sm text-white text-right"
+                            className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm text-gray-900 text-right"
                           />
                         </div>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">
+                        <div className="col-span-1 text-sm text-gray-500 text-right">
                           {Math.round((mat.purchase_price || 0) * (1 + editValues.markup_percent / 100))} kr
                         </div>
-                        <div className="col-span-1 text-sm text-white text-right font-medium">
+                        <div className="col-span-1 text-sm text-gray-900 text-right font-medium">
                           {formatCurrency(Math.round(editValues.quantity * (mat.purchase_price || 0) * (1 + editValues.markup_percent / 100)))}
                         </div>
                         <div className="col-span-2 flex justify-end gap-1">
                           <button
                             onClick={() => handleUpdateMaterial(mat.material_id)}
-                            className="p-1 text-emerald-400 hover:text-emerald-300"
+                            className="p-1 text-emerald-600 hover:text-emerald-700"
                           >
                             <CheckCircle className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setEditingMaterial(null)}
-                            className="p-1 text-zinc-500 hover:text-zinc-300"
+                            className="p-1 text-gray-400 hover:text-gray-700"
                           >
                             <X className="w-4 h-4" />
                           </button>
@@ -1629,14 +1629,14 @@ export default function ProjectDetailPage() {
                       </>
                     ) : (
                       <>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.quantity} {mat.unit}</div>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.purchase_price} kr</div>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.markup_percent}%</div>
-                        <div className="col-span-1 text-sm text-zinc-400 text-right">{mat.sell_price} kr</div>
-                        <div className="col-span-1 text-sm text-white text-right font-medium">{formatCurrency(mat.total_sell || 0)}</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.quantity} {mat.unit}</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.purchase_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.markup_percent}%</div>
+                        <div className="col-span-1 text-sm text-gray-500 text-right">{mat.sell_price} kr</div>
+                        <div className="col-span-1 text-sm text-gray-900 text-right font-medium">{formatCurrency(mat.total_sell || 0)}</div>
                         <div className="col-span-2 flex items-center justify-end gap-1">
                           {mat.invoiced ? (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-500/30">
                               Fakturerad
                             </span>
                           ) : (
@@ -1646,13 +1646,13 @@ export default function ProjectDetailPage() {
                                   setEditingMaterial(mat.material_id)
                                   setEditValues({ quantity: mat.quantity, markup_percent: mat.markup_percent })
                                 }}
-                                className="p-1 text-zinc-500 hover:text-violet-400"
+                                className="p-1 text-gray-400 hover:text-blue-600"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDeleteMaterial(mat.material_id)}
-                                className="p-1 text-zinc-500 hover:text-red-400"
+                                className="p-1 text-gray-400 hover:text-red-600"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
@@ -1680,21 +1680,21 @@ export default function ProjectDetailPage() {
         {activeTab === 'team' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Users className="w-5 h-5 text-violet-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-600" />
                 Tilldelade ({projectTeam.length})
               </h2>
               {can('see_all_projects') && (
                 <div className="relative">
                   <button
                     onClick={() => setShowAddMember(!showAddMember)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-4 h-4" />
                     Lagg till
                   </button>
                   {showAddMember && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl z-30 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
                       {allTeamMembers
                         .filter(m => !projectTeam.some(a => a.business_user_id === m.id))
                         .map(member => (
@@ -1702,24 +1702,24 @@ export default function ProjectDetailPage() {
                             key={member.id}
                             onClick={() => handleAssignMember(member.id)}
                             disabled={assignLoading}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800 transition-all disabled:opacity-50"
+                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-all disabled:opacity-50"
                           >
                             <div
                               className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                               style={{ backgroundColor: member.color }}
                             >
-                              <span className="text-white text-xs font-bold">
+                              <span className="text-gray-900 text-xs font-bold">
                                 {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                               </span>
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm text-white truncate">{member.name}</p>
-                              <p className="text-xs text-zinc-500 truncate">{member.title || member.role}</p>
+                              <p className="text-sm text-gray-900 truncate">{member.name}</p>
+                              <p className="text-xs text-gray-400 truncate">{member.title || member.role}</p>
                             </div>
                           </button>
                         ))}
                       {allTeamMembers.filter(m => !projectTeam.some(a => a.business_user_id === m.id)).length === 0 && (
-                        <p className="px-4 py-3 text-sm text-zinc-500">Alla teammedlemmar ar redan tillagda</p>
+                        <p className="px-4 py-3 text-sm text-gray-400">Alla teammedlemmar ar redan tillagda</p>
                       )}
                     </div>
                   )}
@@ -1728,13 +1728,13 @@ export default function ProjectDetailPage() {
             </div>
 
             {projectTeam.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <Users className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-400 font-medium">Ingen tilldelad annu</p>
-                <p className="text-zinc-600 text-sm mt-1">Lagg till teammedlemmar for att tilldela dem detta projekt</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 font-medium">Ingen tilldelad annu</p>
+                <p className="text-gray-400 text-sm mt-1">Lagg till teammedlemmar for att tilldela dem detta projekt</p>
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 divide-y divide-zinc-800">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
                 {projectTeam.map(assignment => (
                   <div key={assignment.id} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -1742,22 +1742,22 @@ export default function ProjectDetailPage() {
                         className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: assignment.business_user.color }}
                       >
-                        <span className="text-white text-sm font-bold">
+                        <span className="text-gray-900 text-sm font-bold">
                           {assignment.business_user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                         </span>
                       </div>
                       <div>
-                        <p className="text-white font-medium">{assignment.business_user.name}</p>
-                        <p className="text-xs text-zinc-500">{assignment.business_user.title || assignment.business_user.role}</p>
+                        <p className="text-gray-900 font-medium">{assignment.business_user.name}</p>
+                        <p className="text-xs text-gray-400">{assignment.business_user.title || assignment.business_user.role}</p>
                       </div>
-                      <span className="px-2 py-0.5 text-xs rounded-full bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-300">
                         {assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}
                       </span>
                     </div>
                     {can('see_all_projects') && (
                       <button
                         onClick={() => handleRemoveMember(assignment.business_user_id)}
-                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -1776,33 +1776,33 @@ export default function ProjectDetailPage() {
             {generatedDocs.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-zinc-300">Malldokument</h3>
-                  <a href="/dashboard/documents" className="text-xs text-violet-400 hover:text-violet-300">Alla dokument &rarr;</a>
+                  <h3 className="text-sm font-medium text-gray-700">Malldokument</h3>
+                  <a href="/dashboard/documents" className="text-xs text-blue-600 hover:text-blue-500">Alla dokument &rarr;</a>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {generatedDocs.map((gd: any) => (
                     <a
                       key={gd.id}
                       href="/dashboard/documents"
-                      className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition block"
+                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition block"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 bg-violet-500/10 rounded-lg flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-violet-400" />
+                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-blue-600" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{gd.title}</p>
+                          <p className="text-sm font-medium text-gray-900 truncate">{gd.title}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          gd.status === 'signed' ? 'bg-emerald-500/20 text-emerald-300' :
-                          gd.status === 'completed' ? 'bg-violet-500/20 text-violet-300' :
-                          'bg-zinc-800 text-zinc-400'
+                          gd.status === 'signed' ? 'bg-emerald-100 text-emerald-700' :
+                          gd.status === 'completed' ? 'bg-blue-100 text-blue-500' :
+                          'bg-gray-100 text-gray-500'
                         }`}>
                           {gd.status === 'signed' ? 'Signerad' : gd.status === 'completed' ? 'Klar' : 'Utkast'}
                         </span>
-                        <span className="text-xs text-zinc-600">{new Date(gd.created_at).toLocaleDateString('sv-SE')}</span>
+                        <span className="text-xs text-gray-400">{new Date(gd.created_at).toLocaleDateString('sv-SE')}</span>
                       </div>
                     </a>
                   ))}
@@ -1819,15 +1819,15 @@ export default function ProjectDetailPage() {
                     onClick={() => { setDocCategory(cat); setTimeout(fetchDocuments, 50) }}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition ${
                       docCategory === cat
-                        ? 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                        : 'bg-zinc-900/50 text-zinc-400 border-zinc-800 hover:border-zinc-700'
+                        ? 'bg-blue-100 text-blue-500 border-blue-300'
+                        : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     {cat === 'all' ? 'Alla' : cat === 'photo' ? 'Foton' : cat === 'drawing' ? 'Ritningar' : cat === 'contract' ? 'Kontrakt' : 'Övrigt'}
                   </button>
                 ))}
               </div>
-              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
+              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 Ladda upp
                 <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploading} />
@@ -1840,28 +1840,28 @@ export default function ProjectDetailPage() {
                 {documents.map((doc: any) => {
                   const isImage = doc.mime_type?.startsWith('image/')
                   return (
-                    <div key={doc.id} className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 transition">
+                    <div key={doc.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
                       <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-cyan-500/20' : 'bg-violet-500/20'}`}>
-                          {isImage ? <Image className="w-5 h-5 text-cyan-400" /> : <FileText className="w-5 h-5 text-violet-400" />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-cyan-500/20' : 'bg-blue-100'}`}>
+                          {isImage ? <Image className="w-5 h-5 text-cyan-400" /> : <FileText className="w-5 h-5 text-blue-600" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">{doc.name}</p>
-                          <p className="text-xs text-zinc-500 mt-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
+                          <p className="text-xs text-gray-400 mt-1">
                             {doc.file_size ? `${(doc.file_size / 1024).toFixed(0)} KB` : ''} · {formatDate(doc.created_at)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800">
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
                           onClick={() => handleDocDownload(doc.id)}
-                          className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500"
                         >
                           <Download className="w-3.5 h-3.5" /> Ladda ner
                         </button>
                         <button
                           onClick={() => handleDocDelete(doc.id)}
-                          className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 ml-auto"
+                          className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
                         >
                           <Trash2 className="w-3.5 h-3.5" /> Ta bort
                         </button>
@@ -1871,10 +1871,10 @@ export default function ProjectDetailPage() {
                 })}
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <FolderOpen className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Inga dokument uppladdade</p>
-                <p className="text-xs text-zinc-600 mt-1">Ladda upp foton, ritningar eller kontrakt</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Inga dokument uppladdade</p>
+                <p className="text-xs text-gray-400 mt-1">Ladda upp foton, ritningar eller kontrakt</p>
               </div>
             )}
           </div>
@@ -1884,13 +1884,13 @@ export default function ProjectDetailPage() {
         {activeTab === 'log' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-400" />
                 Byggdagbok
               </h2>
               <button
                 onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" /> Ny anteckning
               </button>
@@ -1899,15 +1899,15 @@ export default function ProjectDetailPage() {
             {logs.length > 0 ? (
               <div className="space-y-4">
                 {logs.map((log: any) => (
-                  <div key={log.id} className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+                  <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <p className="text-white font-medium">{formatDate(log.log_date)}</p>
+                        <p className="text-gray-900 font-medium">{formatDate(log.log_date)}</p>
                         {log.business_user && (
-                          <p className="text-xs text-zinc-500 mt-0.5">{log.business_user.name}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">{log.business_user.name}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-zinc-500">
+                      <div className="flex items-center gap-3 text-xs text-gray-400">
                         {log.weather && (
                           <span className="flex items-center gap-1">
                             <CloudSun className="w-3.5 h-3.5" />
@@ -1923,26 +1923,26 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                     {log.work_description && (
-                      <p className="text-sm text-zinc-300 mb-2">{log.work_description}</p>
+                      <p className="text-sm text-gray-700 mb-2">{log.work_description}</p>
                     )}
                     {log.materials_used && (
-                      <p className="text-xs text-zinc-500 mb-2">
-                        <span className="text-zinc-400 font-medium">Material:</span> {log.materials_used}
+                      <p className="text-xs text-gray-400 mb-2">
+                        <span className="text-gray-500 font-medium">Material:</span> {log.materials_used}
                       </p>
                     )}
                     {log.notes && (
-                      <p className="text-xs text-zinc-500 italic">{log.notes}</p>
+                      <p className="text-xs text-gray-400 italic">{log.notes}</p>
                     )}
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-800">
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                       <button
                         onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                        className="flex items-center gap-1 text-xs text-violet-400 hover:text-violet-300"
+                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500"
                       >
                         <Edit className="w-3.5 h-3.5" /> Redigera
                       </button>
                       <button
                         onClick={() => handleDeleteLog(log.id)}
-                        className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 ml-auto"
+                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Ta bort
                       </button>
@@ -1951,10 +1951,10 @@ export default function ProjectDetailPage() {
                 ))}
               </div>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <BookOpen className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Inga dagboksanteckningar ännu</p>
-                <p className="text-xs text-zinc-600 mt-1">Dokumentera arbetet dag för dag</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Inga dagboksanteckningar ännu</p>
+                <p className="text-xs text-gray-400 mt-1">Dokumentera arbetet dag för dag</p>
               </div>
             )}
 
@@ -1973,13 +1973,13 @@ export default function ProjectDetailPage() {
         {activeTab === 'checklists' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <ClipboardCheck className="w-5 h-5 text-emerald-600" />
                 Checklistor
               </h2>
               <button
                 onClick={() => setShowChecklistCreate(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" /> Ny checklista
               </button>
@@ -1990,16 +1990,16 @@ export default function ProjectDetailPage() {
               <div className="space-y-4">
                 <button
                   onClick={() => setActiveChecklist(null)}
-                  className="flex items-center gap-1 text-sm text-violet-400 hover:text-violet-300"
+                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-500"
                 >
                   <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
                 </button>
-                <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-semibold">{activeChecklist.name}</h3>
+                    <h3 className="text-gray-900 font-semibold">{activeChecklist.name}</h3>
                     <span className={`px-2 py-0.5 text-xs rounded-full ${
                       activeChecklist.status === 'completed'
-                        ? 'bg-emerald-500/20 text-emerald-400'
+                        ? 'bg-emerald-100 text-emerald-600'
                         : 'bg-amber-500/20 text-amber-400'
                     }`}>
                       {activeChecklist.status === 'completed' ? 'Klar' : 'Pågår'}
@@ -2007,11 +2007,11 @@ export default function ProjectDetailPage() {
                   </div>
                   {/* Progress bar */}
                   <div className="mb-4">
-                    <div className="flex justify-between text-xs text-zinc-500 mb-1">
+                    <div className="flex justify-between text-xs text-gray-400 mb-1">
                       <span>{activeChecklist.progress?.checked || 0} av {activeChecklist.progress?.total || 0} klara</span>
                       <span>{activeChecklist.progress?.percent || 0}%</span>
                     </div>
-                    <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-emerald-500 rounded-full transition-all duration-300"
                         style={{ width: `${activeChecklist.progress?.percent || 0}%` }}
@@ -2023,32 +2023,32 @@ export default function ProjectDetailPage() {
                     {(activeChecklist.items || []).map((item: any, idx: number) => (
                       <label
                         key={item.id || idx}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-800/50 cursor-pointer transition"
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition"
                       >
                         <input
                           type="checkbox"
                           checked={item.checked || false}
                           onChange={() => handleToggleChecklistItem(activeChecklist.id, idx)}
-                          className="w-4 h-4 rounded border-zinc-600 text-violet-500 bg-zinc-800 focus:ring-violet-500"
+                          className="w-4 h-4 rounded border-gray-300 text-blue-600 bg-gray-100 focus:ring-blue-500"
                         />
-                        <span className={`text-sm ${item.checked ? 'text-zinc-500 line-through' : 'text-zinc-300'}`}>
+                        <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                           {item.text}
-                          {item.required && <span className="text-red-400 ml-1">*</span>}
+                          {item.required && <span className="text-red-600 ml-1">*</span>}
                         </span>
                       </label>
                     ))}
                   </div>
                   {/* Notes */}
                   {activeChecklist.notes && (
-                    <div className="mt-4 pt-4 border-t border-zinc-800">
-                      <p className="text-xs text-zinc-500">{activeChecklist.notes}</p>
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-xs text-gray-400">{activeChecklist.notes}</p>
                     </div>
                   )}
                   {/* Delete */}
-                  <div className="mt-4 pt-4 border-t border-zinc-800 flex justify-end">
+                  <div className="mt-4 pt-4 border-t border-gray-200 flex justify-end">
                     <button
                       onClick={() => handleDeleteChecklist(activeChecklist.id)}
-                      className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
+                      className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Ta bort checklista
                     </button>
@@ -2064,35 +2064,35 @@ export default function ProjectDetailPage() {
                       <button
                         key={cl.id}
                         onClick={() => setActiveChecklist(cl)}
-                        className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 text-left hover:border-violet-500/30 transition"
+                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="text-sm font-medium text-white">{cl.name}</h3>
+                          <h3 className="text-sm font-medium text-gray-900">{cl.name}</h3>
                           <span className={`px-2 py-0.5 text-xs rounded-full ${
                             cl.status === 'completed'
-                              ? 'bg-emerald-500/20 text-emerald-400'
+                              ? 'bg-emerald-100 text-emerald-600'
                               : 'bg-amber-500/20 text-amber-400'
                           }`}>
                             {cl.status === 'completed' ? 'Klar' : 'Pågår'}
                           </span>
                         </div>
-                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
                             className="h-full bg-emerald-500 rounded-full transition-all"
                             style={{ width: `${cl.progress?.percent || 0}%` }}
                           />
                         </div>
-                        <p className="text-xs text-zinc-500 mt-1.5">
+                        <p className="text-xs text-gray-400 mt-1.5">
                           {cl.progress?.checked || 0}/{cl.progress?.total || 0} punkter klara
                         </p>
                       </button>
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                    <ClipboardList className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                    <p className="text-zinc-500">Inga checklistor skapade</p>
-                    <p className="text-xs text-zinc-600 mt-1">Skapa en checklista från en mall eller bygg en egen</p>
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                    <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-400">Inga checklistor skapade</p>
+                    <p className="text-xs text-gray-400 mt-1">Skapa en checklista från en mall eller bygg en egen</p>
                   </div>
                 )}
               </>
@@ -2114,32 +2114,32 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {profitLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
               </div>
             ) : profitability ? (
               <>
                 {/* Revenue / Costs / Result / Invoicing cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Intakter */}
-                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <DollarSign className="w-4 h-4 text-emerald-400" />
-                      <p className="text-sm font-medium text-zinc-400">Intakter</p>
+                      <DollarSign className="w-4 h-4 text-emerald-600" />
+                      <p className="text-sm font-medium text-gray-500">Intakter</p>
                     </div>
-                    <p className="text-2xl font-bold text-white mb-2">{formatCurrency(profitability.revenue.total)}</p>
-                    <div className="space-y-1 text-xs text-zinc-500">
+                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.revenue.total)}</p>
+                    <div className="space-y-1 text-xs text-gray-400">
                       <div className="flex justify-between">
                         <span>Offert</span>
                         <span>{formatCurrency(profitability.revenue.quote_amount)}</span>
                       </div>
                       {profitability.revenue.ata_additions > 0 && (
-                        <div className="flex justify-between text-emerald-400">
+                        <div className="flex justify-between text-emerald-600">
                           <span>+ ATA tillagg</span>
                           <span>+{formatCurrency(profitability.revenue.ata_additions)}</span>
                         </div>
                       )}
                       {profitability.revenue.ata_removals > 0 && (
-                        <div className="flex justify-between text-red-400">
+                        <div className="flex justify-between text-red-600">
                           <span>- ATA avgaende</span>
                           <span>-{formatCurrency(profitability.revenue.ata_removals)}</span>
                         </div>
@@ -2148,13 +2148,13 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Kostnader */}
-                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="w-4 h-4 text-amber-400" />
-                      <p className="text-sm font-medium text-zinc-400">Kostnader</p>
+                      <p className="text-sm font-medium text-gray-500">Kostnader</p>
                     </div>
-                    <p className="text-2xl font-bold text-white mb-2">{formatCurrency(profitability.costs.actual_amount)}</p>
-                    <div className="text-xs text-zinc-500">
+                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.costs.actual_amount)}</p>
+                    <div className="text-xs text-gray-400">
                       <div className="flex justify-between">
                         <span>{formatHours(profitability.costs.actual_hours)} arbetad tid</span>
                       </div>
@@ -2162,75 +2162,75 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Resultat */}
-                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-violet-400" />
-                      <p className="text-sm font-medium text-zinc-400">Resultat</p>
+                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                      <p className="text-sm font-medium text-gray-500">Resultat</p>
                     </div>
-                    <p className={`text-2xl font-bold mb-1 ${profitability.margin.amount >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <p className={`text-2xl font-bold mb-1 ${profitability.margin.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {profitability.margin.amount >= 0 ? '+' : ''}{formatCurrency(profitability.margin.amount)}
                     </p>
-                    <p className={`text-sm font-medium ${profitability.margin.percent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                    <p className={`text-sm font-medium ${profitability.margin.percent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                       {profitability.margin.percent}% marginal
                     </p>
                   </div>
 
                   {/* Fakturering */}
-                  <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Receipt className="w-4 h-4 text-cyan-400" />
-                      <p className="text-sm font-medium text-zinc-400">Fakturering</p>
+                      <p className="text-sm font-medium text-gray-500">Fakturering</p>
                     </div>
                     <div className="space-y-2">
                       <div>
-                        <p className="text-xs text-zinc-500">Fakturerat</p>
-                        <p className="text-lg font-bold text-white">{formatCurrency(profitability.invoicing.invoiced_amount)}</p>
+                        <p className="text-xs text-gray-400">Fakturerat</p>
+                        <p className="text-lg font-bold text-gray-900">{formatCurrency(profitability.invoicing.invoiced_amount)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-zinc-500">Ofakturerat</p>
+                        <p className="text-xs text-gray-400">Ofakturerat</p>
                         <p className="text-lg font-bold text-amber-400">{formatCurrency(profitability.invoicing.uninvoiced_amount)}</p>
-                        <p className="text-xs text-zinc-600">{formatHours(profitability.invoicing.uninvoiced_hours)}</p>
+                        <p className="text-xs text-gray-400">{formatHours(profitability.invoicing.uninvoiced_hours)}</p>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Budget usage bars */}
-                <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-                  <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                  <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <BarChart3 className="w-5 h-5 text-cyan-400" />
                     Budgetforbrukning
                   </h2>
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-zinc-400">Timmar</span>
-                        <span className="text-sm text-white">
+                        <span className="text-sm text-gray-500">Timmar</span>
+                        <span className="text-sm text-gray-900">
                           {formatHours(profitability.costs.actual_hours)} / {formatHours(profitability.budget.hours_with_ata)}
                         </span>
                       </div>
-                      <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(profitability.budget.hours_usage_percent)}`}
                           style={{ width: `${Math.min(profitability.budget.hours_usage_percent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">{profitability.budget.hours_usage_percent}%</p>
+                      <p className="text-xs text-gray-400 mt-1">{profitability.budget.hours_usage_percent}%</p>
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-zinc-400">Belopp</span>
-                        <span className="text-sm text-white">
+                        <span className="text-sm text-gray-500">Belopp</span>
+                        <span className="text-sm text-gray-900">
                           {formatCurrency(profitability.costs.actual_amount)} / {formatCurrency(profitability.budget.amount_with_ata)}
                         </span>
                       </div>
-                      <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(profitability.budget.amount_usage_percent)}`}
                           style={{ width: `${Math.min(profitability.budget.amount_usage_percent, 100)}%` }}
                         />
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">{profitability.budget.amount_usage_percent}%</p>
+                      <p className="text-xs text-gray-400 mt-1">{profitability.budget.amount_usage_percent}%</p>
                     </div>
                   </div>
                 </div>
@@ -2240,7 +2240,7 @@ export default function ProjectDetailPage() {
                   <button
                     onClick={createInvoiceFromTime}
                     disabled={creatingInvoice}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
                   >
                     {creatingInvoice ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -2252,9 +2252,9 @@ export default function ProjectDetailPage() {
                 )}
               </>
             ) : (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <BarChart3 className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-500">Kunde inte ladda ekonomidata</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-400">Kunde inte ladda ekonomidata</p>
               </div>
             )}
           </div>
@@ -2347,41 +2347,41 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera delmoment' : 'Nytt delmoment'}
           </h2>
-          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Namn *</label>
+            <label className="text-sm text-gray-500 mb-2 block">Namn *</label>
             <input
               type="text"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="T.ex. Stomresning"
               autoFocus
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Beskrivning</label>
+            <label className="text-sm text-gray-500 mb-2 block">Beskrivning</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={2}
               placeholder="Valfri beskrivning"
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Budgettimmar</label>
+              <label className="text-sm text-gray-500 mb-2 block">Budgettimmar</label>
               <input
                 type="number"
                 value={budgetHours}
@@ -2389,28 +2389,28 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Budgetbelopp (kr)</label>
+              <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr)</label>
               <input
                 type="number"
                 value={budgetAmount}
                 onChange={e => setBudgetAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
           </div>
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Forfallodatum</label>
+            <label className="text-sm text-gray-500 mb-2 block">Forfallodatum</label>
             <input
               type="date"
               value={dueDate}
               onChange={e => setDueDate(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
         </div>
@@ -2418,14 +2418,14 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
@@ -2480,17 +2480,17 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Ny ATA</h2>
-          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+          <h2 className="text-lg font-semibold text-gray-900">Ny ATA</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Typ</label>
+            <label className="text-sm text-gray-500 mb-2 block">Typ</label>
             <div className="grid grid-cols-3 gap-2">
               {([
                 { key: 'addition' as const, label: 'Tillagg', color: 'emerald' },
@@ -2503,11 +2503,11 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                   className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
                     changeType === opt.key
                       ? opt.color === 'emerald'
-                        ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                        ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
                         : opt.color === 'amber'
                         ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
-                        : 'bg-red-500/20 border-red-500/30 text-red-400'
-                      : 'bg-zinc-800 border-zinc-700 text-zinc-400'
+                        : 'bg-red-100 border-red-500/30 text-red-600'
+                      : 'bg-gray-100 border-gray-300 text-gray-500'
                   }`}
                 >
                   {opt.label}
@@ -2516,30 +2516,30 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
             </div>
           </div>
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Beskrivning *</label>
+            <label className="text-sm text-gray-500 mb-2 block">Beskrivning *</label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={3}
               placeholder="Beskriv andringar/tillagg..."
               autoFocus
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Belopp (kr)</label>
+              <label className="text-sm text-gray-500 mb-2 block">Belopp (kr)</label>
               <input
                 type="number"
                 value={amount}
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Timmar</label>
+              <label className="text-sm text-gray-500 mb-2 block">Timmar</label>
               <input
                 type="number"
                 value={hours}
@@ -2547,7 +2547,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
           </div>
@@ -2556,14 +2556,14 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
           <button
             onClick={handleSave}
             disabled={saving || !description.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Skapa
@@ -2614,12 +2614,12 @@ function LogModal({ editing, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera dagboksanteckning' : 'Ny dagboksanteckning'}
           </h2>
-          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2627,16 +2627,16 @@ function LogModal({ editing, onClose, onSave }: {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Datum *</label>
+              <label className="text-sm text-gray-500 mb-2 block">Datum *</label>
               <input
                 type="date"
                 value={logDate}
                 onChange={e => setLogDate(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Timmar</label>
+              <label className="text-sm text-gray-500 mb-2 block">Timmar</label>
               <input
                 type="number"
                 value={hoursWorked}
@@ -2644,18 +2644,18 @@ function LogModal({ editing, onClose, onSave }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Väder</label>
+              <label className="text-sm text-gray-500 mb-2 block">Väder</label>
               <select
                 value={weather}
                 onChange={e => setWeather(e.target.value)}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 <option value="">Välj...</option>
                 {weatherOptions.map(w => (
@@ -2664,48 +2664,48 @@ function LogModal({ editing, onClose, onSave }: {
               </select>
             </div>
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Temperatur (°C)</label>
+              <label className="text-sm text-gray-500 mb-2 block">Temperatur (°C)</label>
               <input
                 type="number"
                 value={temperature}
                 onChange={e => setTemperature(e.target.value)}
                 placeholder="0"
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Arbetsbeskrivning *</label>
+            <label className="text-sm text-gray-500 mb-2 block">Arbetsbeskrivning *</label>
             <textarea
               value={workDescription}
               onChange={e => setWorkDescription(e.target.value)}
               rows={3}
               placeholder="Beskriv dagens arbete..."
               autoFocus
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
 
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Använt material</label>
+            <label className="text-sm text-gray-500 mb-2 block">Använt material</label>
             <input
               type="text"
               value={materialsUsed}
               onChange={e => setMaterialsUsed(e.target.value)}
               placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
 
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Anteckningar</label>
+            <label className="text-sm text-gray-500 mb-2 block">Anteckningar</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Övriga anteckningar..."
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
         </div>
@@ -2713,14 +2713,14 @@ function LogModal({ editing, onClose, onSave }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
@@ -2758,10 +2758,10 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-white">Ny checklista</h2>
-          <button onClick={onClose} className="p-1 text-zinc-500 hover:text-white">
+          <h2 className="text-lg font-semibold text-gray-900">Ny checklista</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2769,7 +2769,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
         {/* Template selection */}
         {templates.length > 0 && (
           <div className="mb-6">
-            <label className="text-sm text-zinc-400 mb-3 block">Välj mall</label>
+            <label className="text-sm text-gray-500 mb-3 block">Välj mall</label>
             <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
               {templates.map((t: any) => (
                 <button
@@ -2777,12 +2777,12 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
                   onClick={() => { setSelectedTemplate(t); setCustomName(''); setCustomItems('') }}
                   className={`p-3 rounded-xl text-left text-sm border transition ${
                     selectedTemplate?.id === t.id
-                      ? 'bg-violet-500/20 border-violet-500/30 text-violet-300'
-                      : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                      ? 'bg-blue-100 border-blue-300 text-blue-500'
+                      : 'bg-gray-100 border-gray-300 text-gray-700 hover:border-gray-300'
                   }`}
                 >
                   <span className="font-medium">{t.name}</span>
-                  <span className="text-xs text-zinc-500 ml-2">({(t.items || []).length} punkter)</span>
+                  <span className="text-xs text-gray-400 ml-2">({(t.items || []).length} punkter)</span>
                 </button>
               ))}
             </div>
@@ -2792,30 +2792,30 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
         {/* Or custom */}
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <div className="h-px flex-1 bg-zinc-800" />
-            <span className="text-xs text-zinc-600">eller skapa egen</span>
-            <div className="h-px flex-1 bg-zinc-800" />
+            <div className="h-px flex-1 bg-gray-100" />
+            <span className="text-xs text-gray-400">eller skapa egen</span>
+            <div className="h-px flex-1 bg-gray-100" />
           </div>
 
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Namn</label>
+            <label className="text-sm text-gray-500 mb-2 block">Namn</label>
             <input
               type="text"
               value={customName}
               onChange={e => { setCustomName(e.target.value); setSelectedTemplate(null) }}
               placeholder="T.ex. Slutbesiktning badrum"
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
 
           <div>
-            <label className="text-sm text-zinc-400 mb-2 block">Punkter (en per rad)</label>
+            <label className="text-sm text-gray-500 mb-2 block">Punkter (en per rad)</label>
             <textarea
               value={customItems}
               onChange={e => { setCustomItems(e.target.value); setSelectedTemplate(null) }}
               rows={5}
               placeholder={"Kontrollera tätskikt\nTesta golvvärme\nKontrollera fall mot brunn"}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
             />
           </div>
         </div>
@@ -2823,14 +2823,14 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
           <button
             onClick={handleCreate}
             disabled={!selectedTemplate && (!customName.trim() || !customItems.trim())}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             Skapa checklista
           </button>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef } from 'react'
 import { Camera, Upload, X, RotateCcw, Loader2 } from 'lucide-react'
@@ -41,9 +41,9 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
           </div>
         )}
         <div className="space-y-3">
-          <Loader2 className="w-8 h-8 text-violet-400 animate-spin mx-auto" />
-          <p className="text-white font-medium">Analyserar bild...</p>
-          <div className="space-y-2 text-sm text-zinc-500">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+          <p className="text-gray-900 font-medium">Analyserar bild...</p>
+          <div className="space-y-2 text-sm text-gray-400">
             <p>Identifierar arbete och material...</p>
             <p>Hämtar din prishistorik...</p>
             <p>Genererar offertförslag...</p>
@@ -56,35 +56,35 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Ta foto av jobbet</h2>
-        <button onClick={onBack} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+        <h2 className="text-lg font-semibold text-gray-900">Ta foto av jobbet</h2>
+        <button onClick={onBack} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {!preview ? (
         <div className="space-y-4">
-          <div className="border-2 border-dashed border-zinc-700 rounded-xl p-8 text-center">
-            <Camera className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-            <p className="text-zinc-400 mb-4">Ta bild på det som ska åtgärdas</p>
+          <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+            <Camera className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+            <p className="text-gray-500 mb-4">Ta bild på det som ska åtgärdas</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => cameraInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
               >
                 <Camera className="w-5 h-5" />
                 Ta bild
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 min-h-[48px]"
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 min-h-[48px]"
               >
                 <Upload className="w-5 h-5" />
                 Ladda upp
               </button>
             </div>
           </div>
-          <p className="text-xs text-zinc-600 text-center">
+          <p className="text-xs text-gray-400 text-center">
             Tips: Ta bild på det som ska åtgärdas — elcentral, trasigt rör, ytan som ska målas, etc.
           </p>
 
@@ -108,19 +108,19 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
       ) : (
         <div className="space-y-4">
           <div className="relative rounded-xl overflow-hidden">
-            <img src={preview} alt="Preview" className="w-full max-h-[300px] object-contain bg-zinc-800 rounded-xl" />
+            <img src={preview} alt="Preview" className="w-full max-h-[300px] object-contain bg-gray-100 rounded-xl" />
           </div>
           <div className="flex gap-3">
             <button
               onClick={() => setPreview(null)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 min-h-[48px]"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 min-h-[48px]"
             >
               <RotateCcw className="w-4 h-4" />
               Ta ny bild
             </button>
             <button
               onClick={submitImage}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
             >
               Analysera bild
             </button>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import {
@@ -131,11 +131,11 @@ export default function OrdersPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'draft': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-      case 'pending': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'ordered': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'delivered': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'pending': return 'bg-amber-100 text-amber-600 border-amber-200'
+      case 'ordered': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'delivered': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
 
@@ -179,24 +179,24 @@ export default function OrdersPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -206,12 +206,12 @@ export default function OrdersPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Materialbeställningar</h1>
-            <p className="text-sm text-zinc-400">Beställ material från dina grossister</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Materialbeställningar</h1>
+            <p className="text-sm text-gray-500">Beställ material från dina grossister</p>
           </div>
           <Link
             href="/dashboard/orders/new"
-            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny beställning
@@ -220,47 +220,47 @@ export default function OrdersPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-violet-500/20 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-violet-400" />
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                <Package className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.total}</p>
-                <p className="text-xs text-zinc-500">Totalt</p>
+                <p className="text-xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-xs text-gray-400">Totalt</p>
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
                 <Send className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.ordered}</p>
-                <p className="text-xs text-zinc-500">Beställda</p>
+                <p className="text-xl font-bold text-gray-900">{stats.ordered}</p>
+                <p className="text-xs text-gray-400">Beställda</p>
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <Truck className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <Truck className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.delivered}</p>
-                <p className="text-xs text-zinc-500">Levererade</p>
+                <p className="text-xl font-bold text-gray-900">{stats.delivered}</p>
+                <p className="text-xs text-gray-400">Levererade</p>
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-amber-400" />
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                <Package className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.totalValue.toLocaleString('sv-SE')}</p>
-                <p className="text-xs text-zinc-500">kr totalt</p>
+                <p className="text-xl font-bold text-gray-900">{stats.totalValue.toLocaleString('sv-SE')}</p>
+                <p className="text-xs text-gray-400">kr totalt</p>
               </div>
             </div>
           </div>
@@ -268,7 +268,7 @@ export default function OrdersPage() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+          <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
             {[
               { id: 'all', label: 'Alla' },
               { id: 'draft', label: 'Utkast' },
@@ -279,7 +279,7 @@ export default function OrdersPage() {
                 key={f.id}
                 onClick={() => setFilter(f.id as typeof filter)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === f.id ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white' : 'text-zinc-400 hover:text-white'
+                  filter === f.id ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-white'
                 }`}
               >
                 {f.label}
@@ -288,42 +288,42 @@ export default function OrdersPage() {
           </div>
 
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Sök beställning..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
         </div>
 
         {/* Orders List */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
           {filteredOrders.length === 0 ? (
             <div className="p-12 text-center">
-              <Package className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-400 mb-2">Inga beställningar hittades</p>
+              <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">Inga beställningar hittades</p>
               <Link
                 href="/dashboard/orders/new"
-                className="text-violet-400 hover:text-violet-300 text-sm"
+                className="text-blue-600 hover:text-blue-500 text-sm"
               >
                 Skapa din första beställning →
               </Link>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-gray-200">
               {filteredOrders.map((order) => (
-                <div key={order.order_id} className="p-4 hover:bg-zinc-800/30 transition-all">
+                <div key={order.order_id} className="p-4 hover:bg-gray-100/30 transition-all">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
-                        <Package className="w-5 h-5 text-violet-400" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-300">
+                        <Package className="w-5 h-5 text-blue-600" />
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
-                          <p className="font-medium text-white">
+                          <p className="font-medium text-gray-900">
                             {order.supplier?.name || 'Ingen leverantör'}
                           </p>
                           <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(order.status)}`}>
@@ -331,11 +331,11 @@ export default function OrdersPage() {
                             {getStatusText(order.status)}
                           </span>
                         </div>
-                        <p className="text-sm text-zinc-500 mt-1">
+                        <p className="text-sm text-gray-400 mt-1">
                           {order.items?.length || 0} produkter • {order.total?.toLocaleString('sv-SE')} kr
                         </p>
                         {order.quote && (
-                          <p className="text-xs text-zinc-600 mt-1">
+                          <p className="text-xs text-gray-400 mt-1">
                             Från offert: {order.quote.title}
                           </p>
                         )}
@@ -343,7 +343,7 @@ export default function OrdersPage() {
                     </div>
 
                     <div className="flex items-center gap-2 sm:ml-auto">
-                      <p className="text-sm text-zinc-500 mr-4 hidden sm:block">
+                      <p className="text-sm text-gray-400 mr-4 hidden sm:block">
                         {order.ordered_at
                           ? `Beställd ${new Date(order.ordered_at).toLocaleDateString('sv-SE')}`
                           : `Skapad ${new Date(order.created_at).toLocaleDateString('sv-SE')}`
@@ -355,7 +355,7 @@ export default function OrdersPage() {
                           <button
                             onClick={() => handleSend(order.order_id)}
                             disabled={sendingId === order.order_id || !order.supplier?.contact_email}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
                             title={order.supplier?.contact_email ? 'Skicka till leverantör' : 'Leverantören saknar email'}
                           >
                             {sendingId === order.order_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -363,7 +363,7 @@ export default function OrdersPage() {
                           </button>
                           <button
                             onClick={() => handleDelete(order.order_id)}
-                            className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -373,7 +373,7 @@ export default function OrdersPage() {
                       {order.status === 'ordered' && (
                         <button
                           onClick={() => handleMarkDelivered(order.order_id)}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-emerald-400 hover:bg-emerald-500/30"
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-600 hover:bg-emerald-500/30"
                         >
                           <Truck className="w-4 h-4" />
                           Levererad
@@ -381,7 +381,7 @@ export default function OrdersPage() {
                       )}
 
                       {order.status === 'delivered' && (
-                        <span className="flex items-center gap-2 px-3 py-1.5 text-sm text-emerald-400">
+                        <span className="flex items-center gap-2 px-3 py-1.5 text-sm text-emerald-600">
                           <CheckCircle className="w-4 h-4" />
                           Klar
                         </span>
@@ -392,12 +392,12 @@ export default function OrdersPage() {
                   {/* Items preview */}
                   <div className="mt-3 ml-14 flex flex-wrap gap-2">
                     {order.items?.slice(0, 3).map((item, idx) => (
-                      <span key={idx} className="text-xs px-2 py-1 bg-zinc-800 rounded-lg text-zinc-400">
+                      <span key={idx} className="text-xs px-2 py-1 bg-gray-100 rounded-lg text-gray-500">
                         {item.quantity}× {item.name}
                       </span>
                     ))}
                     {(order.items?.length || 0) > 3 && (
-                      <span className="text-xs px-2 py-1 bg-zinc-800 rounded-lg text-zinc-500">
+                      <span className="text-xs px-2 py-1 bg-gray-100 rounded-lg text-gray-400">
                         +{(order.items?.length || 0) - 3} till
                       </span>
                     )}

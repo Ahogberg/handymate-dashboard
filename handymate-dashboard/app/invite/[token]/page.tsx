@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -114,8 +114,8 @@ export default function InviteAcceptPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
@@ -123,34 +123,34 @@ export default function InviteAcceptPage() {
   // Error state (invalid/expired token)
   if (!invite?.valid) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/25">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Handymate</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
           </div>
 
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 p-8 text-center">
+          <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
             <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-7 h-7 text-amber-400" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Ogiltig inbjudan</h2>
-            <p className="text-zinc-400 mb-1">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Ogiltig inbjudan</h2>
+            <p className="text-gray-500 mb-1">
               {invite?.error || 'Inbjudan har g\u00e5tt ut eller \u00e4r ogiltig.'}
             </p>
-            <p className="text-zinc-500 text-sm mb-6">
+            <p className="text-gray-400 text-sm mb-6">
               Kontakta din arbetsgivare f\u00f6r en ny inbjudan.
             </p>
             <a
               href="/login"
-              className="inline-block px-6 py-3 text-sm font-medium text-violet-400 hover:text-violet-300 transition-colors"
+              className="inline-block px-6 py-3 text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
             >
               Tillbaka till inloggning
             </a>
@@ -163,20 +163,20 @@ export default function InviteAcceptPage() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center relative overflow-hidden">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 p-8 text-center">
+          <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
             <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-7 h-7 text-emerald-400" />
+              <CheckCircle className="w-7 h-7 text-emerald-600" />
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">V\u00e4lkommen!</h2>
-            <p className="text-zinc-400 mb-4">Ditt konto har skapats. Omdirigerar...</p>
-            <Loader2 className="w-5 h-5 text-violet-500 animate-spin mx-auto" />
+            <h2 className="text-xl font-bold text-gray-900 mb-2">V\u00e4lkommen!</h2>
+            <p className="text-gray-500 mb-4">Ditt konto har skapats. Omdirigerar...</p>
+            <Loader2 className="w-5 h-5 text-blue-600 animate-spin mx-auto" />
           </div>
         </div>
       </div>
@@ -185,31 +185,31 @@ export default function InviteAcceptPage() {
 
   // Valid invite - acceptance form
   return (
-    <div className="min-h-screen bg-[#09090b] flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md mx-4 py-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/25">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
             <Zap className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Handymate</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
         </div>
 
         {/* Form Card */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 p-8">
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8">
           <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-white mb-2">
+            <h2 className="text-xl font-bold text-gray-900 mb-2">
               Du har blivit inbjuden till{' '}
-              <span className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 {invite.business_name}
               </span>
             </h2>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-500/20">
               {roleLabels[invite.role] || invite.role}
               {invite.title ? ` \u2013 ${invite.title}` : ''}
             </span>
@@ -218,7 +218,7 @@ export default function InviteAcceptPage() {
           <form onSubmit={handleAccept} className="space-y-5">
             {/* Name */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <User className="w-4 h-4" />
                 Namn
               </label>
@@ -228,21 +228,21 @@ export default function InviteAcceptPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Ditt namn"
                 required
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
 
             {/* Email (read-only display) */}
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">E-post</label>
-              <p className="px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-zinc-300 text-sm">
+              <label className="text-sm text-gray-500 mb-2 block">E-post</label>
+              <p className="px-4 py-3 bg-gray-50 border border-gray-300/50 rounded-xl text-gray-700 text-sm">
                 {invite.email}
               </p>
             </div>
 
             {/* Password */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <Lock className="w-4 h-4" />
                 L\u00f6senord
               </label>
@@ -254,12 +254,12 @@ export default function InviteAcceptPage() {
                   placeholder="Minst 6 tecken"
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 pr-12 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 pr-12 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-300 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -268,7 +268,7 @@ export default function InviteAcceptPage() {
 
             {/* Confirm Password */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <Lock className="w-4 h-4" />
                 Bekr\u00e4fta l\u00f6senord
               </label>
@@ -279,13 +279,13 @@ export default function InviteAcceptPage() {
                 placeholder="Upprepa l\u00f6senord"
                 required
                 minLength={6}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
 
             {/* Error */}
             {error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-sm">
                 {error}
               </div>
             )}
@@ -294,7 +294,7 @@ export default function InviteAcceptPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+              className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
             >
               {submitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -306,9 +306,9 @@ export default function InviteAcceptPage() {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-sm text-zinc-500 mt-6">
+        <p className="text-center text-sm text-gray-400 mt-6">
           Har du redan ett konto?{' '}
-          <a href="/login" className="text-violet-400 hover:text-violet-300">
+          <a href="/login" className="text-blue-600 hover:text-blue-500">
             Logga in
           </a>
         </p>

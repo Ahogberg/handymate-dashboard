@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
@@ -801,8 +801,8 @@ export default function SchedulePage() {
 
   if (loading) {
     return (
-      <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
       </div>
     )
   }
@@ -812,20 +812,20 @@ export default function SchedulePage() {
   // ---------------------------------------------------------------------------
 
   function getUtilColor(util: number, isTimeOff: boolean, isWeekend: boolean): string {
-    if (isWeekend) return 'bg-zinc-900/30'
-    if (isTimeOff) return 'bg-zinc-600/30'
-    if (util <= 0) return 'bg-zinc-800/50'
-    if (util < 50) return 'bg-emerald-500/20'
-    if (util < 80) return 'bg-amber-500/20'
-    return 'bg-red-500/20'
+    if (isWeekend) return 'bg-white/30'
+    if (isTimeOff) return 'bg-gray-200/50'
+    if (util <= 0) return 'bg-gray-50'
+    if (util < 50) return 'bg-emerald-100'
+    if (util < 80) return 'bg-amber-100'
+    return 'bg-red-100'
   }
 
   function getUtilTextColor(util: number, isTimeOff: boolean, isWeekend: boolean): string {
-    if (isWeekend || isTimeOff) return 'text-zinc-600'
-    if (util <= 0) return 'text-zinc-600'
-    if (util < 50) return 'text-emerald-400'
-    if (util < 80) return 'text-amber-400'
-    return 'text-red-400'
+    if (isWeekend || isTimeOff) return 'text-gray-400'
+    if (util <= 0) return 'text-gray-400'
+    if (util < 50) return 'text-emerald-600'
+    if (util < 80) return 'text-amber-600'
+    return 'text-red-600'
   }
 
   // ---------------------------------------------------------------------------
@@ -848,7 +848,7 @@ export default function SchedulePage() {
           if (!isExternal) openEditModal(entry)
         }}
         className={`absolute left-1 right-1 rounded-lg px-2 py-1 text-left overflow-hidden transition-opacity z-10 ${
-          isExternal ? 'opacity-75 cursor-default border border-dashed border-zinc-600' : 'cursor-pointer hover:opacity-90'
+          isExternal ? 'opacity-75 cursor-default border border-dashed border-gray-300' : 'cursor-pointer hover:opacity-90'
         }`}
         style={{
           top: `${top}px`,
@@ -858,22 +858,22 @@ export default function SchedulePage() {
         }}
         title={isExternal ? `${entry.title} (Google Calendar)` : `${entry.title} (${startTime}-${endTime})`}
       >
-        <div className="flex items-center gap-1 text-xs font-medium text-white truncate">
+        <div className="flex items-center gap-1 text-xs font-medium text-gray-900 truncate">
           {getTypeIcon(entry.type)}
           <span className="truncate">{entry.title}</span>
           {isExternal && (
-            <span className="ml-auto text-[9px] text-blue-400 bg-blue-500/10 px-1 rounded flex-shrink-0">Google</span>
+            <span className="ml-auto text-[9px] text-blue-400 bg-blue-50 px-1 rounded flex-shrink-0">Google</span>
           )}
         </div>
         {height > 36 && (
-          <p className="text-[10px] text-zinc-400 mt-0.5 truncate">
+          <p className="text-[10px] text-gray-500 mt-0.5 truncate">
             {startTime} - {endTime}
           </p>
         )}
         {height > 52 && (
           <div className="flex items-center gap-1 mt-0.5">
             <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-            <span className="text-[10px] text-zinc-500 truncate">{memberName}</span>
+            <span className="text-[10px] text-gray-400 truncate">{memberName}</span>
           </div>
         )}
       </button>
@@ -889,13 +889,13 @@ export default function SchedulePage() {
     if (!hasAllDay) return null
 
     return (
-      <div className="flex border-b border-zinc-800">
-        <div className="w-14 flex-shrink-0 text-[10px] text-zinc-600 p-1 text-right pr-2">Heldag</div>
+      <div className="flex border-b border-gray-200">
+        <div className="w-14 flex-shrink-0 text-[10px] text-gray-400 p-1 text-right pr-2">Heldag</div>
         <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
           {days.map((day) => {
             const allDay = getAllDayEntries(day)
             return (
-              <div key={day.toISOString()} className="border-l border-zinc-800 min-h-[28px] p-0.5 flex flex-col gap-0.5">
+              <div key={day.toISOString()} className="border-l border-gray-200 min-h-[28px] p-0.5 flex flex-col gap-0.5">
                 {allDay.map((entry) => {
                   const color = entry.type === 'external' ? '#6b7280' : getEntryColor(entry, teamMembers)
                   const isExternal = entry.type === 'external'
@@ -904,7 +904,7 @@ export default function SchedulePage() {
                       key={entry.id}
                       onClick={() => { if (!isExternal) openEditModal(entry) }}
                       className={`text-[10px] px-1.5 py-0.5 rounded truncate text-left ${
-                        isExternal ? 'opacity-75 border border-dashed border-zinc-600 cursor-default' : ''
+                        isExternal ? 'opacity-75 border border-dashed border-gray-300 cursor-default' : ''
                       }`}
                       style={{ backgroundColor: `${color}30`, color: color }}
                     >
@@ -937,7 +937,7 @@ export default function SchedulePage() {
             {Array.from({ length: TOTAL_HOURS }, (_, i) => (
               <div
                 key={i}
-                className="text-[10px] text-zinc-600 text-right pr-2 border-b border-zinc-800/50"
+                className="text-[10px] text-gray-400 text-right pr-2 border-b border-gray-200/50"
                 style={{ height: `${HOUR_HEIGHT}px` }}
               >
                 {formatHour(START_HOUR + i)}
@@ -953,13 +953,13 @@ export default function SchedulePage() {
               return (
                 <div
                   key={day.toISOString()}
-                  className={`relative border-l border-zinc-800 ${todayHighlight ? 'bg-violet-500/[0.03]' : ''}`}
+                  className={`relative border-l border-gray-200 ${todayHighlight ? 'bg-blue-500/[0.03]' : ''}`}
                 >
                   {/* Hour grid lines & click zones */}
                   {Array.from({ length: TOTAL_HOURS }, (_, i) => (
                     <div
                       key={i}
-                      className="border-b border-zinc-800/50 cursor-pointer hover:bg-zinc-800/20 transition-colors"
+                      className="border-b border-gray-200/50 cursor-pointer hover:bg-gray-100/20 transition-colors"
                       style={{ height: `${HOUR_HEIGHT}px` }}
                       onClick={() => handleGridClick(day, START_HOUR + i)}
                     />
@@ -986,9 +986,9 @@ export default function SchedulePage() {
     return (
       <div>
         {/* Day name headers */}
-        <div className="grid grid-cols-7 border-b border-zinc-800">
+        <div className="grid grid-cols-7 border-b border-gray-200">
           {dayNames.map((name) => (
-            <div key={name} className="text-center text-xs font-medium text-zinc-500 py-2">
+            <div key={name} className="text-center text-xs font-medium text-gray-400 py-2">
               {name}
             </div>
           ))}
@@ -1007,14 +1007,14 @@ export default function SchedulePage() {
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[80px] sm:min-h-[100px] border-b border-r border-zinc-800 p-1 cursor-pointer hover:bg-zinc-800/20 transition-colors ${
+                className={`min-h-[80px] sm:min-h-[100px] border-b border-r border-gray-200 p-1 cursor-pointer hover:bg-gray-100/20 transition-colors ${
                   !inMonth ? 'opacity-30' : ''
                 }`}
                 onClick={() => handleMonthDayClick(day)}
               >
                 <div
                   className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                    today ? 'bg-violet-500 text-white' : 'text-zinc-400'
+                    today ? 'bg-blue-500 text-gray-900' : 'text-gray-500'
                   }`}
                 >
                   {format(day, 'd')}
@@ -1037,12 +1037,12 @@ export default function SchedulePage() {
                         ) : (
                           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         )}
-                        <span className="text-[10px] text-zinc-300 truncate">{entry.title}</span>
+                        <span className="text-[10px] text-gray-700 truncate">{entry.title}</span>
                       </button>
                     )
                   })}
                   {moreCount > 0 && (
-                    <p className="text-[10px] text-zinc-500 pl-2.5">+{moreCount} fler</p>
+                    <p className="text-[10px] text-gray-400 pl-2.5">+{moreCount} fler</p>
                   )}
                 </div>
               </div>
@@ -1066,34 +1066,34 @@ export default function SchedulePage() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[600px]">
           <thead>
-            <tr className="border-b border-zinc-800">
-              <th className="text-left text-xs font-medium text-zinc-500 uppercase py-3 px-4 w-48">Person</th>
+            <tr className="border-b border-gray-200">
+              <th className="text-left text-xs font-medium text-gray-400 uppercase py-3 px-4 w-48">Person</th>
               {days.map((day) => (
                 <th
                   key={day.toISOString()}
                   className={`text-center text-xs font-medium py-3 px-1 ${
-                    isToday(day) ? 'text-violet-400' : 'text-zinc-500'
+                    isToday(day) ? 'text-blue-600' : 'text-gray-400'
                   } ${getDay(day) === 0 || getDay(day) === 6 ? 'opacity-50' : ''}`}
                 >
                   <div>{format(day, 'EEE', { locale: sv })}</div>
                   <div>{format(day, 'd')}</div>
                 </th>
               ))}
-              <th className="text-center text-xs font-medium text-zinc-500 uppercase py-3 px-3">Snitt</th>
+              <th className="text-center text-xs font-medium text-gray-400 uppercase py-3 px-3">Snitt</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-zinc-800">
+          <tbody className="divide-y divide-gray-200">
             {utilizationData.map(({ member, dayData, avgUtilization }) => (
-              <tr key={member.id} className="hover:bg-zinc-800/20">
+              <tr key={member.id} className="hover:bg-gray-100/20">
                 <td className="py-3 px-4">
                   <div className="flex items-center gap-2">
                     <div
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-gray-900 flex-shrink-0"
                       style={{ backgroundColor: member.color }}
                     >
                       {getInitials(member.name)}
                     </div>
-                    <span className="text-sm text-white truncate">{member.name}</span>
+                    <span className="text-sm text-gray-900 truncate">{member.name}</span>
                   </div>
                 </td>
                 {dayData.map((d) => (
@@ -1113,10 +1113,10 @@ export default function SchedulePage() {
                   <span
                     className={`text-xs font-bold ${
                       avgUtilization < 50
-                        ? 'text-emerald-400'
+                        ? 'text-emerald-600'
                         : avgUtilization < 80
-                        ? 'text-amber-400'
-                        : 'text-red-400'
+                        ? 'text-amber-600'
+                        : 'text-red-600'
                     }`}
                   >
                     {avgUtilization.toFixed(0)}%
@@ -1126,17 +1126,17 @@ export default function SchedulePage() {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-zinc-700">
-              <td className="py-3 px-4 text-sm font-medium text-zinc-400">Teamsnitt</td>
+            <tr className="border-t border-gray-300">
+              <td className="py-3 px-4 text-sm font-medium text-gray-500">Teamsnitt</td>
               <td colSpan={days.length} />
               <td className="text-center py-3 px-3">
                 <span
                   className={`text-sm font-bold ${
                     teamUtilization < 50
-                      ? 'text-emerald-400'
+                      ? 'text-emerald-600'
                       : teamUtilization < 80
-                      ? 'text-amber-400'
-                      : 'text-red-400'
+                      ? 'text-amber-600'
+                      : 'text-red-600'
                   }`}
                 >
                   {teamUtilization.toFixed(0)}%
@@ -1156,11 +1156,11 @@ export default function SchedulePage() {
   function renderSidebar() {
     return (
       <div className="hidden lg:block w-64 flex-shrink-0">
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-4 sticky top-8">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-4 sticky top-8">
           {/* Team heading */}
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-white">Team</h3>
-            <button onClick={toggleAll} className="text-xs text-violet-400 hover:text-violet-300">
+            <h3 className="text-sm font-semibold text-gray-900">Team</h3>
+            <button onClick={toggleAll} className="text-xs text-blue-600 hover:text-blue-500">
               {allSelected ? 'Avmarkera' : 'Markera alla'}
             </button>
           </div>
@@ -1170,7 +1170,7 @@ export default function SchedulePage() {
             {teamMembers.map((member) => (
               <label
                 key={member.id}
-                className="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                className="flex items-center gap-2 cursor-pointer group px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
               >
                 <input
                   type="checkbox"
@@ -1182,17 +1182,17 @@ export default function SchedulePage() {
                   className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
                     selectedMembers.has(member.id)
                       ? 'border-transparent'
-                      : 'border-zinc-600 group-hover:border-zinc-500'
+                      : 'border-gray-300 group-hover:border-gray-400'
                   }`}
                   style={selectedMembers.has(member.id) ? { backgroundColor: member.color } : {}}
                 >
-                  {selectedMembers.has(member.id) && <Check className="w-3 h-3 text-white" />}
+                  {selectedMembers.has(member.id) && <Check className="w-3 h-3 text-gray-900" />}
                 </div>
                 <div
                   className="w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: member.color }}
                 />
-                <span className="text-sm text-zinc-300 truncate">{member.name}</span>
+                <span className="text-sm text-gray-700 truncate">{member.name}</span>
               </label>
             ))}
           </div>
@@ -1208,7 +1208,7 @@ export default function SchedulePage() {
               })
               setTimeOffModalOpen(true)
             }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white border border-zinc-800 rounded-xl hover:bg-zinc-800/50 transition-colors mb-4"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mb-4"
           >
             <Palmtree className="w-4 h-4" />
             Ansok om ledighet
@@ -1218,32 +1218,32 @@ export default function SchedulePage() {
           {isOwnerOrAdmin && timeOffRequests.length > 0 && (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-white">Ledighetsansokningar</h3>
-                <span className="text-xs bg-violet-500/20 text-violet-400 px-2 py-0.5 rounded-full">
+                <h3 className="text-sm font-semibold text-gray-900">Ledighetsansokningar</h3>
+                <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">
                   {timeOffRequests.length}
                 </span>
               </div>
               <div className="space-y-2">
                 {timeOffRequests.map((req) => (
-                  <div key={req.id} className="bg-zinc-800/50 rounded-lg p-2.5">
-                    <p className="text-xs font-medium text-white">{req.business_user?.name || 'Okand'}</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                  <div key={req.id} className="bg-gray-50 rounded-lg p-2.5">
+                    <p className="text-xs font-medium text-gray-900">{req.business_user?.name || 'Okand'}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">
                       {format(parseISO(req.start_date), 'd MMM', { locale: sv })} -{' '}
                       {format(parseISO(req.end_date), 'd MMM', { locale: sv })}
                     </p>
-                    <p className="text-[10px] text-zinc-500 capitalize">{req.type}</p>
-                    {req.note && <p className="text-[10px] text-zinc-600 mt-0.5 truncate">{req.note}</p>}
+                    <p className="text-[10px] text-gray-400 capitalize">{req.type}</p>
+                    {req.note && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{req.note}</p>}
                     <div className="flex gap-1 mt-2">
                       <button
                         onClick={() => handleTimeOffAction(req.id, 'approve')}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 rounded transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded transition-colors"
                       >
                         <Check className="w-3 h-3" />
                         Godkann
                       </button>
                       <button
                         onClick={() => handleTimeOffAction(req.id, 'reject')}
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded transition-colors"
                       >
                         <XCircle className="w-3 h-3" />
                         Neka
@@ -1264,11 +1264,11 @@ export default function SchedulePage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]" />
       </div>
 
       {/* Toast */}
@@ -1276,8 +1276,8 @@ export default function SchedulePage() {
         <div
           className={`fixed top-4 right-4 z-[60] px-4 py-3 rounded-xl border backdrop-blur-sm ${
             toast.type === 'success'
-              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/20 border-red-500/30 text-red-400'
+              ? 'bg-emerald-100 border-emerald-200 text-emerald-600'
+              : 'bg-red-100 border-red-200 text-red-600'
           }`}
         >
           {toast.message}
@@ -1289,12 +1289,12 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {entryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {editingEntry ? 'Redigera post' : 'Ny post'}
               </h3>
-              <button onClick={() => setEntryModalOpen(false)} className="text-zinc-500 hover:text-white">
+              <button onClick={() => setEntryModalOpen(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1302,11 +1302,11 @@ export default function SchedulePage() {
             <div className="space-y-4">
               {/* Person */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Person *</label>
+                <label className="block text-sm text-gray-500 mb-1">Person *</label>
                 <select
                   value={entryForm.business_user_id}
                   onChange={(e) => setEntryForm({ ...entryForm, business_user_id: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Valj person...</option>
                   {teamMembers.map((m) => (
@@ -1319,11 +1319,11 @@ export default function SchedulePage() {
 
               {/* Project */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Projekt (valfritt)</label>
+                <label className="block text-sm text-gray-500 mb-1">Projekt (valfritt)</label>
                 <select
                   value={entryForm.project_id}
                   onChange={(e) => handleProjectChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Inget projekt</option>
                   {projects.map((p) => (
@@ -1336,24 +1336,24 @@ export default function SchedulePage() {
 
               {/* Title */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Titel *</label>
+                <label className="block text-sm text-gray-500 mb-1">Titel *</label>
                 <input
                   type="text"
                   value={entryForm.title}
                   onChange={(e) => setEntryForm({ ...entryForm, title: e.target.value })}
                   placeholder="Vad ska goras?"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Date */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Datum *</label>
+                <label className="block text-sm text-gray-500 mb-1">Datum *</label>
                 <input
                   type="date"
                   value={entryForm.date}
                   onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
@@ -1363,7 +1363,7 @@ export default function SchedulePage() {
                   type="button"
                   onClick={() => setEntryForm({ ...entryForm, all_day: !entryForm.all_day })}
                   className={`w-10 h-6 rounded-full transition-colors ${
-                    entryForm.all_day ? 'bg-violet-500' : 'bg-zinc-700'
+                    entryForm.all_day ? 'bg-blue-500' : 'bg-gray-200'
                   } relative`}
                 >
                   <div
@@ -1372,28 +1372,28 @@ export default function SchedulePage() {
                     }`}
                   />
                 </button>
-                <span className="text-sm text-zinc-300">Heldag</span>
+                <span className="text-sm text-gray-700">Heldag</span>
               </label>
 
               {/* Times (if not all day) */}
               {!entryForm.all_day && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Starttid</label>
+                    <label className="block text-sm text-gray-500 mb-1">Starttid</label>
                     <input
                       type="time"
                       value={entryForm.start_time}
                       onChange={(e) => setEntryForm({ ...entryForm, start_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Sluttid</label>
+                    <label className="block text-sm text-gray-500 mb-1">Sluttid</label>
                     <input
                       type="time"
                       value={entryForm.end_time}
                       onChange={(e) => setEntryForm({ ...entryForm, end_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                   </div>
                 </div>
@@ -1401,7 +1401,7 @@ export default function SchedulePage() {
 
               {/* Type */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Typ</label>
+                <label className="block text-sm text-gray-500 mb-1">Typ</label>
                 <div className="flex gap-2">
                   {ENTRY_TYPE_OPTIONS.map((opt) => (
                     <button
@@ -1410,8 +1410,8 @@ export default function SchedulePage() {
                       onClick={() => setEntryForm({ ...entryForm, type: opt.value })}
                       className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                         entryForm.type === opt.value
-                          ? 'bg-violet-500/20 text-violet-400 border border-violet-500/40'
-                          : 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:border-zinc-600'
+                          ? 'bg-blue-100 text-blue-600 border border-blue-500/40'
+                          : 'bg-gray-100 text-gray-500 border border-gray-300 hover:border-gray-300'
                       }`}
                     >
                       {opt.value === 'project' && <Briefcase className="w-3.5 h-3.5" />}
@@ -1425,28 +1425,28 @@ export default function SchedulePage() {
 
               {/* Description */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Anteckningar</label>
+                <label className="block text-sm text-gray-500 mb-1">Anteckningar</label>
                 <textarea
                   value={entryForm.description}
                   onChange={(e) => setEntryForm({ ...entryForm, description: e.target.value })}
                   rows={2}
                   placeholder="Valfria anteckningar..."
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                 />
               </div>
 
               {/* Color override */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Farg (valfritt)</label>
+                <label className="block text-sm text-gray-500 mb-1">Farg (valfritt)</label>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setEntryForm({ ...entryForm, color: '' })}
                     className={`w-7 h-7 rounded-full border-2 flex items-center justify-center ${
-                      !entryForm.color ? 'border-white' : 'border-zinc-700'
-                    } bg-zinc-800`}
+                      !entryForm.color ? 'border-white' : 'border-gray-300'
+                    } bg-gray-100`}
                   >
-                    {!entryForm.color && <X className="w-3 h-3 text-zinc-500" />}
+                    {!entryForm.color && <X className="w-3 h-3 text-gray-400" />}
                   </button>
                   {COLOR_OPTIONS.map((c) => (
                     <button
@@ -1464,11 +1464,11 @@ export default function SchedulePage() {
 
               {/* Conflict warning */}
               {conflicts.length > 0 && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-amber-400 font-medium">Overlappning</p>
-                    <p className="text-xs text-amber-400/70 mt-0.5">
+                    <p className="text-sm text-amber-600 font-medium">Overlappning</p>
+                    <p className="text-xs text-amber-600/70 mt-0.5">
                       Denna person har redan {conflicts.length} post{conflicts.length > 1 ? 'er' : ''} under denna tid.
                     </p>
                   </div>
@@ -1483,17 +1483,17 @@ export default function SchedulePage() {
                   <>
                     {deleteConfirmId === editingEntry.id ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs text-red-400">Radera?</span>
+                        <span className="text-xs text-red-600">Radera?</span>
                         <button
                           onClick={handleEntryDelete}
                           disabled={actionLoading}
-                          className="px-3 py-1.5 text-xs font-medium text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20"
+                          className="px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100"
                         >
                           Ja
                         </button>
                         <button
                           onClick={() => setDeleteConfirmId(null)}
-                          className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                          className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-900"
                         >
                           Nej
                         </button>
@@ -1501,7 +1501,7 @@ export default function SchedulePage() {
                     ) : (
                       <button
                         onClick={() => setDeleteConfirmId(editingEntry.id)}
-                        className="flex items-center gap-1 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                        className="flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                         Radera
@@ -1513,14 +1513,14 @@ export default function SchedulePage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setEntryModalOpen(false)}
-                  className="px-4 py-2 text-zinc-400 hover:text-white"
+                  className="px-4 py-2 text-gray-500 hover:text-gray-900"
                 >
                   Avbryt
                 </button>
                 <button
                   onClick={handleEntrySubmit}
                   disabled={actionLoading}
-                  className="flex items-center px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {editingEntry ? 'Spara' : 'Skapa'}
@@ -1536,10 +1536,10 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {timeOffModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Ansok om ledighet</h3>
-              <button onClick={() => setTimeOffModalOpen(false)} className="text-zinc-500 hover:text-white">
+              <h3 className="text-lg font-semibold text-gray-900">Ansok om ledighet</h3>
+              <button onClick={() => setTimeOffModalOpen(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1547,31 +1547,31 @@ export default function SchedulePage() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Fran *</label>
+                  <label className="block text-sm text-gray-500 mb-1">Fran *</label>
                   <input
                     type="date"
                     value={timeOffForm.start_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, start_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Till *</label>
+                  <label className="block text-sm text-gray-500 mb-1">Till *</label>
                   <input
                     type="date"
                     value={timeOffForm.end_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, end_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Typ</label>
+                <label className="block text-sm text-gray-500 mb-1">Typ</label>
                 <select
                   value={timeOffForm.type}
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   {TIME_OFF_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -1582,25 +1582,25 @@ export default function SchedulePage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Anteckning</label>
+                <label className="block text-sm text-gray-500 mb-1">Anteckning</label>
                 <textarea
                   value={timeOffForm.note}
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, note: e.target.value })}
                   rows={2}
                   placeholder="Valfri kommentar..."
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                 />
               </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setTimeOffModalOpen(false)} className="px-4 py-2 text-zinc-400 hover:text-white">
+              <button onClick={() => setTimeOffModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">
                 Avbryt
               </button>
               <button
                 onClick={handleTimeOffSubmit}
                 disabled={actionLoading}
-                className="flex items-center px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="flex items-center px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Skicka ansokan
@@ -1615,10 +1615,10 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {mobileFilterOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileFilterOpen(false)}>
-          <div className="absolute top-28 left-4 right-4 bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-28 left-4 right-4 bg-white border border-gray-200 rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-white">Filtrera team</h3>
-              <button onClick={toggleAll} className="text-xs text-violet-400 hover:text-violet-300">
+              <h3 className="text-sm font-semibold text-gray-900">Filtrera team</h3>
+              <button onClick={toggleAll} className="text-xs text-blue-600 hover:text-blue-500">
                 {allSelected ? 'Avmarkera' : 'Markera alla'}
               </button>
             </div>
@@ -1626,19 +1626,19 @@ export default function SchedulePage() {
               {teamMembers.map((member) => (
                 <label
                   key={member.id}
-                  className="flex items-center gap-2 cursor-pointer px-2 py-2 rounded-lg hover:bg-zinc-800/50 transition-colors"
+                  className="flex items-center gap-2 cursor-pointer px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <input type="checkbox" checked={selectedMembers.has(member.id)} onChange={() => toggleMember(member.id)} className="sr-only" />
                   <div
                     className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                      selectedMembers.has(member.id) ? 'border-transparent' : 'border-zinc-600'
+                      selectedMembers.has(member.id) ? 'border-transparent' : 'border-gray-300'
                     }`}
                     style={selectedMembers.has(member.id) ? { backgroundColor: member.color } : {}}
                   >
-                    {selectedMembers.has(member.id) && <Check className="w-3 h-3 text-white" />}
+                    {selectedMembers.has(member.id) && <Check className="w-3 h-3 text-gray-900" />}
                   </div>
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: member.color }} />
-                  <span className="text-sm text-zinc-300 truncate">{member.name}</span>
+                  <span className="text-sm text-gray-700 truncate">{member.name}</span>
                 </label>
               ))}
             </div>
@@ -1653,7 +1653,7 @@ export default function SchedulePage() {
                 setTimeOffModalOpen(true)
                 setMobileFilterOpen(false)
               }}
-              className="w-full flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm text-zinc-400 hover:text-white border border-zinc-800 rounded-xl hover:bg-zinc-800/50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
             >
               <Palmtree className="w-4 h-4" />
               Ansok om ledighet
@@ -1669,12 +1669,12 @@ export default function SchedulePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-xl flex items-center justify-center border border-violet-500/30">
-              <CalendarDays className="w-5 h-5 text-violet-400" />
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-300">
+              <CalendarDays className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Resursplanering</h1>
-              <p className="text-sm text-zinc-500 hidden sm:block">Planera och overblicka teamets schema</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Resursplanering</h1>
+              <p className="text-sm text-gray-400 hidden sm:block">Planera och overblicka teamets schema</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1688,7 +1688,7 @@ export default function SchedulePage() {
                   } catch {}
                   setSyncing(false)
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-300 hover:border-violet-500/50 transition"
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-700 hover:border-blue-300 transition"
                 title="Synka med Google Calendar"
               >
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -1697,7 +1697,7 @@ export default function SchedulePage() {
             )}
             <button
               onClick={() => openCreateModal()}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
             >
               <Plus className="w-4 h-4" />
               Ny post
@@ -1708,13 +1708,13 @@ export default function SchedulePage() {
         {/* Controls row */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           {/* Mode toggle */}
-          <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
+          <div className="flex bg-white border border-gray-200 rounded-xl p-1">
             <button
               onClick={() => setMode('calendar')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'calendar'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  : 'text-gray-500 hover:text-white'
               }`}
             >
               <CalendarDays className="w-4 h-4" />
@@ -1724,8 +1724,8 @@ export default function SchedulePage() {
               onClick={() => setMode('utilization')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'utilization'
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'text-zinc-400 hover:text-white'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  : 'text-gray-500 hover:text-white'
               }`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -1735,11 +1735,11 @@ export default function SchedulePage() {
 
           {/* View switcher */}
           {mode === 'calendar' && (
-            <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
+            <div className="flex bg-white border border-gray-200 rounded-xl p-1">
               <button
                 onClick={() => setView('day')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  view === 'day' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+                  view === 'day' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Dag
@@ -1749,7 +1749,7 @@ export default function SchedulePage() {
                   if (!isMobile) setView('week')
                 }}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  view === 'week' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+                  view === 'week' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
                 } ${isMobile ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 Vecka
@@ -1757,7 +1757,7 @@ export default function SchedulePage() {
               <button
                 onClick={() => setView('month')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  view === 'month' ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white'
+                  view === 'month' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Manad
@@ -1769,29 +1769,29 @@ export default function SchedulePage() {
           <div className="flex items-center gap-1 sm:ml-auto">
             <button
               onClick={() => navigate('prev')}
-              className="p-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             <button
               onClick={goToday}
-              className="px-3 py-2 text-sm font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors min-h-[44px]"
+              className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors min-h-[44px]"
             >
               Idag
             </button>
             <button
               onClick={() => navigate('next')}
-              className="p-2.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
-            <span className="ml-2 text-sm font-medium text-white capitalize hidden sm:inline">{headerLabel}</span>
+            <span className="ml-2 text-sm font-medium text-gray-900 capitalize hidden sm:inline">{headerLabel}</span>
           </div>
 
           {/* Mobile filter button */}
           <button
             onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-            className="lg:hidden flex items-center gap-2 px-3 py-2 text-sm text-zinc-400 hover:text-white border border-zinc-800 rounded-xl hover:bg-zinc-800/50 transition-colors min-h-[44px]"
+            className="lg:hidden flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
           >
             <Filter className="w-4 h-4" />
             Team ({selectedMembers.size}/{teamMembers.length})
@@ -1800,7 +1800,7 @@ export default function SchedulePage() {
 
         {/* Mobile date label */}
         <div className="sm:hidden mb-3">
-          <p className="text-sm font-medium text-white capitalize">{headerLabel}</p>
+          <p className="text-sm font-medium text-gray-900 capitalize">{headerLabel}</p>
         </div>
 
         {/* Main layout: sidebar + content */}
@@ -1810,14 +1810,14 @@ export default function SchedulePage() {
 
           {/* Calendar / Utilization content */}
           <div className="flex-1 min-w-0">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
               {mode === 'calendar' ? (
                 <>
                   {/* Week view */}
                   {view === 'week' && (
                     <>
                       {/* Day headers */}
-                      <div className="flex border-b border-zinc-800">
+                      <div className="flex border-b border-gray-200">
                         <div className="w-14 flex-shrink-0" />
                         <div className="flex-1 grid grid-cols-7">
                           {weekDays.map((day) => {
@@ -1825,16 +1825,16 @@ export default function SchedulePage() {
                             return (
                               <div
                                 key={day.toISOString()}
-                                className={`text-center py-3 border-l border-zinc-800 ${
-                                  today ? 'bg-violet-500/[0.05]' : ''
+                                className={`text-center py-3 border-l border-gray-200 ${
+                                  today ? 'bg-blue-500/[0.05]' : ''
                                 }`}
                               >
-                                <p className="text-xs text-zinc-500 uppercase">
+                                <p className="text-xs text-gray-400 uppercase">
                                   {format(day, 'EEE', { locale: sv })}
                                 </p>
                                 <p
                                   className={`text-lg font-semibold ${
-                                    today ? 'text-violet-400' : 'text-white'
+                                    today ? 'text-blue-600' : 'text-gray-900'
                                   }`}
                                 >
                                   {format(day, 'd')}
@@ -1851,20 +1851,20 @@ export default function SchedulePage() {
                   {/* Day view */}
                   {view === 'day' && (
                     <>
-                      <div className="flex border-b border-zinc-800">
+                      <div className="flex border-b border-gray-200">
                         <div className="w-14 flex-shrink-0" />
                         <div className="flex-1">
                           <div
                             className={`text-center py-3 ${
-                              isToday(currentDate) ? 'bg-violet-500/[0.05]' : ''
+                              isToday(currentDate) ? 'bg-blue-500/[0.05]' : ''
                             }`}
                           >
-                            <p className="text-xs text-zinc-500 uppercase">
+                            <p className="text-xs text-gray-400 uppercase">
                               {format(currentDate, 'EEEE', { locale: sv })}
                             </p>
                             <p
                               className={`text-lg font-semibold ${
-                                isToday(currentDate) ? 'text-violet-400' : 'text-white'
+                                isToday(currentDate) ? 'text-blue-600' : 'text-gray-900'
                               }`}
                             >
                               {format(currentDate, 'd MMMM', { locale: sv })}
@@ -1882,11 +1882,11 @@ export default function SchedulePage() {
                   {/* Empty state */}
                   {filteredEntries.length === 0 && !loading && (
                     <div className="text-center py-12">
-                      <CalendarDays className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                      <p className="text-zinc-500">Inga poster under denna period</p>
+                      <CalendarDays className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-400">Inga poster under denna period</p>
                       <button
                         onClick={() => openCreateModal()}
-                        className="mt-4 text-violet-400 hover:text-violet-300 text-sm"
+                        className="mt-4 text-blue-600 hover:text-blue-500 text-sm"
                       >
                         Lagg till en post
                       </button>
@@ -1898,8 +1898,8 @@ export default function SchedulePage() {
                 <>
                   {teamMembers.length === 0 ? (
                     <div className="text-center py-12">
-                      <Users className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                      <p className="text-zinc-500">Inga teammedlemmar hittades</p>
+                      <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-400">Inga teammedlemmar hittades</p>
                     </div>
                   ) : (
                     renderUtilizationView()

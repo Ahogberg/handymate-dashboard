@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -254,11 +254,11 @@ export default function ImportCustomersPage() {
   }
 
   return (
-    <div className="p-8 bg-[#09090b] min-h-screen">
+    <div className="p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -266,13 +266,13 @@ export default function ImportCustomersPage() {
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/dashboard/customers"
-            className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+            className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Importera kunder</h1>
-            <p className="text-zinc-400 text-sm">Ladda upp en CSV-fil med dina befintliga kunder</p>
+            <h1 className="text-2xl font-bold text-gray-900">Importera kunder</h1>
+            <p className="text-gray-500 text-sm">Ladda upp en CSV-fil med dina befintliga kunder</p>
           </div>
         </div>
 
@@ -287,15 +287,15 @@ export default function ImportCustomersPage() {
             <div key={s.num} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step >= s.num 
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white' 
-                  : 'bg-zinc-800 text-zinc-500'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' 
+                  : 'bg-gray-100 text-gray-400'
               }`}>
                 {step > s.num ? <Check className="w-4 h-4" /> : s.num}
               </div>
-              <span className={`ml-2 text-sm hidden sm:block ${step >= s.num ? 'text-white' : 'text-zinc-500'}`}>
+              <span className={`ml-2 text-sm hidden sm:block ${step >= s.num ? 'text-gray-900' : 'text-gray-400'}`}>
                 {s.label}
               </span>
-              {i < 3 && <div className="w-8 sm:w-12 h-px bg-zinc-800 mx-2 sm:mx-4"></div>}
+              {i < 3 && <div className="w-8 sm:w-12 h-px bg-gray-100 mx-2 sm:mx-4"></div>}
             </div>
           ))}
         </div>
@@ -304,19 +304,19 @@ export default function ImportCustomersPage() {
         {step === 1 && (
           <div className="space-y-6">
             <div 
-              className={`bg-zinc-900/50 backdrop-blur-xl rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
-                dragOver ? 'border-violet-500 bg-violet-500/10' : 'border-zinc-700 hover:border-zinc-600'
+              className={`bg-white shadow-sm rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
+                dragOver ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-300'
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
               onDrop={handleDrop}
             >
-              <Upload className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">
+              <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
                 Dra och släpp din fil här
               </h3>
-              <p className="text-zinc-500 mb-6">eller</p>
-              <label className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 cursor-pointer">
+              <p className="text-gray-400 mb-6">eller</p>
+              <label className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 cursor-pointer">
                 <FileSpreadsheet className="w-5 h-5 mr-2" />
                 Välj fil
                 <input
@@ -326,29 +326,29 @@ export default function ImportCustomersPage() {
                   className="hidden"
                 />
               </label>
-              <p className="text-xs text-zinc-600 mt-4">Stödjer CSV-filer (komma-, semikolon- eller tab-separerade)</p>
+              <p className="text-xs text-gray-400 mt-4">Stödjer CSV-filer (komma-, semikolon- eller tab-separerade)</p>
             </div>
 
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h3 className="text-lg font-medium text-white mb-4">Tips för import</h3>
-              <ul className="space-y-3 text-sm text-zinc-400">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Tips för import</h3>
+              <ul className="space-y-3 text-sm text-gray-500">
                 <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                   <span>Se till att telefonnummer är i kolumn (07XXXXXXXX eller +467XXXXXXXX)</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                   <span>Första raden ska innehålla kolumnrubriker (Namn, Telefon, etc.)</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Check className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                   <span>Dubbletter (samma telefonnummer) uppdateras automatiskt</span>
                 </li>
               </ul>
               
               <button
                 onClick={downloadTemplate}
-                className="flex items-center gap-2 mt-6 text-sm text-violet-400 hover:text-violet-300"
+                className="flex items-center gap-2 mt-6 text-sm text-blue-600 hover:text-blue-500"
               >
                 <Download className="w-4 h-4" />
                 Ladda ner exempelmall
@@ -360,13 +360,13 @@ export default function ImportCustomersPage() {
         {/* Step 2: Map columns */}
         {step === 2 && (
           <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h3 className="text-lg font-medium text-white">Mappa kolumner</h3>
-                  <p className="text-sm text-zinc-500">Välj vilka kolumner som motsvarar kunddata</p>
+                  <h3 className="text-lg font-medium text-gray-900">Mappa kolumner</h3>
+                  <p className="text-sm text-gray-400">Välj vilka kolumner som motsvarar kunddata</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-zinc-400">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
                   <FileSpreadsheet className="w-4 h-4" />
                   {file?.name}
                 </div>
@@ -380,9 +380,9 @@ export default function ImportCustomersPage() {
                   { key: 'address', label: 'Adress', required: false }
                 ].map((field) => (
                   <div key={field.key} className="flex items-center gap-4">
-                    <label className="w-32 text-sm text-zinc-400">
+                    <label className="w-32 text-sm text-gray-500">
                       {field.label}
-                      {field.required && <span className="text-red-400 ml-1">*</span>}
+                      {field.required && <span className="text-red-600 ml-1">*</span>}
                     </label>
                     <select
                       value={mapping[field.key as keyof ColumnMapping] ?? ''}
@@ -390,7 +390,7 @@ export default function ImportCustomersPage() {
                         ...mapping,
                         [field.key]: e.target.value === '' ? null : parseInt(e.target.value)
                       })}
-                      className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
                       <option value="">-- Välj kolumn --</option>
                       {headers.map((header, index) => (
@@ -402,8 +402,8 @@ export default function ImportCustomersPage() {
               </div>
 
               {mapping.phone_number === null && (
-                <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <p className="text-sm text-amber-400">
+                <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-sm text-amber-600">
                     ⚠️ Du måste välja en kolumn för telefonnummer
                   </p>
                 </div>
@@ -411,17 +411,17 @@ export default function ImportCustomersPage() {
             </div>
 
             {/* Preview */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h3 className="text-lg font-medium text-white mb-4">Förhandsgranskning (första 5 rader)</h3>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Förhandsgranskning (första 5 rader)</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800">
+                    <tr className="border-b border-gray-200">
                       {headers.map((header, i) => (
-                        <th key={i} className="px-3 py-2 text-left text-zinc-500 font-medium">
+                        <th key={i} className="px-3 py-2 text-left text-gray-400 font-medium">
                           {header}
                           {Object.entries(mapping).find(([_, v]) => v === i) && (
-                            <span className="ml-2 text-violet-400">
+                            <span className="ml-2 text-blue-600">
                               ← {Object.entries(mapping).find(([_, v]) => v === i)?.[0]}
                             </span>
                           )}
@@ -431,29 +431,29 @@ export default function ImportCustomersPage() {
                   </thead>
                   <tbody>
                     {rows.slice(0, 5).map((row, i) => (
-                      <tr key={i} className="border-b border-zinc-800/50">
+                      <tr key={i} className="border-b border-gray-200/50">
                         {row.map((cell, j) => (
-                          <td key={j} className="px-3 py-2 text-zinc-300">{cell}</td>
+                          <td key={j} className="px-3 py-2 text-gray-700">{cell}</td>
                         ))}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-              <p className="text-xs text-zinc-600 mt-4">Visar {Math.min(5, rows.length)} av {rows.length} rader</p>
+              <p className="text-xs text-gray-400 mt-4">Visar {Math.min(5, rows.length)} av {rows.length} rader</p>
             </div>
 
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setStep(1)}
-                className="px-6 py-3 text-zinc-400 hover:text-white transition-colors"
+                className="px-6 py-3 text-gray-500 hover:text-gray-900 transition-colors"
               >
                 ← Tillbaka
               </button>
               <button
                 onClick={prepareData}
                 disabled={mapping.phone_number === null}
-                className="px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Fortsätt
               </button>
@@ -464,34 +464,34 @@ export default function ImportCustomersPage() {
         {/* Step 3: Review */}
         {step === 3 && (
           <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h3 className="text-lg font-medium text-white mb-2">Redo att importera</h3>
-              <p className="text-zinc-500 mb-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Redo att importera</h3>
+              <p className="text-gray-400 mb-6">
                 {parsedData.length} kunder kommer att importeras
               </p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-4 bg-zinc-800/50 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-white">{parsedData.length}</p>
-                  <p className="text-xs text-zinc-500">Totalt</p>
+                <div className="p-4 bg-gray-50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-gray-900">{parsedData.length}</p>
+                  <p className="text-xs text-gray-400">Totalt</p>
                 </div>
-                <div className="p-4 bg-zinc-800/50 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-white">{parsedData.filter(r => r.name).length}</p>
-                  <p className="text-xs text-zinc-500">Med namn</p>
+                <div className="p-4 bg-gray-50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-gray-900">{parsedData.filter(r => r.name).length}</p>
+                  <p className="text-xs text-gray-400">Med namn</p>
                 </div>
-                <div className="p-4 bg-zinc-800/50 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-white">{parsedData.filter(r => r.email).length}</p>
-                  <p className="text-xs text-zinc-500">Med e-post</p>
+                <div className="p-4 bg-gray-50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-gray-900">{parsedData.filter(r => r.email).length}</p>
+                  <p className="text-xs text-gray-400">Med e-post</p>
                 </div>
-                <div className="p-4 bg-zinc-800/50 rounded-xl text-center">
-                  <p className="text-2xl font-bold text-white">{parsedData.filter(r => r.address).length}</p>
-                  <p className="text-xs text-zinc-500">Med adress</p>
+                <div className="p-4 bg-gray-50 rounded-xl text-center">
+                  <p className="text-2xl font-bold text-gray-900">{parsedData.filter(r => r.address).length}</p>
+                  <p className="text-xs text-gray-400">Med adress</p>
                 </div>
               </div>
 
               {rows.length - parsedData.length > 0 && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl mb-6">
-                  <p className="text-sm text-amber-400">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
+                  <p className="text-sm text-amber-600">
                     ⚠️ {rows.length - parsedData.length} rader hoppas över (ogiltigt telefonnummer)
                   </p>
                 </div>
@@ -501,41 +501,41 @@ export default function ImportCustomersPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="px-3 py-2 text-left text-zinc-500 font-medium">Namn</th>
-                      <th className="px-3 py-2 text-left text-zinc-500 font-medium">Telefon</th>
-                      <th className="px-3 py-2 text-left text-zinc-500 font-medium">E-post</th>
-                      <th className="px-3 py-2 text-left text-zinc-500 font-medium">Adress</th>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-3 py-2 text-left text-gray-400 font-medium">Namn</th>
+                      <th className="px-3 py-2 text-left text-gray-400 font-medium">Telefon</th>
+                      <th className="px-3 py-2 text-left text-gray-400 font-medium">E-post</th>
+                      <th className="px-3 py-2 text-left text-gray-400 font-medium">Adress</th>
                     </tr>
                   </thead>
                   <tbody>
                     {parsedData.slice(0, 10).map((row, i) => (
-                      <tr key={i} className="border-b border-zinc-800/50">
-                        <td className="px-3 py-2 text-zinc-300">{row.name || '-'}</td>
-                        <td className="px-3 py-2 text-zinc-300">{row.phone_number}</td>
-                        <td className="px-3 py-2 text-zinc-300">{row.email || '-'}</td>
-                        <td className="px-3 py-2 text-zinc-300">{row.address || '-'}</td>
+                      <tr key={i} className="border-b border-gray-200/50">
+                        <td className="px-3 py-2 text-gray-700">{row.name || '-'}</td>
+                        <td className="px-3 py-2 text-gray-700">{row.phone_number}</td>
+                        <td className="px-3 py-2 text-gray-700">{row.email || '-'}</td>
+                        <td className="px-3 py-2 text-gray-700">{row.address || '-'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
               {parsedData.length > 10 && (
-                <p className="text-xs text-zinc-600 mt-4">Visar 10 av {parsedData.length} kunder</p>
+                <p className="text-xs text-gray-400 mt-4">Visar 10 av {parsedData.length} kunder</p>
               )}
             </div>
 
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setStep(2)}
-                className="px-6 py-3 text-zinc-400 hover:text-white transition-colors"
+                className="px-6 py-3 text-gray-500 hover:text-gray-900 transition-colors"
               >
                 ← Tillbaka
               </button>
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className="flex items-center px-8 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {importing ? (
                   <>
@@ -556,38 +556,38 @@ export default function ImportCustomersPage() {
         {/* Step 4: Done */}
         {step === 4 && importResult && (
           <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-8 text-center">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-8 text-center">
               {importResult.success > 0 ? (
-                <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-8 h-8 text-emerald-400" />
+                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-8 h-8 text-emerald-600" />
                 </div>
               ) : (
-                <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <X className="w-8 h-8 text-red-400" />
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <X className="w-8 h-8 text-red-600" />
                 </div>
               )}
               
-              <h2 className="text-2xl font-bold text-white mb-2">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
                 {importResult.success > 0 ? 'Import klar!' : 'Import misslyckades'}
               </h2>
               
               <div className="flex items-center justify-center gap-8 my-6">
                 <div>
-                  <p className="text-3xl font-bold text-emerald-400">{importResult.success}</p>
-                  <p className="text-sm text-zinc-500">Importerade</p>
+                  <p className="text-3xl font-bold text-emerald-600">{importResult.success}</p>
+                  <p className="text-sm text-gray-400">Importerade</p>
                 </div>
                 {importResult.failed > 0 && (
                   <div>
-                    <p className="text-3xl font-bold text-red-400">{importResult.failed}</p>
-                    <p className="text-sm text-zinc-500">Misslyckade</p>
+                    <p className="text-3xl font-bold text-red-600">{importResult.failed}</p>
+                    <p className="text-sm text-gray-400">Misslyckade</p>
                   </div>
                 )}
               </div>
 
               {importResult.errors.length > 0 && (
-                <div className="mt-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-left">
-                  <p className="text-sm font-medium text-red-400 mb-2">Fel:</p>
-                  <ul className="text-xs text-red-300 space-y-1 max-h-32 overflow-y-auto">
+                <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-left">
+                  <p className="text-sm font-medium text-red-600 mb-2">Fel:</p>
+                  <ul className="text-xs text-red-700 space-y-1 max-h-32 overflow-y-auto">
                     {importResult.errors.slice(0, 10).map((err, i) => (
                       <li key={i}>{err}</li>
                     ))}
@@ -601,13 +601,13 @@ export default function ImportCustomersPage() {
               <div className="flex items-center justify-center gap-4 mt-8">
                 <Link
                   href="/dashboard/customers"
-                  className="px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
                 >
                   Visa kunder
                 </Link>
                 <Link
                   href="/dashboard/campaigns/new"
-                  className="px-6 py-3 bg-zinc-800 border border-zinc-700 rounded-xl font-medium text-white hover:bg-zinc-700"
+                  className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl font-medium text-gray-900 hover:bg-gray-200"
                 >
                   Skapa kampanj
                 </Link>

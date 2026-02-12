@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { Sparkles, Trash2, Plus, TrendingUp, Edit3, Check, ChevronDown, ChevronUp } from 'lucide-react'
@@ -100,15 +100,15 @@ export default function AIQuotePreview({
     })
   }
 
-  const confidenceColor = confidence >= 75 ? 'text-emerald-400' : confidence >= 50 ? 'text-amber-400' : 'text-red-400'
+  const confidenceColor = confidence >= 75 ? 'text-emerald-600' : confidence >= 50 ? 'text-amber-600' : 'text-red-600'
 
   return (
     <div className="space-y-4">
       {/* Header with confidence */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-violet-400" />
-          <h2 className="text-lg font-semibold text-white">AI-förslag</h2>
+          <Sparkles className="w-5 h-5 text-blue-600" />
+          <h2 className="text-lg font-semibold text-gray-900">AI-förslag</h2>
         </div>
         <span className={`text-sm font-medium ${confidenceColor}`}>
           Träffsäkerhet: {confidence}%
@@ -118,33 +118,33 @@ export default function AIQuotePreview({
       {/* Reasoning toggle */}
       <button
         onClick={() => setShowReasoning(!showReasoning)}
-        className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white"
+        className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900"
       >
         {showReasoning ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         AI-resonemang
       </button>
       {showReasoning && (
-        <p className="text-sm text-zinc-400 bg-zinc-800/50 p-3 rounded-lg">{reasoning}</p>
+        <p className="text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">{reasoning}</p>
       )}
 
       {/* Editable title & description */}
       <div className="space-y-3">
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">Jobbtitel</label>
+          <label className="block text-xs text-gray-400 mb-1">Jobbtitel</label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
           />
         </div>
         <div>
-          <label className="block text-xs text-zinc-500 mb-1">Beskrivning till kund</label>
+          <label className="block text-xs text-gray-400 mb-1">Beskrivning till kund</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
           />
         </div>
       </div>
@@ -152,17 +152,17 @@ export default function AIQuotePreview({
       {/* Items */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="text-xs text-zinc-500">Offertrader</label>
+          <label className="text-xs text-gray-400">Offertrader</label>
           <div className="flex gap-2">
-            <button onClick={() => addItem('labor')} className="text-xs text-blue-400 hover:text-blue-300">+ Arbete</button>
-            <button onClick={() => addItem('material')} className="text-xs text-emerald-400 hover:text-emerald-300">+ Material</button>
+            <button onClick={() => addItem('labor')} className="text-xs text-blue-400 hover:text-blue-700">+ Arbete</button>
+            <button onClick={() => addItem('material')} className="text-xs text-emerald-600 hover:text-emerald-700">+ Material</button>
           </div>
         </div>
         <div className="space-y-2">
           {items.map(item => (
-            <div key={item.id} className="flex items-center gap-2 p-2 bg-zinc-800/50 rounded-lg">
+            <div key={item.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
               <span className={`px-1.5 py-0.5 text-[10px] rounded ${
-                item.type === 'labor' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
+                item.type === 'labor' ? 'bg-blue-100 text-blue-400' : 'bg-emerald-100 text-emerald-600'
               }`}>
                 {item.type === 'labor' ? 'Arb' : 'Mat'}
               </span>
@@ -170,24 +170,24 @@ export default function AIQuotePreview({
                 type="text"
                 value={item.description}
                 onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                className="flex-1 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-white text-sm focus:outline-none min-w-0"
+                className="flex-1 px-2 py-1 bg-gray-200 border border-gray-300 rounded text-gray-900 text-sm focus:outline-none min-w-0"
                 placeholder="Beskrivning"
               />
               <input
                 type="number"
                 value={item.quantity}
                 onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                className="w-14 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-white text-sm text-center focus:outline-none"
+                className="w-14 px-2 py-1 bg-gray-200 border border-gray-300 rounded text-gray-900 text-sm text-center focus:outline-none"
               />
-              <span className="text-zinc-500 text-xs w-6">{item.unit === 'timmar' ? 'h' : 'st'}</span>
+              <span className="text-gray-400 text-xs w-6">{item.unit === 'timmar' ? 'h' : 'st'}</span>
               <input
                 type="number"
                 value={item.unitPrice}
                 onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
-                className="w-20 px-2 py-1 bg-zinc-700 border border-zinc-600 rounded text-white text-sm text-right focus:outline-none"
+                className="w-20 px-2 py-1 bg-gray-200 border border-gray-300 rounded text-gray-900 text-sm text-right focus:outline-none"
               />
-              <span className="text-white text-sm font-medium w-20 text-right">{formatCurrency(item.quantity * item.unitPrice)}</span>
-              <button onClick={() => removeItem(item.id)} className="p-1 text-zinc-500 hover:text-red-400">
+              <span className="text-gray-900 text-sm font-medium w-20 text-right">{formatCurrency(item.quantity * item.unitPrice)}</span>
+              <button onClick={() => removeItem(item.id)} className="p-1 text-gray-400 hover:text-red-600">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -196,32 +196,32 @@ export default function AIQuotePreview({
       </div>
 
       {/* Summary */}
-      <div className="border-t border-zinc-700 pt-3 space-y-2 text-sm">
+      <div className="border-t border-gray-300 pt-3 space-y-2 text-sm">
         <div className="flex justify-between">
-          <span className="text-zinc-400">Arbetskostnad</span>
-          <span className="text-white">{formatCurrency(laborCost)}</span>
+          <span className="text-gray-500">Arbetskostnad</span>
+          <span className="text-gray-900">{formatCurrency(laborCost)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-zinc-400">Materialkostnad</span>
-          <span className="text-white">{formatCurrency(materialCost)}</span>
+          <span className="text-gray-500">Materialkostnad</span>
+          <span className="text-gray-900">{formatCurrency(materialCost)}</span>
         </div>
-        <div className="flex justify-between font-semibold text-base pt-2 border-t border-zinc-700">
-          <span className="text-white">Summa exkl moms</span>
-          <span className="text-white">{formatCurrency(total)}</span>
+        <div className="flex justify-between font-semibold text-base pt-2 border-t border-gray-300">
+          <span className="text-gray-900">Summa exkl moms</span>
+          <span className="text-gray-900">{formatCurrency(total)}</span>
         </div>
       </div>
 
       {/* ROT/RUT suggestion */}
       {suggestedDeductionType !== 'none' && (
-        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span className="text-sm text-emerald-400">
+        <div className="flex items-center gap-2 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+          <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+          <span className="text-sm text-emerald-600">
             {suggestedDeductionType.toUpperCase()}-avdrag rekommenderas
           </span>
           <button
             onClick={() => setRotRut(rotRut ? '' : suggestedDeductionType as 'rot' | 'rut')}
             className={`ml-auto px-3 py-1 text-xs rounded-lg ${
-              rotRut ? 'bg-emerald-500 text-white' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+              rotRut ? 'bg-emerald-500 text-gray-900' : 'bg-gray-100 text-gray-500 hover:text-gray-900'
             }`}
           >
             {rotRut ? 'Aktiverat' : 'Aktivera'}
@@ -231,16 +231,16 @@ export default function AIQuotePreview({
 
       {/* Price comparison */}
       {priceComparison.count > 0 && (
-        <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+        <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-cyan-400" />
-            <span className="text-sm font-medium text-white">Jämfört med din historik</span>
+            <TrendingUp className="w-4 h-4 text-cyan-600" />
+            <span className="text-sm font-medium text-gray-900">Jämfört med din historik</span>
           </div>
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-gray-500">
             Liknande jobb: {formatCurrency(priceComparison.min)} – {formatCurrency(priceComparison.max)} (snitt: {formatCurrency(priceComparison.average)})
           </p>
           {total > 0 && priceComparison.average > 0 && (
-            <p className={`text-xs mt-1 ${total < priceComparison.average * 0.85 ? 'text-amber-400' : total > priceComparison.average * 1.15 ? 'text-amber-400' : 'text-emerald-400'}`}>
+            <p className={`text-xs mt-1 ${total < priceComparison.average * 0.85 ? 'text-amber-600' : total > priceComparison.average * 1.15 ? 'text-amber-600' : 'text-emerald-600'}`}>
               Denna offert är {Math.round(((total - priceComparison.average) / priceComparison.average) * 100)}% {total < priceComparison.average ? 'under' : 'över'} ditt snitt
             </p>
           )}
@@ -251,13 +251,13 @@ export default function AIQuotePreview({
       <div className="flex gap-3 pt-2">
         <button
           onClick={onRegenerate}
-          className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 text-sm min-h-[48px]"
+          className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 text-sm min-h-[48px]"
         >
           Generera nytt förslag
         </button>
         <button
           onClick={handleAccept}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 text-sm min-h-[48px]"
+          className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 text-sm min-h-[48px]"
         >
           Använd förslaget
         </button>

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -7,7 +7,7 @@ import { Inbox, Mic, Volume2, Loader2 } from 'lucide-react'
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
   </div>
 )
 
@@ -39,21 +39,21 @@ export default function CallsPage() {
   )
 
   return (
-    <div className="bg-[#09090b] min-h-screen">
+    <div className="bg-slate-50 min-h-screen">
       {/* Sticky tab bar */}
-      <div className="sticky top-0 z-30 bg-[#09090b]/95 backdrop-blur-xl border-b border-zinc-800 px-4 sm:px-8 pt-4 sm:pt-6 pb-0">
-        <div className="flex gap-1 p-1 bg-zinc-900/50 rounded-xl border border-zinc-800 mb-4 overflow-x-auto">
+      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-xl border-b border-gray-200 px-4 sm:px-8 pt-4 sm:pt-6 pb-0">
+        <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-200 mb-4 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-white border border-violet-500/30'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                  ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-white border border-blue-300'
+                  : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-violet-400' : ''}`} />
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-blue-600' : ''}`} />
               {tab.label}
             </button>
           ))}

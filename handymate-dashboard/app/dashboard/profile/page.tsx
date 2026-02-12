@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -27,16 +27,16 @@ function getRoleBadge(role: string) {
     return {
       label: '\u00c4gare',
       className:
-        'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/30',
+        'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-500 border-blue-300',
     }
   if (role === 'admin')
     return {
       label: 'Admin',
-      className: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      className: 'bg-blue-100 text-blue-400 border-blue-500/30',
     }
   return {
     label: 'Anst\u00e4lld',
-    className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+    className: 'bg-gray-100 text-gray-500 border-gray-300',
   }
 }
 
@@ -98,7 +98,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
@@ -106,7 +106,7 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-zinc-400">Kunde inte ladda anv\u00e4ndare.</p>
+        <p className="text-gray-500">Kunde inte ladda anv\u00e4ndare.</p>
       </div>
     )
   }
@@ -121,21 +121,21 @@ export default function ProfilePage() {
   return (
     <div className="relative p-4 sm:p-8 max-w-3xl mx-auto">
       {/* Background gradient blobs */}
-      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -top-16 -right-32 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 bg-blue-50 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-16 -right-32 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
 
       {/* Header */}
       <div className="relative mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-white">Min profil</h1>
-        <p className="text-zinc-400 mt-1">Hantera dina personuppgifter och kontoinformation</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Min profil</h1>
+        <p className="text-gray-500 mt-1">Hantera dina personuppgifter och kontoinformation</p>
       </div>
 
       {/* Profile card */}
-      <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-6 mb-6">
+      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           {/* Avatar */}
           <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-bold text-white"
+            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-bold text-gray-900"
             style={{ backgroundColor: user.color || '#7c3aed' }}
           >
             {getInitials(user.name)}
@@ -143,8 +143,8 @@ export default function ProfilePage() {
 
           {/* Info */}
           <div className="text-center sm:text-left">
-            <h2 className="text-xl font-semibold text-white">{user.name}</h2>
-            <p className="text-zinc-400 flex items-center justify-center sm:justify-start gap-1.5 mt-1">
+            <h2 className="text-xl font-semibold text-gray-900">{user.name}</h2>
+            <p className="text-gray-500 flex items-center justify-center sm:justify-start gap-1.5 mt-1">
               <Mail className="w-4 h-4" />
               {user.email}
             </p>
@@ -156,7 +156,7 @@ export default function ProfilePage() {
                 {roleBadge.label}
               </span>
               {user.title && (
-                <span className="text-sm text-zinc-400">{user.title}</span>
+                <span className="text-sm text-gray-500">{user.title}</span>
               )}
             </div>
           </div>
@@ -164,61 +164,61 @@ export default function ProfilePage() {
       </div>
 
       {/* Edit form card */}
-      <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-6 mb-6">
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-          <User className="w-5 h-5 text-violet-400" />
+      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <User className="w-5 h-5 text-blue-600" />
           Redigera profil
         </h3>
 
         <div className="space-y-4">
           {/* Namn */}
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Namn
             </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
               placeholder="Ditt namn"
             />
           </div>
 
           {/* Telefon */}
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Telefon
             </label>
             <input
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
               placeholder="070-123 45 67"
             />
           </div>
 
           {/* Avatar URL */}
           <div>
-            <label className="block text-sm font-medium text-zinc-300 mb-1.5">
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Avatar URL
             </label>
             <input
               type="text"
               value={form.avatar_url}
               onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
-              className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
               placeholder="https://..."
             />
           </div>
 
           {/* Email (read-only) */}
           <div>
-            <label className="block text-sm font-medium text-zinc-500 mb-1.5">
+            <label className="block text-sm font-medium text-gray-400 mb-1.5">
               E-post (kan inte \u00e4ndras)
             </label>
-            <p className="px-4 py-2.5 text-zinc-500 text-sm">{user.email}</p>
+            <p className="px-4 py-2.5 text-gray-400 text-sm">{user.email}</p>
           </div>
         </div>
 
@@ -227,7 +227,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -240,16 +240,16 @@ export default function ProfilePage() {
       </div>
 
       {/* Info card */}
-      <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-6">
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-violet-400" />
+      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-blue-600" />
           Kontoinformation
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Roll */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Roll</p>
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Roll</p>
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${roleBadge.className}`}
             >
@@ -259,71 +259,71 @@ export default function ProfilePage() {
           </div>
 
           {/* Titel */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Titel</p>
-            <p className="text-white text-sm font-medium">
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Titel</p>
+            <p className="text-gray-900 text-sm font-medium">
               {user.title || '\u2014'}
             </p>
           </div>
 
           {/* Timpris */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Timpris</p>
-            <p className="text-white text-sm font-medium">
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Timpris</p>
+            <p className="text-gray-900 text-sm font-medium">
               {user.hourly_rate ? `${user.hourly_rate} kr/h` : '\u2014'}
             </p>
           </div>
 
           {/* Medlem sedan */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+          <div className="p-4 bg-gray-50 rounded-xl">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               Medlem sedan
             </p>
-            <p className="text-white text-sm font-medium">{formatDate(acceptedAt)}</p>
+            <p className="text-gray-900 text-sm font-medium">{formatDate(acceptedAt)}</p>
           </div>
 
           {/* Senast inloggad */}
-          <div className="p-4 bg-zinc-800/50 rounded-xl sm:col-span-2">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+          <div className="p-4 bg-gray-50 rounded-xl sm:col-span-2">
+            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1 flex items-center gap-1">
               <Clock className="w-3 h-3" />
               Senast inloggad
             </p>
-            <p className="text-white text-sm font-medium">{formatDate(lastLoginAt)}</p>
+            <p className="text-gray-900 text-sm font-medium">{formatDate(lastLoginAt)}</p>
           </div>
         </div>
       </div>
 
       {/* Connected Calendars */}
-      <div className="relative bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-6 mt-6">
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-violet-400" />
+      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mt-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
+          <CalendarDays className="w-5 h-5 text-blue-600" />
           Anslutna kalendrar
         </h3>
 
         <div className="space-y-3">
           {/* Google Calendar */}
-          <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/20">
+              <div className="p-2 rounded-lg bg-blue-100">
                 <CalendarDays className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="font-medium text-white">Google Calendar</p>
-                <p className="text-xs text-zinc-500">
+                <p className="font-medium text-gray-900">Google Calendar</p>
+                <p className="text-xs text-gray-400">
                   {googleStatus?.connected ? googleStatus.email : 'Ej ansluten'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
               {googleStatus?.connected ? (
-                <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">
                   Ansluten
                 </span>
               ) : (
                 <a
                   href="/api/google/connect"
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-100 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30"
                 >
                   <ExternalLink className="w-3 h-3" /> Anslut
                 </a>
@@ -332,17 +332,17 @@ export default function ProfilePage() {
           </div>
 
           {/* Outlook placeholder */}
-          <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl opacity-60">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl opacity-60">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-blue-600/20">
-                <CalendarDays className="w-5 h-5 text-blue-300" />
+                <CalendarDays className="w-5 h-5 text-blue-700" />
               </div>
               <div>
-                <p className="font-medium text-white">Microsoft Outlook</p>
-                <p className="text-xs text-zinc-500">Kommer snart</p>
+                <p className="font-medium text-gray-900">Microsoft Outlook</p>
+                <p className="text-xs text-gray-400">Kommer snart</p>
               </div>
             </div>
-            <span className="px-2 py-1 text-xs rounded-full bg-zinc-500/20 text-zinc-400 border border-zinc-500/30">
+            <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-300">
               Kommande
             </span>
           </div>
@@ -354,8 +354,8 @@ export default function ProfilePage() {
         <div
           className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${
             toast.type === 'success'
-              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-              : 'bg-red-500/20 text-red-300 border border-red-500/30'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+              : 'bg-red-100 text-red-700 border border-red-200'
           }`}
         >
           {toast.message}

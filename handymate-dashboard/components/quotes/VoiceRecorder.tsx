@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Square, X, Loader2, Play, RotateCcw } from 'lucide-react'
@@ -106,9 +106,9 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
   if (transcribing) {
     return (
       <div className="text-center py-8">
-        <Loader2 className="w-8 h-8 text-fuchsia-400 animate-spin mx-auto mb-3" />
-        <p className="text-white font-medium">Transkriberar...</p>
-        <p className="text-sm text-zinc-500 mt-1">Omvandlar tal till text</p>
+        <Loader2 className="w-8 h-8 text-cyan-600 animate-spin mx-auto mb-3" />
+        <p className="text-gray-900 font-medium">Transkriberar...</p>
+        <p className="text-sm text-gray-400 mt-1">Omvandlar tal till text</p>
       </div>
     )
   }
@@ -116,14 +116,14 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-white">Beskriv jobbet med röst</h2>
-        <button onClick={onBack} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+        <h2 className="text-lg font-semibold text-gray-900">Beskriv jobbet med röst</h2>
+        <button onClick={onBack} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
           <X className="w-5 h-5" />
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
           {error}
         </div>
       )}
@@ -133,21 +133,21 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
           <>
             <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-4 transition-all ${
               isRecording
-                ? 'bg-red-500/20 border-2 border-red-500 animate-pulse'
-                : 'bg-zinc-800 border-2 border-zinc-700'
+                ? 'bg-red-100 border-2 border-red-500 animate-pulse'
+                : 'bg-gray-100 border-2 border-gray-300'
             }`}>
-              <Mic className={`w-10 h-10 ${isRecording ? 'text-red-400' : 'text-zinc-400'}`} />
+              <Mic className={`w-10 h-10 ${isRecording ? 'text-red-600' : 'text-gray-500'}`} />
             </div>
 
             {isRecording && (
-              <p className="text-2xl font-mono text-white mb-2">{formatTime(duration)}</p>
+              <p className="text-2xl font-mono text-gray-900 mb-2">{formatTime(duration)}</p>
             )}
 
             <div className="flex justify-center">
               {!isRecording ? (
                 <button
                   onClick={startRecording}
-                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
                 >
                   <Mic className="w-5 h-5" />
                   Starta inspelning
@@ -155,7 +155,7 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
               ) : (
                 <button
                   onClick={stopRecording}
-                  className="flex items-center gap-2 px-6 py-3 bg-red-500 rounded-xl text-white font-medium hover:bg-red-600 min-h-[48px]"
+                  className="flex items-center gap-2 px-6 py-3 bg-red-500 rounded-xl text-gray-900 font-medium hover:bg-red-600 min-h-[48px]"
                 >
                   <Square className="w-5 h-5" />
                   Stoppa
@@ -163,29 +163,29 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
               )}
             </div>
 
-            <p className="text-xs text-zinc-600 mt-4">
+            <p className="text-xs text-gray-400 mt-4">
               Beskriv vad som ska göras, ungefärlig omfattning och eventuella speciella förutsättningar.
             </p>
           </>
         ) : (
           <>
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mb-3">
-              <Play className="w-8 h-8 text-emerald-400" />
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 border-2 border-emerald-500 flex items-center justify-center mb-3">
+              <Play className="w-8 h-8 text-emerald-600" />
             </div>
-            <p className="text-white font-medium mb-1">Inspelning klar</p>
-            <p className="text-sm text-zinc-500 mb-4">{formatTime(duration)}</p>
+            <p className="text-gray-900 font-medium mb-1">Inspelning klar</p>
+            <p className="text-sm text-gray-400 mb-4">{formatTime(duration)}</p>
 
             <div className="flex gap-3 justify-center">
               <button
                 onClick={resetRecording}
-                className="flex items-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 min-h-[48px]"
+                className="flex items-center gap-2 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 min-h-[48px]"
               >
                 <RotateCcw className="w-4 h-4" />
                 Spela in igen
               </button>
               <button
                 onClick={submitRecording}
-                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
               >
                 Transkribera
               </button>

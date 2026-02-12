@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -298,23 +298,23 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] flex items-center justify-center relative overflow-hidden py-12">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden py-12">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-violet-500/20 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-fuchsia-500/20 rounded-full blur-[128px]"></div>
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-blue-100 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-100 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative w-full max-w-lg mx-4">
         {/* Logo */}
         <div className="text-center mb-8">
           <a href="https://handymate.se" className="inline-block">
-            <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-500/25">
+            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
           </a>
-          <h1 className="text-3xl font-bold text-white">Kom igång med Handymate</h1>
-          <p className="text-zinc-400 mt-2">Skapa ditt konto på några minuter</p>
+          <h1 className="text-3xl font-bold text-gray-900">Kom igång med Handymate</h1>
+          <p className="text-gray-500 mt-2">Skapa ditt konto på några minuter</p>
         </div>
 
         {/* Progress Steps */}
@@ -323,13 +323,13 @@ export default function SignupPage() {
             <div key={s} className="flex items-center">
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
                 step >= s
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'bg-zinc-800 text-zinc-500'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  : 'bg-gray-100 text-gray-400'
               }`}>
                 {step > s ? <Check className="w-4 h-4" /> : s}
               </div>
               {s < 5 && (
-                <div className={`w-8 h-1 mx-1 rounded transition-all ${step > s ? 'bg-violet-500' : 'bg-zinc-800'}`} />
+                <div className={`w-8 h-1 mx-1 rounded transition-all ${step > s ? 'bg-blue-500' : 'bg-gray-100'}`} />
               )}
             </div>
           ))}
@@ -338,7 +338,7 @@ export default function SignupPage() {
         {/* Step labels */}
         <div className="flex justify-between mb-8 px-1">
           {STEP_LABELS.map((label, i) => (
-            <span key={i} className={`text-xs ${step >= i + 1 ? 'text-violet-400' : 'text-zinc-600'}`}>
+            <span key={i} className={`text-xs ${step >= i + 1 ? 'text-blue-600' : 'text-gray-400'}`}>
               {label}
             </span>
           ))}
@@ -353,15 +353,15 @@ export default function SignupPage() {
         )}
 
         {/* Form Card */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-3xl border border-zinc-800 p-8">
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8">
           {/* Step 1: Företagsinfo */}
           {step === 1 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-white mb-2">Om ditt företag</h2>
-              <p className="text-sm text-zinc-500 mb-6">Den här informationen används av AI-assistenten och i SMS till kunder.</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Om ditt företag</h2>
+              <p className="text-sm text-gray-400 mb-6">Den här informationen används av AI-assistenten och i SMS till kunder.</p>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Building2 className="w-4 h-4" />
                   Företagsnamn *
                 </label>
@@ -370,28 +370,28 @@ export default function SignupPage() {
                   value={form.business_name}
                   onChange={(e) => setForm({ ...form, business_name: e.target.value })}
                   placeholder="Elexperten Stockholm AB"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Info className="w-4 h-4" />
                   Visningsnamn för SMS
-                  <span className="text-zinc-600">(valfritt)</span>
+                  <span className="text-gray-400">(valfritt)</span>
                 </label>
                 <input
                   type="text"
                   value={form.display_name}
                   onChange={(e) => setForm({ ...form, display_name: e.target.value })}
                   placeholder={form.business_name || "T.ex. Elexperten"}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">Detta namn visas som avsändare i SMS. Max 11 tecken rekommenderas.</p>
+                <p className="text-xs text-gray-400 mt-1">Detta namn visas som avsändare i SMS. Max 11 tecken rekommenderas.</p>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   Bransch *
                 </label>
                 <div className="grid grid-cols-4 gap-2">
@@ -402,8 +402,8 @@ export default function SignupPage() {
                       onClick={() => setForm({ ...form, branch: b.value })}
                       className={`p-3 rounded-xl border text-center transition-all ${
                         form.branch === b.value
-                          ? 'bg-violet-500/20 border-violet-500 text-white'
-                          : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                          ? 'bg-blue-100 border-blue-500 text-gray-900'
+                          : 'bg-gray-100 border-gray-300 text-gray-500 hover:border-gray-300'
                       }`}
                     >
                       <span className="text-xl block mb-1">{b.icon}</span>
@@ -414,7 +414,7 @@ export default function SignupPage() {
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <User className="w-4 h-4" />
                   Ditt namn *
                 </label>
@@ -423,12 +423,12 @@ export default function SignupPage() {
                   value={form.contact_name}
                   onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
                   placeholder="Förnamn Efternamn"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Phone className="w-4 h-4" />
                   Telefonnummer *
                 </label>
@@ -437,25 +437,25 @@ export default function SignupPage() {
                   value={form.phone}
                   onChange={handlePhoneChange}
                   placeholder="+46 70 123 45 67"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">Svenskt mobilnummer dit vi kan nå dig.</p>
+                <p className="text-xs text-gray-400 mt-1">Svenskt mobilnummer dit vi kan nå dig.</p>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <MapPin className="w-4 h-4" />
                   Tjänsteområde
-                  <span className="text-zinc-600">(valfritt)</span>
+                  <span className="text-gray-400">(valfritt)</span>
                 </label>
                 <input
                   type="text"
                   value={form.service_area}
                   onChange={(e) => setForm({ ...form, service_area: e.target.value })}
                   placeholder="T.ex. Stockholm, Solna, Sundbyberg"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">AI-assistenten berättar för kunder var ni jobbar.</p>
+                <p className="text-xs text-gray-400 mt-1">AI-assistenten berättar för kunder var ni jobbar.</p>
               </div>
 
               <button
@@ -471,7 +471,7 @@ export default function SignupPage() {
                   setError('')
                   setStep(2)
                 }}
-                className="w-full mt-6 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
+                className="w-full mt-6 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
               >
                 Fortsätt
                 <ArrowRight className="w-5 h-5 ml-2" />
@@ -482,11 +482,11 @@ export default function SignupPage() {
           {/* Step 2: Kontoinformation */}
           {step === 2 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-white mb-2">Skapa ditt konto</h2>
-              <p className="text-sm text-zinc-500 mb-6">Använd dessa uppgifter för att logga in i din dashboard.</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Skapa ditt konto</h2>
+              <p className="text-sm text-gray-400 mb-6">Använd dessa uppgifter för att logga in i din dashboard.</p>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Mail className="w-4 h-4" />
                   E-postadress *
                 </label>
@@ -495,12 +495,12 @@ export default function SignupPage() {
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="johan@foretag.se"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Lock className="w-4 h-4" />
                   Lösenord *
                 </label>
@@ -509,12 +509,12 @@ export default function SignupPage() {
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   placeholder="Minst 6 tecken"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Lock className="w-4 h-4" />
                   Bekräfta lösenord *
                 </label>
@@ -523,29 +523,29 @@ export default function SignupPage() {
                   value={form.password_confirm}
                   onChange={(e) => setForm({ ...form, password_confirm: e.target.value })}
                   placeholder="Upprepa lösenord"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Sammanfattning */}
-              <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700 mt-6">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Ditt konto</p>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-300 mt-6">
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Ditt konto</p>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Företag:</span>
-                    <span className="text-white font-medium">{form.business_name}</span>
+                    <span className="text-gray-500">Företag:</span>
+                    <span className="text-gray-900 font-medium">{form.business_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">SMS-avsändare:</span>
-                    <span className="text-white font-medium">{form.display_name || form.business_name}</span>
+                    <span className="text-gray-500">SMS-avsändare:</span>
+                    <span className="text-gray-900 font-medium">{form.display_name || form.business_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Telefon:</span>
-                    <span className="text-white font-medium">{form.phone}</span>
+                    <span className="text-gray-500">Telefon:</span>
+                    <span className="text-gray-900 font-medium">{form.phone}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Provperiod:</span>
-                    <span className="text-emerald-400 font-medium">14 dagar gratis</span>
+                    <span className="text-gray-500">Provperiod:</span>
+                    <span className="text-emerald-600 font-medium">14 dagar gratis</span>
                   </div>
                 </div>
               </div>
@@ -553,14 +553,14 @@ export default function SignupPage() {
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => setStep(1)}
-                  className="flex-1 py-4 bg-zinc-800 border border-zinc-700 rounded-xl font-semibold text-white hover:bg-zinc-700 transition-colors"
+                  className="flex-1 py-4 bg-gray-100 border border-gray-300 rounded-xl font-semibold text-gray-900 hover:bg-gray-200 transition-colors"
                 >
                   Tillbaka
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={loading}
-                  className="flex-1 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+                  className="flex-1 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
                 >
                   {loading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -578,8 +578,8 @@ export default function SignupPage() {
           {/* Step 3: Phone Setup */}
           {step === 3 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-white mb-2">Hur vill du ta emot samtal?</h2>
-              <p className="text-sm text-zinc-500 mb-6">Som standard ringer kunden dig först. Om du inte svarar tar AI-assistenten över och bokar jobbet åt dig.</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Hur vill du ta emot samtal?</h2>
+              <p className="text-sm text-gray-400 mb-6">Som standard ringer kunden dig först. Om du inte svarar tar AI-assistenten över och bokar jobbet åt dig.</p>
 
               {/* Phone setup type selection */}
               {!assignedPhoneNumber && (
@@ -589,22 +589,22 @@ export default function SignupPage() {
                     onClick={() => setPhoneSetupType('keep_existing')}
                     className={`w-full p-4 rounded-xl border text-left transition-all ${
                       phoneSetupType === 'keep_existing'
-                        ? 'bg-violet-500/20 border-violet-500'
-                        : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                        ? 'bg-blue-100 border-blue-500'
+                        : 'bg-gray-100 border-gray-300 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        phoneSetupType === 'keep_existing' ? 'bg-violet-500/30' : 'bg-zinc-700'
+                        phoneSetupType === 'keep_existing' ? 'bg-blue-500/30' : 'bg-gray-200'
                       }`}>
-                        <PhoneForwarded className="w-5 h-5 text-violet-400" />
+                        <PhoneForwarded className="w-5 h-5 text-blue-600" />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-white">Behåll mitt nuvarande nummer</span>
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full">Rekommenderat</span>
+                          <span className="font-medium text-gray-900">Behåll mitt nuvarande nummer</span>
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-600 text-xs rounded-full">Rekommenderat</span>
                         </div>
-                        <p className="text-sm text-zinc-400 mt-1">Dina kunder ringer dig som vanligt. Svarar du inte kopplas samtalet till AI-assistenten.</p>
+                        <p className="text-sm text-gray-500 mt-1">Dina kunder ringer dig som vanligt. Svarar du inte kopplas samtalet till AI-assistenten.</p>
                       </div>
                     </div>
                   </button>
@@ -614,19 +614,19 @@ export default function SignupPage() {
                     onClick={() => setPhoneSetupType('new_number')}
                     className={`w-full p-4 rounded-xl border text-left transition-all ${
                       phoneSetupType === 'new_number'
-                        ? 'bg-violet-500/20 border-violet-500'
-                        : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                        ? 'bg-blue-100 border-blue-500'
+                        : 'bg-gray-100 border-gray-300 hover:border-gray-300'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                        phoneSetupType === 'new_number' ? 'bg-violet-500/30' : 'bg-zinc-700'
+                        phoneSetupType === 'new_number' ? 'bg-blue-500/30' : 'bg-gray-200'
                       }`}>
-                        <Phone className="w-5 h-5 text-violet-400" />
+                        <Phone className="w-5 h-5 text-blue-600" />
                       </div>
                       <div className="flex-1">
-                        <span className="font-medium text-white">Ge mig ett nytt nummer</span>
-                        <p className="text-sm text-zinc-400 mt-1">Du får ett eget företagsnummer. AI svarar direkt och kopplar till dig vid behov.</p>
+                        <span className="font-medium text-gray-900">Ge mig ett nytt nummer</span>
+                        <p className="text-sm text-gray-500 mt-1">Du får ett eget företagsnummer. AI svarar direkt och kopplar till dig vid behov.</p>
                       </div>
                     </div>
                   </button>
@@ -638,7 +638,7 @@ export default function SignupPage() {
                 <div className="mt-6 space-y-5">
                   {/* Forward phone number input */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                    <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                       <Phone className="w-4 h-4" />
                       Ditt mobilnummer (dit AI kopplar om kunden vill prata med dig)
                     </label>
@@ -647,13 +647,13 @@ export default function SignupPage() {
                       value={forwardPhoneNumber}
                       onChange={(e) => setForwardPhoneNumber(formatPhoneNumber(e.target.value))}
                       placeholder="+46 70 123 45 67"
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                   </div>
 
                   {/* Call mode selection */}
                   <div>
-                    <label className="flex items-center gap-2 text-sm text-zinc-400 mb-3">
+                    <label className="flex items-center gap-2 text-sm text-gray-500 mb-3">
                       <PhoneCall className="w-4 h-4" />
                       Hur ska samtal hanteras?
                     </label>
@@ -668,31 +668,31 @@ export default function SignupPage() {
                           onClick={() => setCallMode(option.value as CallMode)}
                           className={`w-full p-3 rounded-xl border text-left flex items-center gap-3 transition-all ${
                             callMode === option.value
-                              ? 'bg-violet-500/20 border-violet-500'
-                              : 'bg-zinc-800 border-zinc-700 hover:border-zinc-600'
+                              ? 'bg-blue-100 border-blue-500'
+                              : 'bg-gray-100 border-gray-300 hover:border-gray-300'
                           }`}
                         >
                           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            callMode === option.value ? 'border-violet-500' : 'border-zinc-600'
+                            callMode === option.value ? 'border-blue-500' : 'border-gray-300'
                           }`}>
-                            {callMode === option.value && <div className="w-2.5 h-2.5 rounded-full bg-violet-500" />}
+                            {callMode === option.value && <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />}
                           </div>
-                          <option.icon className="w-4 h-4 text-zinc-400" />
-                          <span className="text-sm text-white">{option.label}</span>
+                          <option.icon className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm text-gray-900">{option.label}</span>
                           {option.value === 'human_first' && (
-                            <span className="ml-auto text-xs text-zinc-500">Standard</span>
+                            <span className="ml-auto text-xs text-gray-400">Standard</span>
                           )}
                         </button>
                       ))}
                     </div>
-                    <p className="text-xs text-zinc-600 mt-2">Du kan ändra detta när som helst i inställningarna</p>
+                    <p className="text-xs text-gray-400 mt-2">Du kan ändra detta när som helst i inställningarna</p>
                   </div>
 
                   {/* Activate button */}
                   <button
                     onClick={handlePhoneSetup}
                     disabled={phoneLoading}
-                    className="w-full py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+                    className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
                   >
                     {phoneLoading ? (
                       <>
@@ -715,43 +715,43 @@ export default function SignupPage() {
                   {/* Success message */}
                   <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
-                        <Check className="w-5 h-5 text-emerald-400" />
+                      <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <Check className="w-5 h-5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="text-sm text-emerald-400 font-medium">Telefonnummer aktiverat</p>
-                        <p className="text-2xl font-bold text-white mt-1">{assignedPhoneNumber}</p>
+                        <p className="text-sm text-emerald-600 font-medium">Telefonnummer aktiverat</p>
+                        <p className="text-2xl font-bold text-gray-900 mt-1">{assignedPhoneNumber}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Forwarding instructions for "keep existing" */}
                   {phoneSetupType === 'keep_existing' && !forwardingConfirmed && (
-                    <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
-                      <p className="text-sm text-zinc-400 mb-3">Ställ in vidarekoppling vid inget svar till detta nummer hos din operatör:</p>
+                    <div className="p-4 bg-gray-50 rounded-xl border border-gray-300">
+                      <p className="text-sm text-gray-500 mb-3">Ställ in vidarekoppling vid inget svar till detta nummer hos din operatör:</p>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-zinc-500">Telia:</span>
-                          <code className="text-violet-400">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
+                          <span className="text-gray-400">Telia:</span>
+                          <code className="text-blue-600">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-zinc-500">Tele2:</span>
-                          <code className="text-violet-400">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
+                          <span className="text-gray-400">Tele2:</span>
+                          <code className="text-blue-600">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-zinc-500">Tre:</span>
-                          <code className="text-violet-400">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
+                          <span className="text-gray-400">Tre:</span>
+                          <code className="text-blue-600">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-zinc-500">Telenor:</span>
-                          <code className="text-violet-400">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
+                          <span className="text-gray-400">Telenor:</span>
+                          <code className="text-blue-600">**61*{assignedPhoneNumber.replace(/\s/g, '')}#</code>
                         </div>
                       </div>
-                      <p className="text-xs text-zinc-600 mt-3">Kontakta din operatör om du behöver hjälp.</p>
+                      <p className="text-xs text-gray-400 mt-3">Kontakta din operatör om du behöver hjälp.</p>
 
                       <button
                         onClick={() => setForwardingConfirmed(true)}
-                        className="w-full mt-4 py-3 bg-zinc-700 border border-zinc-600 rounded-xl font-medium text-white hover:bg-zinc-600 transition-colors"
+                        className="w-full mt-4 py-3 bg-gray-200 border border-gray-300 rounded-xl font-medium text-gray-900 hover:bg-gray-300 transition-colors"
                       >
                         Jag har ställt in vidarekopplingen
                       </button>
@@ -762,7 +762,7 @@ export default function SignupPage() {
                   {(phoneSetupType === 'new_number' || forwardingConfirmed) && (
                     <button
                       onClick={() => setStep(4)}
-                      className="w-full py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
+                      className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
                     >
                       Fortsätt
                       <ArrowRight className="w-5 h-5 ml-2" />
@@ -774,7 +774,7 @@ export default function SignupPage() {
               {/* Skip link */}
               <button
                 onClick={skipPhoneSetup}
-                className="w-full text-center text-sm text-zinc-500 hover:text-zinc-400 transition-colors mt-4"
+                className="w-full text-center text-sm text-gray-400 hover:text-gray-500 transition-colors mt-4"
               >
                 Jag vill konfigurera detta senare
               </button>
@@ -784,18 +784,18 @@ export default function SignupPage() {
           {/* Step 4: Working Hours */}
           {step === 4 && (
             <div className="space-y-5">
-              <h2 className="text-xl font-semibold text-white mb-2">När är du tillgänglig?</h2>
-              <p className="text-sm text-zinc-500 mb-6">Under öppettiderna svarar AI-assistenten och bokar jobb. Utanför tar den meddelanden som du får som SMS.</p>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">När är du tillgänglig?</h2>
+              <p className="text-sm text-gray-400 mb-6">Under öppettiderna svarar AI-assistenten och bokar jobb. Utanför tar den meddelanden som du får som SMS.</p>
 
               {/* Days list */}
               <div className="space-y-2">
                 {DAYS.map(day => (
-                  <div key={day.key} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                  <div key={day.key} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-300">
                     {/* Toggle */}
                     <button
                       onClick={() => updateWorkingHours(day.key, 'active', !workingHours[day.key].active)}
                       className={`w-12 h-6 rounded-full transition-colors relative ${
-                        workingHours[day.key].active ? 'bg-violet-500' : 'bg-zinc-600'
+                        workingHours[day.key].active ? 'bg-blue-500' : 'bg-gray-300'
                       }`}
                     >
                       <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${
@@ -805,7 +805,7 @@ export default function SignupPage() {
 
                     {/* Day label */}
                     <span className={`w-20 text-sm font-medium ${
-                      workingHours[day.key].active ? 'text-white' : 'text-zinc-500'
+                      workingHours[day.key].active ? 'text-gray-900' : 'text-gray-400'
                     }`}>
                       {day.label}
                     </span>
@@ -816,17 +816,17 @@ export default function SignupPage() {
                         <select
                           value={workingHours[day.key].start}
                           onChange={(e) => updateWorkingHours(day.key, 'start', e.target.value)}
-                          className="flex-1 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                          className="flex-1 px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         >
                           {TIME_OPTIONS.map(time => (
                             <option key={time} value={time}>{time}</option>
                           ))}
                         </select>
-                        <span className="text-zinc-500">–</span>
+                        <span className="text-gray-400">–</span>
                         <select
                           value={workingHours[day.key].end}
                           onChange={(e) => updateWorkingHours(day.key, 'end', e.target.value)}
-                          className="flex-1 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                          className="flex-1 px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         >
                           {TIME_OPTIONS.map(time => (
                             <option key={time} value={time}>{time}</option>
@@ -834,7 +834,7 @@ export default function SignupPage() {
                         </select>
                       </>
                     ) : (
-                      <span className="flex-1 text-sm text-zinc-500">Stängt</span>
+                      <span className="flex-1 text-sm text-gray-400">Stängt</span>
                     )}
                   </div>
                 ))}
@@ -843,14 +843,14 @@ export default function SignupPage() {
               <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => setStep(3)}
-                  className="flex-1 py-4 bg-zinc-800 border border-zinc-700 rounded-xl font-semibold text-white hover:bg-zinc-700 transition-colors"
+                  className="flex-1 py-4 bg-gray-100 border border-gray-300 rounded-xl font-semibold text-gray-900 hover:bg-gray-200 transition-colors"
                 >
                   Tillbaka
                 </button>
                 <button
                   onClick={handleSaveHours}
                   disabled={hoursLoading}
-                  className="flex-1 py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+                  className="flex-1 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
                 >
                   {hoursLoading ? (
                     <Loader2 className="w-5 h-5 animate-spin" />
@@ -866,7 +866,7 @@ export default function SignupPage() {
               {/* Skip link */}
               <button
                 onClick={skipHoursSetup}
-                className="w-full text-center text-sm text-zinc-500 hover:text-zinc-400 transition-colors"
+                className="w-full text-center text-sm text-gray-400 hover:text-gray-500 transition-colors"
               >
                 Hoppa över (behåll standardtider)
               </button>
@@ -877,36 +877,36 @@ export default function SignupPage() {
           {step === 5 && (
             <div className="space-y-6">
               <div className="text-center">
-                <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-10 h-10 text-emerald-400" />
+                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Check className="w-10 h-10 text-emerald-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Allt klart! 🎉</h2>
-                <p className="text-zinc-400">Din Handymate är redo att ta emot samtal och bokningar.</p>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Allt klart! 🎉</h2>
+                <p className="text-gray-500">Din Handymate är redo att ta emot samtal och bokningar.</p>
               </div>
 
               {/* Summary */}
-              <div className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
-                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-3">Sammanfattning</p>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-300">
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Sammanfattning</p>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Företag:</span>
-                    <span className="text-white font-medium">{form.business_name}</span>
+                    <span className="text-gray-500">Företag:</span>
+                    <span className="text-gray-900 font-medium">{form.business_name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Telefonnummer:</span>
-                    <span className={assignedPhoneNumber ? 'text-emerald-400 font-medium' : 'text-zinc-500'}>
+                    <span className="text-gray-500">Telefonnummer:</span>
+                    <span className={assignedPhoneNumber ? 'text-emerald-600 font-medium' : 'text-gray-400'}>
                       {assignedPhoneNumber || 'Ej konfigurerat'}
                     </span>
                   </div>
                   {assignedPhoneNumber && (
                     <div className="flex justify-between">
-                      <span className="text-zinc-400">Samtalshantering:</span>
-                      <span className="text-white font-medium">{getCallModeLabel(callMode)}</span>
+                      <span className="text-gray-500">Samtalshantering:</span>
+                      <span className="text-gray-900 font-medium">{getCallModeLabel(callMode)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span className="text-zinc-400">Öppettider:</span>
-                    <span className="text-white font-medium">{getActiveHoursSummary()}</span>
+                    <span className="text-gray-500">Öppettider:</span>
+                    <span className="text-gray-900 font-medium">{getActiveHoursSummary()}</span>
                   </div>
                 </div>
               </div>
@@ -914,49 +914,49 @@ export default function SignupPage() {
               {/* Checklist */}
               <div className="space-y-2">
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                  <Check className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm text-white">Konto skapat</span>
+                  <Check className="w-5 h-5 text-emerald-600" />
+                  <span className="text-sm text-gray-900">Konto skapat</span>
                 </div>
                 <div className={`flex items-center gap-3 p-3 rounded-xl ${
-                  assignedPhoneNumber ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-zinc-800/50 border border-zinc-700'
+                  assignedPhoneNumber ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-50 border border-gray-300'
                 }`}>
                   {assignedPhoneNumber ? (
-                    <Check className="w-5 h-5 text-emerald-400" />
+                    <Check className="w-5 h-5 text-emerald-600" />
                   ) : (
-                    <div className="w-5 h-5 rounded border-2 border-zinc-600" />
+                    <div className="w-5 h-5 rounded border-2 border-gray-300" />
                   )}
-                  <span className={`text-sm ${assignedPhoneNumber ? 'text-white' : 'text-zinc-500'}`}>
+                  <span className={`text-sm ${assignedPhoneNumber ? 'text-gray-900' : 'text-gray-400'}`}>
                     Telefonnummer aktiverat
                   </span>
                 </div>
                 {phoneSetupType === 'keep_existing' && (
                   <div className={`flex items-center gap-3 p-3 rounded-xl ${
-                    forwardingConfirmed ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-zinc-800/50 border border-zinc-700'
+                    forwardingConfirmed ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-gray-50 border border-gray-300'
                   }`}>
                     {forwardingConfirmed ? (
-                      <Check className="w-5 h-5 text-emerald-400" />
+                      <Check className="w-5 h-5 text-emerald-600" />
                     ) : (
-                      <div className="w-5 h-5 rounded border-2 border-zinc-600" />
+                      <div className="w-5 h-5 rounded border-2 border-gray-300" />
                     )}
-                    <span className={`text-sm ${forwardingConfirmed ? 'text-white' : 'text-zinc-500'}`}>
+                    <span className={`text-sm ${forwardingConfirmed ? 'text-gray-900' : 'text-gray-400'}`}>
                       Vidarekoppling konfigurerad
                     </span>
                   </div>
                 )}
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                  <Check className="w-5 h-5 text-emerald-400" />
-                  <span className="text-sm text-white">Öppettider konfigurerade</span>
+                  <Check className="w-5 h-5 text-emerald-600" />
+                  <span className="text-sm text-gray-900">Öppettider konfigurerade</span>
                 </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/50 border border-zinc-700">
-                  <div className="w-5 h-5 rounded border-2 border-zinc-600" />
-                  <span className="text-sm text-zinc-500">Första testsamtalet</span>
-                  <span className="ml-auto text-xs text-violet-400">→ I dashboarden</span>
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border border-gray-300">
+                  <div className="w-5 h-5 rounded border-2 border-gray-300" />
+                  <span className="text-sm text-gray-400">Första testsamtalet</span>
+                  <span className="ml-auto text-xs text-blue-600">→ I dashboarden</span>
                 </div>
               </div>
 
               <button
                 onClick={() => router.push('/dashboard')}
-                className="w-full py-4 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
+                className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center"
               >
                 Gå till Dashboard
                 <ArrowRight className="w-5 h-5 ml-2" />
@@ -966,7 +966,7 @@ export default function SignupPage() {
 
           {/* Error */}
           {error && (
-            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+            <div className="mt-4 p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-red-600 text-sm">
               {error}
             </div>
           )}
@@ -974,9 +974,9 @@ export default function SignupPage() {
 
         {/* Footer */}
         {step < 3 && (
-          <p className="text-center text-sm text-zinc-500 mt-6">
+          <p className="text-center text-sm text-gray-400 mt-6">
             Har du redan ett konto?{' '}
-            <a href="/login" className="text-violet-400 hover:text-violet-300">
+            <a href="/login" className="text-blue-600 hover:text-blue-500">
               Logga in
             </a>
           </p>

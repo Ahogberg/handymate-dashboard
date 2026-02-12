@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import {
@@ -106,15 +106,15 @@ function getInitials(name: string): string {
 }
 
 function getStatusInfo(member: TeamMember): { label: string; className: string } {
-  if (!member.is_active) return { label: 'Inaktiv', className: 'bg-red-500/20 text-red-400 border-red-500/30' }
-  if (member.invite_token && !member.accepted_at) return { label: 'Inbjuden', className: 'bg-amber-500/20 text-amber-400 border-amber-500/30' }
-  return { label: 'Aktiv', className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' }
+  if (!member.is_active) return { label: 'Inaktiv', className: 'bg-red-100 text-red-600 border-red-200' }
+  if (member.invite_token && !member.accepted_at) return { label: 'Inbjuden', className: 'bg-amber-100 text-amber-600 border-amber-200' }
+  return { label: 'Aktiv', className: 'bg-emerald-100 text-emerald-600 border-emerald-200' }
 }
 
 function getRoleBadge(role: string): { label: string; className: string } {
-  if (role === 'owner') return { label: 'Agare', className: 'bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 text-violet-300 border-violet-500/30' }
-  if (role === 'admin') return { label: 'Admin', className: 'bg-blue-500/20 text-blue-400 border-blue-500/30' }
-  return { label: 'Anstalld', className: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30' }
+  if (role === 'owner') return { label: 'Agare', className: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-500 border-blue-300' }
+  if (role === 'admin') return { label: 'Admin', className: 'bg-blue-100 text-blue-400 border-blue-500/30' }
+  return { label: 'Anstalld', className: 'bg-gray-100 text-gray-500 border-gray-300' }
 }
 
 function formatRelativeDate(dateStr: string | null): string {
@@ -145,8 +145,8 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-        checked ? 'bg-violet-500' : 'bg-zinc-700'
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+        checked ? 'bg-blue-500' : 'bg-gray-200'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <span
@@ -440,8 +440,8 @@ export default function TeamPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400 flex items-center gap-2">
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500 flex items-center gap-2">
           <Loader2 className="w-5 h-5 animate-spin" />
           Laddar...
         </div>
@@ -460,17 +460,17 @@ export default function TeamPage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen pt-16 sm:pt-8">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen pt-16 sm:pt-8">
       {/* Background gradient blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast notification */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -481,13 +481,13 @@ export default function TeamPage() {
       {/* ----------------------------------------------------------------- */}
       {inviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-violet-400" />
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-blue-600" />
                 Bjud in teammedlem
               </h3>
-              <button onClick={() => setInviteModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+              <button onClick={() => setInviteModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -495,35 +495,35 @@ export default function TeamPage() {
             <div className="space-y-4">
               {/* Email */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">E-post *</label>
+                <label className="block text-sm text-gray-500 mb-1">E-post *</label>
                 <input
                   type="email"
                   value={inviteForm.email}
                   onChange={e => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="namn@foretag.se"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Namn *</label>
+                <label className="block text-sm text-gray-500 mb-1">Namn *</label>
                 <input
                   type="text"
                   value={inviteForm.name}
                   onChange={e => setInviteForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Förnamn Efternamn"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Roll</label>
+                <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={inviteForm.role}
                   onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'employee')}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 >
                   <option value="admin">Admin</option>
                   <option value="employee">Anstalld</option>
@@ -532,46 +532,46 @@ export default function TeamPage() {
 
               {/* Title */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Titel</label>
+                <label className="block text-sm text-gray-500 mb-1">Titel</label>
                 <input
                   type="text"
                   value={inviteForm.title}
                   onChange={e => setInviteForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="T.ex. Elektriker, Snickare"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Phone */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Telefon</label>
+                <label className="block text-sm text-gray-500 mb-1">Telefon</label>
                 <input
                   type="tel"
                   value={inviteForm.phone}
                   onChange={e => setInviteForm(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+46..."
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Hourly rate */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Timpris (kr/h)</label>
+                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h)</label>
                 <input
                   type="number"
                   value={inviteForm.hourly_rate}
                   onChange={e => setInviteForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Permissions toggle section */}
-              <div className="border border-zinc-800 rounded-xl overflow-hidden">
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setShowPermissions(!showPermissions)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-zinc-400 hover:text-white transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-500 hover:text-gray-900 transition-colors"
                 >
                   <span className="flex items-center gap-2">
                     <Shield className="w-4 h-4" />
@@ -583,7 +583,7 @@ export default function TeamPage() {
                   <div className="px-4 pb-4 space-y-3">
                     {permissionLabels.map(perm => (
                       <div key={perm.key} className="flex items-center justify-between">
-                        <span className="text-sm text-zinc-300">{perm.label}</span>
+                        <span className="text-sm text-gray-700">{perm.label}</span>
                         <Toggle
                           checked={inviteForm[perm.key]}
                           onChange={val => setInviteForm(prev => ({ ...prev, [perm.key]: val }))}
@@ -598,7 +598,7 @@ export default function TeamPage() {
               <button
                 onClick={handleInviteSubmit}
                 disabled={actionLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -617,25 +617,25 @@ export default function TeamPage() {
       {/* ----------------------------------------------------------------- */}
       {editModalOpen && editingMember && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Redigera teammedlem</h3>
-              <button onClick={() => setEditModalOpen(false)} className="text-zinc-500 hover:text-white transition-colors">
+              <h3 className="text-lg font-semibold text-gray-900">Redigera teammedlem</h3>
+              <button onClick={() => setEditModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Member avatar and name header */}
-            <div className="flex items-center gap-3 mb-6 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+            <div className="flex items-center gap-3 mb-6 p-3 bg-gray-50 rounded-xl border border-gray-300/50">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+                className="w-10 h-10 rounded-full flex items-center justify-center text-gray-900 text-sm font-semibold shrink-0"
                 style={{ backgroundColor: editingMember.color }}
               >
                 {getInitials(editingMember.name)}
               </div>
               <div className="min-w-0">
-                <p className="text-white font-medium truncate">{editingMember.name}</p>
-                <p className="text-zinc-500 text-sm truncate">{editingMember.email}</p>
+                <p className="text-gray-900 font-medium truncate">{editingMember.name}</p>
+                <p className="text-gray-400 text-sm truncate">{editingMember.email}</p>
               </div>
               <div className="ml-auto">
                 <span className={`text-xs px-2 py-1 rounded-full border ${getStatusInfo(editingMember).className}`}>
@@ -647,34 +647,34 @@ export default function TeamPage() {
             <div className="space-y-4">
               {/* Email (read-only) */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">E-post</label>
+                <label className="block text-sm text-gray-500 mb-1">E-post</label>
                 <input
                   type="email"
                   value={editForm.email}
                   disabled
-                  className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700/50 rounded-xl text-zinc-500 cursor-not-allowed"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300/50 rounded-xl text-gray-400 cursor-not-allowed"
                 />
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Namn</label>
+                <label className="block text-sm text-gray-500 mb-1">Namn</label>
                 <input
                   type="text"
                   value={editForm.name}
                   onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Roll</label>
+                <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={editingMember.role === 'owner' ? 'owner' : editForm.role}
                   onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'employee')}
                   disabled={editingMember.role === 'owner'}
-                  className={`w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50 ${
+                  className={`w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 ${
                     editingMember.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -686,47 +686,47 @@ export default function TeamPage() {
 
               {/* Title */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Titel</label>
+                <label className="block text-sm text-gray-500 mb-1">Titel</label>
                 <input
                   type="text"
                   value={editForm.title}
                   onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="T.ex. Elektriker, Snickare"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Phone */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Telefon</label>
+                <label className="block text-sm text-gray-500 mb-1">Telefon</label>
                 <input
                   type="tel"
                   value={editForm.phone}
                   onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+46..."
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Hourly rate */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Timpris (kr/h)</label>
+                <label className="block text-sm text-gray-500 mb-1">Timpris (kr/h)</label>
                 <input
                   type="number"
                   value={editForm.hourly_rate}
                   onChange={e => setEditForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Permissions toggle section */}
               {editingMember.role !== 'owner' && (
-                <div className="border border-zinc-800 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setShowPermissions(!showPermissions)}
-                    className="w-full flex items-center justify-between px-4 py-3 text-sm text-zinc-400 hover:text-white transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-500 hover:text-gray-900 transition-colors"
                   >
                     <span className="flex items-center gap-2">
                       <Shield className="w-4 h-4" />
@@ -738,7 +738,7 @@ export default function TeamPage() {
                     <div className="px-4 pb-4 space-y-3">
                       {permissionLabels.map(perm => (
                         <div key={perm.key} className="flex items-center justify-between">
-                          <span className="text-sm text-zinc-300">{perm.label}</span>
+                          <span className="text-sm text-gray-700">{perm.label}</span>
                           <Toggle
                             checked={editForm[perm.key]}
                             onChange={val => setEditForm(prev => ({ ...prev, [perm.key]: val }))}
@@ -754,7 +754,7 @@ export default function TeamPage() {
               <button
                 onClick={handleEditSubmit}
                 disabled={actionLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Spara ändringar
@@ -765,7 +765,7 @@ export default function TeamPage() {
                 <button
                   onClick={handleResendInvite}
                   disabled={actionLoading}
-                  className="w-full py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white font-medium hover:bg-zinc-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-gray-100 border border-gray-300 text-gray-900 font-medium hover:bg-gray-200 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Skicka ny inbjudan
@@ -774,10 +774,10 @@ export default function TeamPage() {
 
               {/* Deactivate button (not for owner, not for self) */}
               {editingMember.role !== 'owner' && currentUser?.id !== editingMember.id && (
-                <div className="pt-2 border-t border-zinc-800">
+                <div className="pt-2 border-t border-gray-200">
                   {confirmDeactivate ? (
                     <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-amber-400 text-sm">
+                      <div className="flex items-center gap-2 text-amber-600 text-sm">
                         <AlertTriangle className="w-4 h-4 shrink-0" />
                         <span>Är du säker? Användaren förlorar åtkomst.</span>
                       </div>
@@ -785,14 +785,14 @@ export default function TeamPage() {
                         <button
                           onClick={handleDeactivate}
                           disabled={actionLoading}
-                          className="flex-1 py-2.5 rounded-xl bg-red-500/20 border border-red-500/30 text-red-400 font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                          className="flex-1 py-2.5 rounded-xl bg-red-100 border border-red-200 text-red-600 font-medium hover:bg-red-500/30 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                           {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                           Ja, inaktivera
                         </button>
                         <button
                           onClick={() => setConfirmDeactivate(false)}
-                          className="flex-1 py-2.5 rounded-xl bg-zinc-800 border border-zinc-700 text-zinc-400 font-medium hover:text-white transition-colors"
+                          className="flex-1 py-2.5 rounded-xl bg-gray-100 border border-gray-300 text-gray-500 font-medium hover:text-gray-900 transition-colors"
                         >
                           Avbryt
                         </button>
@@ -801,7 +801,7 @@ export default function TeamPage() {
                   ) : (
                     <button
                       onClick={() => setConfirmDeactivate(true)}
-                      className="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-medium hover:bg-red-500/20 transition-colors"
+                      className="w-full py-2.5 rounded-xl bg-red-50 border border-red-500/20 text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
                     >
                       Inaktivera användare
                     </button>
@@ -821,15 +821,15 @@ export default function TeamPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Team</h1>
-            <p className="text-zinc-400 text-sm mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Team</h1>
+            <p className="text-gray-500 text-sm mt-1">
               {members.length} {members.length === 1 ? 'medlem' : 'medlemmar'}
             </p>
           </div>
           {can('manage_users') && (
             <button
               onClick={openInviteModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium hover:opacity-90 transition-opacity text-sm"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity text-sm"
             >
               <Plus className="w-4 h-4" />
               Bjud in
@@ -839,20 +839,20 @@ export default function TeamPage() {
 
         {/* Empty state */}
         {showEmptyState ? (
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 sm:p-16 text-center">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 sm:p-16 text-center">
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 flex items-center justify-center border border-violet-500/30">
-                <Users className="w-10 h-10 text-violet-400" />
+              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 flex items-center justify-center border border-blue-300">
+                <Users className="w-10 h-10 text-blue-600" />
               </div>
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Du arbetar ensam just nu</h2>
-            <p className="text-zinc-400 mb-8 max-w-sm mx-auto">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Du arbetar ensam just nu</h2>
+            <p className="text-gray-500 mb-8 max-w-sm mx-auto">
               Bjud in ditt team för att komma igång med samarbete, tidrapportering och projekthantering.
             </p>
             {can('manage_users') && (
               <button
                 onClick={openInviteModal}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity"
               >
                 <UserPlus className="w-5 h-5" />
                 Bjud in teammedlem
@@ -869,12 +869,12 @@ export default function TeamPage() {
                   onClick={() => setFilter(tab.key)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     filter === tab.key
-                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                      : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                      : 'bg-white text-gray-500 hover:text-white border border-gray-200'
                   }`}
                 >
                   {tab.label}
-                  <span className={`ml-1.5 ${filter === tab.key ? 'text-white/70' : 'text-zinc-600'}`}>
+                  <span className={`ml-1.5 ${filter === tab.key ? 'text-white/70' : 'text-gray-400'}`}>
                     {tab.count}
                   </span>
                 </button>
@@ -883,18 +883,18 @@ export default function TeamPage() {
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Sök på namn eller e-post..."
-                className="w-full pl-11 pr-4 py-3 bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/50"
+                className="w-full pl-11 pr-4 py-3 bg-white shadow-sm border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -903,8 +903,8 @@ export default function TeamPage() {
 
             {/* Members list */}
             {filteredMembers.length === 0 ? (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-12 text-center">
-                <p className="text-zinc-400">Inga teammedlemmar matchar din sökning.</p>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+                <p className="text-gray-500">Inga teammedlemmar matchar din sökning.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -917,14 +917,14 @@ export default function TeamPage() {
                     <div
                       key={member.id}
                       onClick={() => canClick && openEditModal(member)}
-                      className={`bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-5 transition-colors ${
-                        canClick ? 'cursor-pointer hover:border-zinc-700 hover:bg-zinc-900/80' : ''
+                      className={`bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-5 transition-colors ${
+                        canClick ? 'cursor-pointer hover:border-gray-300 hover:bg-white/80' : ''
                       }`}
                     >
                       <div className="flex items-center gap-4">
                         {/* Avatar */}
                         <div
-                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0"
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-gray-900 text-sm font-semibold shrink-0"
                           style={{ backgroundColor: member.color }}
                         >
                           {getInitials(member.name)}
@@ -933,7 +933,7 @@ export default function TeamPage() {
                         {/* Name, title, role */}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-white font-medium truncate">{member.name}</span>
+                            <span className="text-gray-900 font-medium truncate">{member.name}</span>
                             <span className={`text-xs px-2 py-0.5 rounded-full border shrink-0 ${roleBadge.className}`}>
                               {roleBadge.label}
                             </span>
@@ -942,13 +942,13 @@ export default function TeamPage() {
                             </span>
                           </div>
                           {member.title && (
-                            <p className="text-zinc-500 text-sm mt-0.5 truncate">{member.title}</p>
+                            <p className="text-gray-400 text-sm mt-0.5 truncate">{member.title}</p>
                           )}
                         </div>
 
                         {/* Contact + last activity (desktop) */}
                         <div className="hidden md:flex items-center gap-6 shrink-0">
-                          <div className="flex items-center gap-4 text-sm text-zinc-400">
+                          <div className="flex items-center gap-4 text-sm text-gray-500">
                             <span className="flex items-center gap-1.5 truncate max-w-[200px]">
                               <Mail className="w-3.5 h-3.5 shrink-0" />
                               {member.email}
@@ -960,7 +960,7 @@ export default function TeamPage() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-1.5 text-xs text-zinc-500 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-400 whitespace-nowrap">
                             <Clock className="w-3.5 h-3.5" />
                             {formatRelativeDate(member.last_login_at || member.accepted_at)}
                           </div>
@@ -968,7 +968,7 @@ export default function TeamPage() {
                       </div>
 
                       {/* Mobile secondary info */}
-                      <div className="mt-3 flex items-center gap-4 text-xs text-zinc-500 md:hidden">
+                      <div className="mt-3 flex items-center gap-4 text-xs text-gray-400 md:hidden">
                         <span className="flex items-center gap-1 truncate">
                           <Mail className="w-3 h-3 shrink-0" />
                           {member.email}

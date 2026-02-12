@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -207,11 +207,11 @@ export default function InvoiceDetailPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'draft': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'sent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'paid': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      case 'overdue': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+      case 'overdue': return 'bg-red-100 text-red-600 border-red-500/30'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
 
@@ -242,16 +242,16 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   if (!invoice) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Faktura hittades inte</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Faktura hittades inte</div>
       </div>
     )
   }
@@ -294,17 +294,17 @@ export default function InvoiceDetailPage() {
   timelineEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600' : 'bg-red-100 border-red-500/30 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -313,12 +313,12 @@ export default function InvoiceDetailPage() {
       {/* Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Markera som betald</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Markera som betald</h3>
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -326,17 +326,17 @@ export default function InvoiceDetailPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Betaldatum</label>
+                <label className="block text-sm text-gray-500 mb-2">Betaldatum</label>
                 <input
                   type="date"
                   value={paymentData.paid_at}
                   onChange={(e) => setPaymentData({ ...paymentData, paid_at: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Betalningsmetod</label>
+                <label className="block text-sm text-gray-500 mb-2">Betalningsmetod</label>
                 <div className="grid grid-cols-2 gap-2">
                   {PAYMENT_METHODS.map((method) => (
                     <button
@@ -344,8 +344,8 @@ export default function InvoiceDetailPage() {
                       onClick={() => setPaymentData({ ...paymentData, payment_method: method.value })}
                       className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
                         paymentData.payment_method === method.value
-                          ? 'bg-violet-500/20 border-violet-500 text-white'
-                          : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                          ? 'bg-blue-100 border-blue-500 text-gray-900'
+                          : 'bg-gray-100 border-gray-300 text-gray-500 hover:border-gray-300'
                       }`}
                     >
                       <method.icon className="w-4 h-4" />
@@ -356,17 +356,17 @@ export default function InvoiceDetailPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Betalt belopp</label>
+                <label className="block text-sm text-gray-500 mb-2">Betalt belopp</label>
                 <div className="relative">
                   <input
                     type="number"
                     value={paymentData.paid_amount}
                     onChange={(e) => setPaymentData({ ...paymentData, paid_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-12"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-12"
                   />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">kr</span>
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-gray-400 mt-1">
                   Att betala: {(invoice.customer_pays || invoice.total)?.toLocaleString('sv-SE')} kr
                 </p>
               </div>
@@ -375,14 +375,14 @@ export default function InvoiceDetailPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                className="flex-1 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
               <button
                 onClick={handleMarkPaid}
                 disabled={updatingStatus}
-                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-green-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {updatingStatus ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -402,17 +402,17 @@ export default function InvoiceDetailPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/invoices" className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg">
+            <Link href="/dashboard/invoices" className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-white">Faktura #{invoice.invoice_number}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Faktura #{invoice.invoice_number}</h1>
                 <span className={`px-3 py-1 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
                   {getStatusText(invoice.status)}
                 </span>
               </div>
-              <p className="text-sm text-zinc-400 mt-1">
+              <p className="text-sm text-gray-500 mt-1">
                 Skapad {new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}
               </p>
             </div>
@@ -423,7 +423,7 @@ export default function InvoiceDetailPage() {
               href={`/api/invoices/pdf?invoiceId=${invoiceId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
             >
               <Download className="w-4 h-4" />
               PDF
@@ -433,17 +433,17 @@ export default function InvoiceDetailPage() {
               <div className="relative group">
                 <button
                   disabled={sending}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white hover:opacity-90 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Skicka
                 </button>
                 <div className="absolute right-0 top-full mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                  <div className="bg-zinc-800 border border-zinc-700 rounded-xl p-2 shadow-xl min-w-[160px]">
+                  <div className="bg-gray-100 border border-gray-300 rounded-xl p-2 shadow-xl min-w-[160px]">
                     <button
                       onClick={() => handleSend('email')}
                       disabled={!invoice.customer?.email || sending}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-700 rounded-lg disabled:opacity-50"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg disabled:opacity-50"
                     >
                       <Mail className="w-4 h-4" />
                       Via email
@@ -451,7 +451,7 @@ export default function InvoiceDetailPage() {
                     <button
                       onClick={() => handleSend('sms')}
                       disabled={!invoice.customer?.phone_number || sending}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-700 rounded-lg disabled:opacity-50"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg disabled:opacity-50"
                     >
                       <MessageSquare className="w-4 h-4" />
                       Via SMS
@@ -459,7 +459,7 @@ export default function InvoiceDetailPage() {
                     <button
                       onClick={() => handleSend('both')}
                       disabled={(!invoice.customer?.email && !invoice.customer?.phone_number) || sending}
-                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-zinc-300 hover:text-white hover:bg-zinc-700 rounded-lg disabled:opacity-50"
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-200 rounded-lg disabled:opacity-50"
                     >
                       <Send className="w-4 h-4" />
                       Båda
@@ -473,7 +473,7 @@ export default function InvoiceDetailPage() {
               <>
                 <button
                   onClick={() => setShowPaymentModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-emerald-400 hover:bg-emerald-500/30"
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-100 border border-emerald-500/30 rounded-xl text-emerald-600 hover:bg-emerald-500/30"
                 >
                   <CheckCircle className="w-4 h-4" />
                   Markera betald
@@ -499,17 +499,17 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Status Timeline */}
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 mb-6">
-          <h3 className="text-sm font-medium text-zinc-400 mb-4">Historik</h3>
+        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6">
+          <h3 className="text-sm font-medium text-gray-500 mb-4">Historik</h3>
           <div className="flex flex-wrap gap-4">
             {timelineEvents.map((event, index) => {
               const Icon = event.icon
               const colorClasses: Record<string, string> = {
-                zinc: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
+                zinc: 'bg-gray-100 text-gray-500 border-gray-300',
                 blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-                red: 'bg-red-500/20 text-red-400 border-red-500/30',
+                red: 'bg-red-100 text-red-600 border-red-500/30',
                 amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-                emerald: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+                emerald: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
               }
               return (
                 <div key={index} className="flex items-center gap-2">
@@ -517,11 +517,11 @@ export default function InvoiceDetailPage() {
                     <Icon className="w-3.5 h-3.5" />
                   </div>
                   <div>
-                    <p className="text-sm text-white">{event.label}</p>
-                    <p className="text-xs text-zinc-500">{new Date(event.date).toLocaleDateString('sv-SE')}</p>
+                    <p className="text-sm text-gray-900">{event.label}</p>
+                    <p className="text-xs text-gray-400">{new Date(event.date).toLocaleDateString('sv-SE')}</p>
                   </div>
                   {index < timelineEvents.length - 1 && (
-                    <div className="w-8 h-px bg-zinc-700 hidden sm:block" />
+                    <div className="w-8 h-px bg-gray-200 hidden sm:block" />
                   )}
                 </div>
               )
@@ -530,45 +530,45 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Invoice Content */}
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
           {/* Customer & Dates */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-b border-zinc-800">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-b border-gray-200">
             <div>
-              <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Kund</h3>
+              <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Kund</h3>
               {invoice.customer ? (
                 <div>
-                  <p className="text-white font-medium">{invoice.customer.name}</p>
-                  <p className="text-sm text-zinc-400">{invoice.customer.address_line || ''}</p>
-                  <p className="text-sm text-zinc-400">{invoice.customer.email || ''}</p>
-                  <p className="text-sm text-zinc-400">{invoice.customer.phone_number || ''}</p>
+                  <p className="text-gray-900 font-medium">{invoice.customer.name}</p>
+                  <p className="text-sm text-gray-500">{invoice.customer.address_line || ''}</p>
+                  <p className="text-sm text-gray-500">{invoice.customer.email || ''}</p>
+                  <p className="text-sm text-gray-500">{invoice.customer.phone_number || ''}</p>
                 </div>
               ) : (
-                <p className="text-zinc-500">Ingen kund vald</p>
+                <p className="text-gray-400">Ingen kund vald</p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Fakturadatum</h3>
-                <p className="text-white">{new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}</p>
+                <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Fakturadatum</h3>
+                <p className="text-gray-900">{new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}</p>
               </div>
               <div>
-                <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Förfallodatum</h3>
-                <p className={isOverdue() ? 'text-red-400 font-medium' : 'text-white'}>
+                <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Förfallodatum</h3>
+                <p className={isOverdue() ? 'text-red-600 font-medium' : 'text-gray-900'}>
                   {new Date(invoice.due_date).toLocaleDateString('sv-SE')}
                   {isOverdue() && ' (förfallen)'}
                 </p>
               </div>
               <div>
-                <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">OCR-nummer</h3>
-                <p className="text-white font-mono">{ocrNumber}</p>
+                <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">OCR-nummer</h3>
+                <p className="text-gray-900 font-mono">{ocrNumber}</p>
               </div>
               {invoice.paid_at && (
                 <div>
-                  <h3 className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Betald</h3>
-                  <p className="text-emerald-400">
+                  <h3 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Betald</h3>
+                  <p className="text-emerald-600">
                     {new Date(invoice.paid_at).toLocaleDateString('sv-SE')}
                     {invoice.payment_method && (
-                      <span className="text-zinc-400 text-xs ml-1">
+                      <span className="text-gray-500 text-xs ml-1">
                         ({getPaymentMethodText(invoice.payment_method)})
                       </span>
                     )}
@@ -581,7 +581,7 @@ export default function InvoiceDetailPage() {
           {/* ROT/RUT Notice */}
           {invoice.rot_rut_type && (
             <div className="p-4 bg-emerald-500/10 border-b border-emerald-500/20">
-              <p className="text-emerald-400 text-sm">
+              <p className="text-emerald-600 text-sm">
                 <strong>{invoice.rot_rut_type.toUpperCase()}-avdrag tillämpas.</strong>{' '}
                 Avdraget på {invoice.rot_rut_deduction?.toLocaleString('sv-SE')} kr dras automatiskt via Skatteverket.
                 Kunden betalar {invoice.customer_pays?.toLocaleString('sv-SE')} kr.
@@ -593,22 +593,22 @@ export default function InvoiceDetailPage() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-800/50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase">Beskrivning</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase">Antal</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase">Enhet</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase">à-pris</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-zinc-500 uppercase">Summa</th>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Beskrivning</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Antal</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Enhet</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">à-pris</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Summa</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800">
+              <tbody className="divide-y divide-gray-200">
                 {items.map((item, index) => (
-                  <tr key={index} className="hover:bg-zinc-800/30">
-                    <td className="px-6 py-4 text-white">{item.description}</td>
-                    <td className="px-6 py-4 text-right text-zinc-400">{item.quantity}</td>
-                    <td className="px-6 py-4 text-right text-zinc-400">{item.unit}</td>
-                    <td className="px-6 py-4 text-right text-zinc-400">{item.unit_price?.toLocaleString('sv-SE')} kr</td>
-                    <td className="px-6 py-4 text-right text-white font-medium">{item.total?.toLocaleString('sv-SE')} kr</td>
+                  <tr key={index} className="hover:bg-gray-100/30">
+                    <td className="px-6 py-4 text-gray-900">{item.description}</td>
+                    <td className="px-6 py-4 text-right text-gray-500">{item.quantity}</td>
+                    <td className="px-6 py-4 text-right text-gray-500">{item.unit}</td>
+                    <td className="px-6 py-4 text-right text-gray-500">{item.unit_price?.toLocaleString('sv-SE')} kr</td>
+                    <td className="px-6 py-4 text-right text-gray-900 font-medium">{item.total?.toLocaleString('sv-SE')} kr</td>
                   </tr>
                 ))}
               </tbody>
@@ -616,27 +616,27 @@ export default function InvoiceDetailPage() {
           </div>
 
           {/* Totals */}
-          <div className="p-6 bg-zinc-800/30">
+          <div className="p-6 bg-gray-100/30">
             <div className="max-w-xs ml-auto space-y-2">
-              <div className="flex justify-between text-zinc-400">
+              <div className="flex justify-between text-gray-500">
                 <span>Delsumma</span>
                 <span>{invoice.subtotal?.toLocaleString('sv-SE')} kr</span>
               </div>
-              <div className="flex justify-between text-zinc-400">
+              <div className="flex justify-between text-gray-500">
                 <span>Moms ({invoice.vat_rate}%)</span>
                 <span>{invoice.vat_amount?.toLocaleString('sv-SE')} kr</span>
               </div>
-              <div className="flex justify-between text-xl font-bold text-white pt-2 border-t border-zinc-700">
+              <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t border-gray-300">
                 <span>Totalt</span>
                 <span>{invoice.total?.toLocaleString('sv-SE')} kr</span>
               </div>
               {invoice.rot_rut_type && (
                 <>
-                  <div className="flex justify-between text-emerald-400">
+                  <div className="flex justify-between text-emerald-600">
                     <span>{invoice.rot_rut_type.toUpperCase()}-avdrag</span>
                     <span>-{invoice.rot_rut_deduction?.toLocaleString('sv-SE')} kr</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold text-emerald-400 pt-2 border-t border-zinc-700">
+                  <div className="flex justify-between text-lg font-bold text-emerald-600 pt-2 border-t border-gray-300">
                     <span>Att betala</span>
                     <span>{invoice.customer_pays?.toLocaleString('sv-SE')} kr</span>
                   </div>

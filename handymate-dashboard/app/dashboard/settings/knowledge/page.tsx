@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Plus, X, Save, Loader2, Zap, HelpCircle, FileText, AlertTriangle } from 'lucide-react'
@@ -166,21 +166,21 @@ export default function KnowledgeBasePage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'}`}>
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'}`}>
           {toast.message}
         </div>
       )}
@@ -189,18 +189,18 @@ export default function KnowledgeBasePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/settings" className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all">
+            <Link href="/dashboard/settings" className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">AI Knowledge Base</h1>
-              <p className="text-sm text-zinc-400">Lär AI-assistenten om ditt företag</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">AI Knowledge Base</h1>
+              <p className="text-sm text-gray-500">Lär AI-assistenten om ditt företag</p>
             </div>
           </div>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Spara
@@ -209,48 +209,48 @@ export default function KnowledgeBasePage() {
 
         <div className="space-y-6">
           {/* Bransch */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-violet-400" />
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-blue-600" />
               Bransch
             </h2>
             <select
               value={kb.industry}
               onChange={(e) => handleIndustryChange(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             >
               <option value="">Välj bransch...</option>
               {INDUSTRIES.map(ind => (
                 <option key={ind.value} value={ind.value}>{ind.label}</option>
               ))}
             </select>
-            <p className="text-xs text-zinc-500 mt-2">Hjälper AI:n förstå vilken typ av frågor den kan förvänta sig</p>
+            <p className="text-xs text-gray-400 mt-2">Hjälper AI:n förstå vilken typ av frågor den kan förvänta sig</p>
           </div>
 
           {/* Tjänster & Priser */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FileText className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-cyan-600" />
                 Tjänster & Priser
               </h2>
               <button
                 onClick={addService}
-                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700"
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
             </div>
 
             {kb.services.length === 0 ? (
-              <p className="text-zinc-500 text-sm">Inga tjänster tillagda. Klicka &quot;Lägg till&quot; för att börja.</p>
+              <p className="text-gray-400 text-sm">Inga tjänster tillagda. Klicka &quot;Lägg till&quot; för att börja.</p>
             ) : (
               <div className="space-y-4">
                 {kb.services.map((service, index) => (
-                  <div key={index} className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                  <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-300">
                     <div className="flex justify-between mb-3">
-                      <span className="text-sm text-zinc-400">Tjänst {index + 1}</span>
-                      <button onClick={() => removeService(index)} className="text-zinc-500 hover:text-red-400">
+                      <span className="text-sm text-gray-500">Tjänst {index + 1}</span>
+                      <button onClick={() => removeService(index)} className="text-gray-400 hover:text-red-600">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -260,28 +260,28 @@ export default function KnowledgeBasePage() {
                         value={service.name}
                         onChange={(e) => updateService(index, 'name', e.target.value)}
                         placeholder="Tjänstens namn"
-                        className="px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                       <input
                         type="text"
                         value={service.price_indication}
                         onChange={(e) => updateService(index, 'price_indication', e.target.value)}
                         placeholder="Prisindikation (t.ex. 'Från 995 kr')"
-                        className="px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                       <input
                         type="text"
                         value={service.typical_duration}
                         onChange={(e) => updateService(index, 'typical_duration', e.target.value)}
                         placeholder="Tidsåtgång (t.ex. '1-2 timmar')"
-                        className="px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                       <input
                         type="text"
                         value={service.description}
                         onChange={(e) => updateService(index, 'description', e.target.value)}
                         placeholder="Kort beskrivning"
-                        className="px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                   </div>
@@ -291,29 +291,29 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Vanliga frågor */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <HelpCircle className="w-5 h-5 text-amber-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-amber-600" />
                 Vanliga frågor (FAQ)
               </h2>
               <button
                 onClick={addFAQ}
-                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700"
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
             </div>
 
             {kb.faqs.length === 0 ? (
-              <p className="text-zinc-500 text-sm">Inga FAQ tillagda. Lägg till vanliga frågor kunder ställer.</p>
+              <p className="text-gray-400 text-sm">Inga FAQ tillagda. Lägg till vanliga frågor kunder ställer.</p>
             ) : (
               <div className="space-y-4">
                 {kb.faqs.map((faq, index) => (
-                  <div key={index} className="p-4 bg-zinc-800/50 rounded-xl border border-zinc-700">
+                  <div key={index} className="p-4 bg-gray-50 rounded-xl border border-gray-300">
                     <div className="flex justify-between mb-3">
-                      <span className="text-sm text-zinc-400">Fråga {index + 1}</span>
-                      <button onClick={() => removeFAQ(index)} className="text-zinc-500 hover:text-red-400">
+                      <span className="text-sm text-gray-500">Fråga {index + 1}</span>
+                      <button onClick={() => removeFAQ(index)} className="text-gray-400 hover:text-red-600">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
@@ -322,14 +322,14 @@ export default function KnowledgeBasePage() {
                       value={faq.question}
                       onChange={(e) => updateFAQ(index, 'question', e.target.value)}
                       placeholder="Frågan kunden ställer"
-                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                     <textarea
                       value={faq.answer}
                       onChange={(e) => updateFAQ(index, 'answer', e.target.value)}
                       placeholder="Svaret AI:n ska ge"
                       rows={2}
-                      className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                   </div>
                 ))}
@@ -338,23 +338,23 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Akuta situationer */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-red-400" />
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
                 Akuta situationer
               </h2>
               <button
                 onClick={addEmergency}
-                className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700"
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
             </div>
-            <p className="text-xs text-zinc-500 mb-4">Situationer som AI:n ska behandla som akuta och prioritera</p>
+            <p className="text-xs text-gray-400 mb-4">Situationer som AI:n ska behandla som akuta och prioritera</p>
 
             {kb.emergency_situations.length === 0 ? (
-              <p className="text-zinc-500 text-sm">Välj en bransch ovan för att få förslag på akuta situationer.</p>
+              <p className="text-gray-400 text-sm">Välj en bransch ovan för att få förslag på akuta situationer.</p>
             ) : (
               <div className="space-y-2">
                 {kb.emergency_situations.map((emergency, index) => (
@@ -364,9 +364,9 @@ export default function KnowledgeBasePage() {
                       value={emergency}
                       onChange={(e) => updateEmergency(index, e.target.value)}
                       placeholder="Beskrivning av akut situation"
-                      className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
-                    <button onClick={() => removeEmergency(index)} className="p-2 text-zinc-500 hover:text-red-400">
+                    <button onClick={() => removeEmergency(index)} className="p-2 text-gray-400 hover:text-red-600">
                       <X className="w-4 h-4" />
                     </button>
                   </div>
@@ -376,50 +376,50 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Policyer */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-            <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-emerald-400" />
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-emerald-600" />
               Policyer
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Offert</label>
+                <label className="block text-sm text-gray-500 mb-1">Offert</label>
                 <input
                   type="text"
                   value={kb.policies.quote}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, quote: e.target.value } })}
                   placeholder="T.ex. 'Vi ger alltid prisuppskattning innan'"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Betalning</label>
+                <label className="block text-sm text-gray-500 mb-1">Betalning</label>
                 <input
                   type="text"
                   value={kb.policies.payment}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, payment: e.target.value } })}
                   placeholder="T.ex. 'Faktura 30 dagar eller Swish'"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Garanti</label>
+                <label className="block text-sm text-gray-500 mb-1">Garanti</label>
                 <input
                   type="text"
                   value={kb.policies.warranty}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, warranty: e.target.value } })}
                   placeholder="T.ex. '2 års garanti på arbete'"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Avbokning</label>
+                <label className="block text-sm text-gray-500 mb-1">Avbokning</label>
                 <input
                   type="text"
                   value={kb.policies.cancellation}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, cancellation: e.target.value } })}
                   placeholder="T.ex. 'Avboka senast 24h innan'"
-                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
             </div>

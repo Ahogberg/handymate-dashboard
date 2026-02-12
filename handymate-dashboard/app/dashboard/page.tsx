@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import {
@@ -202,7 +202,7 @@ export default function DashboardPage() {
     if (value === 0) return null
     const isPositive = value > 0
     return (
-      <span className={`flex items-center text-xs ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+      <span className={`flex items-center text-xs ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
         {isPositive ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
         {Math.abs(value)}%
       </span>
@@ -225,17 +225,17 @@ export default function DashboardPage() {
           return (
             <div key={i} className="flex flex-col items-center flex-1">
               <div className="w-full flex flex-col items-center justify-end h-14">
-                <span className="text-xs text-zinc-500 mb-1">{day.count}</span>
+                <span className="text-xs text-gray-400 mb-1">{day.count}</span>
                 <div
                   className={`w-full rounded-t transition-all ${
                     isToday
-                      ? 'bg-gradient-to-t from-violet-500 to-fuchsia-500'
-                      : 'bg-zinc-700'
+                      ? 'bg-gradient-to-t from-blue-500 to-cyan-500'
+                      : 'bg-gray-200'
                   }`}
                   style={{ height: `${height}%`, minHeight: '4px' }}
                 />
               </div>
-              <span className={`text-xs mt-1 ${isToday ? 'text-violet-400' : 'text-zinc-500'}`}>
+              <span className={`text-xs mt-1 ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
                 {dayName}
               </span>
             </div>
@@ -247,8 +247,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
@@ -256,20 +256,20 @@ export default function DashboardPage() {
   const todaysBookingsCount = bookings.length
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
             {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}!
           </h1>
-          <p className="text-sm sm:text-base text-zinc-400">
+          <p className="text-sm sm:text-base text-gray-500">
             Översikt för {business.business_name}
           </p>
         </div>
@@ -288,22 +288,22 @@ export default function DashboardPage() {
         {/* AI Inbox Banner - visa om det finns väntande förslag */}
         {stats?.ai?.pending_suggestions && stats.ai.pending_suggestions > 0 && (
           <Link href="/dashboard/ai-inbox">
-            <div className="mb-6 p-4 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30 rounded-xl hover:border-violet-500/50 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 border border-blue-300 rounded-xl hover:border-blue-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500">
-                    <Sparkles className="w-5 h-5 text-white" />
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                    <Sparkles className="w-5 h-5 text-gray-900" />
                   </div>
                   <div>
-                    <p className="font-medium text-white">
+                    <p className="font-medium text-gray-900">
                       {stats.ai.pending_suggestions} AI-förslag väntar
                     </p>
-                    <p className="text-sm text-zinc-400">
+                    <p className="text-sm text-gray-500">
                       Från samtalsanalys - granska och godkänn
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-violet-400" />
+                <ArrowRight className="w-5 h-5 text-blue-600" />
               </div>
             </div>
           </Link>
@@ -312,116 +312,116 @@ export default function DashboardPage() {
         {/* Stat cards - huvudstatistik */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           {/* Bokningar denna vecka */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500">
-                <Calendar className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                <Calendar className="w-4 h-4 text-gray-900" />
               </div>
               <TrendIndicator value={stats?.bookings?.trend || 0} />
             </div>
-            <p className="text-2xl font-bold text-white">{stats?.bookings?.week || 0}</p>
-            <p className="text-xs text-zinc-500">Bokningar denna vecka</p>
+            <p className="text-2xl font-bold text-gray-900">{stats?.bookings?.week || 0}</p>
+            <p className="text-xs text-gray-400">Bokningar denna vecka</p>
           </div>
 
           {/* Nya kunder */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500">
-                <Users className="w-4 h-4 text-white" />
+                <Users className="w-4 h-4 text-gray-900" />
               </div>
               <TrendIndicator value={stats?.customers?.trend || 0} />
             </div>
-            <p className="text-2xl font-bold text-white">{stats?.customers?.new_this_month || 0}</p>
-            <p className="text-xs text-zinc-500">Nya kunder i månad</p>
+            <p className="text-2xl font-bold text-gray-900">{stats?.customers?.new_this_month || 0}</p>
+            <p className="text-xs text-gray-400">Nya kunder i månad</p>
           </div>
 
           {/* Samtal */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500">
-                <Mic className="w-4 h-4 text-white" />
+                <Mic className="w-4 h-4 text-gray-900" />
               </div>
               <TrendIndicator value={stats?.calls?.trend || 0} />
             </div>
-            <p className="text-2xl font-bold text-white">{stats?.calls?.week || 0}</p>
-            <p className="text-xs text-zinc-500">Samtal denna vecka</p>
+            <p className="text-2xl font-bold text-gray-900">{stats?.calls?.week || 0}</p>
+            <p className="text-xs text-gray-400">Samtal denna vecka</p>
           </div>
 
           {/* Timmar */}
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
-                <Clock className="w-4 h-4 text-white" />
+                <Clock className="w-4 h-4 text-gray-900" />
               </div>
             </div>
-            <p className="text-2xl font-bold text-white">{stats?.time?.week_hours || 0}h</p>
-            <p className="text-xs text-zinc-500">Arbetad tid vecka</p>
+            <p className="text-2xl font-bold text-gray-900">{stats?.time?.week_hours || 0}h</p>
+            <p className="text-xs text-gray-400">Arbetad tid vecka</p>
           </div>
 
           {/* Aktiva projekt */}
-          <Link href="/dashboard/projects" className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800 hover:border-violet-500/30 transition-all">
+          <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-blue-300 transition-all">
             <div className="flex items-center justify-between mb-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500">
-                <FolderKanban className="w-4 h-4 text-white" />
+                <FolderKanban className="w-4 h-4 text-gray-900" />
               </div>
-              <ArrowRight className="w-3 h-3 text-zinc-600" />
+              <ArrowRight className="w-3 h-3 text-gray-400" />
             </div>
-            <p className="text-2xl font-bold text-white">{activeProjects}</p>
-            <p className="text-xs text-zinc-500">Aktiva projekt</p>
+            <p className="text-2xl font-bold text-gray-900">{activeProjects}</p>
+            <p className="text-xs text-gray-400">Aktiva projekt</p>
           </Link>
         </div>
 
         {/* Main content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Dagens bokningar */}
-          <div className="lg:col-span-2 bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">
+          <div className="lg:col-span-2 bg-white shadow-sm rounded-xl border border-gray-200">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-gray-900">
                 Dagens bokningar
-                <span className="ml-2 text-sm font-normal text-zinc-500">({todaysBookingsCount})</span>
+                <span className="ml-2 text-sm font-normal text-gray-400">({todaysBookingsCount})</span>
               </h2>
               <Link
                 href="/dashboard/bookings"
-                className="text-xs text-violet-400 hover:text-violet-300 flex items-center gap-1"
+                className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1"
               >
                 Visa alla
                 <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-gray-200">
               {bookings.length === 0 ? (
                 <div className="p-6 text-center">
-                  <Calendar className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-                  <p className="text-zinc-500 text-sm">Inga bokningar idag</p>
+                  <Calendar className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">Inga bokningar idag</p>
                   <Link
                     href="/dashboard/bookings"
-                    className="inline-block mt-3 text-sm text-violet-400 hover:text-violet-300"
+                    className="inline-block mt-3 text-sm text-blue-600 hover:text-blue-500"
                   >
                     Skapa en bokning
                   </Link>
                 </div>
               ) : (
                 bookings.slice(0, 5).map((booking) => (
-                  <div key={booking.booking_id} className="p-3 hover:bg-zinc-800/30 transition-all">
+                  <div key={booking.booking_id} className="p-3 hover:bg-gray-100/30 transition-all">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center min-w-0">
-                        <div className="w-8 h-8 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 rounded-lg flex items-center justify-center border border-violet-500/30 flex-shrink-0">
-                          <Clock className="w-4 h-4 text-violet-400" />
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-lg flex items-center justify-center border border-blue-300 flex-shrink-0">
+                          <Clock className="w-4 h-4 text-blue-600" />
                         </div>
                         <div className="ml-3 min-w-0">
-                          <p className="font-medium text-white text-sm truncate">
+                          <p className="font-medium text-gray-900 text-sm truncate">
                             {booking.customer?.name || 'Okänd kund'}
                           </p>
-                          <p className="text-xs text-zinc-500 truncate">
+                          <p className="text-xs text-gray-400 truncate">
                             {getServiceFromNotes(booking.notes)}
                           </p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0 ml-2">
-                        <p className="font-medium text-white text-sm">
+                        <p className="font-medium text-gray-900 text-sm">
                           {formatTime(booking.scheduled_start)}
                         </p>
-                        <span className="inline-flex px-2 py-0.5 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span className="inline-flex px-2 py-0.5 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">
                           {booking.status === 'confirmed' ? 'Bekräftad' :
                            booking.status === 'pending' ? 'Väntar' : booking.status}
                         </span>
@@ -434,7 +434,7 @@ export default function DashboardPage() {
                 <div className="p-3 text-center">
                   <Link
                     href="/dashboard/bookings"
-                    className="text-sm text-violet-400 hover:text-violet-300"
+                    className="text-sm text-blue-600 hover:text-blue-500"
                   >
                     +{bookings.length - 5} fler bokningar
                   </Link>
@@ -447,38 +447,38 @@ export default function DashboardPage() {
           <div className="space-y-4">
             {/* Bokningar senaste 7 dagarna */}
             {stats?.bookings_per_day && stats.bookings_per_day.length > 0 && (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
-                <h3 className="text-sm font-medium text-white mb-4">Bokningar senaste 7 dagarna</h3>
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                <h3 className="text-sm font-medium text-gray-900 mb-4">Bokningar senaste 7 dagarna</h3>
                 <BookingsChart data={stats.bookings_per_day} />
               </div>
             )}
 
             {/* Dagens schema */}
-            <Link href="/dashboard/schedule" className="block bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition-all group">
+            <Link href="/dashboard/schedule" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium text-white flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4 text-violet-400" />
+                <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4 text-blue-600" />
                   Dagens schema
                 </h3>
-                <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                <ArrowRight className="w-3 h-3 text-gray-400 group-hover:text-blue-600 transition-colors" />
               </div>
               {scheduleToday.count === 0 ? (
-                <p className="text-zinc-500 text-sm">Inga schemalagda aktiviteter idag</p>
+                <p className="text-gray-400 text-sm">Inga schemalagda aktiviteter idag</p>
               ) : (
                 <>
-                  <p className="text-xs text-zinc-400 mb-2">
+                  <p className="text-xs text-gray-500 mb-2">
                     {scheduleToday.count} aktiviteter · {scheduleToday.people} {scheduleToday.people === 1 ? 'person' : 'personer'}
                   </p>
                   <div className="space-y-1.5">
                     {scheduleToday.entries.map((entry, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                        <span className="text-sm text-zinc-300 truncate flex-1">{entry.title}</span>
-                        <span className="text-xs text-zinc-500 shrink-0">{entry.time}</span>
+                        <span className="text-sm text-gray-700 truncate flex-1">{entry.title}</span>
+                        <span className="text-xs text-gray-400 shrink-0">{entry.time}</span>
                       </div>
                     ))}
                     {scheduleToday.count > 3 && (
-                      <p className="text-xs text-violet-400">+{scheduleToday.count - 3} fler</p>
+                      <p className="text-xs text-blue-600">+{scheduleToday.count - 3} fler</p>
                     )}
                   </div>
                 </>
@@ -487,31 +487,31 @@ export default function DashboardPage() {
 
             {/* Pipeline */}
             {pipelineStats && (pipelineStats.totalDeals > 0 || pipelineStats.newLeadsToday > 0) && (
-              <Link href="/dashboard/pipeline" className="block bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition-all group">
+              <Link href="/dashboard/pipeline" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-sm font-medium text-white flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-violet-400" />
+                  <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-blue-600" />
                     Pipeline
                   </h3>
-                  <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                  <ArrowRight className="w-3 h-3 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-zinc-800/50 rounded-lg text-center">
-                    <p className="text-lg font-bold text-white">{pipelineStats.totalDeals}</p>
-                    <p className="text-xs text-zinc-500">Aktiva deals</p>
+                  <div className="p-2 bg-gray-50 rounded-lg text-center">
+                    <p className="text-lg font-bold text-gray-900">{pipelineStats.totalDeals}</p>
+                    <p className="text-xs text-gray-400">Aktiva deals</p>
                   </div>
-                  <div className="p-2 bg-zinc-800/50 rounded-lg text-center">
-                    <p className="text-lg font-bold text-white">{formatCurrency(pipelineStats.totalValue)} kr</p>
-                    <p className="text-xs text-zinc-500">Totalt värde</p>
+                  <div className="p-2 bg-gray-50 rounded-lg text-center">
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(pipelineStats.totalValue)} kr</p>
+                    <p className="text-xs text-gray-400">Totalt värde</p>
                   </div>
                 </div>
                 {(pipelineStats.newLeadsToday > 0 || pipelineStats.needsFollowUp > 0) && (
                   <div className="mt-2 space-y-1">
                     {pipelineStats.newLeadsToday > 0 && (
-                      <p className="text-xs text-emerald-400">{pipelineStats.newLeadsToday} nya leads idag</p>
+                      <p className="text-xs text-emerald-600">{pipelineStats.newLeadsToday} nya leads idag</p>
                     )}
                     {pipelineStats.needsFollowUp > 0 && (
-                      <p className="text-xs text-amber-400">{pipelineStats.needsFollowUp} behöver uppföljning</p>
+                      <p className="text-xs text-amber-600">{pipelineStats.needsFollowUp} behöver uppföljning</p>
                     )}
                   </div>
                 )}
@@ -519,64 +519,64 @@ export default function DashboardPage() {
             )}
 
             {/* Snabblänkar */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
-              <h2 className="text-sm font-semibold text-white mb-3">Snabbåtgärder</h2>
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">Snabbåtgärder</h2>
               <div className="space-y-2">
                 <Link
                   href="/dashboard/calendar"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
+                  className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all group min-h-[48px]"
                 >
                   <div className="flex items-center gap-3">
-                    <Calendar className="w-5 h-5 text-violet-400" />
-                    <span className="text-sm text-white">Ny bokning</span>
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                    <span className="text-sm text-gray-900">Ny bokning</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </Link>
 
                 <Link
                   href="/dashboard/quotes/new"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
+                  className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all group min-h-[48px]"
                 >
                   <div className="flex items-center gap-3">
-                    <FileText className="w-5 h-5 text-fuchsia-400" />
-                    <span className="text-sm text-white">Ny offert</span>
+                    <FileText className="w-5 h-5 text-cyan-600" />
+                    <span className="text-sm text-gray-900">Ny offert</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-fuchsia-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-cyan-600 transition-colors" />
                 </Link>
 
                 <Link
                   href="/dashboard/calendar"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
+                  className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all group min-h-[48px]"
                 >
                   <div className="flex items-center gap-3">
-                    <Clock className="w-5 h-5 text-amber-400" />
-                    <span className="text-sm text-white">Rapportera tid</span>
+                    <Clock className="w-5 h-5 text-amber-600" />
+                    <span className="text-sm text-gray-900">Rapportera tid</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-amber-600 transition-colors" />
                 </Link>
 
                 <Link
                   href="/dashboard/assistant"
-                  className="flex items-center justify-between p-3 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-all group min-h-[48px]"
+                  className="flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 rounded-lg transition-all group min-h-[48px]"
                 >
                   <div className="flex items-center gap-3">
-                    <Mic className="w-5 h-5 text-emerald-400" />
-                    <span className="text-sm text-white">Röstassistent</span>
+                    <Mic className="w-5 h-5 text-emerald-600" />
+                    <span className="text-sm text-gray-900">Röstassistent</span>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-emerald-400 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-emerald-600 transition-colors" />
                 </Link>
               </div>
             </div>
 
             {/* Totala kunder */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-2xl font-bold text-white">{stats?.customers?.total || 0}</p>
-                  <p className="text-xs text-zinc-500">Totalt antal kunder</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats?.customers?.total || 0}</p>
+                  <p className="text-xs text-gray-400">Totalt antal kunder</p>
                 </div>
                 <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 border border-cyan-500/30">
-                  <Users className="w-5 h-5 text-cyan-400" />
+                  <Users className="w-5 h-5 text-cyan-600" />
                 </div>
               </div>
             </div>

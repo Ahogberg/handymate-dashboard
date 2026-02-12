@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -295,13 +295,13 @@ export default function QuoteDetailPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'draft': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'sent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       case 'opened': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'accepted': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      case 'declined': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      case 'expired': return 'bg-zinc-500/20 text-zinc-500 border-zinc-500/30'
-      default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+      case 'declined': return 'bg-red-100 text-red-600 border-red-500/30'
+      case 'expired': return 'bg-gray-100 text-gray-400 border-gray-300'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
 
@@ -319,29 +319,29 @@ export default function QuoteDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   if (!quote) {
     return (
-      <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Offerten hittades inte</div>
+      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Offerten hittades inte</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'}`}>
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600' : 'bg-red-100 border-red-500/30 text-red-600'}`}>
           {toast.message}
         </div>
       )}
@@ -350,12 +350,12 @@ export default function QuoteDetailPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-4">
-            <Link href="/dashboard/quotes" className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all">
+            <Link href="/dashboard/quotes" className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">{quote.title || 'Offert'}</h1>
-              <p className="text-sm text-zinc-400">Skapad {formatDate(quote.created_at)}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{quote.title || 'Offert'}</h1>
+              <p className="text-sm text-gray-500">Skapad {formatDate(quote.created_at)}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export default function QuoteDetailPage() {
           {quote.status === 'draft' && (
             <button
               onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90"
             >
               <Send className="w-4 h-4" />
               Skicka offert
@@ -380,7 +380,7 @@ export default function QuoteDetailPage() {
             <button
               onClick={generateSignLink}
               disabled={generatingSignLink}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
             >
               {generatingSignLink ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
               Signeringslänk
@@ -389,7 +389,7 @@ export default function QuoteDetailPage() {
           {['sent', 'opened'].includes(quote.status) && (
             <button
               onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
             >
               <RefreshCw className="w-4 h-4" />
               Skicka påminnelse
@@ -400,7 +400,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createProjectFromQuote}
                 disabled={creatingProject}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderKanban className="w-4 h-4" />}
                 Skapa projekt
@@ -408,7 +408,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createInvoiceFromQuote}
                 disabled={creatingInvoice}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                 Skapa faktura
@@ -418,14 +418,14 @@ export default function QuoteDetailPage() {
           <button
             onClick={generatePDF}
             disabled={generatingPdf}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
             {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
             Ladda ner PDF
           </button>
           <button
             onClick={() => { setTemplateName(quote.title || ''); setShowSaveTemplate(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
           >
             <Bookmark className="w-4 h-4" />
             Spara mall
@@ -434,14 +434,14 @@ export default function QuoteDetailPage() {
             <>
               <Link
                 href={`/dashboard/quotes/${quote.quote_id}/edit`}
-                className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
               >
                 <Edit className="w-4 h-4" />
                 Redigera
               </Link>
               <button
                 onClick={deleteQuote}
-                className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-red-400 hover:bg-red-500/10 hover:border-red-500/30"
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-red-600 hover:bg-red-500/10 hover:border-red-500/30"
               >
                 <Trash2 className="w-4 h-4" />
                 Ta bort
@@ -454,53 +454,53 @@ export default function QuoteDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Customer */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <User className="w-5 h-5 text-cyan-400" />
                 Kund
               </h2>
               {quote.customer ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-zinc-500">Namn</p>
-                    <p className="text-white">{quote.customer.name}</p>
+                    <p className="text-sm text-gray-400">Namn</p>
+                    <p className="text-gray-900">{quote.customer.name}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-zinc-500">Telefon</p>
-                    <p className="text-white">{quote.customer.phone_number}</p>
+                    <p className="text-sm text-gray-400">Telefon</p>
+                    <p className="text-gray-900">{quote.customer.phone_number}</p>
                   </div>
                   {quote.customer.email && (
                     <div>
-                      <p className="text-sm text-zinc-500">Email</p>
-                      <p className="text-white">{quote.customer.email}</p>
+                      <p className="text-sm text-gray-400">Email</p>
+                      <p className="text-gray-900">{quote.customer.email}</p>
                     </div>
                   )}
                   {quote.customer.address_line && (
                     <div>
-                      <p className="text-sm text-zinc-500">Adress</p>
-                      <p className="text-white">{quote.customer.address_line}</p>
+                      <p className="text-sm text-gray-400">Adress</p>
+                      <p className="text-gray-900">{quote.customer.address_line}</p>
                     </div>
                   )}
                 </div>
               ) : (
-                <p className="text-zinc-500">Ingen kund vald</p>
+                <p className="text-gray-400">Ingen kund vald</p>
               )}
             </div>
 
             {/* Description */}
             {quote.description && (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-                <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-amber-400" />
                   Beskrivning
                 </h2>
-                <p className="text-zinc-300">{quote.description}</p>
+                <p className="text-gray-700">{quote.description}</p>
               </div>
             )}
 
             {/* Items */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="font-semibold text-white mb-4">Specifikation</h2>
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Specifikation</h2>
               
               {/* Labor */}
               {quote.items.filter((i: any) => i.type === 'labor').length > 0 && (
@@ -508,12 +508,12 @@ export default function QuoteDetailPage() {
                   <h3 className="text-sm font-medium text-blue-400 mb-2">Arbete</h3>
                   <div className="space-y-2">
                     {quote.items.filter((i: any) => i.type === 'labor').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-zinc-800">
+                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                         <div>
-                          <p className="text-white">{item.name}</p>
-                          <p className="text-sm text-zinc-500">{item.quantity} {item.unit === 'hour' ? 'timmar' : 'st'} × {formatCurrency(item.unit_price)}</p>
+                          <p className="text-gray-900">{item.name}</p>
+                          <p className="text-sm text-gray-400">{item.quantity} {item.unit === 'hour' ? 'timmar' : 'st'} × {formatCurrency(item.unit_price)}</p>
                         </div>
-                        <p className="text-white font-medium">{formatCurrency(item.total)}</p>
+                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                       </div>
                     ))}
                   </div>
@@ -523,15 +523,15 @@ export default function QuoteDetailPage() {
               {/* Materials */}
               {quote.items.filter((i: any) => i.type === 'material').length > 0 && (
                 <div className="mb-4">
-                  <h3 className="text-sm font-medium text-emerald-400 mb-2">Material</h3>
+                  <h3 className="text-sm font-medium text-emerald-600 mb-2">Material</h3>
                   <div className="space-y-2">
                     {quote.items.filter((i: any) => i.type === 'material').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-zinc-800">
+                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                         <div>
-                          <p className="text-white">{item.name}</p>
-                          <p className="text-sm text-zinc-500">{item.quantity} st × {formatCurrency(item.unit_price)}</p>
+                          <p className="text-gray-900">{item.name}</p>
+                          <p className="text-sm text-gray-400">{item.quantity} st × {formatCurrency(item.unit_price)}</p>
                         </div>
-                        <p className="text-white font-medium">{formatCurrency(item.total)}</p>
+                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                       </div>
                     ))}
                   </div>
@@ -544,11 +544,11 @@ export default function QuoteDetailPage() {
                   <h3 className="text-sm font-medium text-amber-400 mb-2">Tjänster</h3>
                   <div className="space-y-2">
                     {quote.items.filter((i: any) => i.type === 'service').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-zinc-800">
+                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                         <div>
-                          <p className="text-white">{item.name}</p>
+                          <p className="text-gray-900">{item.name}</p>
                         </div>
-                        <p className="text-white font-medium">{formatCurrency(item.total)}</p>
+                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                       </div>
                     ))}
                   </div>
@@ -559,47 +559,47 @@ export default function QuoteDetailPage() {
 
           {/* Sidebar - Summary */}
           <div className="space-y-6">
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="font-semibold text-white mb-4">Summering</h2>
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <h2 className="font-semibold text-gray-900 mb-4">Summering</h2>
 
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Arbete</span>
-                  <span className="text-white">{formatCurrency(quote.labor_total)}</span>
+                  <span className="text-gray-500">Arbete</span>
+                  <span className="text-gray-900">{formatCurrency(quote.labor_total)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Material</span>
-                  <span className="text-white">{formatCurrency(quote.material_total)}</span>
+                  <span className="text-gray-500">Material</span>
+                  <span className="text-gray-900">{formatCurrency(quote.material_total)}</span>
                 </div>
-                <div className="border-t border-zinc-700 pt-3 flex justify-between">
-                  <span className="text-zinc-400">Summa</span>
-                  <span className="text-white">{formatCurrency(quote.subtotal)}</span>
+                <div className="border-t border-gray-300 pt-3 flex justify-between">
+                  <span className="text-gray-500">Summa</span>
+                  <span className="text-gray-900">{formatCurrency(quote.subtotal)}</span>
                 </div>
                 {quote.discount_amount > 0 && (
-                  <div className="flex justify-between text-emerald-400">
+                  <div className="flex justify-between text-emerald-600">
                     <span>Rabatt ({quote.discount_percent}%)</span>
                     <span>-{formatCurrency(quote.discount_amount)}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-zinc-400">Moms ({quote.vat_rate}%)</span>
-                  <span className="text-white">{formatCurrency(quote.vat_amount)}</span>
+                  <span className="text-gray-500">Moms ({quote.vat_rate}%)</span>
+                  <span className="text-gray-900">{formatCurrency(quote.vat_amount)}</span>
                 </div>
-                <div className="border-t border-zinc-700 pt-3 flex justify-between text-lg font-semibold">
-                  <span className="text-white">Totalt</span>
-                  <span className="text-white">{formatCurrency(quote.total)}</span>
+                <div className="border-t border-gray-300 pt-3 flex justify-between text-lg font-semibold">
+                  <span className="text-gray-900">Totalt</span>
+                  <span className="text-gray-900">{formatCurrency(quote.total)}</span>
                 </div>
 
                 {quote.rot_rut_type && (
                   <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="text-emerald-400">{quote.rot_rut_type.toUpperCase()}-avdrag</span>
-                      <span className="text-emerald-400">-{formatCurrency(quote.rot_rut_deduction)}</span>
+                      <span className="text-emerald-600">{quote.rot_rut_type.toUpperCase()}-avdrag</span>
+                      <span className="text-emerald-600">-{formatCurrency(quote.rot_rut_deduction)}</span>
                     </div>
                     <div className="border-t border-emerald-500/30 pt-2 mt-2">
                       <div className="flex justify-between font-semibold">
-                        <span className="text-white">Kund betalar</span>
-                        <span className="text-emerald-400">{formatCurrency(quote.customer_pays)}</span>
+                        <span className="text-gray-900">Kund betalar</span>
+                        <span className="text-emerald-600">{formatCurrency(quote.customer_pays)}</span>
                       </div>
                     </div>
                   </div>
@@ -608,49 +608,49 @@ export default function QuoteDetailPage() {
             </div>
 
             {/* Timeline */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
-              <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-violet-400" />
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
                 Historik
               </h2>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-zinc-500 rounded-full"></div>
-                  <span className="text-zinc-400">Skapad {formatDate(quote.created_at)}</span>
+                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                  <span className="text-gray-500">Skapad {formatDate(quote.created_at)}</span>
                 </div>
                 {quote.sent_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-zinc-400">Skickad {formatDate(quote.sent_at)}</span>
+                    <span className="text-gray-500">Skickad {formatDate(quote.sent_at)}</span>
                   </div>
                 )}
                 {quote.opened_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                    <span className="text-zinc-400">Öppnad {formatDate(quote.opened_at)}</span>
+                    <span className="text-gray-500">Öppnad {formatDate(quote.opened_at)}</span>
                   </div>
                 )}
                 {quote.accepted_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-zinc-400">Accepterad {formatDate(quote.accepted_at)}</span>
+                    <span className="text-gray-500">Accepterad {formatDate(quote.accepted_at)}</span>
                   </div>
                 )}
                 {(quote as any).signed_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-zinc-400">Signerad av {(quote as any).signed_by_name} {formatDate((quote as any).signed_at)}</span>
+                    <span className="text-gray-500">Signerad av {(quote as any).signed_by_name} {formatDate((quote as any).signed_at)}</span>
                   </div>
                 )}
                 {quote.declined_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-zinc-400">Nekad {formatDate(quote.declined_at)}</span>
+                    <span className="text-gray-500">Nekad {formatDate(quote.declined_at)}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-zinc-700 rounded-full"></div>
-                  <span className="text-zinc-500">Giltig till {formatDate(quote.valid_until)}</span>
+                  <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
+                  <span className="text-gray-400">Giltig till {formatDate(quote.valid_until)}</span>
                 </div>
               </div>
             </div>
@@ -661,9 +661,9 @@ export default function QuoteDetailPage() {
       {/* Send Modal */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-900 rounded-2xl border border-zinc-800 w-full max-w-md p-6">
-            <h2 className="text-xl font-semibold text-white mb-4">Skicka offert</h2>
-            <p className="text-zinc-400 text-sm mb-6">
+          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Skicka offert</h2>
+            <p className="text-gray-500 text-sm mb-6">
               Välj hur du vill skicka offerten till {quote.customer?.name}
             </p>
 
@@ -672,8 +672,8 @@ export default function QuoteDetailPage() {
                 onClick={() => setSendMethod('sms')}
                 className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                   sendMethod === 'sms'
-                    ? 'bg-violet-500/20 border-violet-500 text-white'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'
+                    ? 'bg-blue-100 border-blue-500 text-gray-900'
+                    : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                 }`}
               >
                 <MessageSquare className="w-5 h-5" />
@@ -688,8 +688,8 @@ export default function QuoteDetailPage() {
                   onClick={() => setSendMethod('email')}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                     sendMethod === 'email'
-                      ? 'bg-violet-500/20 border-violet-500 text-white'
-                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'
+                      ? 'bg-blue-100 border-blue-500 text-gray-900'
+                      : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                   }`}
                 >
                   <Mail className="w-5 h-5" />
@@ -705,8 +705,8 @@ export default function QuoteDetailPage() {
                   onClick={() => setSendMethod('both')}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                     sendMethod === 'both'
-                      ? 'bg-violet-500/20 border-violet-500 text-white'
-                      : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'
+                      ? 'bg-blue-100 border-blue-500 text-gray-900'
+                      : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                   }`}
                 >
                   <Send className="w-5 h-5" />
@@ -721,14 +721,14 @@ export default function QuoteDetailPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSendModal(false)}
-                className="flex-1 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
               <button
                 onClick={sendQuote}
                 disabled={sending}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Skicka
@@ -740,31 +740,31 @@ export default function QuoteDetailPage() {
 
       {/* Save as Template Modal */}
       {showSaveTemplate && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSaveTemplate(false)}>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-white mb-4">Spara som mall</h3>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSaveTemplate(false)}>
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Spara som mall</h3>
             <div className="mb-4">
-              <label className="block text-sm text-zinc-400 mb-1">Mallnamn</label>
+              <label className="block text-sm text-gray-500 mb-1">Mallnamn</label>
               <input
                 type="text"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSaveTemplate(false)}
-                className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
               </button>

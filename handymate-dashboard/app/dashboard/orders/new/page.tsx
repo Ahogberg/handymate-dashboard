@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -204,43 +204,43 @@ export default function NewOrderPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/dashboard/orders" className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg">
+          <Link href="/dashboard/orders" className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Ny materialbeställning</h1>
-            <p className="text-sm text-zinc-400">Beställ material från din grossist</p>
+            <h1 className="text-2xl font-bold text-gray-900">Ny materialbeställning</h1>
+            <p className="text-sm text-gray-500">Beställ material från din grossist</p>
           </div>
         </div>
 
         {/* Form */}
         <div className="space-y-6">
           {/* Supplier & Delivery */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Leverantör</label>
+                <label className="block text-sm text-gray-500 mb-2">Leverantör</label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Välj leverantör...</option>
                   {suppliers.map(s => (
@@ -250,63 +250,63 @@ export default function NewOrderPage() {
                   ))}
                 </select>
                 {supplierId && !suppliers.find(s => s.supplier_id === supplierId)?.contact_email && (
-                  <p className="text-xs text-amber-400 mt-1">Leverantören saknar email - beställningen kan inte skickas digitalt</p>
+                  <p className="text-xs text-amber-600 mt-1">Leverantören saknar email - beställningen kan inte skickas digitalt</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Leveransadress</label>
+                <label className="block text-sm text-gray-500 mb-2">Leveransadress</label>
                 <input
                   type="text"
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                   placeholder="Adress för leverans"
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm text-zinc-400 mb-2">Meddelande till leverantör</label>
+              <label className="block text-sm text-gray-500 mb-2">Meddelande till leverantör</label>
               <textarea
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ev. önskemål om leverans, brådskande etc."
                 rows={2}
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
               />
             </div>
           </div>
 
           {/* Products */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Produkter</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Produkter</h2>
               <div className="flex gap-2">
                 <div className="relative">
                   <button
                     onClick={() => setShowProductSearch(!showProductSearch)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
                   >
                     <Search className="w-4 h-4" />
                     Sök produkt
                   </button>
 
                   {showProductSearch && (
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-10">
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-gray-100 border border-gray-300 rounded-xl shadow-xl z-10">
                       <div className="p-2">
                         <input
                           type="text"
                           value={productSearch}
                           onChange={(e) => setProductSearch(e.target.value)}
                           placeholder="Sök på namn eller artikelnummer..."
-                          className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none"
+                          className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none"
                           autoFocus
                         />
                       </div>
                       <div className="max-h-60 overflow-y-auto">
                         {filteredProducts.length === 0 ? (
-                          <p className="p-4 text-center text-zinc-500 text-sm">
+                          <p className="p-4 text-center text-gray-400 text-sm">
                             {products.length === 0 ? 'Inga produkter i prislistan' : 'Inga produkter hittades'}
                           </p>
                         ) : (
@@ -314,16 +314,16 @@ export default function NewOrderPage() {
                             <button
                               key={product.product_id}
                               onClick={() => addProduct(product)}
-                              className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-zinc-700 transition-all"
+                              className="w-full flex items-center justify-between px-4 py-2 text-left hover:bg-gray-200 transition-all"
                             >
                               <div>
-                                <p className="text-white text-sm">{product.name}</p>
-                                <p className="text-xs text-zinc-500">
+                                <p className="text-gray-900 text-sm">{product.name}</p>
+                                <p className="text-xs text-gray-400">
                                   {product.sku && `${product.sku} • `}
                                   {product.supplier?.name}
                                 </p>
                               </div>
-                              <span className="text-zinc-400 text-sm">
+                              <span className="text-gray-500 text-sm">
                                 {product.purchase_price?.toLocaleString('sv-SE')} kr
                               </span>
                             </button>
@@ -335,7 +335,7 @@ export default function NewOrderPage() {
                 </div>
                 <button
                   onClick={addEmptyItem}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-400 hover:bg-violet-500/30"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 border border-blue-300 rounded-xl text-blue-600 hover:bg-blue-500/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till rad
@@ -344,46 +344,46 @@ export default function NewOrderPage() {
             </div>
 
             {items.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-zinc-700 rounded-xl">
-                <Package className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-500 mb-2">Inga produkter ännu</p>
-                <p className="text-sm text-zinc-600">Sök i prislistan eller lägg till manuellt</p>
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl">
+                <Package className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-400 mb-2">Inga produkter ännu</p>
+                <p className="text-sm text-gray-400">Sök i prislistan eller lägg till manuellt</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <div key={index} className="flex flex-wrap items-end gap-3 p-4 bg-zinc-800/50 rounded-xl">
+                  <div key={index} className="flex flex-wrap items-end gap-3 p-4 bg-gray-50 rounded-xl">
                     {item.sku && (
                       <div className="w-24">
-                        <label className="block text-xs text-zinc-500 mb-1">Art.nr</label>
-                        <p className="py-2 text-zinc-400 text-sm font-mono">{item.sku}</p>
+                        <label className="block text-xs text-gray-400 mb-1">Art.nr</label>
+                        <p className="py-2 text-gray-500 text-sm font-mono">{item.sku}</p>
                       </div>
                     )}
                     <div className="flex-1 min-w-[200px]">
-                      <label className="block text-xs text-zinc-500 mb-1">Produkt</label>
+                      <label className="block text-xs text-gray-400 mb-1">Produkt</label>
                       <input
                         type="text"
                         value={item.name}
                         onChange={(e) => updateItem(index, 'name', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-20">
-                      <label className="block text-xs text-zinc-500 mb-1">Antal</label>
+                      <label className="block text-xs text-gray-400 mb-1">Antal</label>
                       <input
                         type="number"
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-20">
-                      <label className="block text-xs text-zinc-500 mb-1">Enhet</label>
+                      <label className="block text-xs text-gray-400 mb-1">Enhet</label>
                       <select
                         value={item.unit}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       >
                         <option value="st">st</option>
                         <option value="m">m</option>
@@ -393,21 +393,21 @@ export default function NewOrderPage() {
                       </select>
                     </div>
                     <div className="w-24">
-                      <label className="block text-xs text-zinc-500 mb-1">Inköpspris</label>
+                      <label className="block text-xs text-gray-400 mb-1">Inköpspris</label>
                       <input
                         type="number"
                         value={item.unit_price}
                         onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-24 text-right">
-                      <label className="block text-xs text-zinc-500 mb-1">Summa</label>
-                      <p className="py-2 text-white font-medium">{item.total.toLocaleString('sv-SE')} kr</p>
+                      <label className="block text-xs text-gray-400 mb-1">Summa</label>
+                      <p className="py-2 text-gray-900 font-medium">{item.total.toLocaleString('sv-SE')} kr</p>
                     </div>
                     <button
                       onClick={() => removeItem(index)}
-                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -418,13 +418,13 @@ export default function NewOrderPage() {
           </div>
 
           {/* Total */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="max-w-sm ml-auto">
-              <div className="flex justify-between text-xl font-bold text-white">
+              <div className="flex justify-between text-xl font-bold text-gray-900">
                 <span>Totalt inköpsvärde</span>
                 <span>{total.toLocaleString('sv-SE')} kr</span>
               </div>
-              <p className="text-sm text-zinc-500 text-right mt-1">exkl. moms</p>
+              <p className="text-sm text-gray-400 text-right mt-1">exkl. moms</p>
             </div>
           </div>
 
@@ -432,14 +432,14 @@ export default function NewOrderPage() {
           <div className="flex justify-end gap-4">
             <Link
               href="/dashboard/orders"
-              className="px-6 py-3 text-zinc-400 hover:text-white"
+              className="px-6 py-3 text-gray-500 hover:text-gray-900"
             >
               Avbryt
             </Link>
             <button
               onClick={handleCreate}
               disabled={creating || items.length === 0}
-              className="flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Skapa beställning

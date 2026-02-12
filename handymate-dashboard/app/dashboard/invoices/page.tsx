@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import {
@@ -148,12 +148,12 @@ export default function InvoicesPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'draft': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-      case 'sent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'paid': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      case 'overdue': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      case 'cancelled': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-      default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'sent': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
+      case 'overdue': return 'bg-red-100 text-red-600 border-red-200'
+      case 'cancelled': return 'bg-gray-100 text-gray-500 border-gray-300'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
 
@@ -213,24 +213,24 @@ export default function InvoicesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -240,12 +240,12 @@ export default function InvoicesPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-1">Fakturor</h1>
-            <p className="text-sm text-zinc-400">Hantera och skicka fakturor</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Fakturor</h1>
+            <p className="text-sm text-gray-500">Hantera och skicka fakturor</p>
           </div>
           <Link
             href="/dashboard/invoices/new"
-            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny faktura
@@ -254,53 +254,53 @@ export default function InvoicesPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-500/20 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
                 <Clock className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.unpaidCount} st</p>
-                <p className="text-xs text-zinc-500">Obetalda</p>
+                <p className="text-xl font-bold text-gray-900">{stats.unpaidCount} st</p>
+                <p className="text-xs text-gray-400">Obetalda</p>
                 <p className="text-xs text-blue-400">{stats.unpaidValue.toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
-          <div className={`border rounded-xl p-4 ${stats.overdue > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-zinc-900/50 border-zinc-800'}`}>
+          <div className={`border rounded-xl p-4 ${stats.overdue > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stats.overdue > 0 ? 'bg-red-500/20' : 'bg-zinc-800'}`}>
-                <AlertCircle className={`w-5 h-5 ${stats.overdue > 0 ? 'text-red-400' : 'text-zinc-500'}`} />
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stats.overdue > 0 ? 'bg-red-100' : 'bg-gray-100'}`}>
+                <AlertCircle className={`w-5 h-5 ${stats.overdue > 0 ? 'text-red-600' : 'text-gray-400'}`} />
               </div>
               <div>
-                <p className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-400' : 'text-white'}`}>{stats.overdue} st</p>
-                <p className="text-xs text-zinc-500">Förfallna</p>
+                <p className={`text-xl font-bold ${stats.overdue > 0 ? 'text-red-600' : 'text-gray-900'}`}>{stats.overdue} st</p>
+                <p className="text-xs text-gray-400">Förfallna</p>
                 {stats.overdue > 0 && (
-                  <p className="text-xs text-red-400">{stats.overdueValue.toLocaleString('sv-SE')} kr</p>
+                  <p className="text-xs text-red-600">{stats.overdueValue.toLocaleString('sv-SE')} kr</p>
                 )}
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.paid}</p>
-                <p className="text-xs text-zinc-500">Betalda totalt</p>
-                <p className="text-xs text-emerald-400">{stats.paidValue.toLocaleString('sv-SE')} kr</p>
+                <p className="text-xl font-bold text-gray-900">{stats.paid}</p>
+                <p className="text-xs text-gray-400">Betalda totalt</p>
+                <p className="text-xs text-emerald-600">{stats.paidValue.toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xl font-bold text-white">{stats.paidThisMonthValue.toLocaleString('sv-SE')}</p>
-                <p className="text-xs text-zinc-500">kr inbetalt</p>
-                <p className="text-xs text-zinc-400">denna månad</p>
+                <p className="text-xl font-bold text-gray-900">{stats.paidThisMonthValue.toLocaleString('sv-SE')}</p>
+                <p className="text-xs text-gray-400">kr inbetalt</p>
+                <p className="text-xs text-gray-500">denna månad</p>
               </div>
             </div>
           </div>
@@ -308,7 +308,7 @@ export default function InvoicesPage() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl p-1 overflow-x-auto">
+          <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
             {[
               { id: 'all', label: 'Alla' },
               { id: 'draft', label: 'Utkast' },
@@ -320,7 +320,7 @@ export default function InvoicesPage() {
                 key={f.id}
                 onClick={() => setFilter(f.id as typeof filter)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === f.id ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white' : 'text-zinc-400 hover:text-white'
+                  filter === f.id ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-white'
                 }`}
               >
                 {f.label}
@@ -329,26 +329,26 @@ export default function InvoicesPage() {
           </div>
 
           <div className="relative flex-1 max-w-xs">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Sök faktura..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
         </div>
 
         {/* Invoice List */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
           {filteredInvoices.length === 0 ? (
             <div className="p-12 text-center">
-              <FileText className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-              <p className="text-zinc-400 mb-2">Inga fakturor hittades</p>
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">Inga fakturor hittades</p>
               <Link
                 href="/dashboard/invoices/new"
-                className="text-violet-400 hover:text-violet-300 text-sm"
+                className="text-blue-600 hover:text-blue-500 text-sm"
               >
                 Skapa din första faktura →
               </Link>
@@ -356,13 +356,13 @@ export default function InvoicesPage() {
           ) : (
             <>
               {/* Mobile Card View */}
-              <div className="sm:hidden divide-y divide-zinc-800">
+              <div className="sm:hidden divide-y divide-gray-200">
                 {filteredInvoices.map((invoice) => (
                   <div key={invoice.invoice_id} className="p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-white hover:text-violet-400">
+                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-gray-900 hover:text-blue-600">
                             #{invoice.invoice_number}
                           </Link>
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
@@ -370,25 +370,25 @@ export default function InvoicesPage() {
                             {getStatusText(invoice.status)}
                           </span>
                           {invoice.fortnox_invoice_number ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-600 border border-emerald-500/20">
                               FN:{invoice.fortnox_invoice_number}
                             </span>
                           ) : invoice.fortnox_sync_error ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-500/10 text-red-400 border border-red-500/20" title={invoice.fortnox_sync_error}>
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-red-50 text-red-600 border border-red-500/20" title={invoice.fortnox_sync_error}>
                               <AlertCircle className="w-3 h-3" />
                               Synkfel
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-sm text-zinc-400 mt-1">{invoice.customer?.name || 'Ingen kund'}</p>
-                        <div className="flex items-center gap-2 mt-1 text-xs text-zinc-500">
+                        <p className="text-sm text-gray-500 mt-1">{invoice.customer?.name || 'Ingen kund'}</p>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400">
                           <span>Förfaller {new Date(invoice.due_date).toLocaleDateString('sv-SE')}</span>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="font-bold text-white">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+                        <p className="font-bold text-gray-900">{invoice.total?.toLocaleString('sv-SE')} kr</p>
                         {invoice.rot_rut_type && (
-                          <p className="text-xs text-emerald-400">
+                          <p className="text-xs text-emerald-600">
                             {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
                           </p>
                         )}
@@ -399,7 +399,7 @@ export default function InvoicesPage() {
                         href={`/api/invoices/pdf?invoiceId=${invoice.invoice_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 flex items-center justify-center gap-2 p-2.5 text-zinc-400 hover:text-white bg-zinc-800/50 rounded-lg min-h-[44px]"
+                        className="flex-1 flex items-center justify-center gap-2 p-2.5 text-gray-500 hover:text-gray-900 bg-gray-50 rounded-lg min-h-[44px]"
                       >
                         <Eye className="w-4 h-4" />
                         Visa PDF
@@ -409,14 +409,14 @@ export default function InvoicesPage() {
                           <button
                             onClick={() => handleSend(invoice.invoice_id)}
                             disabled={sendingId === invoice.invoice_id}
-                            className="flex-1 flex items-center justify-center gap-2 p-2.5 text-violet-400 bg-violet-500/10 rounded-lg min-h-[44px] disabled:opacity-50"
+                            className="flex-1 flex items-center justify-center gap-2 p-2.5 text-blue-600 bg-blue-50 rounded-lg min-h-[44px] disabled:opacity-50"
                           >
                             <Send className="w-4 h-4" />
                             Skicka
                           </button>
                           <button
                             onClick={() => handleDelete(invoice.invoice_id)}
-                            className="p-2.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
+                            className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -425,7 +425,7 @@ export default function InvoicesPage() {
                       {invoice.status === 'sent' && (
                         <button
                           onClick={() => handleMarkPaid(invoice.invoice_id)}
-                          className="flex-1 flex items-center justify-center gap-2 p-2.5 text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-lg min-h-[44px]"
+                          className="flex-1 flex items-center justify-center gap-2 p-2.5 text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-lg min-h-[44px]"
                         >
                           <CheckCircle className="w-4 h-4" />
                           Betald
@@ -435,7 +435,7 @@ export default function InvoicesPage() {
                         <button
                           onClick={() => handleSyncToFortnox(invoice.invoice_id)}
                           disabled={syncingId === invoice.invoice_id}
-                          className="p-2.5 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
+                          className="p-2.5 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center disabled:opacity-50"
                           title="Synka till Fortnox"
                         >
                           {syncingId === invoice.invoice_id ? (
@@ -454,39 +454,39 @@ export default function InvoicesPage() {
               <div className="overflow-x-auto hidden sm:block">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b border-zinc-800">
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Faktura</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Kund</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Datum</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Förfaller</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Belopp</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Fortnox</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium text-zinc-500 uppercase">Åtgärder</th>
+                    <tr className="border-b border-gray-200">
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Faktura</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Kund</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Datum</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Förfaller</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Belopp</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Fortnox</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Åtgärder</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-zinc-800">
+                  <tbody className="divide-y divide-gray-200">
                     {filteredInvoices.map((invoice) => (
-                      <tr key={invoice.invoice_id} className="hover:bg-zinc-800/30 transition-all">
+                      <tr key={invoice.invoice_id} className="hover:bg-gray-100/30 transition-all">
                         <td className="px-6 py-4">
-                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-white hover:text-violet-400">
+                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-gray-900 hover:text-blue-600">
                             #{invoice.invoice_number}
                           </Link>
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-white">{invoice.customer?.name || 'Ingen kund'}</p>
-                          <p className="text-sm text-zinc-500">{invoice.customer?.email || ''}</p>
+                          <p className="text-gray-900">{invoice.customer?.name || 'Ingen kund'}</p>
+                          <p className="text-sm text-gray-400">{invoice.customer?.email || ''}</p>
                         </td>
-                        <td className="px-6 py-4 text-zinc-400">
+                        <td className="px-6 py-4 text-gray-500">
                           {new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}
                         </td>
-                        <td className="px-6 py-4 text-zinc-400">
+                        <td className="px-6 py-4 text-gray-500">
                           {new Date(invoice.due_date).toLocaleDateString('sv-SE')}
                         </td>
                         <td className="px-6 py-4">
-                          <p className="text-white font-medium">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+                          <p className="text-gray-900 font-medium">{invoice.total?.toLocaleString('sv-SE')} kr</p>
                           {invoice.rot_rut_type && (
-                            <p className="text-xs text-emerald-400">
+                            <p className="text-xs text-emerald-600">
                               {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
                             </p>
                           )}
@@ -499,12 +499,12 @@ export default function InvoicesPage() {
                         </td>
                         <td className="px-6 py-4">
                           {invoice.fortnox_invoice_number ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-emerald-50 text-emerald-600 border border-emerald-500/20">
                               <CheckCircle className="w-3 h-3" />
                               {invoice.fortnox_invoice_number}
                             </span>
                           ) : invoice.fortnox_sync_error ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-red-500/10 text-red-400 border border-red-500/20 cursor-help" title={invoice.fortnox_sync_error}>
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-red-50 text-red-600 border border-red-500/20 cursor-help" title={invoice.fortnox_sync_error}>
                               <AlertCircle className="w-3 h-3" />
                               Fel
                             </span>
@@ -512,7 +512,7 @@ export default function InvoicesPage() {
                             <button
                               onClick={() => handleSyncToFortnox(invoice.invoice_id)}
                               disabled={syncingId === invoice.invoice_id}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-zinc-800 text-zinc-400 hover:text-violet-300 hover:bg-violet-500/10 border border-zinc-700 hover:border-violet-500/30 transition-colors disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-gray-100 text-gray-500 hover:text-blue-500 hover:bg-blue-50 border border-gray-300 hover:border-blue-300 transition-colors disabled:opacity-50"
                             >
                               {syncingId === invoice.invoice_id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -522,7 +522,7 @@ export default function InvoicesPage() {
                               Synka
                             </button>
                           ) : (
-                            <span className="text-xs text-zinc-600">-</span>
+                            <span className="text-xs text-gray-400">-</span>
                           )}
                         </td>
                         <td className="px-6 py-4">
@@ -531,7 +531,7 @@ export default function InvoicesPage() {
                               href={`/api/invoices/pdf?invoiceId=${invoice.invoice_id}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
                               title="Visa PDF"
                             >
                               <Eye className="w-4 h-4" />
@@ -542,14 +542,14 @@ export default function InvoicesPage() {
                                 <button
                                   onClick={() => handleSend(invoice.invoice_id)}
                                   disabled={sendingId === invoice.invoice_id}
-                                  className="p-2 text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 rounded-lg transition-all disabled:opacity-50 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all disabled:opacity-50 min-w-[40px] min-h-[40px] flex items-center justify-center"
                                   title="Skicka"
                                 >
                                   <Send className="w-4 h-4" />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(invoice.invoice_id)}
-                                  className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
+                                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[40px] min-h-[40px] flex items-center justify-center"
                                   title="Ta bort"
                                 >
                                   <Trash2 className="w-4 h-4" />
@@ -560,7 +560,7 @@ export default function InvoicesPage() {
                             {invoice.status === 'sent' && (
                               <button
                                 onClick={() => handleMarkPaid(invoice.invoice_id)}
-                                className="px-3 py-1.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-lg min-h-[36px]"
+                                className="px-3 py-1.5 text-xs font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg min-h-[36px]"
                               >
                                 Markera betald
                               </button>

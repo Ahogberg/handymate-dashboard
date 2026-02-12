@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -138,19 +138,19 @@ function getStatusBadge(status: string) {
   switch (status) {
     case 'draft':
       return (
-        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-zinc-800 text-zinc-300 rounded-full">
+        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-700 rounded-full">
           <Clock className="w-3 h-3" /> Utkast
         </span>
       )
     case 'completed':
       return (
-        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-violet-500/20 text-violet-300 rounded-full">
+        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-500 rounded-full">
           <CheckCircle2 className="w-3 h-3" /> Klar
         </span>
       )
     case 'signed':
       return (
-        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-emerald-500/20 text-emerald-300 rounded-full">
+        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">
           <PenTool className="w-3 h-3" /> Signerad
         </span>
       )
@@ -457,7 +457,7 @@ export default function DocumentsPage() {
         if (ctx) {
           canvas.width = canvas.offsetWidth
           canvas.height = canvas.offsetHeight
-          ctx.strokeStyle = '#fff'
+          ctx.strokeStyle = '#1e293b'
           ctx.lineWidth = 2
           ctx.lineCap = 'round'
         }
@@ -576,25 +576,25 @@ export default function DocumentsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-white">
+    <div className="min-h-screen bg-slate-50 text-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 md:ml-64">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Dokument</h1>
-            <p className="text-zinc-400 text-sm mt-1">Mallar, protokoll och intyg</p>
+            <p className="text-gray-500 text-sm mt-1">Mallar, protokoll och intyg</p>
           </div>
           <button
             onClick={startCreate}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 rounded-xl font-medium text-sm transition-all shadow-lg shadow-violet-500/25"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 rounded-xl font-medium text-sm transition-all shadow-lg shadow-blue-500/10"
           >
             <Plus className="w-4 h-4" /> Nytt dokument
           </button>
@@ -602,16 +602,16 @@ export default function DocumentsPage() {
 
         {/* Tabs + Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-zinc-900/50 rounded-xl p-1 border border-zinc-800">
+          <div className="flex bg-white rounded-xl p-1 border border-gray-200">
             <button
               onClick={() => { setView('documents'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-blue-600 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Mina dokument ({documents.length})
             </button>
             <button
               onClick={() => { setView('templates'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'templates' ? 'bg-violet-600 text-white' : 'text-zinc-400 hover:text-white'}`}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'templates' ? 'bg-blue-600 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Mallar ({templates.length})
             </button>
@@ -619,20 +619,20 @@ export default function DocumentsPage() {
 
           <div className="flex-1 flex gap-3">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Sök dokument..."
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-violet-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-500"
               />
             </div>
             {view === 'documents' && (
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2.5 bg-zinc-900/50 border border-zinc-800 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
               >
                 <option value="">Alla status</option>
                 <option value="draft">Utkast</option>
@@ -647,11 +647,11 @@ export default function DocumentsPage() {
         <div className="flex gap-6">
           {/* Category sidebar */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-xl p-3">
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-3">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                  !selectedCategory ? 'bg-violet-500/20 text-violet-300' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                  !selectedCategory ? 'bg-blue-100 text-blue-500' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 <FolderOpen className="w-4 h-4" />
@@ -662,7 +662,7 @@ export default function DocumentsPage() {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                    selectedCategory === cat.id ? 'bg-violet-500/20 text-violet-300' : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+                    selectedCategory === cat.id ? 'bg-blue-100 text-blue-500' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   {getCategoryIcon(cat.icon, 'w-4 h-4')}
@@ -678,7 +678,7 @@ export default function DocumentsPage() {
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                  !selectedCategory ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  !selectedCategory ? 'bg-blue-600 text-gray-900' : 'bg-gray-100 text-gray-500'
                 }`}
               >
                 Alla
@@ -688,7 +688,7 @@ export default function DocumentsPage() {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                    selectedCategory === cat.id ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                    selectedCategory === cat.id ? 'bg-blue-600 text-gray-900' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {cat.name}
@@ -703,12 +703,12 @@ export default function DocumentsPage() {
               /* Documents list */
               filteredDocuments.length === 0 ? (
                 <div className="text-center py-16">
-                  <FileText className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                  <p className="text-zinc-400 text-lg mb-2">Inga dokument ännu</p>
-                  <p className="text-zinc-500 text-sm mb-6">Skapa ditt första dokument från en mall</p>
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg mb-2">Inga dokument ännu</p>
+                  <p className="text-gray-400 text-sm mb-6">Skapa ditt första dokument från en mall</p>
                   <button
                     onClick={startCreate}
-                    className="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-sm font-medium"
+                    className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl text-sm font-medium"
                   >
                     <Plus className="w-4 h-4 inline mr-2" /> Nytt dokument
                   </button>
@@ -718,18 +718,18 @@ export default function DocumentsPage() {
                   {filteredDocuments.map(doc => (
                     <div
                       key={doc.id}
-                      className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-all group"
+                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all group"
                     >
                       <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-violet-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {doc.template?.category ? getCategoryIcon(doc.template.category.icon, 'w-5 h-5 text-violet-400') : <FileText className="w-5 h-5 text-violet-400" />}
+                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {doc.template?.category ? getCategoryIcon(doc.template.category.icon, 'w-5 h-5 text-blue-600') : <FileText className="w-5 h-5 text-blue-600" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-sm font-medium text-white truncate">{doc.title}</h3>
+                            <h3 className="text-sm font-medium text-gray-900 truncate">{doc.title}</h3>
                             {getStatusBadge(doc.status)}
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
                             {doc.template && (
                               <span className="flex items-center gap-1">
                                 <FileText className="w-3 h-3" /> {doc.template.name}
@@ -753,7 +753,7 @@ export default function DocumentsPage() {
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => viewDocument(doc)}
-                            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                             title="Förhandsgranska"
                           >
                             <Eye className="w-4 h-4" />
@@ -761,7 +761,7 @@ export default function DocumentsPage() {
                           {doc.status === 'draft' && (
                             <button
                               onClick={() => openEdit(doc)}
-                              className="p-2 text-zinc-400 hover:text-violet-400 hover:bg-zinc-800 rounded-lg transition-all"
+                              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all"
                               title="Redigera"
                             >
                               <PenTool className="w-4 h-4" />
@@ -770,7 +770,7 @@ export default function DocumentsPage() {
                           {(doc.status === 'draft' || doc.status === 'completed') && (
                             <button
                               onClick={() => openSign(doc)}
-                              className="p-2 text-zinc-400 hover:text-emerald-400 hover:bg-zinc-800 rounded-lg transition-all"
+                              className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-gray-100 rounded-lg transition-all"
                               title="Signera"
                             >
                               <Check className="w-4 h-4" />
@@ -781,7 +781,7 @@ export default function DocumentsPage() {
                               e.stopPropagation()
                               setContextMenu({ docId: doc.id, x: e.clientX, y: e.clientY })
                             }}
-                            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+                            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                           >
                             <MoreVertical className="w-4 h-4" />
                           </button>
@@ -795,48 +795,48 @@ export default function DocumentsPage() {
               /* Templates grid */
               filteredTemplates.length === 0 ? (
                 <div className="text-center py-16">
-                  <FileText className="w-12 h-12 text-zinc-700 mx-auto mb-4" />
-                  <p className="text-zinc-400">Inga mallar hittades</p>
+                  <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Inga mallar hittades</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                   {filteredTemplates.map(tpl => (
                     <div
                       key={tpl.id}
-                      className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-xl p-5 hover:border-violet-500/50 transition-all group cursor-pointer"
+                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 hover:border-blue-300 transition-all group cursor-pointer"
                       onClick={() => { selectTemplate(tpl); setShowCreate(true) }}
                     >
                       <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 bg-violet-500/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-violet-400') : <FileText className="w-5 h-5 text-violet-400" />}
+                        <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-blue-600') : <FileText className="w-5 h-5 text-blue-600" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-medium text-white mb-0.5">{tpl.name}</h3>
-                          <p className="text-xs text-zinc-500">{tpl.category?.name}</p>
+                          <h3 className="text-sm font-medium text-gray-900 mb-0.5">{tpl.name}</h3>
+                          <p className="text-xs text-gray-400">{tpl.category?.name}</p>
                         </div>
                         {tpl.is_system ? (
-                          <span className="px-2 py-0.5 bg-violet-500/10 text-violet-400 text-xs rounded-full">System</span>
+                          <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs rounded-full">System</span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded-full">Egen</span>
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">Egen</span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-400 mb-3 line-clamp-2">{tpl.description}</p>
+                      <p className="text-xs text-gray-500 mb-3 line-clamp-2">{tpl.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-zinc-600">{(tpl.variables || []).filter((v: any) => v.source === 'input').length} fält att fylla i</span>
+                        <span className="text-xs text-gray-400">{(tpl.variables || []).filter((v: any) => v.source === 'input').length} fält att fylla i</span>
                         <div className="flex gap-1">
                           <button
                             onClick={(e) => { e.stopPropagation(); duplicateTemplate(tpl) }}
-                            className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
                             title="Kopiera mall"
                           >
                             <Copy className="w-3.5 h-3.5" />
                           </button>
-                          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                          <ChevronRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                         </div>
                       </div>
                       {tpl.branch && (
-                        <div className="mt-2 pt-2 border-t border-zinc-800">
-                          <span className="text-xs text-zinc-600">
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <span className="text-xs text-gray-400">
                             {tpl.branch === 'electrician' ? 'Elektriker' :
                              tpl.branch === 'plumber' ? 'Rörmokare' :
                              tpl.branch === 'carpenter' ? 'Snickare' :
@@ -857,10 +857,10 @@ export default function DocumentsPage() {
           Create Wizard Modal
           ========================================== */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             {/* Wizard header */}
-            <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
                 <h2 className="text-lg font-semibold">
                   {wizardStep === 1 ? 'Välj mall' : wizardStep === 2 ? 'Välj kund & projekt' : 'Fyll i uppgifter'}
@@ -868,12 +868,12 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-2 mt-2">
                   {[1, 2, 3].map(step => (
                     <div key={step} className={`h-1.5 rounded-full transition-all ${
-                      step <= wizardStep ? 'w-12 bg-violet-500' : 'w-8 bg-zinc-700'
+                      step <= wizardStep ? 'w-12 bg-blue-500' : 'w-8 bg-gray-200'
                     }`} />
                   ))}
                 </div>
               </div>
-              <button onClick={() => setShowCreate(false)} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+              <button onClick={() => setShowCreate(false)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -887,26 +887,26 @@ export default function DocumentsPage() {
                     if (catTemplates.length === 0) return null
                     return (
                       <div key={cat.id}>
-                        <h3 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">{cat.name}</h3>
+                        <h3 className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">{cat.name}</h3>
                         <div className="space-y-2">
                           {catTemplates.map(tpl => (
                             <button
                               key={tpl.id}
                               onClick={() => selectTemplate(tpl)}
-                              className="w-full flex items-center gap-3 p-3 bg-zinc-800/50 hover:bg-zinc-800 border border-zinc-800 hover:border-violet-500/50 rounded-xl text-left transition-all"
+                              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-blue-300 rounded-xl text-left transition-all"
                             >
-                              {getCategoryIcon(cat.icon, 'w-5 h-5 text-violet-400')}
+                              {getCategoryIcon(cat.icon, 'w-5 h-5 text-blue-600')}
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-white">{tpl.name}</p>
-                                <p className="text-xs text-zinc-500 truncate">{tpl.description}</p>
+                                <p className="text-sm font-medium text-gray-900">{tpl.name}</p>
+                                <p className="text-xs text-gray-400 truncate">{tpl.description}</p>
                               </div>
-                              {tpl.branch && <span className="text-xs text-zinc-600 px-2 py-0.5 bg-zinc-900 rounded-full">{
+                              {tpl.branch && <span className="text-xs text-gray-400 px-2 py-0.5 bg-white rounded-full">{
                                 tpl.branch === 'electrician' ? 'El' :
                                 tpl.branch === 'plumber' ? 'VVS' :
                                 tpl.branch === 'carpenter' ? 'Bygg' :
                                 tpl.branch === 'painter' ? 'Måleri' : tpl.branch
                               }</span>}
-                              <ChevronRight className="w-4 h-4 text-zinc-600" />
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
                             </button>
                           ))}
                         </div>
@@ -920,20 +920,20 @@ export default function DocumentsPage() {
               {wizardStep === 2 && selectedTemplate && (
                 <div className="space-y-5">
                   <div>
-                    <label className="text-sm text-zinc-400 mb-1.5 block">Dokumenttitel</label>
+                    <label className="text-sm text-gray-500 mb-1.5 block">Dokumenttitel</label>
                     <input
                       type="text"
                       value={createTitle}
                       onChange={e => setCreateTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                     />
                   </div>
                   <div>
-                    <label className="text-sm text-zinc-400 mb-1.5 block">Kund (valfritt)</label>
+                    <label className="text-sm text-gray-500 mb-1.5 block">Kund (valfritt)</label>
                     <select
                       value={createCustomerId}
                       onChange={e => setCreateCustomerId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                     >
                       <option value="">Ingen kund vald</option>
                       {customers.map(c => (
@@ -942,11 +942,11 @@ export default function DocumentsPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-sm text-zinc-400 mb-1.5 block">Projekt (valfritt)</label>
+                    <label className="text-sm text-gray-500 mb-1.5 block">Projekt (valfritt)</label>
                     <select
                       value={createProjectId}
                       onChange={e => setCreateProjectId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                     >
                       <option value="">Inget projekt valt</option>
                       {projects.map(p => (
@@ -957,13 +957,13 @@ export default function DocumentsPage() {
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={() => setWizardStep(1)}
-                      className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-all"
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-all"
                     >
                       <ArrowLeft className="w-4 h-4 inline mr-1" /> Tillbaka
                     </button>
                     <button
                       onClick={() => setWizardStep(3)}
-                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-sm font-medium transition-all"
+                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl text-sm font-medium transition-all"
                     >
                       Nästa <ChevronRight className="w-4 h-4 inline ml-1" />
                     </button>
@@ -979,13 +979,13 @@ export default function DocumentsPage() {
                     .filter((v: TemplateVariable) => v.source === 'input')
                     .map((v: TemplateVariable) => (
                       <div key={v.key}>
-                        <label className="text-sm text-zinc-400 mb-1.5 block">{v.label}</label>
+                        <label className="text-sm text-gray-500 mb-1.5 block">{v.label}</label>
                         {v.input_type === 'textarea' ? (
                           <textarea
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
                             rows={3}
-                            className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500 resize-none"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
                           />
                         ) : v.input_type === 'checkbox' ? (
                           <label className="flex items-center gap-3 cursor-pointer">
@@ -993,15 +993,15 @@ export default function DocumentsPage() {
                               type="checkbox"
                               checked={variableValues[v.key] || false}
                               onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.checked }))}
-                              className="w-4 h-4 accent-violet-500"
+                              className="w-4 h-4 accent-blue-500"
                             />
-                            <span className="text-sm text-zinc-300">{v.label}</span>
+                            <span className="text-sm text-gray-700">{v.label}</span>
                           </label>
                         ) : v.input_type === 'select' && v.options ? (
                           <select
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
-                            className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                           >
                             <option value="">Välj...</option>
                             {v.options.map(opt => (
@@ -1013,7 +1013,7 @@ export default function DocumentsPage() {
                             type={v.input_type === 'date' ? 'date' : 'text'}
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
-                            className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                           />
                         )}
                       </div>
@@ -1022,14 +1022,14 @@ export default function DocumentsPage() {
                   <div className="flex gap-3 pt-4">
                     <button
                       onClick={() => setWizardStep(2)}
-                      className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-all"
+                      className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-all"
                     >
                       <ArrowLeft className="w-4 h-4 inline mr-1" /> Tillbaka
                     </button>
                     <button
                       onClick={createDocument}
                       disabled={creating}
-                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                      className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                     >
                       {creating ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <Plus className="w-4 h-4 inline mr-2" />}
                       Skapa dokument
@@ -1046,13 +1046,13 @@ export default function DocumentsPage() {
           Document Viewer Modal
           ========================================== */}
       {viewDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold">{viewDoc.title}</h2>
               <div className="flex items-center gap-2">
                 {getStatusBadge(viewDoc.status)}
-                <button onClick={() => setViewDoc(null)} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+                <button onClick={() => setViewDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -1060,7 +1060,7 @@ export default function DocumentsPage() {
             <div className="flex-1 overflow-y-auto p-4">
               {loadingHtml ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
                 </div>
               ) : (
                 <div className="bg-white rounded-xl overflow-hidden">
@@ -1072,11 +1072,11 @@ export default function DocumentsPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3 p-4 border-t border-zinc-800">
+            <div className="flex items-center gap-3 p-4 border-t border-gray-200">
               {viewDoc.status === 'draft' && (
                 <button
                   onClick={() => { setViewDoc(null); openEdit(viewDoc) }}
-                  className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium transition-all"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-medium transition-all"
                 >
                   <PenTool className="w-4 h-4 inline mr-2" /> Redigera
                 </button>
@@ -1099,7 +1099,7 @@ export default function DocumentsPage() {
                   a.click()
                   URL.revokeObjectURL(url)
                 }}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-all"
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-all"
               >
                 <Download className="w-4 h-4 inline mr-2" /> Ladda ner HTML
               </button>
@@ -1112,11 +1112,11 @@ export default function DocumentsPage() {
           Edit Document Modal
           ========================================== */}
       {editDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Redigera: {editDoc.title}</h2>
-              <button onClick={() => setEditDoc(null)} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+              <button onClick={() => setEditDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1127,16 +1127,16 @@ export default function DocumentsPage() {
                 if (section.type === 'signatures') return null
                 return (
                   <div key={idx}>
-                    {section.title && <h3 className="text-sm font-medium text-violet-400 mb-3">{section.title}</h3>}
+                    {section.title && <h3 className="text-sm font-medium text-blue-600 mb-3">{section.title}</h3>}
                     {section.fields?.map((field: any) => (
                       <div key={field.variable} className="mb-3">
-                        <label className="text-xs text-zinc-400 mb-1 block">{field.label}</label>
+                        <label className="text-xs text-gray-500 mb-1 block">{field.label}</label>
                         {field.type === 'textarea' ? (
                           <textarea
                             value={editVars[field.variable] || ''}
                             onChange={e => setEditVars(prev => ({ ...prev, [field.variable]: e.target.value }))}
                             rows={2}
-                            className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500 resize-none"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-500 resize-none"
                           />
                         ) : field.type === 'checkbox' ? (
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -1144,16 +1144,16 @@ export default function DocumentsPage() {
                               type="checkbox"
                               checked={editVars[field.variable] || false}
                               onChange={e => setEditVars(prev => ({ ...prev, [field.variable]: e.target.checked }))}
-                              className="w-4 h-4 accent-violet-500"
+                              className="w-4 h-4 accent-blue-500"
                             />
-                            <span className="text-sm text-zinc-300">{field.label}</span>
+                            <span className="text-sm text-gray-700">{field.label}</span>
                           </label>
                         ) : (
                           <input
                             type="text"
                             value={editVars[field.variable] || ''}
                             onChange={e => setEditVars(prev => ({ ...prev, [field.variable]: e.target.value }))}
-                            className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:border-violet-500"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                           />
                         )}
                       </div>
@@ -1164,20 +1164,20 @@ export default function DocumentsPage() {
                           type="checkbox"
                           checked={editVars[item.variable] || false}
                           onChange={e => setEditVars(prev => ({ ...prev, [item.variable]: e.target.checked }))}
-                          className="w-4 h-4 accent-violet-500"
+                          className="w-4 h-4 accent-blue-500"
                         />
-                        <span className="text-sm text-zinc-300">{item.text}</span>
+                        <span className="text-sm text-gray-700">{item.text}</span>
                       </label>
                     ))}
                   </div>
                 )
               })}
             </div>
-            <div className="flex gap-3 p-6 border-t border-zinc-800">
+            <div className="flex gap-3 p-6 border-t border-gray-200">
               <button
                 onClick={saveDocument}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : null}
                 Spara utkast
@@ -1198,29 +1198,29 @@ export default function DocumentsPage() {
           Sign Document Modal
           ========================================== */}
       {signDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg">
-            <div className="flex items-center justify-between p-6 border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Signera dokument</h2>
-              <button onClick={() => setSignDoc(null)} className="p-2 text-zinc-400 hover:text-white rounded-lg">
+              <button onClick={() => setSignDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <p className="text-sm text-zinc-400">{signDoc.title}</p>
+              <p className="text-sm text-gray-500">{signDoc.title}</p>
               <div>
-                <label className="text-sm text-zinc-400 mb-1.5 block">Namn</label>
+                <label className="text-sm text-gray-500 mb-1.5 block">Namn</label>
                 <input
                   type="text"
                   value={signName}
                   onChange={e => setSignName(e.target.value)}
                   placeholder="Ditt namn"
-                  className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="text-sm text-zinc-400 mb-1.5 block">Signatur</label>
-                <div className="relative border border-zinc-700 rounded-xl overflow-hidden bg-zinc-800/50">
+                <label className="text-sm text-gray-500 mb-1.5 block">Signatur</label>
+                <div className="relative border border-gray-300 rounded-xl overflow-hidden bg-gray-50">
                   <canvas
                     ref={canvasRef}
                     className="w-full h-32 cursor-crosshair touch-none"
@@ -1234,24 +1234,24 @@ export default function DocumentsPage() {
                   />
                   <button
                     onClick={clearCanvas}
-                    className="absolute top-2 right-2 px-2 py-1 text-xs bg-zinc-700 hover:bg-zinc-600 rounded-lg text-zinc-300"
+                    className="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded-lg text-gray-700"
                   >
                     Rensa
                   </button>
                 </div>
               </div>
             </div>
-            <div className="flex gap-3 p-6 border-t border-zinc-800">
+            <div className="flex gap-3 p-6 border-t border-gray-200">
               <button
                 onClick={() => setSignDoc(null)}
-                className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-sm text-zinc-300 transition-all"
+                className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-all"
               >
                 Avbryt
               </button>
               <button
                 onClick={submitSignature}
                 disabled={!signName || signing}
-                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
               >
                 {signing ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <PenTool className="w-4 h-4 inline mr-2" />}
                 Signera
@@ -1264,7 +1264,7 @@ export default function DocumentsPage() {
       {/* Context menu */}
       {contextMenu && (
         <div
-          className="fixed z-[60] bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl py-1 min-w-[160px]"
+          className="fixed z-[60] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[160px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button
@@ -1273,7 +1273,7 @@ export default function DocumentsPage() {
               if (doc) viewDocument(doc)
               setContextMenu(null)
             }}
-            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-all"
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-all"
           >
             <Eye className="w-4 h-4" /> Förhandsgranska
           </button>
@@ -1283,14 +1283,14 @@ export default function DocumentsPage() {
               if (doc) openEdit(doc)
               setContextMenu(null)
             }}
-            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-all"
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-all"
           >
             <PenTool className="w-4 h-4" /> Redigera
           </button>
-          <div className="border-t border-zinc-800 my-1" />
+          <div className="border-t border-gray-200 my-1" />
           <button
             onClick={() => deleteDocument(contextMenu.docId)}
-            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 transition-all"
+            className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100 transition-all"
           >
             <Trash2 className="w-4 h-4" /> Ta bort
           </button>
@@ -1301,8 +1301,8 @@ export default function DocumentsPage() {
       {toast.show && (
         <div className={`fixed bottom-6 right-6 z-[70] px-5 py-3 rounded-xl shadow-xl text-sm font-medium ${
           toast.type === 'success'
-            ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-            : 'bg-red-500/20 border border-red-500/30 text-red-300'
+            ? 'bg-emerald-100 border border-emerald-200 text-emerald-700'
+            : 'bg-red-100 border border-red-200 text-red-700'
         }`}>
           {toast.type === 'success' ? <Check className="w-4 h-4 inline mr-2" /> : <AlertCircle className="w-4 h-4 inline mr-2" />}
           {toast.message}

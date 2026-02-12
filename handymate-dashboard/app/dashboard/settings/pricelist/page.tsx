@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
@@ -442,17 +442,17 @@ export default function PricelistPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -463,21 +463,21 @@ export default function PricelistPage() {
         <div className="flex items-center gap-4 mb-6">
           <Link
             href="/dashboard/settings"
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+            className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-white">Grossistprislista</h1>
-            <p className="text-zinc-400">Hantera leverantörer och produktpriser</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Grossistprislista</h1>
+            <p className="text-gray-500">Hantera leverantörer och produktpriser</p>
           </div>
         </div>
 
         {/* Suppliers Section */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 mb-6">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Building className="w-5 h-5 text-violet-400" />
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Building className="w-5 h-5 text-blue-600" />
               Leverantörer
             </h2>
             <button
@@ -486,7 +486,7 @@ export default function PricelistPage() {
                 setSupplierForm({ name: '', customer_number: '', contact_email: '', contact_phone: '' })
                 setShowSupplierModal(true)
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-400 hover:bg-violet-500/30 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-xl text-blue-600 hover:bg-blue-500/30 text-sm"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -494,7 +494,7 @@ export default function PricelistPage() {
           </div>
 
           {suppliers.length === 0 ? (
-            <p className="text-zinc-500 text-center py-8">
+            <p className="text-gray-400 text-center py-8">
               Inga leverantörer ännu. Lägg till din första leverantör för att börja importera priser.
             </p>
           ) : (
@@ -504,8 +504,8 @@ export default function PricelistPage() {
                   key={supplier.supplier_id}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
                     selectedSupplier === supplier.supplier_id
-                      ? 'bg-violet-500/20 border-violet-500/30'
-                      : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                      ? 'bg-blue-100 border-blue-300'
+                      : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                   }`}
                   onClick={() => setSelectedSupplier(
                     selectedSupplier === supplier.supplier_id ? null : supplier.supplier_id
@@ -513,11 +513,11 @@ export default function PricelistPage() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-medium text-white truncate">{supplier.name}</h3>
+                      <h3 className="font-medium text-gray-900 truncate">{supplier.name}</h3>
                       {supplier.customer_number && (
-                        <p className="text-xs text-zinc-500">Kundnr: {supplier.customer_number}</p>
+                        <p className="text-xs text-gray-400">Kundnr: {supplier.customer_number}</p>
                       )}
-                      <p className="text-sm text-zinc-400 mt-1">
+                      <p className="text-sm text-gray-500 mt-1">
                         {supplier.product_count} produkter
                       </p>
                     </div>
@@ -528,7 +528,7 @@ export default function PricelistPage() {
                           setImportSupplierId(supplier.supplier_id)
                           setShowImportModal(true)
                         }}
-                        className="p-1.5 text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 rounded"
+                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
                         title="Importera produkter"
                       >
                         <Upload className="w-4 h-4" />
@@ -545,7 +545,7 @@ export default function PricelistPage() {
                           })
                           setShowSupplierModal(true)
                         }}
-                        className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded"
+                        className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-200 rounded"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
@@ -554,7 +554,7 @@ export default function PricelistPage() {
                           e.stopPropagation()
                           handleDeleteSupplier(supplier)
                         }}
-                        className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded"
+                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -567,29 +567,29 @@ export default function PricelistPage() {
         </div>
 
         {/* Products Section */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Package className="w-5 h-5 text-fuchsia-400" />
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <Package className="w-5 h-5 text-cyan-600" />
               Produkter
-              <span className="text-sm font-normal text-zinc-500">({totalProducts})</span>
+              <span className="text-sm font-normal text-gray-400">({totalProducts})</span>
             </h2>
             <div className="flex items-center gap-2">
               <div className="relative flex-1 sm:flex-initial">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Sök produkter..."
-                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-violet-500"
+                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-500"
                 />
               </div>
               {categories.length > 0 && (
                 <select
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-sm focus:outline-none focus:border-violet-500"
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Alla kategorier</option>
                   {categories.map(cat => (
@@ -603,7 +603,7 @@ export default function PricelistPage() {
                   resetProductForm()
                   setShowProductModal(true)
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-fuchsia-500/20 border border-fuchsia-500/30 rounded-xl text-fuchsia-400 hover:bg-fuchsia-500/30 text-sm whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2 bg-cyan-100 border border-fuchsia-500/30 rounded-xl text-cyan-600 hover:bg-cyan-500/30 text-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
                 Ny produkt
@@ -612,12 +612,12 @@ export default function PricelistPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-12 text-zinc-500">Laddar...</div>
+            <div className="text-center py-12 text-gray-400">Laddar...</div>
           ) : products.length === 0 ? (
             <div className="text-center py-12">
-              <Package className="w-12 h-12 text-zinc-700 mx-auto mb-3" />
-              <p className="text-zinc-500">Inga produkter{selectedSupplier ? ' för denna leverantör' : ''}</p>
-              <p className="text-zinc-600 text-sm mt-1">
+              <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-400">Inga produkter{selectedSupplier ? ' för denna leverantör' : ''}</p>
+              <p className="text-gray-400 text-sm mt-1">
                 Importera produkter från en CSV-fil eller lägg till manuellt
               </p>
             </div>
@@ -625,34 +625,34 @@ export default function PricelistPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-zinc-800">
-                    <th className="text-left py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Produkt</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-zinc-500 uppercase hidden sm:table-cell">Kategori</th>
-                    <th className="text-left py-3 px-4 text-xs font-medium text-zinc-500 uppercase hidden md:table-cell">Leverantör</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Inköp</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Sälj</th>
-                    <th className="text-right py-3 px-4 text-xs font-medium text-zinc-500 uppercase w-24"></th>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase">Produkt</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase hidden sm:table-cell">Kategori</th>
+                    <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase hidden md:table-cell">Leverantör</th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Inköp</th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase">Sälj</th>
+                    <th className="text-right py-3 px-4 text-xs font-medium text-gray-400 uppercase w-24"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {products.map(product => (
-                    <tr key={product.product_id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                    <tr key={product.product_id} className="border-b border-gray-200/50 hover:bg-gray-100/30">
                       <td className="py-3 px-4">
-                        <div className="font-medium text-white">{product.name}</div>
+                        <div className="font-medium text-gray-900">{product.name}</div>
                         {product.sku && (
-                          <div className="text-xs text-zinc-500">{product.sku}</div>
+                          <div className="text-xs text-gray-400">{product.sku}</div>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-zinc-400 text-sm hidden sm:table-cell">
+                      <td className="py-3 px-4 text-gray-500 text-sm hidden sm:table-cell">
                         {product.category || '-'}
                       </td>
-                      <td className="py-3 px-4 text-zinc-400 text-sm hidden md:table-cell">
+                      <td className="py-3 px-4 text-gray-500 text-sm hidden md:table-cell">
                         {product.supplier?.name || '-'}
                       </td>
-                      <td className="py-3 px-4 text-right text-zinc-400 text-sm">
+                      <td className="py-3 px-4 text-right text-gray-500 text-sm">
                         {formatCurrency(product.purchase_price)}
                       </td>
-                      <td className="py-3 px-4 text-right text-white font-medium">
+                      <td className="py-3 px-4 text-right text-gray-900 font-medium">
                         {formatCurrency(product.sell_price)}
                       </td>
                       <td className="py-3 px-4 text-right">
@@ -672,13 +672,13 @@ export default function PricelistPage() {
                               })
                               setShowProductModal(true)
                             }}
-                            className="p-1.5 text-zinc-500 hover:text-white hover:bg-zinc-700 rounded"
+                            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-200 rounded"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteProduct(product)}
-                            className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -696,53 +696,53 @@ export default function PricelistPage() {
       {/* Supplier Modal */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {editingSupplier ? 'Redigera leverantör' : 'Ny leverantör'}
               </h3>
-              <button onClick={() => setShowSupplierModal(false)} className="text-zinc-500 hover:text-white">
+              <button onClick={() => setShowSupplierModal(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Namn *</label>
+                <label className="block text-sm text-gray-500 mb-1">Namn *</label>
                 <input
                   type="text"
                   value={supplierForm.name}
                   onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   placeholder="T.ex. Ahlsell, Elektroskandia"
                 />
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Kundnummer</label>
+                <label className="block text-sm text-gray-500 mb-1">Kundnummer</label>
                 <input
                   type="text"
                   value={supplierForm.customer_number}
                   onChange={(e) => setSupplierForm({ ...supplierForm, customer_number: e.target.value })}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   placeholder="Ditt kundnummer hos leverantören"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Email</label>
+                  <label className="block text-sm text-gray-500 mb-1">Email</label>
                   <input
                     type="email"
                     value={supplierForm.contact_email}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_email: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Telefon</label>
+                  <label className="block text-sm text-gray-500 mb-1">Telefon</label>
                   <input
                     type="tel"
                     value={supplierForm.contact_phone}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_phone: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
@@ -750,14 +750,14 @@ export default function PricelistPage() {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowSupplierModal(false)}
-                className="px-4 py-2 text-zinc-400 hover:text-white"
+                className="px-4 py-2 text-gray-500 hover:text-gray-900"
               >
                 Avbryt
               </button>
               <button
                 onClick={handleSaveSupplier}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Spara
@@ -770,51 +770,51 @@ export default function PricelistPage() {
       {/* Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {editingProduct ? 'Redigera produkt' : 'Ny produkt'}
               </h3>
-              <button onClick={() => setShowProductModal(false)} className="text-zinc-500 hover:text-white">
+              <button onClick={() => setShowProductModal(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Namn *</label>
+                <label className="block text-sm text-gray-500 mb-1">Namn *</label>
                 <input
                   type="text"
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Artikelnr/SKU</label>
+                  <label className="block text-sm text-gray-500 mb-1">Artikelnr/SKU</label>
                   <input
                     type="text"
                     value={productForm.sku}
                     onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Kategori</label>
+                  <label className="block text-sm text-gray-500 mb-1">Kategori</label>
                   <input
                     type="text"
                     value={productForm.category}
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-zinc-400 mb-1">Leverantör</label>
+                <label className="block text-sm text-gray-500 mb-1">Leverantör</label>
                 <select
                   value={productForm.supplier_id}
                   onChange={(e) => setProductForm({ ...productForm, supplier_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                 >
                   <option value="">Ingen leverantör</option>
                   {suppliers.map(s => (
@@ -824,31 +824,31 @@ export default function PricelistPage() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Inköpspris</label>
+                  <label className="block text-sm text-gray-500 mb-1">Inköpspris</label>
                   <input
                     type="number"
                     value={productForm.purchase_price}
                     onChange={(e) => setProductForm({ ...productForm, purchase_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                     step="0.01"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Påslag %</label>
+                  <label className="block text-sm text-gray-500 mb-1">Påslag %</label>
                   <input
                     type="number"
                     value={productForm.markup_percent}
                     onChange={(e) => setProductForm({ ...productForm, markup_percent: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Säljpris</label>
+                  <label className="block text-sm text-gray-500 mb-1">Säljpris</label>
                   <input
                     type="number"
                     value={productForm.sell_price}
                     onChange={(e) => setProductForm({ ...productForm, sell_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
                     step="0.01"
                   />
                 </div>
@@ -857,14 +857,14 @@ export default function PricelistPage() {
             <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setShowProductModal(false)}
-                className="px-4 py-2 text-zinc-400 hover:text-white"
+                className="px-4 py-2 text-gray-500 hover:text-gray-900"
               >
                 Avbryt
               </button>
               <button
                 onClick={handleSaveProduct}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Spara
@@ -877,13 +877,13 @@ export default function PricelistPage() {
       {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-violet-400" />
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-blue-600" />
                 Importera produkter
               </h3>
-              <button onClick={closeImportModal} className="text-zinc-500 hover:text-white">
+              <button onClick={closeImportModal} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -891,16 +891,16 @@ export default function PricelistPage() {
             {/* Step 1: Upload */}
             {importStep === 'upload' && (
               <div className="space-y-4">
-                <p className="text-zinc-400">
+                <p className="text-gray-500">
                   Ladda upp en CSV-fil med produkter. Filen bör ha kolumner för produktnamn och pris.
                 </p>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-700 rounded-xl p-8 text-center cursor-pointer hover:border-violet-500/50 transition-colors"
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 transition-colors"
                 >
-                  <Upload className="w-10 h-10 text-zinc-600 mx-auto mb-3" />
-                  <p className="text-white font-medium">Klicka för att välja fil</p>
-                  <p className="text-zinc-500 text-sm mt-1">CSV-filer (.csv)</p>
+                  <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-900 font-medium">Klicka för att välja fil</p>
+                  <p className="text-gray-400 text-sm mt-1">CSV-filer (.csv)</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -915,17 +915,17 @@ export default function PricelistPage() {
             {/* Step 2: Map columns */}
             {importStep === 'map' && (
               <div className="space-y-4">
-                <p className="text-zinc-400">
+                <p className="text-gray-500">
                   Välj vilka kolumner i din fil som motsvarar produktdata.
                 </p>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Produktnamn *</label>
+                    <label className="block text-sm text-gray-500 mb-1">Produktnamn *</label>
                     <select
                       value={columnMapping.name || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, name: e.target.value })}
-                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -934,11 +934,11 @@ export default function PricelistPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Artikelnummer/SKU</label>
+                    <label className="block text-sm text-gray-500 mb-1">Artikelnummer/SKU</label>
                     <select
                       value={columnMapping.sku || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, sku: e.target.value })}
-                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -947,11 +947,11 @@ export default function PricelistPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Kategori</label>
+                    <label className="block text-sm text-gray-500 mb-1">Kategori</label>
                     <select
                       value={columnMapping.category || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, category: e.target.value })}
-                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -960,11 +960,11 @@ export default function PricelistPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-1">Inköpspris</label>
+                    <label className="block text-sm text-gray-500 mb-1">Inköpspris</label>
                     <select
                       value={columnMapping.purchase_price || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, purchase_price: e.target.value })}
-                      className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -975,26 +975,26 @@ export default function PricelistPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-1">Standardpåslag (%)</label>
+                  <label className="block text-sm text-gray-500 mb-1">Standardpåslag (%)</label>
                   <input
                     type="number"
                     value={defaultMarkup}
                     onChange={(e) => setDefaultMarkup(parseInt(e.target.value) || 20)}
-                    className="w-32 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white"
+                    className="w-32 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
                   />
                 </div>
 
                 <div className="flex justify-between mt-6">
                   <button
                     onClick={() => setImportStep('upload')}
-                    className="px-4 py-2 text-zinc-400 hover:text-white"
+                    className="px-4 py-2 text-gray-500 hover:text-gray-900"
                   >
                     Tillbaka
                   </button>
                   <button
                     onClick={handlePreviewImport}
                     disabled={importing || !columnMapping.name}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
                   >
                     {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                     Förhandsgranska
@@ -1007,24 +1007,24 @@ export default function PricelistPage() {
             {importStep === 'preview' && importPreview && (
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-emerald-400">{importPreview.valid}</div>
-                    <div className="text-sm text-emerald-400/80">Giltiga</div>
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-emerald-600">{importPreview.valid}</div>
+                    <div className="text-sm text-emerald-600/80">Giltiga</div>
                   </div>
-                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-red-400">{importPreview.errors}</div>
-                    <div className="text-sm text-red-400/80">Fel</div>
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-red-600">{importPreview.errors}</div>
+                    <div className="text-sm text-red-600/80">Fel</div>
                   </div>
-                  <div className="p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-white">{importData.length}</div>
-                    <div className="text-sm text-zinc-400">Totalt</div>
+                  <div className="p-4 bg-gray-100 border border-gray-300 rounded-xl text-center">
+                    <div className="text-2xl font-bold text-gray-900">{importData.length}</div>
+                    <div className="text-sm text-gray-500">Totalt</div>
                   </div>
                 </div>
 
                 {importPreview.errorMessages.length > 0 && (
-                  <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-                    <p className="text-sm text-red-400 font-medium mb-2">Fel i filen:</p>
-                    <ul className="text-sm text-red-400/80 space-y-1">
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                    <p className="text-sm text-red-600 font-medium mb-2">Fel i filen:</p>
+                    <ul className="text-sm text-red-600/80 space-y-1">
                       {importPreview.errorMessages.map((msg, i) => (
                         <li key={i}>{msg}</li>
                       ))}
@@ -1033,26 +1033,26 @@ export default function PricelistPage() {
                 )}
 
                 <div>
-                  <p className="text-sm text-zinc-400 mb-2">Förhandsvisning (första 5):</p>
-                  <div className="bg-zinc-800/50 rounded-xl overflow-hidden">
+                  <p className="text-sm text-gray-500 mb-2">Förhandsvisning (första 5):</p>
+                  <div className="bg-gray-50 rounded-xl overflow-hidden">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-zinc-700">
-                          <th className="text-left p-2 text-zinc-500">Namn</th>
-                          <th className="text-left p-2 text-zinc-500">SKU</th>
-                          <th className="text-right p-2 text-zinc-500">Inköp</th>
-                          <th className="text-right p-2 text-zinc-500">Sälj</th>
+                        <tr className="border-b border-gray-300">
+                          <th className="text-left p-2 text-gray-400">Namn</th>
+                          <th className="text-left p-2 text-gray-400">SKU</th>
+                          <th className="text-right p-2 text-gray-400">Inköp</th>
+                          <th className="text-right p-2 text-gray-400">Sälj</th>
                         </tr>
                       </thead>
                       <tbody>
                         {importPreview.preview.slice(0, 5).map((p, i) => (
-                          <tr key={i} className="border-b border-zinc-800">
-                            <td className="p-2 text-white">{p.name}</td>
-                            <td className="p-2 text-zinc-400">{p.sku || '-'}</td>
-                            <td className="p-2 text-right text-zinc-400">
+                          <tr key={i} className="border-b border-gray-200">
+                            <td className="p-2 text-gray-900">{p.name}</td>
+                            <td className="p-2 text-gray-500">{p.sku || '-'}</td>
+                            <td className="p-2 text-right text-gray-500">
                               {p.purchase_price ? `${p.purchase_price} kr` : '-'}
                             </td>
-                            <td className="p-2 text-right text-white">
+                            <td className="p-2 text-right text-gray-900">
                               {p.sell_price ? `${p.sell_price} kr` : '-'}
                             </td>
                           </tr>
@@ -1065,14 +1065,14 @@ export default function PricelistPage() {
                 <div className="flex justify-between mt-6">
                   <button
                     onClick={() => setImportStep('map')}
-                    className="px-4 py-2 text-zinc-400 hover:text-white"
+                    className="px-4 py-2 text-gray-500 hover:text-gray-900"
                   >
                     Tillbaka
                   </button>
                   <button
                     onClick={handleImport}
                     disabled={importing || importPreview.valid === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
                   >
                     {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                     Importera {importPreview.valid} produkter
@@ -1084,9 +1084,9 @@ export default function PricelistPage() {
             {/* Step 4: Importing */}
             {importStep === 'importing' && (
               <div className="text-center py-12">
-                <Loader2 className="w-12 h-12 text-violet-400 animate-spin mx-auto mb-4" />
-                <p className="text-white font-medium">Importerar produkter...</p>
-                <p className="text-zinc-500 text-sm">Detta kan ta en stund</p>
+                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+                <p className="text-gray-900 font-medium">Importerar produkter...</p>
+                <p className="text-gray-400 text-sm">Detta kan ta en stund</p>
               </div>
             )}
           </div>

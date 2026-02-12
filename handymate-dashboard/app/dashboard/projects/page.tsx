@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import {
@@ -173,12 +173,12 @@ export default function ProjectsPage() {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
-      case 'active': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-      case 'paused': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'completed': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-      case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+      case 'planning': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'active': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'paused': return 'bg-amber-100 text-amber-600 border-amber-200'
+      case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
+      case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
+      default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
 
@@ -194,19 +194,19 @@ export default function ProjectsPage() {
   }
 
   const getBudgetColor = (actual: number, budget: number) => {
-    if (!budget || budget === 0) return 'text-zinc-400'
+    if (!budget || budget === 0) return 'text-gray-500'
     const usage = (actual / budget) * 100
-    if (usage > 100) return 'text-red-400'
-    if (usage > 80) return 'text-amber-400'
-    return 'text-emerald-400'
+    if (usage > 100) return 'text-red-600'
+    if (usage > 80) return 'text-amber-600'
+    return 'text-emerald-600'
   }
 
   const getBudgetBarColor = (actual: number, budget: number) => {
-    if (!budget || budget === 0) return 'bg-zinc-600'
+    if (!budget || budget === 0) return 'bg-gray-300'
     const usage = (actual / budget) * 100
     if (usage > 100) return 'bg-red-500'
     if (usage > 80) return 'bg-amber-500'
-    return 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+    return 'bg-gradient-to-r from-blue-500 to-cyan-500'
   }
 
   const visibleProjects = projects.filter(p => {
@@ -235,15 +235,15 @@ export default function ProjectsPage() {
   }, 0)
 
   return (
-    <div className="p-8 bg-[#09090b] min-h-screen">
+    <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -253,12 +253,12 @@ export default function ProjectsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Projekt</h1>
-            <p className="text-zinc-400">Hantera projekt, delmoment och ÄTA</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Projekt</h1>
+            <p className="text-gray-500">Hantera projekt, delmoment och ÄTA</p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
           >
             <Plus className="w-5 h-5" />
             Nytt projekt
@@ -267,33 +267,33 @@ export default function ProjectsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-2xl p-4">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <FolderKanban className="w-4 h-4 text-blue-400" />
-              <span className="text-xs text-zinc-500">Aktiva</span>
+              <span className="text-xs text-gray-400">Aktiva</span>
             </div>
-            <p className="text-2xl font-bold text-white">{activeCount}</p>
+            <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-2xl p-4">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-red-400" />
-              <span className="text-xs text-zinc-500">Över budget</span>
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              <span className="text-xs text-gray-400">Över budget</span>
             </div>
-            <p className={`text-2xl font-bold ${overBudget > 0 ? 'text-red-400' : 'text-white'}`}>{overBudget}</p>
+            <p className={`text-2xl font-bold ${overBudget > 0 ? 'text-red-600' : 'text-gray-900'}`}>{overBudget}</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-2xl p-4">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="w-4 h-4 text-amber-400" />
-              <span className="text-xs text-zinc-500">Ofakturerat</span>
+              <DollarSign className="w-4 h-4 text-amber-600" />
+              <span className="text-xs text-gray-400">Ofakturerat</span>
             </div>
-            <p className="text-2xl font-bold text-white">{Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr</p>
+            <p className="text-2xl font-bold text-gray-900">{Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 rounded-2xl p-4">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs text-zinc-500">Totalt</span>
+              <CheckCircle className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs text-gray-400">Totalt</span>
             </div>
-            <p className="text-2xl font-bold text-white">{projects.length}</p>
+            <p className="text-2xl font-bold text-gray-900">{projects.length}</p>
           </div>
         </div>
 
@@ -310,8 +310,8 @@ export default function ProjectsPage() {
                 onClick={() => setFilter(f.key as any)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                   filter === f.key
-                    ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'bg-white text-gray-500 hover:text-white border border-gray-200'
                 }`}
               >
                 {f.label}
@@ -319,62 +319,62 @@ export default function ProjectsPage() {
             ))}
           </div>
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               type="text"
               placeholder="Sök projekt..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
             />
           </div>
         </div>
 
         {/* Project List */}
-        <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-20">
-              <FolderKanban className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-              <p className="text-zinc-400 mb-2">Inga projekt ännu</p>
-              <p className="text-sm text-zinc-600">Skapa ett projekt eller konvertera en accepterad offert</p>
+              <FolderKanban className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 mb-2">Inga projekt ännu</p>
+              <p className="text-sm text-gray-400">Skapa ett projekt eller konvertera en accepterad offert</p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-gray-200">
               {filteredProjects.map(project => (
                 <Link
                   key={project.project_id}
                   href={`/dashboard/projects/${project.project_id}`}
-                  className="block p-5 hover:bg-zinc-800/30 transition-all"
+                  className="block p-5 hover:bg-gray-100/30 transition-all"
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold text-white truncate">{project.name}</h3>
+                        <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                         <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
                           {getStatusText(project.status)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-zinc-500">
+                      <div className="flex items-center gap-4 text-sm text-gray-400">
                         {/* Avatar stack */}
                         {projectAssignments[project.project_id]?.length > 0 && (
                           <div className="flex -space-x-1.5">
                             {projectAssignments[project.project_id].slice(0, 3).map((user, i) => (
                               <div
                                 key={i}
-                                className="w-5 h-5 rounded-full border border-[#09090b] flex items-center justify-center flex-shrink-0"
+                                className="w-5 h-5 rounded-full border border-white flex items-center justify-center flex-shrink-0"
                                 style={{ backgroundColor: user.color }}
                                 title={user.name}
                               >
-                                <span className="text-white text-[8px] font-bold">{user.name[0]}</span>
+                                <span className="text-gray-900 text-[8px] font-bold">{user.name[0]}</span>
                               </div>
                             ))}
                             {projectAssignments[project.project_id].length > 3 && (
-                              <div className="w-5 h-5 rounded-full border border-[#09090b] bg-zinc-700 flex items-center justify-center flex-shrink-0">
-                                <span className="text-white text-[8px]">+{projectAssignments[project.project_id].length - 3}</span>
+                              <div className="w-5 h-5 rounded-full border border-white bg-gray-200 flex items-center justify-center flex-shrink-0">
+                                <span className="text-gray-900 text-[8px]">+{projectAssignments[project.project_id].length - 3}</span>
                               </div>
                             )}
                           </div>
@@ -402,12 +402,12 @@ export default function ProjectsPage() {
                       {project.budget_hours ? (
                         <div className="text-right min-w-[120px]">
                           <div className="flex items-center gap-1 justify-end mb-1">
-                            <Clock className="w-3 h-3 text-zinc-500" />
+                            <Clock className="w-3 h-3 text-gray-400" />
                             <span className={`text-sm font-medium ${getBudgetColor(project.actual_hours, project.budget_hours)}`}>
                               {project.actual_hours}/{project.budget_hours} tim
                             </span>
                           </div>
-                          <div className="h-1.5 bg-zinc-800 rounded-full w-24 ml-auto">
+                          <div className="h-1.5 bg-gray-100 rounded-full w-24 ml-auto">
                             <div
                               className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_hours, project.budget_hours)}`}
                               style={{ width: `${Math.min(100, (project.actual_hours / project.budget_hours) * 100)}%` }}
@@ -419,12 +419,12 @@ export default function ProjectsPage() {
                       {project.budget_amount ? (
                         <div className="text-right min-w-[130px] hidden md:block">
                           <div className="flex items-center gap-1 justify-end mb-1">
-                            <DollarSign className="w-3 h-3 text-zinc-500" />
+                            <DollarSign className="w-3 h-3 text-gray-400" />
                             <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
                               {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
                             </span>
                           </div>
-                          <div className="h-1.5 bg-zinc-800 rounded-full w-28 ml-auto">
+                          <div className="h-1.5 bg-gray-100 rounded-full w-28 ml-auto">
                             <div
                               className={`h-full rounded-full transition-all ${getBudgetBarColor(project.actual_amount, project.budget_amount)}`}
                               style={{ width: `${Math.min(100, (project.actual_amount / project.budget_amount) * 100)}%` }}
@@ -435,10 +435,10 @@ export default function ProjectsPage() {
 
                       {/* Progress */}
                       <div className="text-right min-w-[60px]">
-                        <span className="text-sm font-medium text-white">{project.progress_percent}%</span>
-                        <div className="h-1.5 bg-zinc-800 rounded-full w-14 ml-auto mt-1">
+                        <span className="text-sm font-medium text-gray-900">{project.progress_percent}%</span>
+                        <div className="h-1.5 bg-gray-100 rounded-full w-14 ml-auto mt-1">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all"
+                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
                             style={{ width: `${project.progress_percent}%` }}
                           />
                         </div>
@@ -448,7 +448,7 @@ export default function ProjectsPage() {
                       {project.status === 'planning' && project.actual_hours === 0 && (
                         <button
                           onClick={(e) => { e.preventDefault(); handleDeleteProject(project.project_id) }}
-                          className="p-2 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -465,32 +465,32 @@ export default function ProjectsPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-lg">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">Nytt projekt</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-zinc-500 hover:text-white">
+              <h3 className="text-lg font-semibold text-gray-900">Nytt projekt</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Projektnamn *</label>
+                <label className="block text-sm text-gray-500 mb-2">Projektnamn *</label>
                 <input
                   type="text"
                   value={newProject.name}
                   onChange={e => setNewProject({ ...newProject, name: e.target.value })}
                   placeholder="T.ex. Badrumsrenovering Svensson"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Kund</label>
+                <label className="block text-sm text-gray-500 mb-2">Kund</label>
                 <select
                   value={newProject.customer_id}
                   onChange={e => setNewProject({ ...newProject, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
@@ -498,11 +498,11 @@ export default function ProjectsPage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Projekttyp</label>
+                <label className="block text-sm text-gray-500 mb-2">Projekttyp</label>
                 <select
                   value={newProject.project_type}
                   onChange={e => setNewProject({ ...newProject, project_type: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="hourly">Löpande räkning</option>
                   <option value="fixed_price">Fast pris</option>
@@ -512,44 +512,44 @@ export default function ProjectsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Budget timmar</label>
+                  <label className="block text-sm text-gray-500 mb-2">Budget timmar</label>
                   <input
                     type="number"
                     value={newProject.budget_hours}
                     onChange={e => setNewProject({ ...newProject, budget_hours: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Budget belopp (kr)</label>
+                  <label className="block text-sm text-gray-500 mb-2">Budget belopp (kr)</label>
                   <input
                     type="number"
                     value={newProject.budget_amount}
                     onChange={e => setNewProject({ ...newProject, budget_amount: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Startdatum</label>
+                  <label className="block text-sm text-gray-500 mb-2">Startdatum</label>
                   <input
                     type="date"
                     value={newProject.start_date}
                     onChange={e => setNewProject({ ...newProject, start_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Slutdatum</label>
+                  <label className="block text-sm text-gray-500 mb-2">Slutdatum</label>
                   <input
                     type="date"
                     value={newProject.end_date}
                     onChange={e => setNewProject({ ...newProject, end_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
               </div>
@@ -558,14 +558,14 @@ export default function ProjectsPage() {
                 <button
                   onClick={handleCreateProject}
                   disabled={creating || !newProject.name.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                   Skapa projekt
                 </button>
                 <button
                   onClick={() => setShowCreateModal(false)}
-                  className="px-6 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-white"
+                  className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-gray-900"
                 >
                   Avbryt
                 </button>

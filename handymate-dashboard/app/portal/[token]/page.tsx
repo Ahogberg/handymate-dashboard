@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
@@ -225,7 +225,7 @@ export default function CustomerPortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-violet-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
       </div>
     )
   }
@@ -234,7 +234,7 @@ export default function CustomerPortalPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-3" />
+          <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-3" />
           <h1 className="text-xl font-semibold text-gray-900 mb-2">{error}</h1>
           <p className="text-gray-500">Kontrollera att lanken ar korrekt eller kontakta din hantverkare.</p>
         </div>
@@ -251,10 +251,10 @@ export default function CustomerPortalPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <p className="text-sm text-violet-600 font-medium">{portal.business.name}</p>
+          <p className="text-sm text-blue-700 font-medium">{portal.business.name}</p>
           <h1 className="text-lg font-semibold text-gray-900">
             {selectedProject ? (
-              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-violet-600">
+              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-blue-700">
                 <ArrowLeft className="w-4 h-4" />
                 {selectedProjectData?.name}
               </button>
@@ -280,14 +280,14 @@ export default function CustomerPortalPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all ${
                   activeTab === tab.id
-                    ? 'border-violet-500 text-violet-600'
+                    ? 'border-blue-500 text-blue-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
                 {tab.badge ? (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-violet-500 text-white rounded-full">{tab.badge}</span>
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-gray-900 rounded-full">{tab.badge}</span>
                 ) : null}
               </button>
             ))}
@@ -299,7 +299,7 @@ export default function CustomerPortalPage() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         {loadingTab ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
+            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
           </div>
         ) : (
           <>
@@ -315,7 +315,7 @@ export default function CustomerPortalPage() {
                   <button
                     key={p.project_id}
                     onClick={() => setSelectedProject(p.project_id)}
-                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-violet-300 hover:shadow-sm transition-all"
+                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-gray-900">{p.name}</h3>
@@ -335,13 +335,13 @@ export default function CustomerPortalPage() {
                           <span>{p.progress}%</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
+                          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
                         </div>
                       </div>
                     )}
 
                     {p.nextVisit && (
-                      <div className="flex items-center gap-2 text-sm text-violet-600 mb-2">
+                      <div className="flex items-center gap-2 text-sm text-blue-700 mb-2">
                         <Calendar className="w-4 h-4" />
                         Nasta besok: {formatDateTime(p.nextVisit.start_time)}
                       </div>
@@ -353,7 +353,7 @@ export default function CustomerPortalPage() {
                       </p>
                     )}
 
-                    <div className="flex items-center justify-end mt-2 text-sm text-violet-500">
+                    <div className="flex items-center justify-end mt-2 text-sm text-blue-600">
                       Se detaljer <ChevronRight className="w-4 h-4" />
                     </div>
                   </button>
@@ -382,7 +382,7 @@ export default function CustomerPortalPage() {
                         <span>{selectedProjectData.progress}%</span>
                       </div>
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-violet-500 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
+                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
                       </div>
                     </div>
                   )}
@@ -390,14 +390,14 @@ export default function CustomerPortalPage() {
 
                 {/* Next visit */}
                 {selectedProjectData.nextVisit && (
-                  <div className="bg-violet-50 rounded-xl border border-violet-200 p-4">
-                    <div className="flex items-center gap-2 text-violet-700 font-medium mb-1">
+                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
+                    <div className="flex items-center gap-2 text-blue-700 font-medium mb-1">
                       <Calendar className="w-4 h-4" />
                       Kommande besok
                     </div>
-                    <p className="text-sm text-violet-600">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
+                    <p className="text-sm text-blue-700">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
                     {selectedProjectData.nextVisit.title && (
-                      <p className="text-sm text-violet-500 mt-1">{selectedProjectData.nextVisit.title}</p>
+                      <p className="text-sm text-blue-600 mt-1">{selectedProjectData.nextVisit.title}</p>
                     )}
                   </div>
                 )}
@@ -412,8 +412,8 @@ export default function CustomerPortalPage() {
                           {m.status === 'completed' ? (
                             <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                           ) : m.status === 'in_progress' ? (
-                            <div className="w-5 h-5 border-2 border-violet-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <div className="w-2 h-2 bg-violet-500 rounded-full" />
+                            <div className="w-5 h-5 border-2 border-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
                             </div>
                           ) : (
                             <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex-shrink-0" />
@@ -475,7 +475,7 @@ export default function CustomerPortalPage() {
                         {['sent', 'opened'].includes(q.status) && q.sign_token && (
                           <a
                             href={`/quote/${q.sign_token}`}
-                            className="px-3 py-2 text-sm bg-violet-500 text-white rounded-lg hover:bg-violet-600 font-medium"
+                            className="px-3 py-2 text-sm bg-blue-500 text-gray-900 rounded-lg hover:bg-blue-600 font-medium"
                           >
                             Godkann
                           </a>
@@ -545,7 +545,7 @@ export default function CustomerPortalPage() {
                     >
                       <div className={`rounded-2xl px-4 py-2.5 ${
                         msg.direction === 'inbound'
-                          ? 'bg-violet-500 text-white rounded-br-md'
+                          ? 'bg-blue-500 text-gray-900 rounded-br-md'
                           : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
                       }`}>
                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
@@ -567,12 +567,12 @@ export default function CustomerPortalPage() {
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder="Skriv meddelande..."
-                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-300"
+                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-300"
                     />
                     <button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || sendingMessage}
-                      className="px-4 py-3 bg-violet-500 text-white rounded-xl hover:bg-violet-600 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
+                      className="px-4 py-3 bg-blue-500 text-gray-900 rounded-xl hover:bg-blue-600 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
                     >
                       {sendingMessage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                     </button>
@@ -590,8 +590,8 @@ export default function CustomerPortalPage() {
           <div className="max-w-2xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
             <p>{portal.business.name}</p>
             <div className="flex items-center justify-center gap-4 mt-1">
-              {portal.business.phone && <a href={`tel:${portal.business.phone}`} className="text-violet-500 hover:underline">{portal.business.phone}</a>}
-              {portal.business.email && <a href={`mailto:${portal.business.email}`} className="text-violet-500 hover:underline">{portal.business.email}</a>}
+              {portal.business.phone && <a href={`tel:${portal.business.phone}`} className="text-blue-600 hover:underline">{portal.business.phone}</a>}
+              {portal.business.email && <a href={`mailto:${portal.business.email}`} className="text-blue-600 hover:underline">{portal.business.email}</a>}
             </div>
           </div>
         </footer>

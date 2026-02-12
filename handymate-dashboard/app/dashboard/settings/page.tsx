@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
@@ -39,7 +39,7 @@ import dynamic from 'next/dynamic'
 const TeamPageContent = dynamic(() => import('@/app/dashboard/team/page'), {
   loading: () => (
     <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
     </div>
   ),
 })
@@ -168,7 +168,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
   }, [businessId])
 
   if (loading) {
-    return <div className="text-zinc-500">Laddar...</div>
+    return <div className="text-gray-400">Laddar...</div>
   }
 
   const percentUsed = Math.min(100, (usage.sent / included) * 100)
@@ -177,47 +177,47 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
     <div className="space-y-4">
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-zinc-400">Använda SMS</span>
-          <span className="text-sm text-white font-medium">{usage.sent} / {included}</span>
+          <span className="text-sm text-gray-500">Använda SMS</span>
+          <span className="text-sm text-gray-900 font-medium">{usage.sent} / {included}</span>
         </div>
-        <div className="h-3 bg-zinc-800 rounded-full overflow-hidden">
+        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
           <div 
             className={`h-full rounded-full transition-all ${
-              percentUsed > 90 ? 'bg-red-500' : percentUsed > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
+              percentUsed > 90 ? 'bg-red-500' : percentUsed > 70 ? 'bg-amber-500' : 'bg-gradient-to-r from-blue-500 to-cyan-500'
             }`}
             style={{ width: `${percentUsed}%` }}
           />
         </div>
         {percentUsed > 90 && (
-          <p className="text-xs text-amber-400 mt-2">
+          <p className="text-xs text-amber-600 mt-2">
             ⚠️ Du närmar dig gränsen. Överskjutande SMS kostar {overageRate} kr/st.
           </p>
         )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">
-        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
-          <p className="text-xl font-bold text-white">{usage.sent}</p>
-          <p className="text-xs text-zinc-500">Skickade</p>
+        <div className="p-3 bg-gray-50 rounded-xl text-center">
+          <p className="text-xl font-bold text-gray-900">{usage.sent}</p>
+          <p className="text-xs text-gray-400">Skickade</p>
         </div>
-        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
-          <p className="text-xl font-bold text-emerald-400">{usage.delivered}</p>
-          <p className="text-xs text-zinc-500">Levererade</p>
+        <div className="p-3 bg-gray-50 rounded-xl text-center">
+          <p className="text-xl font-bold text-emerald-600">{usage.delivered}</p>
+          <p className="text-xs text-gray-400">Levererade</p>
         </div>
-        <div className="p-3 bg-zinc-800/50 rounded-xl text-center">
-          <p className="text-xl font-bold text-red-400">{usage.failed}</p>
-          <p className="text-xs text-zinc-500">Misslyckade</p>
+        <div className="p-3 bg-gray-50 rounded-xl text-center">
+          <p className="text-xl font-bold text-red-600">{usage.failed}</p>
+          <p className="text-xs text-gray-400">Misslyckade</p>
         </div>
       </div>
 
       {overage > 0 && (
-        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+        <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-amber-400 font-medium">Överskjutande SMS</p>
-              <p className="text-sm text-amber-400/70">{overage} SMS × {overageRate} kr</p>
+              <p className="text-amber-600 font-medium">Överskjutande SMS</p>
+              <p className="text-sm text-amber-600/70">{overage} SMS × {overageRate} kr</p>
             </div>
-            <p className="text-xl font-bold text-amber-400">{overageCost.toFixed(0)} kr</p>
+            <p className="text-xl font-bold text-amber-600">{overageCost.toFixed(0)} kr</p>
           </div>
         </div>
       )}
@@ -859,16 +859,16 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   if (!config) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Kunde inte ladda inställningar</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Kunde inte ladda inställningar</div>
       </div>
     )
   }
@@ -889,15 +889,15 @@ export default function SettingsPage() {
   const currentPlan = config.subscription_plan || 'Starter'
 
   return (
-    <div className="p-8 bg-[#09090b] min-h-screen">
+    <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -906,13 +906,13 @@ export default function SettingsPage() {
       <div className="relative max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Inställningar</h1>
-            <p className="text-zinc-400">Konfigurera ditt företag och AI-assistent</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Inställningar</h1>
+            <p className="text-gray-500">Konfigurera ditt företag och AI-assistent</p>
           </div>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Save className="w-5 h-5 mr-2" />}
             Spara ändringar
@@ -927,8 +927,8 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white'
-                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  : 'bg-white text-gray-500 hover:text-white border border-gray-200'
               }`}
             >
               <tab.icon className="w-4 h-4 mr-2" />
@@ -939,12 +939,12 @@ export default function SettingsPage() {
 
         {/* Company Tab */}
         {activeTab === 'company' && (
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-white">Företagsinformation</h2>
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-gray-900">Företagsinformation</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Building2 className="w-4 h-4" />
                   Företagsnamn
                 </label>
@@ -952,25 +952,25 @@ export default function SettingsPage() {
                   type="text"
                   value={config.business_name || ''}
                   onChange={(e) => setConfig({ ...config, business_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">Visas i SMS och används av AI-assistenten</p>
+                <p className="text-xs text-gray-400 mt-1">Visas i SMS och används av AI-assistenten</p>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   Kontaktperson
                 </label>
                 <input
                   type="text"
                   value={config.contact_name || ''}
                   onChange={(e) => setConfig({ ...config, contact_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Mail className="w-4 h-4" />
                   E-post
                 </label>
@@ -978,12 +978,12 @@ export default function SettingsPage() {
                   type="email"
                   value={config.contact_email || ''}
                   onChange={(e) => setConfig({ ...config, contact_email: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <Phone className="w-4 h-4" />
                   Telefon
                 </label>
@@ -991,14 +991,14 @@ export default function SettingsPage() {
                   type="tel"
                   value={config.phone_number || ''}
                   onChange={(e) => setConfig({ ...config, phone_number: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   <MapPin className="w-4 h-4" />
                   Tjänsteområde
                 </label>
@@ -1007,13 +1007,13 @@ export default function SettingsPage() {
                   value={config.service_area || ''}
                   onChange={(e) => setConfig({ ...config, service_area: e.target.value })}
                   placeholder="T.ex. Stockholm, Solna, Sundbyberg"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">AI-assistenten berättar för kunder var ni jobbar</p>
+                <p className="text-xs text-gray-400 mt-1">AI-assistenten berättar för kunder var ni jobbar</p>
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-zinc-400 mb-2">
+                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                   Organisationsnummer
                 </label>
                 <input
@@ -1021,36 +1021,36 @@ export default function SettingsPage() {
                   value={(config as any).org_number || ''}
                   onChange={(e) => setConfig({ ...config, org_number: e.target.value } as any)}
                   placeholder="XXXXXX-XXXX"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
-                <p className="text-xs text-zinc-600 mt-1">Visas på offerter och fakturor</p>
+                <p className="text-xs text-gray-400 mt-1">Visas på offerter och fakturor</p>
               </div>
             </div>
 
             {/* Länk till prislista */}
             <Link
               href="/dashboard/settings/pricelist"
-              className="flex items-center justify-between p-4 bg-zinc-800/50 hover:bg-zinc-800 rounded-xl border border-zinc-700 hover:border-violet-500/30 transition-all group"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-blue-300 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border border-violet-500/30">
-                  <FileText className="w-5 h-5 text-violet-400" />
+                <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border border-blue-300">
+                  <FileText className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-white">Grossistprislista</p>
-                  <p className="text-sm text-zinc-500">Hantera leverantörer och produktpriser</p>
+                  <p className="font-medium text-gray-900">Grossistprislista</p>
+                  <p className="text-sm text-gray-400">Hantera leverantörer och produktpriser</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
             </Link>
 
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Tjänster ni erbjuder</label>
+              <label className="text-sm text-gray-500 mb-2 block">Tjänster ni erbjuder</label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {config.services_offered?.map((service) => (
-                  <span key={service} className="flex items-center px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-lg text-sm text-violet-300">
+                  <span key={service} className="flex items-center px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg text-sm text-blue-500">
                     {service}
-                    <button onClick={() => removeService(service)} className="ml-2 text-violet-400 hover:text-white">
+                    <button onClick={() => removeService(service)} className="ml-2 text-blue-600 hover:text-gray-900">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -1063,11 +1063,11 @@ export default function SettingsPage() {
                   onChange={(e) => setNewService(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addService()}
                   placeholder="Lägg till tjänst..."
-                  className="flex-1 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
                 <button
                   onClick={addService}
-                  className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                  className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -1077,7 +1077,7 @@ export default function SettingsPage() {
                   <button
                     key={suggestion}
                     onClick={() => setConfig({ ...config, services_offered: [...(config.services_offered || []), suggestion] })}
-                    className="px-2 py-1 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-xs text-zinc-500 hover:text-white hover:border-zinc-600"
+                    className="px-2 py-1 bg-gray-50 border border-gray-300/50 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:border-gray-300"
                   >
                     + {suggestion}
                   </button>
@@ -1089,21 +1089,21 @@ export default function SettingsPage() {
 
         {/* Hours Tab */}
         {activeTab === 'hours' && (
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-            <h2 className="text-lg font-semibold text-white mb-2">Öppettider</h2>
-            <p className="text-sm text-zinc-500 mb-6">AI-assistenten bokar endast tider inom dessa tider</p>
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Öppettider</h2>
+            <p className="text-sm text-gray-400 mb-6">AI-assistenten bokar endast tider inom dessa tider</p>
             
             <div className="space-y-4">
               {Object.entries(workingHours).map(([day, hours]) => (
-                <div key={day} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-zinc-800/50 rounded-xl">
+                <div key={day} className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-gray-50 rounded-xl">
                   <label className="flex items-center gap-3 sm:w-32">
                     <input
                       type="checkbox"
                       checked={hours.enabled}
                       onChange={(e) => updateHours(day, 'enabled', e.target.checked)}
-                      className="w-5 h-5 rounded border-zinc-600 bg-zinc-700 text-violet-500 focus:ring-violet-500/50"
+                      className="w-5 h-5 rounded border-gray-300 bg-gray-200 text-blue-600 focus:ring-blue-500/50"
                     />
-                    <span className={`font-medium ${hours.enabled ? 'text-white' : 'text-zinc-500'}`}>
+                    <span className={`font-medium ${hours.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
                       {DAY_NAMES[day]}
                     </span>
                   </label>
@@ -1114,18 +1114,18 @@ export default function SettingsPage() {
                         type="time"
                         value={hours.open}
                         onChange={(e) => updateHours(day, 'open', e.target.value)}
-                        className="px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
-                      <span className="text-zinc-500">–</span>
+                      <span className="text-gray-400">–</span>
                       <input
                         type="time"
                         value={hours.close}
                         onChange={(e) => updateHours(day, 'close', e.target.value)}
-                        className="px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                   ) : (
-                    <span className="text-zinc-600">Stängt</span>
+                    <span className="text-gray-400">Stängt</span>
                   )}
                 </div>
               ))}
@@ -1137,54 +1137,54 @@ export default function SettingsPage() {
         {activeTab === 'phone' && (
           <div className="space-y-6">
             {/* Nuvarande nummer eller tilldela nytt */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Ditt Handymate-nummer</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Ditt Handymate-nummer</h2>
 
               {config.assigned_phone_number ? (
                 // Har redan ett nummer
                 <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl">
+                  <div className="p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300 rounded-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-gradient-to-br from-violet-500 to-fuchsia-500 rounded-xl">
-                          <Phone className="w-6 h-6 text-white" />
+                        <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl">
+                          <Phone className="w-6 h-6 text-gray-900" />
                         </div>
                         <div>
-                          <p className="text-2xl font-bold text-white">{config.assigned_phone_number}</p>
-                          <p className="text-sm text-zinc-400">Ditt kundnummer för samtal</p>
+                          <p className="text-2xl font-bold text-gray-900">{config.assigned_phone_number}</p>
+                          <p className="text-sm text-gray-500">Ditt kundnummer för samtal</p>
                         </div>
                       </div>
                       <button
                         onClick={handleRemovePhone}
                         disabled={provisioning}
-                        className="px-3 py-1.5 text-red-400 hover:bg-red-500/10 rounded-lg text-sm"
+                        className="px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg text-sm"
                       >
                         Ta bort
                       </button>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <p className="text-sm text-zinc-400 mb-1">Vidarekopplas till</p>
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-1">Vidarekopplas till</p>
                     <input
                       type="tel"
                       value={config.forward_phone_number || ''}
                       onChange={(e) => setConfig({ ...config, forward_phone_number: e.target.value })}
                       placeholder="+46701234567"
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
-                    <p className="text-xs text-zinc-600 mt-1">Din mobil eller fast telefon dit samtal kopplas</p>
+                    <p className="text-xs text-gray-400 mt-1">Din mobil eller fast telefon dit samtal kopplas</p>
                   </div>
                 </div>
               ) : (
                 // Inget nummer - visa formulär för att tilldela
                 <div className="space-y-4">
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
                     <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5" />
+                      <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
                       <div>
-                        <p className="font-medium text-white">Inget telefonnummer tilldelat</p>
-                        <p className="text-sm text-zinc-400 mt-1">
+                        <p className="font-medium text-gray-900">Inget telefonnummer tilldelat</p>
+                        <p className="text-sm text-gray-500 mt-1">
                           För att ta emot samtal via Handymate behöver du ett telefonnummer.
                           Kunder ringer detta nummer och samtalet spelas in och analyseras av AI.
                         </p>
@@ -1193,15 +1193,15 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm text-zinc-400 mb-2">Ditt mobilnummer (för vidarekoppling)</label>
+                    <label className="block text-sm text-gray-500 mb-2">Ditt mobilnummer (för vidarekoppling)</label>
                     <input
                       type="tel"
                       value={forwardNumber}
                       onChange={(e) => setForwardNumber(e.target.value)}
                       placeholder="+46701234567"
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
-                    <p className="text-xs text-zinc-600 mt-1">
+                    <p className="text-xs text-gray-400 mt-1">
                       Samtal till ditt Handymate-nummer kopplas hit efter GDPR-meddelandet
                     </p>
                   </div>
@@ -1209,7 +1209,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleProvisionPhone}
                     disabled={provisioning || !forwardNumber.trim()}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {provisioning ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1224,18 +1224,18 @@ export default function SettingsPage() {
 
             {/* Inspelningsinställningar (endast om nummer finns) */}
             {config.assigned_phone_number && (
-              <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <Mic className="w-5 h-5 text-violet-400" />
-                  <h2 className="text-lg font-semibold text-white">Samtalsinspelning</h2>
+                  <Mic className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Samtalsinspelning</h2>
                 </div>
 
                 <div className="space-y-4">
                   {/* Toggle inspelning */}
-                  <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                     <div>
-                      <p className="font-medium text-white">Spela in samtal</p>
-                      <p className="text-sm text-zinc-500">
+                      <p className="font-medium text-gray-900">Spela in samtal</p>
+                      <p className="text-sm text-gray-400">
                         Samtal spelas in för AI-analys och transkribering
                       </p>
                     </div>
@@ -1246,8 +1246,8 @@ export default function SettingsPage() {
                       })}
                       className={`w-12 h-6 rounded-full transition-all ${
                         config.call_recording_enabled
-                          ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                          : 'bg-zinc-700'
+                          ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                          : 'bg-gray-200'
                       }`}
                     >
                       <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -1259,7 +1259,7 @@ export default function SettingsPage() {
                   {/* GDPR-meddelande */}
                   {config.call_recording_enabled && (
                     <div>
-                      <label className="block text-sm text-zinc-400 mb-2">
+                      <label className="block text-sm text-gray-500 mb-2">
                         GDPR-meddelande (spelas upp innan samtalet kopplas)
                       </label>
                       <textarea
@@ -1270,20 +1270,20 @@ export default function SettingsPage() {
                         })}
                         placeholder="Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål."
                         rows={3}
-                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                       />
-                      <p className="text-xs text-zinc-600 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                         Enligt GDPR måste du informera att samtalet spelas in
                       </p>
                     </div>
                   )}
 
                   {/* Info om vad som händer */}
-                  <div className="p-4 bg-violet-500/10 border border-violet-500/30 rounded-xl">
-                    <p className="text-sm text-violet-300">
+                  <div className="p-4 bg-blue-50 border border-blue-300 rounded-xl">
+                    <p className="text-sm text-blue-500">
                       <strong>Så här fungerar det:</strong>
                     </p>
-                    <ol className="mt-2 space-y-1 text-sm text-zinc-400">
+                    <ol className="mt-2 space-y-1 text-sm text-gray-500">
                       <li>1. Kund ringer ditt Handymate-nummer</li>
                       <li>2. GDPR-meddelandet spelas upp</li>
                       <li>3. Samtalet kopplas till din mobil</li>
@@ -1296,7 +1296,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleSavePhoneSettings}
                     disabled={savingPhone}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {savingPhone ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1315,48 +1315,48 @@ export default function SettingsPage() {
         {activeTab === 'invoice' && (
           <div className="space-y-6">
             {/* Betalningsvillkor */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Betalningsvillkor</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Betalningsvillkor</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Standard betalningsvillkor</label>
+                  <label className="block text-sm text-gray-500 mb-2">Standard betalningsvillkor</label>
                   <select
                     value={config.default_payment_days || 30}
                     onChange={(e) => setConfig({ ...config, default_payment_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
                     <option value={10}>10 dagar</option>
                     <option value={15}>15 dagar</option>
                     <option value={20}>20 dagar</option>
                     <option value={30}>30 dagar</option>
                   </select>
-                  <p className="text-xs text-zinc-600 mt-1">Förfallodatum räknas från fakturadatum</p>
+                  <p className="text-xs text-gray-400 mt-1">Förfallodatum räknas från fakturadatum</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Dröjsmålsränta</label>
+                  <label className="block text-sm text-gray-500 mb-2">Dröjsmålsränta</label>
                   <div className="relative">
                     <input
                       type="number"
                       value={config.late_fee_percent || 8}
                       onChange={(e) => setConfig({ ...config, late_fee_percent: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-12"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-12"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">%</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
-                  <p className="text-xs text-zinc-600 mt-1">Referensräntan (2024) + 8% = ca 11.5%</p>
+                  <p className="text-xs text-gray-400 mt-1">Referensräntan (2024) + 8% = ca 11.5%</p>
                 </div>
               </div>
             </div>
 
             {/* F-skatt */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Skatteuppgifter</h2>
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Skatteuppgifter</h2>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                 <div>
-                  <p className="font-medium text-white">Godkänd för F-skatt</p>
-                  <p className="text-sm text-zinc-500">Visas på offerter och fakturor</p>
+                  <p className="font-medium text-gray-900">Godkänd för F-skatt</p>
+                  <p className="text-sm text-gray-400">Visas på offerter och fakturor</p>
                 </div>
                 <button
                   onClick={() => setConfig({
@@ -1365,8 +1365,8 @@ export default function SettingsPage() {
                   } as any)}
                   className={`w-12 h-6 rounded-full transition-all ${
                     (config as any).f_skatt_registered
-                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                      : 'bg-zinc-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                      : 'bg-gray-200'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -1377,58 +1377,58 @@ export default function SettingsPage() {
             </div>
 
             {/* Betalningsinformation */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Betalningsinformation</h2>
-              <p className="text-sm text-zinc-500 mb-4">Visas på fakturor och i påminnelser</p>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Betalningsinformation</h2>
+              <p className="text-sm text-gray-400 mb-4">Visas på fakturor och i påminnelser</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Bankgiro</label>
+                  <label className="block text-sm text-gray-500 mb-2">Bankgiro</label>
                   <input
                     type="text"
                     value={config.bankgiro || ''}
                     onChange={(e) => setConfig({ ...config, bankgiro: e.target.value })}
                     placeholder="123-4567"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Plusgiro</label>
+                  <label className="block text-sm text-gray-500 mb-2">Plusgiro</label>
                   <input
                     type="text"
                     value={(config as any).plusgiro || ''}
                     onChange={(e) => setConfig({ ...config, ...(({ plusgiro: e.target.value }) as any) } as any)}
                     placeholder="12 34 56-7"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Swish-nummer</label>
+                  <label className="block text-sm text-gray-500 mb-2">Swish-nummer</label>
                   <input
                     type="text"
                     value={config.swish_number || ''}
                     onChange={(e) => setConfig({ ...config, swish_number: e.target.value })}
                     placeholder="123 456 78 90"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
               </div>
             </div>
 
             {/* Påminnelser */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-violet-400" />
-                <h2 className="text-lg font-semibold text-white">Påminnelser</h2>
+                <Bell className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Påminnelser</h2>
               </div>
 
               {/* Auto-påminnelse toggle */}
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl mb-4">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl mb-4">
                 <div>
-                  <p className="font-medium text-white">Automatiska påminnelser</p>
-                  <p className="text-sm text-zinc-500">
+                  <p className="font-medium text-gray-900">Automatiska påminnelser</p>
+                  <p className="text-sm text-gray-400">
                     Skicka påminnelse automatiskt efter förfallodatum
                   </p>
                 </div>
@@ -1439,8 +1439,8 @@ export default function SettingsPage() {
                   })}
                   className={`w-12 h-6 rounded-full transition-all ${
                     config.auto_reminder_enabled
-                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                      : 'bg-zinc-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                      : 'bg-gray-200'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -1451,11 +1451,11 @@ export default function SettingsPage() {
 
               {config.auto_reminder_enabled && (
                 <div className="mb-4">
-                  <label className="block text-sm text-zinc-400 mb-2">Skicka påminnelse efter</label>
+                  <label className="block text-sm text-gray-500 mb-2">Skicka påminnelse efter</label>
                   <select
                     value={config.auto_reminder_days || 7}
                     onChange={(e) => setConfig({ ...config, auto_reminder_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
                     <option value={3}>3 dagar efter förfall</option>
                     <option value={5}>5 dagar efter förfall</option>
@@ -1466,19 +1466,19 @@ export default function SettingsPage() {
               )}
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Påminnelse-mall (SMS)</label>
+                <label className="block text-sm text-gray-500 mb-2">Påminnelse-mall (SMS)</label>
                 <textarea
                   value={config.reminder_sms_template || ''}
                   onChange={(e) => setConfig({ ...config, reminder_sms_template: e.target.value })}
                   placeholder="Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till bankgiro {bankgiro} eller Swish {swish}. //{business_name}"
                   rows={4}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                 />
-                <div className="mt-2 text-xs text-zinc-600">
+                <div className="mt-2 text-xs text-gray-400">
                   <p className="font-medium mb-1">Tillgängliga variabler:</p>
                   <div className="flex flex-wrap gap-2">
                     {['{invoice_number}', '{amount}', '{due_date}', '{ocr}', '{business_name}', '{days_overdue}', '{late_fee_percent}'].map(v => (
-                      <code key={v} className="px-1.5 py-0.5 bg-zinc-800 rounded text-zinc-400">{v}</code>
+                      <code key={v} className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">{v}</code>
                     ))}
                   </div>
                 </div>
@@ -1491,30 +1491,30 @@ export default function SettingsPage() {
         {activeTab === 'time' && (
           <div className="space-y-6">
             {/* Grundinställningar */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Tidrapportering</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tidrapportering</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Standard timpris</label>
+                  <label className="block text-sm text-gray-500 mb-2">Standard timpris</label>
                   <div className="relative">
                     <input
                       type="number"
                       value={config.default_hourly_rate || 500}
                       onChange={(e) => setConfig({ ...config, default_hourly_rate: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-16"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-16"
                     />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500">kr/tim</span>
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr/tim</span>
                   </div>
-                  <p className="text-xs text-zinc-600 mt-1">Används som standard för nya tidrapporter</p>
+                  <p className="text-xs text-gray-400 mt-1">Används som standard för nya tidrapporter</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Tidsavrundning</label>
+                  <label className="block text-sm text-gray-500 mb-2">Tidsavrundning</label>
                   <select
                     value={config.time_rounding_minutes || 15}
                     onChange={(e) => setConfig({ ...config, time_rounding_minutes: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
                     <option value={1}>1 minut (ingen avrundning)</option>
                     <option value={5}>5 minuter</option>
@@ -1522,15 +1522,15 @@ export default function SettingsPage() {
                     <option value={30}>30 minuter</option>
                     <option value={60}>60 minuter</option>
                   </select>
-                  <p className="text-xs text-zinc-600 mt-1">Tid avrundas uppåt till närmaste intervall</p>
+                  <p className="text-xs text-gray-400 mt-1">Tid avrundas uppåt till närmaste intervall</p>
                 </div>
               </div>
 
               {/* Kräv beskrivning toggle */}
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl mt-6">
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl mt-6">
                 <div>
-                  <p className="font-medium text-white">Kräv beskrivning</p>
-                  <p className="text-sm text-zinc-500">Tidrapporter måste ha en beskrivning</p>
+                  <p className="font-medium text-gray-900">Kräv beskrivning</p>
+                  <p className="text-sm text-gray-400">Tidrapporter måste ha en beskrivning</p>
                 </div>
                 <button
                   onClick={() => setConfig({
@@ -1539,8 +1539,8 @@ export default function SettingsPage() {
                   })}
                   className={`w-12 h-6 rounded-full transition-all ${
                     config.time_require_description
-                      ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500'
-                      : 'bg-zinc-700'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
+                      : 'bg-gray-200'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
@@ -1551,15 +1551,15 @@ export default function SettingsPage() {
             </div>
 
             {/* Arbetstyper */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Arbetstyper</h2>
-                  <p className="text-sm text-zinc-500">Kategorisera tid med multiplikatorer</p>
+                  <h2 className="text-lg font-semibold text-gray-900">Arbetstyper</h2>
+                  <p className="text-sm text-gray-400">Kategorisera tid med multiplikatorer</p>
                 </div>
                 <button
                   onClick={() => setShowAddWorkType(!showAddWorkType)}
-                  className="flex items-center gap-2 px-4 py-2 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-xl text-sm text-blue-500 hover:bg-blue-500/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till
@@ -1568,14 +1568,14 @@ export default function SettingsPage() {
 
               {/* Add form */}
               {showAddWorkType && (
-                <div className="p-4 bg-zinc-800/50 rounded-xl mb-4 space-y-3">
+                <div className="p-4 bg-gray-50 rounded-xl mb-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <input
                       type="text"
                       value={newWorkType.name}
                       onChange={(e) => setNewWorkType({ ...newWorkType, name: e.target.value })}
                       placeholder="Namn på arbetstyp"
-                      className="px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     />
                     <div className="relative">
                       <input
@@ -1583,32 +1583,32 @@ export default function SettingsPage() {
                         step="0.1"
                         value={newWorkType.multiplier}
                         onChange={(e) => setNewWorkType({ ...newWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
-                        className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-8"
+                        className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">x</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">x</span>
                     </div>
                     <label className="flex items-center gap-2 px-4 py-2.5">
                       <input
                         type="checkbox"
                         checked={newWorkType.billable_default}
                         onChange={(e) => setNewWorkType({ ...newWorkType, billable_default: e.target.checked })}
-                        className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-violet-500"
+                        className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-blue-600"
                       />
-                      <span className="text-sm text-zinc-300">Fakturerbar</span>
+                      <span className="text-sm text-gray-700">Fakturerbar</span>
                     </label>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={handleAddWorkType}
                       disabled={!newWorkType.name.trim() || savingWorkType}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-sm text-white hover:opacity-90 disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-sm text-white hover:opacity-90 disabled:opacity-50"
                     >
                       {savingWorkType ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       Spara
                     </button>
                     <button
                       onClick={() => { setShowAddWorkType(false); setNewWorkType({ name: '', multiplier: 1.0, billable_default: true }) }}
-                      className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-zinc-400 hover:text-white"
+                      className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-500 hover:text-gray-900"
                     >
                       Avbryt
                     </button>
@@ -1619,14 +1619,14 @@ export default function SettingsPage() {
               {/* Work types list */}
               <div className="space-y-2">
                 {workTypes.map((wt) => (
-                  <div key={wt.work_type_id} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
+                  <div key={wt.work_type_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
                     {editingWorkType?.work_type_id === wt.work_type_id ? (
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3 items-center">
                         <input
                           type="text"
                           value={editingWorkType.name}
                           onChange={(e) => setEditingWorkType({ ...editingWorkType, name: e.target.value })}
-                          className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                          className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                         />
                         <div className="relative">
                           <input
@@ -1634,30 +1634,30 @@ export default function SettingsPage() {
                             step="0.1"
                             value={editingWorkType.multiplier}
                             onChange={(e) => setEditingWorkType({ ...editingWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
-                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 pr-8"
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs">x</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">x</span>
                         </div>
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
                             checked={editingWorkType.billable_default}
                             onChange={(e) => setEditingWorkType({ ...editingWorkType, billable_default: e.target.checked })}
-                            className="w-4 h-4 rounded border-zinc-600 bg-zinc-700 text-violet-500"
+                            className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-blue-600"
                           />
-                          <span className="text-xs text-zinc-300">Fakturerbar</span>
+                          <span className="text-xs text-gray-700">Fakturerbar</span>
                         </label>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleUpdateWorkType(editingWorkType)}
                             disabled={savingWorkType}
-                            className="px-3 py-1.5 bg-violet-500/20 border border-violet-500/30 rounded-lg text-xs text-violet-300 hover:bg-violet-500/30 disabled:opacity-50"
+                            className="px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-lg text-xs text-blue-500 hover:bg-blue-500/30 disabled:opacity-50"
                           >
                             Spara
                           </button>
                           <button
                             onClick={() => setEditingWorkType(null)}
-                            className="px-3 py-1.5 bg-zinc-700 rounded-lg text-xs text-zinc-400 hover:text-white"
+                            className="px-3 py-1.5 bg-gray-200 rounded-lg text-xs text-gray-500 hover:text-gray-900"
                           >
                             Avbryt
                           </button>
@@ -1667,17 +1667,17 @@ export default function SettingsPage() {
                       <>
                         <div className="flex items-center gap-3">
                           <div>
-                            <p className="font-medium text-white">{wt.name}</p>
+                            <p className="font-medium text-gray-900">{wt.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="px-2 py-0.5 bg-violet-500/20 text-violet-300 text-xs rounded-lg">
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-500 text-xs rounded-lg">
                                 {wt.multiplier}x
                               </span>
                               {wt.billable_default ? (
-                                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 text-xs rounded-lg">
+                                <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-lg">
                                   Fakturerbar
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 bg-zinc-700 text-zinc-400 text-xs rounded-lg">
+                                <span className="px-2 py-0.5 bg-gray-200 text-gray-500 text-xs rounded-lg">
                                   Ej fakturerbar
                                 </span>
                               )}
@@ -1687,13 +1687,13 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => setEditingWorkType(wt)}
-                            className="p-2 hover:bg-zinc-700 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                            className="p-2 hover:bg-gray-200 rounded-lg text-gray-500 hover:text-gray-900 transition-colors"
                           >
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDeleteWorkType(wt.work_type_id)}
-                            className="p-2 hover:bg-red-500/10 rounded-lg text-zinc-400 hover:text-red-400 transition-colors"
+                            className="p-2 hover:bg-red-50 rounded-lg text-gray-500 hover:text-red-600 transition-colors"
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -1703,7 +1703,7 @@ export default function SettingsPage() {
                   </div>
                 ))}
                 {workTypes.length === 0 && (
-                  <div className="text-center py-8 text-zinc-500">
+                  <div className="text-center py-8 text-gray-400">
                     <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Inga arbetstyper ännu</p>
                     <p className="text-xs mt-1">Kör SQL-migrationen för att skapa standardtyper</p>
@@ -1723,40 +1723,40 @@ export default function SettingsPage() {
         {activeTab === 'integrations' && (
           <div className="space-y-6">
             {/* Google Calendar Integration */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-blue-500/20">
+                <div className="p-2 rounded-lg bg-blue-100">
                   <CalendarDays className="w-6 h-6 text-blue-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Google Calendar</h2>
-                  <p className="text-sm text-zinc-500">Tvåvägssynk med Google Calendar</p>
+                  <h2 className="text-lg font-semibold text-gray-900">Google Calendar</h2>
+                  <p className="text-sm text-gray-400">Tvåvägssynk med Google Calendar</p>
                 </div>
               </div>
 
               {googleStatus?.connected ? (
                 <div className="space-y-4">
                   {/* Connected status */}
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
                         <div>
-                          <p className="font-medium text-white">Ansluten</p>
-                          <p className="text-sm text-zinc-400">{googleStatus.email}</p>
+                          <p className="font-medium text-gray-900">Ansluten</p>
+                          <p className="text-sm text-gray-500">{googleStatus.email}</p>
                         </div>
                       </div>
-                      <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg">Aktiv</span>
+                      <span className="px-2 py-1 bg-emerald-100 text-emerald-600 text-xs rounded-lg">Aktiv</span>
                     </div>
                   </div>
 
                   {/* Sync direction */}
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <label className="text-sm font-medium text-white block mb-2">Synk-riktning</label>
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <label className="text-sm font-medium text-gray-900 block mb-2">Synk-riktning</label>
                     <select
                       value={googleStatus.syncDirection || 'both'}
                       onChange={(e) => handleChangeSyncDirection(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                     >
                       <option value="both">Båda riktningar</option>
                       <option value="export">Endast export (Handymate &rarr; Google)</option>
@@ -1766,17 +1766,17 @@ export default function SettingsPage() {
 
                   {/* Last sync + manual sync */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-zinc-800/50 rounded-xl">
-                      <p className="text-xs text-zinc-500">Senaste synk</p>
-                      <p className="text-sm text-white">
+                    <div className="p-3 bg-gray-50 rounded-xl">
+                      <p className="text-xs text-gray-400">Senaste synk</p>
+                      <p className="text-sm text-gray-900">
                         {googleStatus.lastSyncAt
                           ? new Date(googleStatus.lastSyncAt).toLocaleString('sv-SE')
                           : 'Aldrig'}
                       </p>
                     </div>
-                    <div className="p-3 bg-zinc-800/50 rounded-xl">
-                      <p className="text-xs text-zinc-500">Ansluten sedan</p>
-                      <p className="text-sm text-white">
+                    <div className="p-3 bg-gray-50 rounded-xl">
+                      <p className="text-xs text-gray-400">Ansluten sedan</p>
+                      <p className="text-sm text-gray-900">
                         Ansluten
                       </p>
                     </div>
@@ -1784,8 +1784,8 @@ export default function SettingsPage() {
 
                   {/* Sync error */}
                   {googleStatus.syncError && (
-                    <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl">
-                      <p className="text-sm text-red-400">Synkfel: {googleStatus.syncError}</p>
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <p className="text-sm text-red-600">Synkfel: {googleStatus.syncError}</p>
                     </div>
                   )}
 
@@ -1793,7 +1793,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleGoogleSync}
                     disabled={googleSyncing}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-blue-100 border border-blue-300 rounded-xl text-blue-500 hover:bg-blue-500/30 disabled:opacity-50 transition-colors"
                   >
                     {googleSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
                     Synka nu
@@ -1801,7 +1801,7 @@ export default function SettingsPage() {
 
                   {/* Sync result */}
                   {googleSyncResult && (
-                    <div className="text-xs text-zinc-500">
+                    <div className="text-xs text-gray-400">
                       {googleSyncResult.imported > 0 && `${googleSyncResult.imported} importerade`}
                       {googleSyncResult.exported > 0 && `, ${googleSyncResult.exported} exporterade`}
                       {googleSyncResult.updated > 0 && `, ${googleSyncResult.updated} uppdaterade`}
@@ -1809,19 +1809,19 @@ export default function SettingsPage() {
                   )}
 
                   {/* Features list */}
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <p className="text-sm text-zinc-400 mb-3">Med Google Calendar kopplat kan du:</p>
-                    <ul className="space-y-2 text-sm text-zinc-300">
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-3">Med Google Calendar kopplat kan du:</p>
+                    <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Se dina Google-events i Handymate-kalendern
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Synka Handymate-schema till Google Calendar
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Automatisk synk var 2:a timme
                       </li>
                     </ul>
@@ -1830,7 +1830,7 @@ export default function SettingsPage() {
                   {/* Disconnect */}
                   <button
                     onClick={handleDisconnectGoogle}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-red-400 hover:border-red-500/30 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-200 transition-colors"
                   >
                     <XCircle className="w-4 h-4" />
                     Koppla bort Google Calendar
@@ -1838,9 +1838,9 @@ export default function SettingsPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <p className="text-sm text-zinc-400 mb-3">Koppla Google Calendar för att:</p>
-                    <ul className="space-y-2 text-sm text-zinc-300">
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-3">Koppla Google Calendar för att:</p>
+                    <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 bg-blue-400 rounded-full" />
                         Synka ditt schema med Google Calendar
@@ -1865,7 +1865,7 @@ export default function SettingsPage() {
                     Anslut Google Calendar
                   </button>
 
-                  <p className="text-xs text-zinc-600 text-center">
+                  <p className="text-xs text-gray-400 text-center">
                     Du omdirigeras till Google för att godkänna åtkomst till din kalender
                   </p>
                 </div>
@@ -1873,64 +1873,64 @@ export default function SettingsPage() {
             </div>
 
             {/* Outlook Calendar (placeholder) */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 opacity-60">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 opacity-60">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-blue-600/20">
-                  <CalendarDays className="w-6 h-6 text-blue-300" />
+                  <CalendarDays className="w-6 h-6 text-blue-700" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Microsoft Outlook</h2>
-                  <p className="text-sm text-zinc-500">Kommer snart</p>
+                  <h2 className="text-lg font-semibold text-gray-900">Microsoft Outlook</h2>
+                  <p className="text-sm text-gray-400">Kommer snart</p>
                 </div>
               </div>
-              <p className="text-sm text-zinc-500">Outlook-kalender integration är under utveckling.</p>
+              <p className="text-sm text-gray-400">Outlook-kalender integration är under utveckling.</p>
             </div>
 
             {/* Fortnox Integration */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-[#1A3A32]">
+                <div className="p-2 rounded-lg bg-emerald-100">
                   <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#4ADE80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Fortnox</h2>
-                  <p className="text-sm text-zinc-500">Bokföring och fakturering</p>
+                  <h2 className="text-lg font-semibold text-gray-900">Fortnox</h2>
+                  <p className="text-sm text-gray-400">Bokföring och fakturering</p>
                 </div>
               </div>
 
               {fortnoxStatus?.connected ? (
                 // Kopplad
                 <div className="space-y-4">
-                  <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <CheckCircle className="w-5 h-5 text-emerald-400" />
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
                         <div>
-                          <p className="font-medium text-white">Kopplad till Fortnox</p>
-                          <p className="text-sm text-zinc-400">{fortnoxStatus.companyName || 'Företag'}</p>
+                          <p className="font-medium text-gray-900">Kopplad till Fortnox</p>
+                          <p className="text-sm text-gray-500">{fortnoxStatus.companyName || 'Företag'}</p>
                         </div>
                       </div>
-                      <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-xs rounded-lg">
+                      <span className="px-2 py-1 bg-emerald-100 text-emerald-600 text-xs rounded-lg">
                         Aktiv
                       </span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-zinc-800/50 rounded-xl">
-                      <p className="text-xs text-zinc-500">Kopplad sedan</p>
-                      <p className="text-sm text-white">
+                    <div className="p-3 bg-gray-50 rounded-xl">
+                      <p className="text-xs text-gray-400">Kopplad sedan</p>
+                      <p className="text-sm text-gray-900">
                         {fortnoxStatus.connectedAt
                           ? new Date(fortnoxStatus.connectedAt).toLocaleDateString('sv-SE')
                           : '-'
                         }
                       </p>
                     </div>
-                    <div className="p-3 bg-zinc-800/50 rounded-xl">
-                      <p className="text-xs text-zinc-500">Token giltig till</p>
-                      <p className="text-sm text-white">
+                    <div className="p-3 bg-gray-50 rounded-xl">
+                      <p className="text-xs text-gray-400">Token giltig till</p>
+                      <p className="text-sm text-gray-900">
                         {fortnoxStatus.expiresAt
                           ? new Date(fortnoxStatus.expiresAt).toLocaleDateString('sv-SE')
                           : '-'
@@ -1940,13 +1940,13 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Kundsynkronisering */}
-                  <div className="p-4 bg-zinc-800/50 rounded-xl space-y-3">
-                    <p className="text-sm font-medium text-white">Kundsynkronisering</p>
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                    <p className="text-sm font-medium text-gray-900">Kundsynkronisering</p>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         onClick={handleSyncCustomersToFortnox}
                         disabled={syncingCustomers}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-100 border border-blue-300 rounded-xl text-sm text-blue-500 hover:bg-blue-500/30 disabled:opacity-50 transition-colors"
                       >
                         {syncingCustomers ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1958,7 +1958,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handleImportCustomersFromFortnox}
                         disabled={importingCustomers}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-700/50 border border-zinc-600 rounded-xl text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-200/50 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
                       >
                         {importingCustomers ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1969,7 +1969,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     {syncResult && (
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-gray-400">
                         {syncResult.synced !== undefined && `${syncResult.synced} kunder synkade`}
                         {syncResult.imported !== undefined && `${syncResult.imported} kunder importerade`}
                         {syncResult.failed !== undefined && syncResult.failed > 0 && ` (${syncResult.failed} misslyckades)`}
@@ -1978,13 +1978,13 @@ export default function SettingsPage() {
                   </div>
 
                   {/* Fakturasynkronisering */}
-                  <div className="p-4 bg-zinc-800/50 rounded-xl space-y-3">
-                    <p className="text-sm font-medium text-white">Fakturasynkronisering</p>
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                    <p className="text-sm font-medium text-gray-900">Fakturasynkronisering</p>
                     <div className="grid grid-cols-2 gap-3">
                       <button
                         onClick={handleSyncInvoicesToFortnox}
                         disabled={syncingInvoices}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-500/20 border border-violet-500/30 rounded-xl text-sm text-violet-300 hover:bg-violet-500/30 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-100 border border-blue-300 rounded-xl text-sm text-blue-500 hover:bg-blue-500/30 disabled:opacity-50 transition-colors"
                       >
                         {syncingInvoices ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -1996,7 +1996,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handleSyncPayments}
                         disabled={syncingPayments}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-700/50 border border-zinc-600 rounded-xl text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-200/50 border border-gray-300 rounded-xl text-sm text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
                       >
                         {syncingPayments ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -2007,7 +2007,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     {invoiceSyncResult && (
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-gray-400">
                         {invoiceSyncResult.synced !== undefined && `${invoiceSyncResult.synced} fakturor synkade`}
                         {invoiceSyncResult.updated !== undefined && `${invoiceSyncResult.updated} betalningar uppdaterade`}
                         {invoiceSyncResult.unchanged !== undefined && `, ${invoiceSyncResult.unchanged} oförändrade`}
@@ -2016,19 +2016,19 @@ export default function SettingsPage() {
                     )}
                   </div>
 
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <p className="text-sm text-zinc-400 mb-3">Med Fortnox kopplat kan du:</p>
-                    <ul className="space-y-2 text-sm text-zinc-300">
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-3">Med Fortnox kopplat kan du:</p>
+                    <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Synka kunder automatiskt
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Exportera fakturor till bokföringen
                       </li>
                       <li className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
+                        <CheckCircle className="w-4 h-4 text-emerald-600" />
                         Hämta artiklar och priser
                       </li>
                     </ul>
@@ -2037,7 +2037,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleDisconnectFortnox}
                     disabled={disconnectingFortnox}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-zinc-400 hover:text-red-400 hover:border-red-500/30 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-200 transition-colors"
                   >
                     {disconnectingFortnox ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -2050,23 +2050,23 @@ export default function SettingsPage() {
               ) : (
                 // Ej kopplad
                 <div className="space-y-4">
-                  <div className="p-4 bg-zinc-800/50 rounded-xl">
-                    <p className="text-sm text-zinc-400 mb-3">Koppla Fortnox för att:</p>
-                    <ul className="space-y-2 text-sm text-zinc-300">
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <p className="text-sm text-gray-500 mb-3">Koppla Fortnox för att:</p>
+                    <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         Synkronisera kunder mellan systemen
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         Exportera fakturor direkt till bokföringen
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         Importera artiklar och prislista
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-violet-400 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
                         Automatisk bokföring av betalningar
                       </li>
                     </ul>
@@ -2075,7 +2075,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleConnectFortnox}
                     disabled={fortnoxLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {fortnoxLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -2085,7 +2085,7 @@ export default function SettingsPage() {
                     Koppla Fortnox-konto
                   </button>
 
-                  <p className="text-xs text-zinc-600 text-center">
+                  <p className="text-xs text-gray-400 text-center">
                     Du kommer att omdirigeras till Fortnox för att godkänna kopplingen
                   </p>
                 </div>
@@ -2093,50 +2093,50 @@ export default function SettingsPage() {
             </div>
 
             {/* Grossist-kopplingar */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-6">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500">
-                  <Package className="w-5 h-5 text-white" />
+                  <Package className="w-5 h-5 text-gray-900" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Grossister</h3>
-                  <p className="text-sm text-zinc-500">Koppla grossistkonton för produktsök och prisuppdatering</p>
+                  <h3 className="text-lg font-semibold text-gray-900">Grossister</h3>
+                  <p className="text-sm text-gray-400">Koppla grossistkonton för produktsök och prisuppdatering</p>
                 </div>
               </div>
 
               <div className="space-y-3">
                 {grossistSuppliers.map(supplier => (
-                  <div key={supplier.key} className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                  <div key={supplier.key} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-300/50">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center">
-                        <span className="text-sm font-bold text-zinc-300">{supplier.name.charAt(0)}</span>
+                      <div className="w-10 h-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                        <span className="text-sm font-bold text-gray-700">{supplier.name.charAt(0)}</span>
                       </div>
                       <div>
-                        <p className="font-medium text-white">{supplier.name}</p>
-                        <p className="text-xs text-zinc-500">{supplier.description}</p>
+                        <p className="font-medium text-gray-900">{supplier.name}</p>
+                        <p className="text-xs text-gray-400">{supplier.description}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       {supplier.connected ? (
                         <>
-                          <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <span className="px-2 py-1 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">
                             Kopplad
                           </span>
                           {supplier.last_sync_at && (
-                            <span className="text-xs text-zinc-500">
+                            <span className="text-xs text-gray-400">
                               Synkad {new Date(supplier.last_sync_at).toLocaleDateString('sv-SE')}
                             </span>
                           )}
                           <button
                             onClick={() => handleSyncPrices(supplier.key)}
                             disabled={syncLoading === supplier.key}
-                            className="px-3 py-1.5 text-xs bg-violet-500/20 text-violet-400 border border-violet-500/30 rounded-lg hover:bg-violet-500/30 disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs bg-blue-100 text-blue-600 border border-blue-300 rounded-lg hover:bg-blue-500/30 disabled:opacity-50"
                           >
                             {syncLoading === supplier.key ? 'Synkar...' : 'Synka priser'}
                           </button>
                           <button
                             onClick={() => handleDisconnectGrossist(supplier.key)}
-                            className="px-3 py-1.5 text-xs bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30"
+                            className="px-3 py-1.5 text-xs bg-red-100 text-red-600 border border-red-200 rounded-lg hover:bg-red-500/30"
                           >
                             Koppla bort
                           </button>
@@ -2147,12 +2147,12 @@ export default function SettingsPage() {
                             setConnectingSupplier(supplier.key)
                             setCredentialForm({})
                           }}
-                          className="px-3 py-1.5 text-xs bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90"
+                          className="px-3 py-1.5 text-xs bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90"
                         >
                           Anslut
                         </button>
                       ) : (
-                        <span className="px-2 py-1 text-xs rounded-full bg-zinc-700 text-zinc-400">
+                        <span className="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-500">
                           Kommer snart
                         </span>
                       )}
@@ -2167,24 +2167,24 @@ export default function SettingsPage() {
               const supplier = grossistSuppliers.find((s: any) => s.key === connectingSupplier)
               if (!supplier) return null
               return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-md">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+                  <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-semibold text-white">Anslut {supplier.name}</h3>
-                      <button onClick={() => setConnectingSupplier(null)} className="text-zinc-500 hover:text-white">
+                      <h3 className="text-lg font-semibold text-gray-900">Anslut {supplier.name}</h3>
+                      <button onClick={() => setConnectingSupplier(null)} className="text-gray-400 hover:text-gray-900">
                         <X className="w-5 h-5" />
                       </button>
                     </div>
                     <div className="space-y-4">
                       {supplier.credentialFields?.map((field: any) => (
                         <div key={field.key}>
-                          <label className="block text-sm font-medium text-zinc-400 mb-1">{field.label}</label>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">{field.label}</label>
                           <input
                             type={field.type}
                             value={credentialForm[field.key] || ''}
                             onChange={e => setCredentialForm(prev => ({ ...prev, [field.key]: e.target.value }))}
                             placeholder={field.placeholder}
-                            className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none"
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none"
                           />
                         </div>
                       ))}
@@ -2192,14 +2192,14 @@ export default function SettingsPage() {
                     <div className="flex gap-3 mt-6">
                       <button
                         onClick={() => setConnectingSupplier(null)}
-                        className="flex-1 px-4 py-2 bg-zinc-800 text-zinc-300 rounded-lg hover:bg-zinc-700"
+                        className="flex-1 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
                       >
                         Avbryt
                       </button>
                       <button
                         onClick={handleConnectGrossist}
                         disabled={connectLoading}
-                        className="flex-1 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                       >
                         {connectLoading ? 'Ansluter...' : 'Testa & Anslut'}
                       </button>
@@ -2210,9 +2210,9 @@ export default function SettingsPage() {
             })()}
 
             {/* Fler integrationer kommer */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Fler integrationer</h3>
-              <p className="text-sm text-zinc-500 mb-4">Kommande integrationer för Handymate</p>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Fler integrationer</h3>
+              <p className="text-sm text-gray-400 mb-4">Kommande integrationer för Handymate</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
@@ -2223,14 +2223,14 @@ export default function SettingsPage() {
                 ].map((integration) => (
                   <div
                     key={integration.name}
-                    className="p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-xl opacity-60"
+                    className="p-4 bg-gray-100/30 border border-gray-300/50 rounded-xl opacity-60"
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-white">{integration.name}</p>
-                        <p className="text-xs text-zinc-500">{integration.desc}</p>
+                        <p className="font-medium text-gray-900">{integration.name}</p>
+                        <p className="text-xs text-gray-400">{integration.desc}</p>
                       </div>
-                      <span className="px-2 py-1 bg-zinc-700 text-zinc-400 text-xs rounded">
+                      <span className="px-2 py-1 bg-gray-200 text-gray-500 text-xs rounded">
                         Kommer snart
                       </span>
                     </div>
@@ -2243,41 +2243,41 @@ export default function SettingsPage() {
 
         {/* AI Tab */}
         {activeTab === 'ai' && (
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6 space-y-6">
-            <h2 className="text-lg font-semibold text-white mb-2">AI-assistent</h2>
-            <p className="text-sm text-zinc-500">Konfigurera hur Lisa svarar på samtal</p>
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">AI-assistent</h2>
+            <p className="text-sm text-gray-400">Konfigurera hur Lisa svarar på samtal</p>
             
             <div>
-              <label className="text-sm text-zinc-400 mb-2 block">Hälsningsfras</label>
+              <label className="text-sm text-gray-500 mb-2 block">Hälsningsfras</label>
               <textarea
                 value={config.greeting_script || ''}
                 onChange={(e) => setConfig({ ...config, greeting_script: e.target.value })}
                 placeholder={`Hej och välkommen till ${config.business_name}! Mitt namn är Lisa, hur kan jag hjälpa dig idag?`}
                 rows={4}
-                className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
               />
-              <p className="text-xs text-zinc-600 mt-1">Detta säger AI-assistenten när den svarar</p>
+              <p className="text-xs text-gray-400 mt-1">Detta säger AI-assistenten när den svarar</p>
               <Link
               href="/dashboard/settings/knowledge"
-              className="mt-4 flex items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl hover:bg-violet-500/20 transition-all"
+              className="mt-4 flex items-center justify-between p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300 rounded-xl hover:bg-blue-100 transition-all"
             >
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-violet-400" />
+                <FileText className="w-5 h-5 text-blue-600" />
                 <div>
-                  <p className="font-medium text-white text-sm">Knowledge Base</p>
-                  <p className="text-xs text-zinc-400">Lär AI:n om dina tjänster, priser och policyer</p>
+                  <p className="font-medium text-gray-900 text-sm">Knowledge Base</p>
+                  <p className="text-xs text-gray-500">Lär AI:n om dina tjänster, priser och policyer</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-violet-400" />
+              <ChevronRight className="w-5 h-5 text-blue-600" />
             </Link>
             </div>
 
-            <div className="p-4 bg-violet-500/10 border border-violet-500/30 rounded-xl">
+            <div className="p-4 bg-blue-50 border border-blue-300 rounded-xl">
               <div className="flex items-start gap-3">
-                <Bot className="w-5 h-5 text-violet-400 mt-0.5" />
+                <Bot className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>
-                  <p className="font-medium text-white text-sm">AI-röst</p>
-                  <p className="text-xs text-zinc-400 mt-1">
+                  <p className="font-medium text-gray-900 text-sm">AI-röst</p>
+                  <p className="text-xs text-gray-500 mt-1">
                     Just nu används "Lisa" (sv-SE-SofieNeural). 
                     Fler röster kommer snart.
                   </p>
@@ -2285,12 +2285,12 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl">
+            <div className="p-4 bg-gray-50 border border-gray-300 rounded-xl">
               <div className="flex items-start gap-3">
-                <Phone className="w-5 h-5 text-zinc-400 mt-0.5" />
+                <Phone className="w-5 h-5 text-gray-500 mt-0.5" />
                 <div>
-                  <p className="font-medium text-white text-sm">AI-telefonnummer</p>
-                  <p className="text-xs text-zinc-400 mt-1">
+                  <p className="font-medium text-gray-900 text-sm">AI-telefonnummer</p>
+                  <p className="text-xs text-gray-500 mt-1">
                     Ditt AI-telefonnummer tilldelas när voice-assistenten aktiveras.
                   </p>
                 </div>
@@ -2307,13 +2307,13 @@ export default function SettingsPage() {
         {activeTab === 'subscription' && (
           <div className="space-y-6">
             {/* Nuvarande plan */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Din prenumeration</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Din prenumeration</h2>
               
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/30 rounded-xl mb-4 gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300 rounded-xl mb-4 gap-4">
                 <div>
-                  <p className="text-white font-semibold text-lg">{currentPlan}</p>
-                  <p className="text-zinc-400 text-sm">
+                  <p className="text-gray-900 font-semibold text-lg">{currentPlan}</p>
+                  <p className="text-gray-500 text-sm">
                     {config.subscription_status === 'trial' && trialDaysLeft !== null
                       ? `Provperiod - ${trialDaysLeft} dagar kvar`
                       : 'Aktiv prenumeration'
@@ -2321,16 +2321,16 @@ export default function SettingsPage() {
                   </p>
                 </div>
                 <div className="sm:text-right">
-                  <p className="text-2xl font-bold text-white">
+                  <p className="text-2xl font-bold text-gray-900">
                     {currentPlan === 'Professional' ? '4 995' : currentPlan === 'Business' ? '9 995' : '1 995'}
                   </p>
-                  <p className="text-zinc-500 text-sm">kr/mån</p>
+                  <p className="text-gray-400 text-sm">kr/mån</p>
                 </div>
               </div>
 
               {config.subscription_status === 'trial' && trialDaysLeft !== null && (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl">
-                  <p className="text-amber-400 text-sm">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="text-amber-600 text-sm">
                     ⏰ Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
                   </p>
                 </div>
@@ -2338,15 +2338,15 @@ export default function SettingsPage() {
             </div>
 
             {/* SMS-användning */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">SMS-användning denna månad</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">SMS-användning denna månad</h2>
               
               <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
             </div>
 
             {/* Planöversikt */}
-            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-              <h2 className="text-lg font-semibold text-white mb-4">Tillgängliga planer</h2>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tillgängliga planer</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {[
@@ -2358,18 +2358,18 @@ export default function SettingsPage() {
                     key={plan.name}
                     className={`p-4 rounded-xl border ${
                       currentPlan === plan.name 
-                        ? 'bg-violet-500/10 border-violet-500/30' 
-                        : 'bg-zinc-800/50 border-zinc-700'
+                        ? 'bg-blue-50 border-blue-300' 
+                        : 'bg-gray-50 border-gray-300'
                     }`}
                   >
-                    <p className="font-semibold text-white">{plan.name}</p>
-                    <p className="text-2xl font-bold text-white mt-1">{plan.price} <span className="text-sm text-zinc-500">kr/mån</span></p>
-                    <div className="mt-3 space-y-1 text-sm text-zinc-400">
+                    <p className="font-semibold text-gray-900">{plan.name}</p>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">{plan.price} <span className="text-sm text-gray-400">kr/mån</span></p>
+                    <div className="mt-3 space-y-1 text-sm text-gray-500">
                       <p>✓ {plan.sms} SMS/mån</p>
                       <p>✓ {plan.calls} samtal/mån</p>
                     </div>
                     {currentPlan === plan.name && (
-                      <p className="mt-3 text-xs text-violet-400 font-medium">Nuvarande plan</p>
+                      <p className="mt-3 text-xs text-blue-600 font-medium">Nuvarande plan</p>
                     )}
                   </div>
                 ))}
@@ -2443,7 +2443,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
       </div>
     )
   }
@@ -2452,19 +2452,19 @@ function PipelineSettings({ businessId }: { businessId: string }) {
     <div className="space-y-6">
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium ${
-          toast.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+          toast.type === 'success' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-100 text-red-600 border border-red-200'
         }`}>
           {toast.message}
         </div>
       )}
 
       {/* AI Automation */}
-      <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-        <h2 className="text-lg font-semibold text-white mb-2">AI-automatisering</h2>
-        <p className="text-sm text-zinc-500 mb-6">Styr hur pipeline-stegen automatiskt uppdateras</p>
+      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">AI-automatisering</h2>
+        <p className="text-sm text-gray-400 mb-6">Styr hur pipeline-stegen automatiskt uppdateras</p>
 
         <div className="space-y-4">
-          <h3 className="text-sm font-medium text-zinc-300">Automatiskt (händer direkt)</h3>
+          <h3 className="text-sm font-medium text-gray-700">Automatiskt (händer direkt)</h3>
 
           {[
             { key: 'auto_create_leads', label: 'Skapa lead från nya samtal' },
@@ -2472,11 +2472,11 @@ function PipelineSettings({ businessId }: { businessId: string }) {
             { key: 'auto_move_on_payment', label: 'Flytta till "Betalt" när faktura betalas' },
             { key: 'auto_move_on_project_complete', label: 'Flytta till "Faktureras" när projekt markeras klart' },
           ].map(({ key, label }) => (
-            <label key={key} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
-              <span className="text-sm text-white">{label}</span>
+            <label key={key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+              <span className="text-sm text-gray-900">{label}</span>
               <div
                 className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                  (settings as any)[key] ? 'bg-violet-500' : 'bg-zinc-700'
+                  (settings as any)[key] ? 'bg-blue-500' : 'bg-gray-200'
                 }`}
                 onClick={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))}
               >
@@ -2489,13 +2489,13 @@ function PipelineSettings({ businessId }: { businessId: string }) {
         </div>
 
         <div className="mt-6 space-y-4">
-          <h3 className="text-sm font-medium text-zinc-300">AI-drivet (baserat på samtalsanalys)</h3>
+          <h3 className="text-sm font-medium text-gray-700">AI-drivet (baserat på samtalsanalys)</h3>
 
-          <label className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
-            <span className="text-sm text-white">Analysera samtal och identifiera kundintent</span>
+          <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+            <span className="text-sm text-gray-900">Analysera samtal och identifiera kundintent</span>
             <div
               className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                settings.ai_analyze_calls ? 'bg-violet-500' : 'bg-zinc-700'
+                settings.ai_analyze_calls ? 'bg-blue-500' : 'bg-gray-200'
               }`}
               onClick={() => setSettings(prev => ({ ...prev, ai_analyze_calls: !prev.ai_analyze_calls }))}
             >
@@ -2505,10 +2505,10 @@ function PipelineSettings({ businessId }: { businessId: string }) {
             </div>
           </label>
 
-          <div className="p-3 bg-zinc-800/50 rounded-xl">
+          <div className="p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-white">Tröskelvärde för automatisk flytt</span>
-              <span className="text-sm text-violet-400 font-mono">{settings.ai_auto_move_threshold}%</span>
+              <span className="text-sm text-gray-900">Tröskelvärde för automatisk flytt</span>
+              <span className="text-sm text-blue-600 font-mono">{settings.ai_auto_move_threshold}%</span>
             </div>
             <input
               type="range"
@@ -2516,15 +2516,15 @@ function PipelineSettings({ businessId }: { businessId: string }) {
               max="100"
               value={settings.ai_auto_move_threshold}
               onChange={(e) => setSettings(prev => ({ ...prev, ai_auto_move_threshold: parseInt(e.target.value) }))}
-              className="w-full accent-violet-500"
+              className="w-full accent-blue-500"
             />
-            <p className="text-xs text-zinc-600 mt-1">AI flyttar deals automatiskt när den är minst så säker</p>
+            <p className="text-xs text-gray-400 mt-1">AI flyttar deals automatiskt när den är minst så säker</p>
           </div>
 
-          <div className="p-3 bg-zinc-800/50 rounded-xl">
+          <div className="p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-white">Tröskelvärde för lead-skapande</span>
-              <span className="text-sm text-violet-400 font-mono">{settings.ai_create_lead_threshold}%</span>
+              <span className="text-sm text-gray-900">Tröskelvärde för lead-skapande</span>
+              <span className="text-sm text-blue-600 font-mono">{settings.ai_create_lead_threshold}%</span>
             </div>
             <input
               type="range"
@@ -2532,16 +2532,16 @@ function PipelineSettings({ businessId }: { businessId: string }) {
               max="100"
               value={settings.ai_create_lead_threshold}
               onChange={(e) => setSettings(prev => ({ ...prev, ai_create_lead_threshold: parseInt(e.target.value) }))}
-              className="w-full accent-violet-500"
+              className="w-full accent-blue-500"
             />
-            <p className="text-xs text-zinc-600 mt-1">AI skapar nya leads när den är minst så säker</p>
+            <p className="text-xs text-gray-400 mt-1">AI skapar nya leads när den är minst så säker</p>
           </div>
 
-          <label className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
-            <span className="text-sm text-white">Visa AI-aktivitet i pipeline</span>
+          <label className="flex items-center justify-between p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+            <span className="text-sm text-gray-900">Visa AI-aktivitet i pipeline</span>
             <div
               className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                settings.show_ai_activity ? 'bg-violet-500' : 'bg-zinc-700'
+                settings.show_ai_activity ? 'bg-blue-500' : 'bg-gray-200'
               }`}
               onClick={() => setSettings(prev => ({ ...prev, show_ai_activity: !prev.show_ai_activity }))}
             >
@@ -2555,7 +2555,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
         <button
           onClick={saveSettings}
           disabled={saving}
-          className="mt-6 flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="mt-6 flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
           Spara pipeline-inställningar
@@ -2563,25 +2563,25 @@ function PipelineSettings({ businessId }: { businessId: string }) {
       </div>
 
       {/* Pipeline Stages */}
-      <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
-        <h2 className="text-lg font-semibold text-white mb-2">Pipeline-steg</h2>
-        <p className="text-sm text-zinc-500 mb-4">Stegen i din säljpipeline</p>
+      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Pipeline-steg</h2>
+        <p className="text-sm text-gray-400 mb-4">Stegen i din säljpipeline</p>
 
         <div className="space-y-2">
           {stages.filter(s => !s.is_lost).map((stage, i) => (
-            <div key={stage.id} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl">
-              <span className="text-zinc-600 text-sm w-6">{i + 1}.</span>
+            <div key={stage.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+              <span className="text-gray-400 text-sm w-6">{i + 1}.</span>
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
-              <span className="text-white text-sm flex-1">{stage.name}</span>
-              {stage.is_won && <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Vunnen</span>}
+              <span className="text-gray-900 text-sm flex-1">{stage.name}</span>
+              {stage.is_won && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Vunnen</span>}
             </div>
           ))}
           {stages.filter(s => s.is_lost).map((stage) => (
-            <div key={stage.id} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl border-t border-zinc-700 mt-2">
-              <span className="text-zinc-600 text-sm w-6" />
+            <div key={stage.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border-t border-gray-300 mt-2">
+              <span className="text-gray-400 text-sm w-6" />
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
-              <span className="text-white text-sm flex-1">{stage.name}</span>
-              <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">Förlorad</span>
+              <span className="text-gray-900 text-sm flex-1">{stage.name}</span>
+              <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Förlorad</span>
             </div>
           ))}
         </div>

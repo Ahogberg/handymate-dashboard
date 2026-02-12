@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { Camera, Mic, Keyboard, FileStack, Phone } from 'lucide-react'
 
@@ -19,24 +19,24 @@ export default function InputSelector({ onSelect, hasCallSuggestions }: InputSel
   ]
 
   const colorMap: Record<string, string> = {
-    violet: 'from-violet-500/20 to-violet-500/5 border-violet-500/30 hover:border-violet-500/60',
-    fuchsia: 'from-fuchsia-500/20 to-fuchsia-500/5 border-fuchsia-500/30 hover:border-fuchsia-500/60',
+    violet: 'from-blue-500/20 to-violet-500/5 border-blue-300 hover:border-blue-500/60',
+    fuchsia: 'from-fuchsia-500/20 to-cyan-500/5 border-fuchsia-500/30 hover:border-fuchsia-500/60',
     cyan: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 hover:border-cyan-500/60',
-    amber: 'from-amber-500/20 to-amber-500/5 border-amber-500/30 hover:border-amber-500/60',
-    emerald: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/30 hover:border-emerald-500/60',
+    amber: 'from-amber-500/20 to-amber-500/5 border-amber-200 hover:border-amber-500/60',
+    emerald: 'from-emerald-500/20 to-emerald-500/5 border-emerald-200 hover:border-emerald-500/60',
   }
 
   const iconColorMap: Record<string, string> = {
-    violet: 'text-violet-400',
-    fuchsia: 'text-fuchsia-400',
-    cyan: 'text-cyan-400',
-    amber: 'text-amber-400',
-    emerald: 'text-emerald-400',
+    violet: 'text-blue-600',
+    fuchsia: 'text-cyan-600',
+    cyan: 'text-cyan-600',
+    amber: 'text-amber-600',
+    emerald: 'text-emerald-600',
   }
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-white mb-4">Hur vill du börja?</h2>
+      <h2 className="text-lg font-semibold text-gray-900 mb-4">Hur vill du börja?</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {methods.map(m => (
           <button
@@ -46,8 +46,8 @@ export default function InputSelector({ onSelect, hasCallSuggestions }: InputSel
           >
             <m.icon className={`w-8 h-8 ${iconColorMap[m.color]}`} />
             <div className="text-center">
-              <p className="text-sm font-medium text-white">{m.label}</p>
-              <p className="text-xs text-zinc-500 mt-0.5">{m.description}</p>
+              <p className="text-sm font-medium text-gray-900">{m.label}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
             </div>
           </button>
         ))}

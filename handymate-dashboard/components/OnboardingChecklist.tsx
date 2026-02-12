@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState } from 'react'
 import Link from 'next/link'
@@ -207,21 +207,21 @@ export default function OnboardingChecklist({
   }
 
   return (
-    <div className="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border border-violet-500/20 rounded-2xl p-5 mb-6">
+    <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-5 mb-6">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500">
+            <Sparkles className="w-5 h-5 text-gray-900" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-white">Kom igång med Handymate</h2>
-            <p className="text-sm text-zinc-400">{completedCount} av {totalCount} steg klara</p>
+            <h2 className="text-lg font-semibold text-gray-900">Kom igång med Handymate</h2>
+            <p className="text-sm text-gray-500">{completedCount} av {totalCount} steg klara</p>
           </div>
         </div>
         <button
           onClick={handleDismiss}
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 transition-colors"
+          className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors"
           title="Dölj checklista"
         >
           <X className="w-4 h-4" />
@@ -229,9 +229,9 @@ export default function OnboardingChecklist({
       </div>
 
       {/* Progress bar */}
-      <div className="h-2 bg-zinc-800 rounded-full overflow-hidden mb-5">
+      <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
         <div
-          className="h-full bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-full transition-all duration-500"
+          className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -243,26 +243,26 @@ export default function OnboardingChecklist({
             key={item.id}
             className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
               item.completed
-                ? 'bg-emerald-500/10 border border-emerald-500/20'
-                : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600'
+                ? 'bg-emerald-50 border border-emerald-500/20'
+                : 'bg-gray-50 border border-gray-300/50 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-3 min-w-0">
               {item.completed ? (
-                <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-4 h-4 text-emerald-400" />
+                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-4 h-4 text-emerald-600" />
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-zinc-600 flex items-center justify-center flex-shrink-0">
-                  <Circle className="w-3 h-3 text-zinc-600" />
+                <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center flex-shrink-0">
+                  <Circle className="w-3 h-3 text-gray-400" />
                 </div>
               )}
               <div className="min-w-0">
-                <p className={`text-sm font-medium ${item.completed ? 'text-emerald-400' : 'text-white'}`}>
+                <p className={`text-sm font-medium ${item.completed ? 'text-emerald-600' : 'text-gray-900'}`}>
                   {item.label}
                 </p>
                 {item.description && (
-                  <p className="text-xs text-zinc-500 truncate">{item.description}</p>
+                  <p className="text-xs text-gray-400 truncate">{item.description}</p>
                 )}
               </div>
             </div>
@@ -272,7 +272,7 @@ export default function OnboardingChecklist({
                 {item.action.type === 'link' && item.action.href && (
                   <Link
                     href={item.action.href}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
                   >
                     {item.action.label}
                     <ChevronRight className="w-3 h-3" />
@@ -282,7 +282,7 @@ export default function OnboardingChecklist({
                   <button
                     onClick={item.action.onClick}
                     disabled={loading === item.id || resendingEmail}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
                   >
                     {(loading === item.id || (item.id === 'email' && resendingEmail)) ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -294,7 +294,7 @@ export default function OnboardingChecklist({
                 {item.action.type === 'external' && item.action.onClick && (
                   <button
                     onClick={item.action.onClick}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-violet-400 hover:text-violet-300 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
                   >
                     {item.action.label}
                     <ExternalLink className="w-3 h-3" />
@@ -307,8 +307,8 @@ export default function OnboardingChecklist({
       </div>
 
       {/* Helpful tip */}
-      <div className="mt-4 pt-4 border-t border-zinc-800">
-        <p className="text-xs text-zinc-500">
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <p className="text-xs text-gray-400">
           Slutför dessa steg för att få ut det mesta av Handymate. Du kan alltid hitta den här listan i inställningarna.
         </p>
       </div>

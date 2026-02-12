@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -204,28 +204,28 @@ export default function NewInvoicePage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <div className="text-zinc-400">Laddar...</div>
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Time Entry Modal */}
       {showTimeEntries && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-white mb-4">Välj tidrapporter</h3>
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Välj tidrapporter</h3>
 
             {timeEntries.length === 0 ? (
-              <p className="text-zinc-500 py-8 text-center">Inga ofakturerade tidrapporter</p>
+              <p className="text-gray-400 py-8 text-center">Inga ofakturerade tidrapporter</p>
             ) : (
               <div className="space-y-2">
                 {timeEntries.map((entry) => {
@@ -237,8 +237,8 @@ export default function NewInvoicePage() {
                       key={entry.entry_id}
                       className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                         selectedTimeEntries.includes(entry.entry_id)
-                          ? 'bg-violet-500/10 border-violet-500/50'
-                          : 'bg-zinc-800/50 border-zinc-700 hover:border-zinc-600'
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                       }`}
                     >
                       <input
@@ -251,18 +251,18 @@ export default function NewInvoicePage() {
                             setSelectedTimeEntries(selectedTimeEntries.filter(id => id !== entry.entry_id))
                           }
                         }}
-                        className="w-5 h-5 rounded border-zinc-600 text-violet-500 focus:ring-violet-500"
+                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
                       <div className="flex-1">
-                        <p className="text-white font-medium">
+                        <p className="text-gray-900 font-medium">
                           {new Date(entry.work_date).toLocaleDateString('sv-SE')} - {entry.hours_worked}h
                         </p>
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-sm text-gray-500">
                           {entry.customer?.name || 'Ingen kund'} - {entry.description || 'Ingen beskrivning'}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-white font-medium">{totalCost.toLocaleString('sv-SE')} kr</p>
+                        <p className="text-gray-900 font-medium">{totalCost.toLocaleString('sv-SE')} kr</p>
                       </div>
                     </label>
                   )
@@ -276,14 +276,14 @@ export default function NewInvoicePage() {
                   setShowTimeEntries(false)
                   setSelectedTimeEntries([])
                 }}
-                className="px-4 py-2 text-zinc-400 hover:text-white"
+                className="px-4 py-2 text-gray-500 hover:text-gray-900"
               >
                 Avbryt
               </button>
               <button
                 onClick={addTimeEntriesToInvoice}
                 disabled={selectedTimeEntries.length === 0}
-                className="px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 Lägg till ({selectedTimeEntries.length})
               </button>
@@ -295,26 +295,26 @@ export default function NewInvoicePage() {
       <div className="relative max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
-          <Link href="/dashboard/invoices" className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg">
+          <Link href="/dashboard/invoices" className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Ny faktura</h1>
-            <p className="text-sm text-zinc-400">Skapa och skicka en faktura</p>
+            <h1 className="text-2xl font-bold text-gray-900">Ny faktura</h1>
+            <p className="text-sm text-gray-500">Skapa och skicka en faktura</p>
           </div>
         </div>
 
         {/* Form */}
         <div className="space-y-6">
           {/* Customer & Settings */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Kund</label>
+                <label className="block text-sm text-gray-500 mb-2">Kund</label>
                 <select
                   value={customerId}
                   onChange={(e) => setCustomerId(e.target.value)}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -324,11 +324,11 @@ export default function NewInvoicePage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Betalningsvillkor</label>
+                <label className="block text-sm text-gray-500 mb-2">Betalningsvillkor</label>
                 <select
                   value={dueDays}
                   onChange={(e) => setDueDays(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value={10}>10 dagar</option>
                   <option value={15}>15 dagar</option>
@@ -339,11 +339,11 @@ export default function NewInvoicePage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Momssats</label>
+                <label className="block text-sm text-gray-500 mb-2">Momssats</label>
                 <select
                   value={vatRate}
                   onChange={(e) => setVatRate(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value={25}>25%</option>
                   <option value={12}>12%</option>
@@ -353,11 +353,11 @@ export default function NewInvoicePage() {
               </div>
 
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">ROT/RUT-avdrag</label>
+                <label className="block text-sm text-gray-500 mb-2">ROT/RUT-avdrag</label>
                 <select
                   value={rotRutType}
                   onChange={(e) => setRotRutType(e.target.value as '' | 'rot' | 'rut')}
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">Inget avdrag</option>
                   <option value="rot">ROT-avdrag (30%)</option>
@@ -368,20 +368,20 @@ export default function NewInvoicePage() {
           </div>
 
           {/* Items */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white">Rader</h2>
+              <h2 className="text-lg font-semibold text-gray-900">Rader</h2>
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowTimeEntries(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
                 >
                   <Timer className="w-4 h-4" />
                   Från tidrapport
                 </button>
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-violet-500/20 border border-violet-500/30 rounded-xl text-violet-400 hover:bg-violet-500/30"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 border border-blue-300 rounded-xl text-blue-600 hover:bg-blue-500/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till rad
@@ -390,40 +390,40 @@ export default function NewInvoicePage() {
             </div>
 
             {items.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-zinc-700 rounded-xl">
-                <Calculator className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-                <p className="text-zinc-500 mb-2">Inga rader ännu</p>
-                <p className="text-sm text-zinc-600">Lägg till rader manuellt eller från tidrapporter</p>
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-xl">
+                <Calculator className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-400 mb-2">Inga rader ännu</p>
+                <p className="text-sm text-gray-400">Lägg till rader manuellt eller från tidrapporter</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {items.map((item, index) => (
-                  <div key={index} className="flex flex-wrap items-end gap-3 p-4 bg-zinc-800/50 rounded-xl">
+                  <div key={index} className="flex flex-wrap items-end gap-3 p-4 bg-gray-50 rounded-xl">
                     <div className="flex-1 min-w-[200px]">
-                      <label className="block text-xs text-zinc-500 mb-1">Beskrivning</label>
+                      <label className="block text-xs text-gray-400 mb-1">Beskrivning</label>
                       <input
                         type="text"
                         value={item.description}
                         onChange={(e) => updateItem(index, 'description', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-20">
-                      <label className="block text-xs text-zinc-500 mb-1">Antal</label>
+                      <label className="block text-xs text-gray-400 mb-1">Antal</label>
                       <input
                         type="number"
                         step="0.5"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-24">
-                      <label className="block text-xs text-zinc-500 mb-1">Enhet</label>
+                      <label className="block text-xs text-gray-400 mb-1">Enhet</label>
                       <select
                         value={item.unit}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       >
                         <option value="st">st</option>
                         <option value="timmar">timmar</option>
@@ -433,32 +433,32 @@ export default function NewInvoicePage() {
                       </select>
                     </div>
                     <div className="w-24">
-                      <label className="block text-xs text-zinc-500 mb-1">à-pris</label>
+                      <label className="block text-xs text-gray-400 mb-1">à-pris</label>
                       <input
                         type="number"
                         value={item.unit_price}
                         onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
                     </div>
                     <div className="w-20">
-                      <label className="block text-xs text-zinc-500 mb-1">Typ</label>
+                      <label className="block text-xs text-gray-400 mb-1">Typ</label>
                       <select
                         value={item.type || 'labor'}
                         onChange={(e) => updateItem(index, 'type', e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       >
                         <option value="labor">Arbete</option>
                         <option value="material">Material</option>
                       </select>
                     </div>
                     <div className="w-24 text-right">
-                      <label className="block text-xs text-zinc-500 mb-1">Summa</label>
-                      <p className="py-2 text-white font-medium">{item.total.toLocaleString('sv-SE')} kr</p>
+                      <label className="block text-xs text-gray-400 mb-1">Summa</label>
+                      <p className="py-2 text-gray-900 font-medium">{item.total.toLocaleString('sv-SE')} kr</p>
                     </div>
                     <button
                       onClick={() => removeItem(index)}
-                      className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -469,27 +469,27 @@ export default function NewInvoicePage() {
           </div>
 
           {/* Totals */}
-          <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6">
             <div className="max-w-sm ml-auto space-y-3">
-              <div className="flex justify-between text-zinc-400">
+              <div className="flex justify-between text-gray-500">
                 <span>Delsumma</span>
                 <span>{subtotal.toLocaleString('sv-SE')} kr</span>
               </div>
-              <div className="flex justify-between text-zinc-400">
+              <div className="flex justify-between text-gray-500">
                 <span>Moms ({vatRate}%)</span>
                 <span>{vatAmount.toLocaleString('sv-SE')} kr</span>
               </div>
-              <div className="flex justify-between text-xl font-bold text-white pt-3 border-t border-zinc-700">
+              <div className="flex justify-between text-xl font-bold text-gray-900 pt-3 border-t border-gray-300">
                 <span>Totalt</span>
                 <span>{total.toLocaleString('sv-SE')} kr</span>
               </div>
               {rotRutType && (
                 <>
-                  <div className="flex justify-between text-emerald-400">
+                  <div className="flex justify-between text-emerald-600">
                     <span>{rotRutType.toUpperCase()}-avdrag</span>
                     <span>-{rotRutDeduction.toLocaleString('sv-SE')} kr</span>
                   </div>
-                  <div className="flex justify-between text-lg font-bold text-emerald-400 pt-3 border-t border-zinc-700">
+                  <div className="flex justify-between text-lg font-bold text-emerald-600 pt-3 border-t border-gray-300">
                     <span>Kunden betalar</span>
                     <span>{customerPays.toLocaleString('sv-SE')} kr</span>
                   </div>
@@ -502,14 +502,14 @@ export default function NewInvoicePage() {
           <div className="flex justify-end gap-4">
             <Link
               href="/dashboard/invoices"
-              className="px-6 py-3 text-zinc-400 hover:text-white"
+              className="px-6 py-3 text-gray-500 hover:text-gray-900"
             >
               Avbryt
             </Link>
             <button
               onClick={handleCreate}
               disabled={creating || items.length === 0}
-              className="flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="flex items-center px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Skapa faktura

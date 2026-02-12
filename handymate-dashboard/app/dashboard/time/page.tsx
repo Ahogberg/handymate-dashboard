@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState, useMemo } from 'react'
 import {
@@ -548,24 +548,24 @@ export default function TimePage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-[#09090b] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
+      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#09090b] min-h-screen">
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-violet-500/10 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-fuchsia-500/10 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]" />
       </div>
 
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-red-500/20 border-red-500/30 text-red-400'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
@@ -574,12 +574,12 @@ export default function TimePage() {
       {/* Add/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-semibold text-gray-900">
                 {editingEntry ? 'Redigera tidpost' : 'Registrera tid'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-zinc-500 hover:text-white">
+              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -588,11 +588,11 @@ export default function TimePage() {
               {/* Registrera för (admin/owner only) */}
               {isOwnerOrAdmin && teamMembers.length > 1 && (
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Registrera för</label>
+                  <label className="block text-sm text-gray-500 mb-2">Registrera för</label>
                   <select
                     value={formPersonId}
                     onChange={e => setFormPersonId(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
                     {teamMembers.map(m => (
                       <option key={m.id} value={m.id}>{m.name}{m.id === currentUser?.id ? ' (dig)' : ''}</option>
@@ -603,37 +603,37 @@ export default function TimePage() {
 
               {/* Datum */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Datum</label>
+                <label className="block text-sm text-gray-500 mb-2">Datum</label>
                 <input
                   type="date"
                   value={formData.work_date}
                   onChange={e => setFormData({ ...formData, work_date: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
 
               {/* Duration */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Tid</label>
+                <label className="block text-sm text-gray-500 mb-2">Tid</label>
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <input type="number" min="0" value={formData.duration_hours}
                       onChange={e => setFormData({ ...formData, duration_hours: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">tim</span>
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">tim</span>
                   </div>
                   <div className="flex-1 relative">
                     <input type="number" min="0" max="59" value={formData.duration_minutes}
                       onChange={e => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">min</span>
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">min</span>
                   </div>
                 </div>
                 {/* Quick presets */}
                 <div className="flex gap-2 mt-2">
                   {[60, 120, 240, 480].map(mins => (
                     <button key={mins} onClick={() => setFormData({ ...formData, duration_hours: Math.floor(mins / 60), duration_minutes: mins % 60 })}
-                      className="px-3 py-1 text-xs bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 hover:text-white hover:border-violet-500/30">
+                      className="px-3 py-1 text-xs bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900 hover:border-blue-300">
                       {mins / 60}h
                     </button>
                   ))}
@@ -642,10 +642,10 @@ export default function TimePage() {
 
               {/* Kund */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Kund</label>
+                <label className="block text-sm text-gray-500 mb-2">Kund</label>
                 <select value={formData.customer_id}
                   onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="">Välj kund...</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
                 </select>
@@ -653,10 +653,10 @@ export default function TimePage() {
 
               {/* Bokning */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Bokning</label>
+                <label className="block text-sm text-gray-500 mb-2">Bokning</label>
                 <select value={formData.booking_id}
                   onChange={e => handleBookingChange(e.target.value)}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="">Välj bokning...</option>
                   {bookings.map(b => (
                     <option key={b.booking_id} value={b.booking_id}>
@@ -669,10 +669,10 @@ export default function TimePage() {
               {/* Projekt */}
               {projects.length > 0 && (
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Projekt</label>
+                  <label className="block text-sm text-gray-500 mb-2">Projekt</label>
                   <select value={formData.project_id}
                     onChange={e => setFormData({ ...formData, project_id: e.target.value })}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                     <option value="">Inget projekt</option>
                     {projects.map(p => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
                   </select>
@@ -682,10 +682,10 @@ export default function TimePage() {
               {/* Arbetstyp */}
               {workTypes.length > 0 && (
                 <div>
-                  <label className="block text-sm text-zinc-400 mb-2">Arbetstyp</label>
+                  <label className="block text-sm text-gray-500 mb-2">Arbetstyp</label>
                   <select value={formData.work_type_id}
                     onChange={e => handleWorkTypeChange(e.target.value)}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                     <option value="">Normal</option>
                     {workTypes.map(wt => (
                       <option key={wt.work_type_id} value={wt.work_type_id}>
@@ -698,39 +698,39 @@ export default function TimePage() {
 
               {/* Beskrivning */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Beskrivning</label>
+                <label className="block text-sm text-gray-500 mb-2">Beskrivning</label>
                 <textarea value={formData.description}
                   onChange={e => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Vad har du gjort?" rows={3}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 resize-none" />
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none" />
               </div>
 
               {/* Timpris */}
               <div>
-                <label className="block text-sm text-zinc-400 mb-2">Timpris</label>
+                <label className="block text-sm text-gray-500 mb-2">Timpris</label>
                 <div className="relative">
                   <input type="number" min="0" value={formData.hourly_rate}
                     onChange={e => setFormData({ ...formData, hourly_rate: e.target.value })}
                     placeholder="Standard"
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-violet-500/50" />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm">kr/tim</span>
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">kr/tim</span>
                 </div>
               </div>
 
               {/* Fakturerbar */}
-              <div className="flex items-center justify-between p-4 bg-zinc-800/50 rounded-xl">
-                <span className="text-white">Fakturerbar tid</span>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                <span className="text-gray-900">Fakturerbar tid</span>
                 <button type="button" onClick={() => setFormData({ ...formData, is_billable: !formData.is_billable })}
-                  className={`w-12 h-6 rounded-full transition-all ${formData.is_billable ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500' : 'bg-zinc-700'}`}>
+                  className={`w-12 h-6 rounded-full transition-all ${formData.is_billable ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gray-200'}`}>
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${formData.is_billable ? 'translate-x-6' : 'translate-x-0.5'}`} />
                 </button>
               </div>
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-zinc-400 hover:text-white">Avbryt</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">Avbryt</button>
               <button onClick={handleSave} disabled={saving}
-                className="flex items-center px-6 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50">
+                className="flex items-center px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50">
                 {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
                 {editingEntry ? 'Spara' : 'Registrera'}
               </button>
@@ -743,12 +743,12 @@ export default function TimePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 mr-4">
-              <Clock className="w-6 h-6 text-white" />
+            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 mr-4">
+              <Clock className="w-6 h-6 text-gray-900" />
             </div>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">Tidrapportering</h1>
-              <p className="text-zinc-400 text-sm">Logga och hantera arbetstid</p>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tidrapportering</h1>
+              <p className="text-gray-500 text-sm">Logga och hantera arbetstid</p>
             </div>
           </div>
 
@@ -758,7 +758,7 @@ export default function TimePage() {
               <select
                 value={filterPerson}
                 onChange={e => setFilterPerson(e.target.value)}
-                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+                className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               >
                 <option value="">Alla i teamet</option>
                 {teamMembers.map(m => (
@@ -768,23 +768,23 @@ export default function TimePage() {
             )}
 
             {activeTimer ? (
-              <div className="flex items-center gap-3 px-4 py-2 bg-emerald-500/20 border border-emerald-500/30 rounded-xl">
+              <div className="flex items-center gap-3 px-4 py-2 bg-emerald-100 border border-emerald-200 rounded-xl">
                 <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-emerald-400 font-mono text-lg">{fmtTimer(timerElapsed)}</span>
-                <button onClick={stopTimer} className="p-2 bg-red-500/20 hover:bg-red-500/30 rounded-lg">
-                  <Square className="w-4 h-4 text-red-400" />
+                <span className="text-emerald-600 font-mono text-lg">{fmtTimer(timerElapsed)}</span>
+                <button onClick={stopTimer} className="p-2 bg-red-100 hover:bg-red-500/30 rounded-lg">
+                  <Square className="w-4 h-4 text-red-600" />
                 </button>
               </div>
             ) : (
               <button onClick={startTimer}
-                className="flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white hover:bg-zinc-700">
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200">
                 <Play className="w-4 h-4" />
                 <span className="hidden sm:inline">Timer</span>
               </button>
             )}
 
             <button onClick={() => openAddModal()}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90">
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Lägg till</span>
             </button>
@@ -795,7 +795,7 @@ export default function TimePage() {
         <div className="sm:hidden flex gap-2 mb-4">
           {[{ label: '1h', mins: 60 }, { label: '2h', mins: 120 }, { label: '4h', mins: 240 }, { label: '8h', mins: 480 }].map(p => (
             <button key={p.label} onClick={() => quickAdd(p.mins)}
-              className="flex-1 py-3 bg-zinc-900/50 border border-zinc-800 rounded-xl text-white font-medium text-center hover:border-violet-500/30">
+              className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 font-medium text-center hover:border-blue-300">
               + {p.label}
             </button>
           ))}
@@ -803,60 +803,60 @@ export default function TimePage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-500"><Clock className="w-4 h-4 text-white" /></div>
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500"><Clock className="w-4 h-4 text-gray-900" /></div>
             </div>
-            <p className="text-2xl font-bold text-white">{fmtDuration(stats.totalMinutesWeek)}</p>
-            <p className="text-xs text-zinc-500">Total tid vecka</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.totalMinutesWeek)}</p>
+            <p className="text-xs text-gray-400">Total tid vecka</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500"><DollarSign className="w-4 h-4 text-white" /></div>
+              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500"><DollarSign className="w-4 h-4 text-gray-900" /></div>
             </div>
-            <p className="text-2xl font-bold text-white">{fmtDuration(stats.billableMinutesWeek)}</p>
-            <p className="text-xs text-zinc-500">Fakturerbar vecka</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.billableMinutesWeek)}</p>
+            <p className="text-xs text-gray-400">Fakturerbar vecka</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500"><FileText className="w-4 h-4 text-white" /></div>
+              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500"><FileText className="w-4 h-4 text-gray-900" /></div>
             </div>
-            <p className="text-2xl font-bold text-white">{fmtDuration(stats.uninvoicedMinutes)}</p>
-            <p className="text-xs text-zinc-500">Ofakturerat ({Math.round(stats.uninvoicedRevenue).toLocaleString('sv-SE')} kr)</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.uninvoicedMinutes)}</p>
+            <p className="text-xs text-gray-400">Ofakturerat ({Math.round(stats.uninvoicedRevenue).toLocaleString('sv-SE')} kr)</p>
           </div>
-          <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl p-4 border border-zinc-800">
+          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500"><Calendar className="w-4 h-4 text-white" /></div>
+              <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500"><Calendar className="w-4 h-4 text-gray-900" /></div>
             </div>
-            <p className="text-2xl font-bold text-white">{fmtDuration(stats.totalMinutesMonth)}</p>
-            <p className="text-xs text-zinc-500">Total tid månad</p>
+            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.totalMinutesMonth)}</p>
+            <p className="text-xs text-gray-400">Total tid månad</p>
           </div>
         </div>
 
         {/* View Toggle + Week Nav */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div className="hidden sm:flex bg-zinc-900 border border-zinc-800 rounded-xl p-1">
+          <div className="hidden sm:flex bg-white border border-gray-200 rounded-xl p-1">
             <button onClick={() => setViewMode('week')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'week' ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white' : 'text-zinc-400 hover:text-white'}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'week' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-white'}`}>
               <LayoutGrid className="w-4 h-4" /> Vecka
             </button>
             <button onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white' : 'text-zinc-400 hover:text-white'}`}>
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-white'}`}>
               <List className="w-4 h-4" /> Lista
             </button>
           </div>
 
           <div className="flex items-center gap-3">
             <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-              className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 hover:text-white">
+              className="p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button onClick={() => setCurrentWeek(new Date())}
-              className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm font-medium hover:border-violet-500/30 min-w-[180px] text-center">
+              className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm font-medium hover:border-blue-300 min-w-[180px] text-center">
               V{weekNumber} &middot; {format(weekStart, 'd MMM', { locale: sv })} – {format(weekEnd, 'd MMM', { locale: sv })}
             </button>
             <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-              className="p-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-400 hover:text-white">
+              className="p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -864,40 +864,40 @@ export default function TimePage() {
 
         {/* WEEK GRID VIEW (desktop only) */}
         {viewMode === 'week' && (
-          <div className="hidden sm:block bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 overflow-hidden mb-6">
+          <div className="hidden sm:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-6">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-zinc-800">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-zinc-500 uppercase w-40">Kund</th>
+                  <tr className="border-b border-gray-200">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase w-40">Kund</th>
                     {weekDates.map((date, i) => {
                       const isToday = isSameDay(date, new Date())
                       return (
-                        <th key={i} className={`px-3 py-3 text-center text-xs font-medium uppercase min-w-[80px] ${isToday ? 'text-violet-400' : 'text-zinc-500'}`}>
+                        <th key={i} className={`px-3 py-3 text-center text-xs font-medium uppercase min-w-[80px] ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
                           <div>{format(date, 'EEE', { locale: sv })}</div>
-                          <div className={`text-lg font-bold ${isToday ? 'text-violet-400' : 'text-zinc-300'}`}>{format(date, 'd')}</div>
+                          <div className={`text-lg font-bold ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>{format(date, 'd')}</div>
                         </th>
                       )
                     })}
-                    <th className="px-4 py-3 text-center text-xs font-medium text-zinc-500 uppercase">Summa</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Summa</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/50">
+                <tbody className="divide-y divide-gray-200/50">
                   {weekGrid.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="p-12 text-center">
-                        <Clock className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-                        <p className="text-zinc-400">Inga tidposter denna vecka</p>
-                        <p className="text-zinc-600 text-sm mt-1">Klicka på en cell eller &quot;Lägg till&quot; för att registrera tid</p>
+                        <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                        <p className="text-gray-500">Inga tidposter denna vecka</p>
+                        <p className="text-gray-400 text-sm mt-1">Klicka på en cell eller &quot;Lägg till&quot; för att registrera tid</p>
                       </td>
                     </tr>
                   ) : (
                     weekGrid.map(row => (
-                      <tr key={row.customerId} className="hover:bg-zinc-800/20">
+                      <tr key={row.customerId} className="hover:bg-gray-100/20">
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-zinc-500 flex-shrink-0" />
-                            <span className="text-sm text-white truncate">{row.label}</span>
+                            <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <span className="text-sm text-gray-900 truncate">{row.label}</span>
                           </div>
                         </td>
                         {row.days.map((day, i) => {
@@ -905,22 +905,22 @@ export default function TimePage() {
                           return (
                             <td key={i}
                               onClick={() => day.entries.length > 0 ? openEditModal(day.entries[0]) : openAddModal(day.dayKey, row.customerId !== 'none' ? row.customerId : undefined)}
-                              className={`px-2 py-3 text-center cursor-pointer transition-colors hover:bg-violet-500/10 ${isToday ? 'bg-violet-500/5' : ''}`}>
+                              className={`px-2 py-3 text-center cursor-pointer transition-colors hover:bg-blue-50 ${isToday ? 'bg-blue-500/5' : ''}`}>
                               {day.totalMinutes > 0 ? (
                                 <div className="flex flex-col items-center gap-1">
-                                  <span className="text-sm font-medium text-white">{fmtDuration(day.totalMinutes)}</span>
+                                  <span className="text-sm font-medium text-gray-900">{fmtDuration(day.totalMinutes)}</span>
                                   {day.entries.length > 1 && (
-                                    <span className="text-xs text-zinc-500">{day.entries.length} poster</span>
+                                    <span className="text-xs text-gray-400">{day.entries.length} poster</span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="text-zinc-700 text-sm">–</span>
+                                <span className="text-gray-300 text-sm">–</span>
                               )}
                             </td>
                           )
                         })}
                         <td className="px-4 py-3 text-center">
-                          <span className="text-sm font-bold text-white">{fmtDuration(row.totalMinutes)}</span>
+                          <span className="text-sm font-bold text-gray-900">{fmtDuration(row.totalMinutes)}</span>
                         </td>
                       </tr>
                     ))
@@ -928,15 +928,15 @@ export default function TimePage() {
                 </tbody>
                 {weekGrid.length > 0 && (
                   <tfoot>
-                    <tr className="border-t border-zinc-700 bg-zinc-800/30">
-                      <td className="px-4 py-3 text-sm font-medium text-zinc-400">Summa</td>
+                    <tr className="border-t border-gray-300 bg-gray-100/30">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-500">Summa</td>
                       {columnTotals.map((total, i) => (
-                        <td key={i} className="px-3 py-3 text-center text-sm font-medium text-zinc-300">
+                        <td key={i} className="px-3 py-3 text-center text-sm font-medium text-gray-700">
                           {total > 0 ? fmtDuration(total) : '–'}
                         </td>
                       ))}
                       <td className="px-4 py-3 text-center">
-                        <span className="text-sm font-bold text-violet-400">{fmtDuration(grandTotal)}</span>
+                        <span className="text-sm font-bold text-blue-600">{fmtDuration(grandTotal)}</span>
                       </td>
                     </tr>
                   </tfoot>
@@ -947,23 +947,23 @@ export default function TimePage() {
         )}
 
         {/* LIST VIEW */}
-        <div className={`${viewMode === 'week' ? 'sm:hidden' : ''} bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800`}>
+        <div className={`${viewMode === 'week' ? 'sm:hidden' : ''} bg-white shadow-sm rounded-2xl border border-gray-200`}>
           {/* Filters header */}
-          <div className="p-4 border-b border-zinc-800">
+          <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">
-                Tidposter <span className="text-zinc-500 font-normal ml-1">({filteredEntries.length})</span>
+              <h2 className="text-base font-semibold text-gray-900">
+                Tidposter <span className="text-gray-400 font-normal ml-1">({filteredEntries.length})</span>
               </h2>
               <div className="flex items-center gap-2">
                 {selectedIds.size > 0 && (
                   <button onClick={handleBulkMarkInvoiced} disabled={bulkLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 hover:bg-emerald-500/30 disabled:opacity-50">
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-xs text-emerald-600 hover:bg-emerald-500/30 disabled:opacity-50">
                     {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckSquare className="w-3 h-3" />}
                     Fakturera ({selectedIds.size})
                   </button>
                 )}
                 <button onClick={() => setShowFilters(!showFilters)}
-                  className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-violet-500/20 text-violet-400' : 'bg-zinc-800 text-zinc-400 hover:text-white'}`}>
+                  className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}>
                   <Filter className="w-4 h-4" />
                 </button>
               </div>
@@ -972,17 +972,17 @@ export default function TimePage() {
             {showFilters && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                 <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="">Alla kunder</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
                 </select>
                 <select value={filterWorkType} onChange={e => setFilterWorkType(e.target.value)}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="">Alla arbetstyper</option>
                   {workTypes.map(wt => <option key={wt.work_type_id} value={wt.work_type_id}>{wt.name}</option>)}
                 </select>
                 <select value={filterInvoiced} onChange={e => setFilterInvoiced(e.target.value as any)}
-                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50">
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="all">Alla</option>
                   <option value="no">Ej fakturerade</option>
                   <option value="yes">Fakturerade</option>
@@ -992,19 +992,19 @@ export default function TimePage() {
           </div>
 
           {/* List items */}
-          <div className="divide-y divide-zinc-800">
+          <div className="divide-y divide-gray-200">
             {filteredEntries.length === 0 ? (
               <div className="p-8 text-center">
-                <Clock className="w-10 h-10 text-zinc-700 mx-auto mb-3" />
-                <p className="text-zinc-400 text-sm">Inga tidposter denna vecka</p>
+                <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500 text-sm">Inga tidposter denna vecka</p>
               </div>
             ) : (
               <>
                 {viewMode === 'list' && filteredEntries.some(e => !e.invoiced) && (
-                  <div className="px-4 py-2 bg-zinc-800/30">
-                    <button onClick={selectAll} className="flex items-center gap-2 text-xs text-zinc-500 hover:text-white">
-                      <div className={`w-4 h-4 rounded border ${selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 ? 'bg-violet-500 border-violet-500' : 'border-zinc-600'} flex items-center justify-center`}>
-                        {selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 && <Check className="w-3 h-3 text-white" />}
+                  <div className="px-4 py-2 bg-gray-100/30">
+                    <button onClick={selectAll} className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-900">
+                      <div className={`w-4 h-4 rounded border ${selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 ? 'bg-blue-500 border-blue-500' : 'border-gray-300'} flex items-center justify-center`}>
+                        {selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 && <Check className="w-3 h-3 text-gray-900" />}
                       </div>
                       Välj alla ej fakturerade
                     </button>
@@ -1012,46 +1012,46 @@ export default function TimePage() {
                 )}
 
                 {filteredEntries.map(entry => (
-                  <div key={entry.time_entry_id} className="p-4 hover:bg-zinc-800/30 transition-all">
+                  <div key={entry.time_entry_id} className="p-4 hover:bg-gray-100/30 transition-all">
                     <div className="flex items-start gap-3">
                       {viewMode === 'list' && !entry.invoiced && (
                         <button onClick={() => toggleSelect(entry.time_entry_id)} className="mt-1 flex-shrink-0">
-                          <div className={`w-5 h-5 rounded border ${selectedIds.has(entry.time_entry_id) ? 'bg-violet-500 border-violet-500' : 'border-zinc-600 hover:border-zinc-400'} flex items-center justify-center`}>
-                            {selectedIds.has(entry.time_entry_id) && <Check className="w-3 h-3 text-white" />}
+                          <div className={`w-5 h-5 rounded border ${selectedIds.has(entry.time_entry_id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300 hover:border-gray-400'} flex items-center justify-center`}>
+                            {selectedIds.has(entry.time_entry_id) && <Check className="w-3 h-3 text-gray-900" />}
                           </div>
                         </button>
                       )}
 
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                        entry.invoiced ? 'bg-emerald-500/10 border-emerald-500/20'
-                        : entry.is_billable ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 border-violet-500/30'
-                        : 'bg-zinc-800/50 border-zinc-700'
+                        entry.invoiced ? 'bg-emerald-50 border-emerald-500/20'
+                        : entry.is_billable ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-blue-300'
+                        : 'bg-gray-50 border-gray-300'
                       }`}>
-                        <Clock className={`w-5 h-5 ${entry.invoiced ? 'text-emerald-400' : entry.is_billable ? 'text-violet-400' : 'text-zinc-500'}`} />
+                        <Clock className={`w-5 h-5 ${entry.invoiced ? 'text-emerald-600' : entry.is_billable ? 'text-blue-600' : 'text-gray-400'}`} />
                       </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-white">{fmtDuration(entry.duration_minutes)}</span>
+                          <span className="font-medium text-gray-900">{fmtDuration(entry.duration_minutes)}</span>
                           {entry.work_type && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 border border-blue-500/20">
                               {entry.work_type.name}
                             </span>
                           )}
                           {entry.invoiced ? (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-600 border border-emerald-500/20">
                               Fakturerad
                             </span>
                           ) : entry.is_billable ? (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-600 border border-amber-500/20">
                               Ofakturerad
                             </span>
                           ) : null}
                         </div>
                         {entry.description && (
-                          <p className="text-sm text-zinc-400 mt-1 truncate">{entry.description}</p>
+                          <p className="text-sm text-gray-500 mt-1 truncate">{entry.description}</p>
                         )}
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500 flex-wrap">
+                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3 h-3" />
                             {format(parseISO(entry.work_date), 'EEE d MMM', { locale: sv })}
@@ -1081,11 +1081,11 @@ export default function TimePage() {
                         {!entry.invoiced && (
                           <>
                             <button onClick={() => openEditModal(entry)}
-                              className="p-2 text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg">
+                              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
                               <Edit2 className="w-4 h-4" />
                             </button>
                             <button onClick={() => handleDelete(entry.time_entry_id)}
-                              className="p-2 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg">
+                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </>
