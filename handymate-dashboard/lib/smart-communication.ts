@@ -312,11 +312,38 @@ export async function triggerEventCommunication(params: {
 }): Promise<void> {
   try {
     const supabase = getServerSupabase()
+
+    // Check centralized automation_settings first (if table exists)
+    try {
+      const { data: autoSettings } = await supabase
+        .from('automation_settings')
+        .select('sms_auto_enabled, sms_booking_confirmation, sms_quote_followup, sms_job_completed, sms_invoice_reminder, sms_review_request')
+        .eq('business_id', params.businessId)
+        .single()
+
+      if (autoSettings) {
+        if (!autoSettings.sms_auto_enabled) return
+
+        const centralMap: Record<string, string> = {
+          booking_created: 'sms_booking_confirmation',
+          quote_sent: 'sms_quote_followup',
+          project_completed: 'sms_job_completed',
+          invoice_sent: 'sms_invoice_reminder',
+          invoice_paid: 'sms_review_request',
+        }
+
+        const centralKey = centralMap[params.event]
+        if (centralKey && !(autoSettings as any)[centralKey]) return
+      }
+    } catch {
+      // automation_settings table may not exist yet, fall through to legacy
+    }
+
+    // Fallback to legacy communication_settings
     const settings = await getCommunicationSettings(params.businessId)
 
     if (!settings.auto_enabled) return
 
-    // Check if this event type is enabled in settings
     const eventSettingsMap: Record<string, keyof CommunicationSettings> = {
       booking_created: 'send_booking_confirmation',
       quote_sent: 'send_quote_followup',

@@ -586,7 +586,7 @@ export default function DashboardPage() {
 
             {/* Smart kommunikation */}
             {commStats && (
-              <Link href="/dashboard/communication" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
+              <Link href="/dashboard/automations" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
                     <Zap className="w-3.5 h-3.5 text-white" />
