@@ -294,6 +294,7 @@ export default function ProjectDetailPage() {
   const [documents, setDocuments] = useState<any[]>([])
   const [docCategory, setDocCategory] = useState('all')
   const [uploading, setUploading] = useState(false)
+  const [generatedDocs, setGeneratedDocs] = useState<any[]>([])
   const [logs, setLogs] = useState<any[]>([])
   const [showLogModal, setShowLogModal] = useState(false)
   const [editingLog, setEditingLog] = useState<any>(null)
@@ -415,6 +416,7 @@ export default function ProjectDetailPage() {
     }
     if (activeTab === 'documents') {
       fetchDocuments()
+      fetchGeneratedDocs()
     }
     if (activeTab === 'log') {
       fetchLogs()
@@ -445,6 +447,21 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setDocuments(data.documents || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchGeneratedDocs = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/documents?project_id=${projectId}`, {
+        headers: {
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setGeneratedDocs(data.documents || [])
       }
     } catch { /* ignore */ }
   }
@@ -1755,6 +1772,44 @@ export default function ProjectDetailPage() {
         {/* === TAB: Dokument === */}
         {activeTab === 'documents' && (
           <div className="space-y-6">
+            {/* Generated documents from template engine */}
+            {generatedDocs.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-zinc-300">Malldokument</h3>
+                  <a href="/dashboard/documents" className="text-xs text-violet-400 hover:text-violet-300">Alla dokument &rarr;</a>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {generatedDocs.map((gd: any) => (
+                    <a
+                      key={gd.id}
+                      href="/dashboard/documents"
+                      className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition block"
+                    >
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 bg-violet-500/10 rounded-lg flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-violet-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-white truncate">{gd.title}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          gd.status === 'signed' ? 'bg-emerald-500/20 text-emerald-300' :
+                          gd.status === 'completed' ? 'bg-violet-500/20 text-violet-300' :
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>
+                          {gd.status === 'signed' ? 'Signerad' : gd.status === 'completed' ? 'Klar' : 'Utkast'}
+                        </span>
+                        <span className="text-xs text-zinc-600">{new Date(gd.created_at).toLocaleDateString('sv-SE')}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Upload + Filter */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-2 flex-wrap">

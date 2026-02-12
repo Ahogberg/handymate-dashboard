@@ -120,7 +120,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   }
 
   // Auto-expand Jobb dropdown if a child route is active
-  const jobbPaths = ['/dashboard/projects', '/dashboard/quotes', '/dashboard/invoices']
+  const jobbPaths = ['/dashboard/projects', '/dashboard/quotes', '/dashboard/invoices', '/dashboard/documents']
   const isJobbActive = jobbPaths.some(p => pathname === p || pathname?.startsWith(p + '/'))
 
   useEffect(() => {
@@ -231,6 +231,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
               <Link href="/dashboard/invoices" className={subNavClass(isActive('/dashboard/invoices'))}>
                 <Receipt className="w-4 h-4" />
                 <span className="text-sm">Fakturor</span>
+              </Link>
+              <Link href="/dashboard/documents" className={subNavClass(isActive('/dashboard/documents'))}>
+                <FileText className="w-4 h-4" />
+                <span className="text-sm">Dokument</span>
               </Link>
             </div>
           )}
