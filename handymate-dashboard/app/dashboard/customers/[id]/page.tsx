@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { 
-  ArrowLeft, 
-  Phone, 
-  Mail, 
+import {
+  ArrowLeft,
+  Phone,
+  Mail,
   MapPin,
   Calendar,
   MessageSquare,
@@ -21,7 +21,11 @@ import {
   PhoneIncoming,
   PhoneOutgoing,
   Loader2,
-  Send
+  Send,
+  Globe,
+  Copy,
+  RefreshCw,
+  ExternalLink
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -78,6 +82,13 @@ export default function CustomerDetailPage() {
   const [showAddNoteModal, setShowAddNoteModal] = useState(false)
   const [showSendSMSModal, setShowSendSMSModal] = useState(false)
 
+  // Portal
+  const [portalToken, setPortalToken] = useState<string | null>(null)
+  const [portalEnabled, setPortalEnabled] = useState(false)
+  const [portalLastVisited, setPortalLastVisited] = useState<string | null>(null)
+  const [generatingPortal, setGeneratingPortal] = useState(false)
+  const [portalCopied, setPortalCopied] = useState(false)
+
   useEffect(() => {
     fetchData()
   }, [customerId])
@@ -108,7 +119,56 @@ export default function CustomerDetailPage() {
     setCustomer(customerData)
     setActivities(activityData || [])
     setBookings(bookingData || [])
+
+    // Load portal fields
+    if (customerData) {
+      setPortalToken(customerData.portal_token || null)
+      setPortalEnabled(customerData.portal_enabled ?? false)
+      setPortalLastVisited(customerData.portal_last_visited_at || null)
+    }
+
     setLoading(false)
+  }
+
+  async function generatePortalLink() {
+    setGeneratingPortal(true)
+    try {
+      const res = await fetch(`/api/customers/${customerId}/portal-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId: business.business_id })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPortalToken(data.token)
+        setPortalEnabled(true)
+      }
+    } catch (err) {
+      console.error('Failed to generate portal link:', err)
+    }
+    setGeneratingPortal(false)
+  }
+
+  async function copyPortalLink() {
+    if (!portalToken) return
+    const url = `${window.location.origin}/portal/${portalToken}`
+    await navigator.clipboard.writeText(url)
+    setPortalCopied(true)
+    setTimeout(() => setPortalCopied(false), 2000)
+  }
+
+  async function disablePortal() {
+    try {
+      await fetch(`/api/customers/${customerId}/portal-link`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessId: business.business_id })
+      })
+      setPortalToken(null)
+      setPortalEnabled(false)
+    } catch (err) {
+      console.error('Failed to disable portal:', err)
+    }
   }
 
   const getActivityIcon = (type: string) => {
@@ -264,6 +324,90 @@ export default function CustomerDetailPage() {
                   <span className="text-white text-sm">Skapa bokning</span>
                 </Link>
               </div>
+            </div>
+
+            {/* Kundportal */}
+            <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 sm:p-6">
+              <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Kundportal</h2>
+
+              {portalToken && portalEnabled ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-sm text-emerald-400 font-medium">Aktiv</span>
+                  </div>
+
+                  <div className="p-3 bg-zinc-800/50 rounded-xl">
+                    <p className="text-xs text-zinc-500 mb-1">Portallänk</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs text-zinc-300 truncate flex-1">
+                        {window.location.origin}/portal/{portalToken.substring(0, 8)}...
+                      </p>
+                      <button
+                        onClick={copyPortalLink}
+                        className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
+                        title="Kopiera länk"
+                      >
+                        {portalCopied ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      </button>
+                      <a
+                        href={`/portal/${portalToken}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-all"
+                        title="Öppna portal"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {portalLastVisited && (
+                    <p className="text-xs text-zinc-500">
+                      Senast besökt: {new Date(portalLastVisited).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={generatePortalLink}
+                      disabled={generatingPortal}
+                      className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-zinc-800/50 rounded-xl hover:bg-zinc-800 transition-all text-sm text-zinc-300"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${generatingPortal ? 'animate-spin' : ''}`} />
+                      Ny länk
+                    </button>
+                    <button
+                      onClick={disablePortal}
+                      className="flex-1 flex items-center justify-center gap-2 p-2.5 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all text-sm text-red-400"
+                    >
+                      Inaktivera
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-zinc-600" />
+                    <span className="text-sm text-zinc-500">Inaktiv</span>
+                  </div>
+                  <p className="text-xs text-zinc-600">
+                    Ge kunden tillgång till projekt, offerter, fakturor och meddelanden via en personlig portallänk.
+                  </p>
+                  <button
+                    onClick={generatePortalLink}
+                    disabled={generatingPortal}
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+                  >
+                    {generatingPortal ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Globe className="w-4 h-4" />
+                    )}
+                    {generatingPortal ? 'Genererar...' : 'Aktivera kundportal'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Statistik */}
