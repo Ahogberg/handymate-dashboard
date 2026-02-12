@@ -181,6 +181,27 @@ export async function POST(
       console.error('Pipeline trigger error (non-blocking):', pipelineErr)
     }
 
+    // Smart communication: trigger quote_signed event
+    try {
+      const { data: signedQuote } = await supabase
+        .from('quotes')
+        .select('quote_id, business_id, customer_id')
+        .eq('sign_token', token)
+        .single()
+
+      if (signedQuote) {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: signedQuote.business_id,
+          event: 'quote_signed',
+          customerId: signedQuote.customer_id,
+          context: { quoteId: signedQuote.quote_id },
+        })
+      }
+    } catch (commErr) {
+      console.error('Communication trigger error (non-blocking):', commErr)
+    }
+
     return NextResponse.json({ success: true })
 
   } catch (error: any) {

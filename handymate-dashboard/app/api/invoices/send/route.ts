@@ -239,6 +239,19 @@ export async function POST(request: NextRequest) {
       } catch (pipelineErr) {
         console.error('Pipeline trigger error (non-blocking):', pipelineErr)
       }
+
+      // Smart communication: trigger invoice_sent event
+      try {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: business.business_id,
+          event: 'invoice_sent',
+          customerId: invoice.customer_id,
+          context: { invoiceId: invoice_id },
+        })
+      } catch (commErr) {
+        console.error('Communication trigger error (non-blocking):', commErr)
+      }
     }
 
     return NextResponse.json({

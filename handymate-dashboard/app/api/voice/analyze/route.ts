@@ -335,6 +335,20 @@ Svara ENDAST med JSON i följande format:
       console.error('Pipeline processing error (non-blocking):', pipelineError)
     }
 
+    // Smart communication: trigger call_completed event
+    try {
+      if (recording.business_id && recording.customer_id) {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: recording.business_id,
+          event: 'call_completed',
+          customerId: recording.customer_id,
+        })
+      }
+    } catch (commErr) {
+      console.error('Communication trigger error (non-blocking):', commErr)
+    }
+
     return NextResponse.json({
       success: true,
       recording_id,

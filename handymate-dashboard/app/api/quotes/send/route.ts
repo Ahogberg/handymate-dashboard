@@ -340,6 +340,19 @@ Frågor? Ring ${business.phone_number}
       console.error('Pipeline trigger error (non-blocking):', pipelineErr)
     }
 
+    // Smart communication: trigger quote_sent event
+    try {
+      const { triggerEventCommunication } = await import('@/lib/smart-communication')
+      await triggerEventCommunication({
+        businessId: business.business_id,
+        event: 'quote_sent',
+        customerId: quote.customer_id,
+        context: { quoteId },
+      })
+    } catch (commErr) {
+      console.error('Communication trigger error (non-blocking):', commErr)
+    }
+
     // Bygg svar
     const sentMethods = []
     if (smsSent) sentMethods.push('SMS')

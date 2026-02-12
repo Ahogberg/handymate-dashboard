@@ -12,7 +12,9 @@ import {
   FileText,
   Sparkles,
   Mic,
-  FolderKanban
+  FolderKanban,
+  MessageSquare,
+  Zap
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -64,6 +66,7 @@ export default function DashboardPage() {
   const [activeProjects, setActiveProjects] = useState(0)
   const [pipelineStats, setPipelineStats] = useState<{ totalDeals: number; totalValue: number; newLeadsToday: number; needsFollowUp: number } | null>(null)
   const [scheduleToday, setScheduleToday] = useState<{ count: number; people: number; entries: { title: string; color: string; time: string }[] }>({ count: 0, people: 0, entries: [] })
+  const [commStats, setCommStats] = useState<{ today: number; weekTotal: number; deliveryRate: number } | null>(null)
 
   useEffect(() => {
     fetchData()
@@ -170,6 +173,19 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Failed to fetch stats:', error)
     }
+
+    // Hämta kommunikationsstatistik
+    try {
+      const commRes = await fetch(`/api/communication/stats?businessId=${business.business_id}`)
+      if (commRes.ok) {
+        const commData = await commRes.json()
+        setCommStats({
+          today: commData.today,
+          weekTotal: commData.week.total,
+          deliveryRate: commData.week.deliveryRate,
+        })
+      }
+    } catch { /* ignore */ }
 
     setLoading(false)
   }
@@ -567,6 +583,28 @@ export default function DashboardPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Smart kommunikation */}
+            {commStats && (
+              <Link href="/dashboard/communication" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                    <Zap className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <h2 className="text-sm font-semibold text-gray-900">Smart kommunikation</h2>
+                </div>
+                <p className="text-sm text-gray-600 mb-1">
+                  Idag: <span className="font-medium text-gray-900">{commStats.today}</span> meddelanden
+                </p>
+                <p className="text-xs text-gray-400">
+                  Vecka: {commStats.weekTotal} st{commStats.weekTotal > 0 ? ` | ${commStats.deliveryRate}% levererade` : ''}
+                </p>
+                <div className="flex items-center gap-1 mt-2 text-xs text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span>Visa aktivitet</span>
+                  <ArrowRight className="w-3 h-3" />
+                </div>
+              </Link>
+            )}
 
             {/* Totala kunder */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">

@@ -89,6 +89,21 @@ export async function PATCH(
       } catch (pipelineErr) {
         console.error('Pipeline trigger error (non-blocking):', pipelineErr)
       }
+
+      // Smart communication: trigger invoice_paid event
+      try {
+        if (invoice?.customer_id) {
+          const { triggerEventCommunication } = await import('@/lib/smart-communication')
+          await triggerEventCommunication({
+            businessId: business.business_id,
+            event: 'invoice_paid',
+            customerId: invoice.customer_id,
+            context: { invoiceId },
+          })
+        }
+      } catch (commErr) {
+        console.error('Communication trigger error (non-blocking):', commErr)
+      }
     }
 
     return NextResponse.json({
