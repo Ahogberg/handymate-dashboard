@@ -290,7 +290,10 @@ export default function PipelinePage() {
       if (!res.ok) throw new Error('Failed to fetch pipeline')
       const data = await res.json()
       setStages((data.stages || []).sort((a: Stage, b: Stage) => a.sort_order - b.sort_order))
-      setDeals(data.deals || [])
+      // API returns deals grouped by stage_id — flatten to array
+      const groupedDeals = data.deals || {}
+      const flatDeals: Deal[] = Object.values(groupedDeals).flat() as Deal[]
+      setDeals(flatDeals)
       setStats(data.stats || null)
     } catch {
       showToast('Kunde inte ladda pipeline', 'error')
