@@ -19,7 +19,8 @@ import {
   FolderKanban,
   Menu,
   X,
-  User
+  User,
+  TrendingUp
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -194,6 +195,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           <div className="flex items-center gap-3">
             <Users className={`w-5 h-5 ${isActive('/dashboard/customers') ? 'text-violet-400' : ''}`} />
             <span className="text-sm sm:text-base">Kunder</span>
+          </div>
+        </Link>
+
+        {/* Pipeline */}
+        <Link href="/dashboard/pipeline" className={navClass(isActive('/dashboard/pipeline'))}>
+          <div className="flex items-center gap-3">
+            <TrendingUp className={`w-5 h-5 ${isActive('/dashboard/pipeline') ? 'text-violet-400' : ''}`} />
+            <span className="text-sm sm:text-base">Pipeline</span>
           </div>
         </Link>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ChevronRight, FileText } from 'lucide-react'
+import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
@@ -881,6 +881,7 @@ export default function SettingsPage() {
     { id: 'time', label: 'Tidrapport', icon: Clock },
     { id: 'team', label: 'Team', icon: UsersRound },
     { id: 'integrations', label: 'Integrationer', icon: Link2 },
+    { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
     { id: 'ai', label: 'AI-assistent', icon: Bot },
     { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
   ]
@@ -2299,6 +2300,10 @@ export default function SettingsPage() {
         )}
 
         {/* Subscription Tab */}
+        {activeTab === 'pipeline' && (
+          <PipelineSettings businessId={business.business_id} />
+        )}
+
         {activeTab === 'subscription' && (
           <div className="space-y-6">
             {/* Nuvarande plan */}
@@ -2372,6 +2377,214 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function PipelineSettings({ businessId }: { businessId: string }) {
+  const [settings, setSettings] = useState({
+    auto_create_leads: true,
+    auto_move_on_signature: true,
+    auto_move_on_payment: true,
+    auto_move_on_project_complete: true,
+    ai_analyze_calls: true,
+    ai_auto_move_threshold: 80,
+    ai_create_lead_threshold: 70,
+    show_ai_activity: true,
+  })
+  const [stages, setStages] = useState<Array<{ id: string; name: string; slug: string; color: string; sort_order: number; is_won: boolean; is_lost: boolean }>>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' })
+
+  useEffect(() => {
+    fetchSettings()
+  }, [businessId])
+
+  async function fetchSettings() {
+    try {
+      const [settingsRes, stagesRes] = await Promise.all([
+        fetch('/api/pipeline/settings'),
+        fetch('/api/pipeline/stages'),
+      ])
+      if (settingsRes.ok) {
+        const data = await settingsRes.json()
+        setSettings(prev => ({ ...prev, ...data }))
+      }
+      if (stagesRes.ok) {
+        const data = await stagesRes.json()
+        setStages(data.stages || [])
+      }
+    } catch { /* ignore */ }
+    setLoading(false)
+  }
+
+  async function saveSettings() {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/pipeline/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      if (res.ok) {
+        setToast({ show: true, message: 'Inställningar sparade', type: 'success' })
+      } else {
+        setToast({ show: true, message: 'Kunde inte spara', type: 'error' })
+      }
+    } catch {
+      setToast({ show: true, message: 'Något gick fel', type: 'error' })
+    }
+    setSaving(false)
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="w-6 h-6 text-violet-400 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium ${
+          toast.type === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
+      {/* AI Automation */}
+      <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+        <h2 className="text-lg font-semibold text-white mb-2">AI-automatisering</h2>
+        <p className="text-sm text-zinc-500 mb-6">Styr hur pipeline-stegen automatiskt uppdateras</p>
+
+        <div className="space-y-4">
+          <h3 className="text-sm font-medium text-zinc-300">Automatiskt (händer direkt)</h3>
+
+          {[
+            { key: 'auto_create_leads', label: 'Skapa lead från nya samtal' },
+            { key: 'auto_move_on_signature', label: 'Flytta till "Accepterad" när offert signeras' },
+            { key: 'auto_move_on_payment', label: 'Flytta till "Betalt" när faktura betalas' },
+            { key: 'auto_move_on_project_complete', label: 'Flytta till "Faktureras" när projekt markeras klart' },
+          ].map(({ key, label }) => (
+            <label key={key} className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
+              <span className="text-sm text-white">{label}</span>
+              <div
+                className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
+                  (settings as any)[key] ? 'bg-violet-500' : 'bg-zinc-700'
+                }`}
+                onClick={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                  (settings as any)[key] ? 'left-5' : 'left-1'
+                }`} />
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-6 space-y-4">
+          <h3 className="text-sm font-medium text-zinc-300">AI-drivet (baserat på samtalsanalys)</h3>
+
+          <label className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
+            <span className="text-sm text-white">Analysera samtal och identifiera kundintent</span>
+            <div
+              className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
+                settings.ai_analyze_calls ? 'bg-violet-500' : 'bg-zinc-700'
+              }`}
+              onClick={() => setSettings(prev => ({ ...prev, ai_analyze_calls: !prev.ai_analyze_calls }))}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                settings.ai_analyze_calls ? 'left-5' : 'left-1'
+              }`} />
+            </div>
+          </label>
+
+          <div className="p-3 bg-zinc-800/50 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-white">Tröskelvärde för automatisk flytt</span>
+              <span className="text-sm text-violet-400 font-mono">{settings.ai_auto_move_threshold}%</span>
+            </div>
+            <input
+              type="range"
+              min="50"
+              max="100"
+              value={settings.ai_auto_move_threshold}
+              onChange={(e) => setSettings(prev => ({ ...prev, ai_auto_move_threshold: parseInt(e.target.value) }))}
+              className="w-full accent-violet-500"
+            />
+            <p className="text-xs text-zinc-600 mt-1">AI flyttar deals automatiskt när den är minst så säker</p>
+          </div>
+
+          <div className="p-3 bg-zinc-800/50 rounded-xl">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-white">Tröskelvärde för lead-skapande</span>
+              <span className="text-sm text-violet-400 font-mono">{settings.ai_create_lead_threshold}%</span>
+            </div>
+            <input
+              type="range"
+              min="40"
+              max="100"
+              value={settings.ai_create_lead_threshold}
+              onChange={(e) => setSettings(prev => ({ ...prev, ai_create_lead_threshold: parseInt(e.target.value) }))}
+              className="w-full accent-violet-500"
+            />
+            <p className="text-xs text-zinc-600 mt-1">AI skapar nya leads när den är minst så säker</p>
+          </div>
+
+          <label className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl cursor-pointer hover:bg-zinc-800 transition-all">
+            <span className="text-sm text-white">Visa AI-aktivitet i pipeline</span>
+            <div
+              className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
+                settings.show_ai_activity ? 'bg-violet-500' : 'bg-zinc-700'
+              }`}
+              onClick={() => setSettings(prev => ({ ...prev, show_ai_activity: !prev.show_ai_activity }))}
+            >
+              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                settings.show_ai_activity ? 'left-5' : 'left-1'
+              }`} />
+            </div>
+          </label>
+        </div>
+
+        <button
+          onClick={saveSettings}
+          disabled={saving}
+          className="mt-6 flex items-center px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+          Spara pipeline-inställningar
+        </button>
+      </div>
+
+      {/* Pipeline Stages */}
+      <div className="bg-zinc-900/50 backdrop-blur-xl rounded-2xl border border-zinc-800 p-6">
+        <h2 className="text-lg font-semibold text-white mb-2">Pipeline-steg</h2>
+        <p className="text-sm text-zinc-500 mb-4">Stegen i din säljpipeline</p>
+
+        <div className="space-y-2">
+          {stages.filter(s => !s.is_lost).map((stage, i) => (
+            <div key={stage.id} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl">
+              <span className="text-zinc-600 text-sm w-6">{i + 1}.</span>
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
+              <span className="text-white text-sm flex-1">{stage.name}</span>
+              {stage.is_won && <span className="text-xs text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">Vunnen</span>}
+            </div>
+          ))}
+          {stages.filter(s => s.is_lost).map((stage) => (
+            <div key={stage.id} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-xl border-t border-zinc-700 mt-2">
+              <span className="text-zinc-600 text-sm w-6" />
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
+              <span className="text-white text-sm flex-1">{stage.name}</span>
+              <span className="text-xs text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">Förlorad</span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   )

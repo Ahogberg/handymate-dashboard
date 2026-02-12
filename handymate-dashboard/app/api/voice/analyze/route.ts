@@ -320,6 +320,21 @@ Svara ENDAST med JSON i följande format:
       }
     }
 
+    // Pipeline integration: process call for pipeline deals
+    try {
+      const { processCallForPipeline } = await import('@/lib/pipeline-ai')
+      if (recording.transcript && recording.business_id) {
+        await processCallForPipeline({
+          callId: recording_id,
+          businessId: recording.business_id,
+          transcript: recording.transcript,
+          callerPhone: recording.phone_number || '',
+        })
+      }
+    } catch (pipelineError) {
+      console.error('Pipeline processing error (non-blocking):', pipelineError)
+    }
+
     return NextResponse.json({
       success: true,
       recording_id,

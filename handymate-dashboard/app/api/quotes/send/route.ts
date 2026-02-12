@@ -321,6 +321,25 @@ Frågor? Ring ${business.phone_number}
       })
       .eq('quote_id', quoteId)
 
+    // Pipeline: move deal to quote_sent if exists
+    try {
+      const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+      const settings = await getAutomationSettings(business.business_id)
+      if (settings?.auto_move_on_signature) {
+        const deal = await findDealByQuote(business.business_id, quoteId)
+        if (deal) {
+          await moveDeal({
+            dealId: deal.id,
+            businessId: business.business_id,
+            toStageSlug: 'quote_sent',
+            triggeredBy: 'system',
+          })
+        }
+      }
+    } catch (pipelineErr) {
+      console.error('Pipeline trigger error (non-blocking):', pipelineErr)
+    }
+
     // Bygg svar
     const sentMethods = []
     if (smsSent) sentMethods.push('SMS')

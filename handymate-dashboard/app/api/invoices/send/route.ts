@@ -220,6 +220,25 @@ export async function POST(request: NextRequest) {
           description: `Faktura ${invoice.invoice_number} skickad${results.email ? ' via email' : ''}${results.sms ? ' via SMS' : ''}`,
           metadata: { invoice_id, ...results }
         })
+
+      // Pipeline: move deal to invoiced
+      try {
+        const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+        const settings = await getAutomationSettings(business.business_id)
+        if (settings?.auto_move_on_payment) {
+          const deal = await findDealByInvoice(business.business_id, invoice_id)
+          if (deal) {
+            await moveDeal({
+              dealId: deal.id,
+              businessId: business.business_id,
+              toStageSlug: 'invoiced',
+              triggeredBy: 'system',
+            })
+          }
+        }
+      } catch (pipelineErr) {
+        console.error('Pipeline trigger error (non-blocking):', pipelineErr)
+      }
     }
 
     return NextResponse.json({

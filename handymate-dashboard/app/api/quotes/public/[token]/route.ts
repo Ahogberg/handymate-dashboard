@@ -154,6 +154,33 @@ export async function POST(
 
     if (updateError) throw updateError
 
+    // Pipeline: move deal to accepted on signature
+    try {
+      const { data: fullQuote } = await supabase
+        .from('quotes')
+        .select('quote_id, business_id')
+        .eq('sign_token', token)
+        .single()
+
+      if (fullQuote) {
+        const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+        const settings = await getAutomationSettings(fullQuote.business_id)
+        if (settings?.auto_move_on_signature) {
+          const deal = await findDealByQuote(fullQuote.business_id, fullQuote.quote_id)
+          if (deal) {
+            await moveDeal({
+              dealId: deal.id,
+              businessId: fullQuote.business_id,
+              toStageSlug: 'accepted',
+              triggeredBy: 'system',
+            })
+          }
+        }
+      }
+    } catch (pipelineErr) {
+      console.error('Pipeline trigger error (non-blocking):', pipelineErr)
+    }
+
     return NextResponse.json({ success: true })
 
   } catch (error: any) {

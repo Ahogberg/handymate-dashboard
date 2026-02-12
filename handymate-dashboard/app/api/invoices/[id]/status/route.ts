@@ -70,6 +70,27 @@ export async function PATCH(
 
     if (updateError) throw updateError
 
+    // Pipeline: move deal to paid when invoice is paid
+    if (status === 'paid') {
+      try {
+        const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+        const settings = await getAutomationSettings(business.business_id)
+        if (settings?.auto_move_on_payment) {
+          const deal = await findDealByInvoice(business.business_id, invoiceId)
+          if (deal) {
+            await moveDeal({
+              dealId: deal.id,
+              businessId: business.business_id,
+              toStageSlug: 'paid',
+              triggeredBy: 'system',
+            })
+          }
+        }
+      } catch (pipelineErr) {
+        console.error('Pipeline trigger error (non-blocking):', pipelineErr)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       invoice,

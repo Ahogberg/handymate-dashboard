@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [callCount, setCallCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [activeProjects, setActiveProjects] = useState(0)
+  const [pipelineStats, setPipelineStats] = useState<{ totalDeals: number; totalValue: number; newLeadsToday: number; needsFollowUp: number } | null>(null)
   const [scheduleToday, setScheduleToday] = useState<{ count: number; people: number; entries: { title: string; color: string; time: string }[] }>({ count: 0, people: 0, entries: [] })
 
   useEffect(() => {
@@ -147,6 +148,15 @@ export default function DashboardPage() {
             time: e.all_day ? 'Heldag' : new Date(e.start_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
           }))
         })
+      }
+    } catch { /* ignore */ }
+
+    // Hämta pipeline-statistik
+    try {
+      const pipeRes = await fetch('/api/pipeline/stats')
+      if (pipeRes.ok) {
+        const pipeData = await pipeRes.json()
+        setPipelineStats(pipeData)
       }
     } catch { /* ignore */ }
 
@@ -474,6 +484,39 @@ export default function DashboardPage() {
                 </>
               )}
             </Link>
+
+            {/* Pipeline */}
+            {pipelineStats && (pipelineStats.totalDeals > 0 || pipelineStats.newLeadsToday > 0) && (
+              <Link href="/dashboard/pipeline" className="block bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4 hover:border-violet-500/30 transition-all group">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-white flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-violet-400" />
+                    Pipeline
+                  </h3>
+                  <ArrowRight className="w-3 h-3 text-zinc-600 group-hover:text-violet-400 transition-colors" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 bg-zinc-800/50 rounded-lg text-center">
+                    <p className="text-lg font-bold text-white">{pipelineStats.totalDeals}</p>
+                    <p className="text-xs text-zinc-500">Aktiva deals</p>
+                  </div>
+                  <div className="p-2 bg-zinc-800/50 rounded-lg text-center">
+                    <p className="text-lg font-bold text-white">{formatCurrency(pipelineStats.totalValue)} kr</p>
+                    <p className="text-xs text-zinc-500">Totalt värde</p>
+                  </div>
+                </div>
+                {(pipelineStats.newLeadsToday > 0 || pipelineStats.needsFollowUp > 0) && (
+                  <div className="mt-2 space-y-1">
+                    {pipelineStats.newLeadsToday > 0 && (
+                      <p className="text-xs text-emerald-400">{pipelineStats.newLeadsToday} nya leads idag</p>
+                    )}
+                    {pipelineStats.needsFollowUp > 0 && (
+                      <p className="text-xs text-amber-400">{pipelineStats.needsFollowUp} behöver uppföljning</p>
+                    )}
+                  </div>
+                )}
+              </Link>
+            )}
 
             {/* Snabblänkar */}
             <div className="bg-zinc-900/50 backdrop-blur-xl rounded-xl border border-zinc-800 p-4">
