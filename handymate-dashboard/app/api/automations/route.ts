@@ -15,44 +15,71 @@ export async function GET(request: NextRequest) {
     const { getServerSupabase } = await import('@/lib/supabase')
     const supabase = getServerSupabase()
 
+    // Get business config (only query columns that definitely exist)
     const { data: config } = await supabase
       .from('business_config')
-      .select('assigned_phone_number, fortnox_access_token, google_calendar_token')
+      .select('assigned_phone_number, fortnox_access_token')
       .eq('business_id', business.business_id)
       .single()
+
+    // Check Google Calendar separately (uses calendar_connection table)
+    let googleCalendarConnected = false
+    try {
+      const { count } = await supabase
+        .from('calendar_connection')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('sync_enabled', true)
+      googleCalendarConnected = (count || 0) > 0
+    } catch {
+      // Table may not exist
+    }
 
     const integrations = {
       phone_connected: !!config?.assigned_phone_number,
       fortnox_connected: !!config?.fortnox_access_token,
-      google_calendar_connected: !!config?.google_calendar_token,
+      google_calendar_connected: googleCalendarConnected,
     }
 
-    // Get recent stats
+    // Get recent stats (with fallbacks for missing tables)
     const now = new Date()
     const weekStart = new Date(now)
     weekStart.setDate(weekStart.getDate() - 7)
 
-    const { count: smsCount } = await supabase
-      .from('communication_log')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', business.business_id)
-      .gte('created_at', weekStart.toISOString())
-      .in('status', ['sent', 'delivered'])
+    let smsCount = 0
+    let leadsCreated = 0
+    let dealsMoved = 0
 
-    const { count: leadsCreated } = await supabase
-      .from('pipeline_activity')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', business.business_id)
-      .eq('activity_type', 'deal_created')
-      .gte('created_at', weekStart.toISOString())
+    try {
+      const { count } = await supabase
+        .from('communication_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .gte('created_at', weekStart.toISOString())
+        .in('status', ['sent', 'delivered'])
+      smsCount = count || 0
+    } catch { /* table may not exist */ }
 
-    const { count: dealsMoved } = await supabase
-      .from('pipeline_activity')
-      .select('*', { count: 'exact', head: true })
-      .eq('business_id', business.business_id)
-      .eq('activity_type', 'stage_changed')
-      .eq('triggered_by', 'system')
-      .gte('created_at', weekStart.toISOString())
+    try {
+      const { count } = await supabase
+        .from('pipeline_activity')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('activity_type', 'deal_created')
+        .gte('created_at', weekStart.toISOString())
+      leadsCreated = count || 0
+    } catch { /* table may not exist */ }
+
+    try {
+      const { count } = await supabase
+        .from('pipeline_activity')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+        .eq('activity_type', 'stage_changed')
+        .eq('triggered_by', 'system')
+        .gte('created_at', weekStart.toISOString())
+      dealsMoved = count || 0
+    } catch { /* table may not exist */ }
 
     return NextResponse.json({
       settings,

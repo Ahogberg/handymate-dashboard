@@ -8,10 +8,10 @@ import { cookies } from 'next/headers'
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ businessId: string }> }
+  { params }: { params: { businessId: string } }
 ) {
   try {
-    const { businessId } = await params
+    const { businessId } = params
 
     // Auth check
     const adminCheck = await isAdmin(request)
@@ -127,10 +127,10 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ businessId: string }> }
+  { params }: { params: { businessId: string } }
 ) {
   try {
-    const { businessId } = await params
+    const { businessId } = params
 
     // Auth check
     const adminCheck = await isAdmin(request)

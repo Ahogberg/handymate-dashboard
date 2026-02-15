@@ -10,10 +10,10 @@ const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: invoiceId } = await params
+    const { id: invoiceId } = params
 
     // Auth check
     const business = await getAuthenticatedBusiness(request)

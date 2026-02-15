@@ -4,7 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -12,7 +12,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = await params
+    const { id } = params
     const body = await request.json()
     const supabase = getServerSupabase()
 
@@ -79,7 +79,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -87,7 +87,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id } = await params
+    const { id } = params
     const supabase = getServerSupabase()
 
     // Can only delete own rules, not system rules without business_id

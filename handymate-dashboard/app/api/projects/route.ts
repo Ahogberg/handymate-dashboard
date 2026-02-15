@@ -177,7 +177,10 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
-    if (insertError) throw insertError
+    if (insertError) {
+      console.error('Project insert error:', insertError)
+      return NextResponse.json({ error: insertError.message || 'Kunde inte skapa projekt' }, { status: 500 })
+    }
 
     // If from quote, create milestones from quote items
     if (body.from_quote_id && body.create_milestones !== false) {
@@ -303,7 +306,12 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Delete milestones and changes first
+    // Delete all child records first (order matters for FK constraints)
+    await supabase.from('project_document').delete().eq('project_id', projectId)
+    await supabase.from('project_log').delete().eq('project_id', projectId)
+    await supabase.from('project_checklist').delete().eq('project_id', projectId)
+    await supabase.from('project_assignment').delete().eq('project_id', projectId)
+    await supabase.from('project_material').delete().eq('project_id', projectId)
     await supabase.from('project_milestone').delete().eq('project_id', projectId)
     await supabase.from('project_change').delete().eq('project_id', projectId)
 

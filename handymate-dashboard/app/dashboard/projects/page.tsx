@@ -144,14 +144,17 @@ export default function ProjectsPage() {
         })
       })
 
-      if (!response.ok) throw new Error('Kunde inte skapa projekt')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.error || 'Kunde inte skapa projekt')
+      }
 
       showToast('Projekt skapat!', 'success')
       setShowCreateModal(false)
       setNewProject({ name: '', customer_id: '', project_type: 'hourly', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
       fetchProjects()
-    } catch {
-      showToast('Något gick fel', 'error')
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
     } finally {
       setCreating(false)
     }

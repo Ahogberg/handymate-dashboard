@@ -60,15 +60,19 @@ const DEFAULT_SETTINGS: Omit<AutomationSettings, 'id' | 'business_id'> = {
 }
 
 export async function getAutomationSettings(businessId: string): Promise<AutomationSettings> {
-  const supabase = getServerSupabase()
+  try {
+    const supabase = getServerSupabase()
 
-  const { data } = await supabase
-    .from('automation_settings')
-    .select('*')
-    .eq('business_id', businessId)
-    .single()
+    const { data, error } = await supabase
+      .from('automation_settings')
+      .select('*')
+      .eq('business_id', businessId)
+      .single()
 
-  if (data) return data as AutomationSettings
+    if (data && !error) return data as AutomationSettings
+  } catch {
+    // Table may not exist yet - return defaults
+  }
 
   return {
     id: '',

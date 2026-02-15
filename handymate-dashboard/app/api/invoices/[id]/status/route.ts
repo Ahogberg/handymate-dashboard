@@ -8,10 +8,10 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id: invoiceId } = await params
+    const { id: invoiceId } = params
 
     // Auth check
     const business = await getAuthenticatedBusiness(request)
