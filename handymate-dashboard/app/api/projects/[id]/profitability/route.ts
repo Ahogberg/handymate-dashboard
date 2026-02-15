@@ -21,7 +21,7 @@ export async function GET(
     // Fetch project
     const { data: project, error } = await supabase
       .from('project')
-      .select('*, customer:customer_id (name)')
+      .select('*')
       .eq('project_id', projectId)
       .eq('business_id', business.business_id)
       .single()

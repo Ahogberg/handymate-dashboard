@@ -19,10 +19,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from('project')
-      .select(`
-        *,
-        customer:customer_id (customer_id, name, phone_number, email)
-      `)
+      .select('*')
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
 
@@ -69,6 +66,19 @@ export async function GET(request: NextRequest) {
       milestoneData = data || []
     }
 
+    // Fetch customer names for projects
+    const customerIds = Array.from(new Set((projects || []).map((p: any) => p.customer_id).filter(Boolean)))
+    let customerMap: Record<string, { customer_id: string; name: string; phone_number?: string; email?: string }> = {}
+    if (customerIds.length > 0) {
+      const { data: customers } = await supabase
+        .from('customer')
+        .select('customer_id, name, phone_number, email')
+        .in('customer_id', customerIds)
+      for (const c of (customers || [])) {
+        customerMap[c.customer_id] = c
+      }
+    }
+
     const enrichedProjects = (projects || []).map((project: any) => {
       const entries = timeData.filter((t: any) => t.project_id === project.project_id)
       const actual_minutes = entries.reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0)
@@ -84,6 +94,7 @@ export async function GET(request: NextRequest) {
 
       return {
         ...project,
+        customer: project.customer_id ? customerMap[project.customer_id] || null : null,
         actual_hours: Math.round(actual_minutes / 60 * 100) / 100,
         actual_amount: Math.round(actual_amount),
         uninvoiced_hours: Math.round(uninvoiced_minutes / 60 * 100) / 100,
@@ -171,10 +182,7 @@ export async function POST(request: NextRequest) {
     const { data: project, error: insertError } = await supabase
       .from('project')
       .insert(projectData)
-      .select(`
-        *,
-        customer:customer_id (customer_id, name)
-      `)
+      .select('*')
       .single()
 
     if (insertError) {
@@ -260,10 +268,7 @@ export async function PUT(request: NextRequest) {
       .update(updates)
       .eq('project_id', project_id)
       .eq('business_id', business.business_id)
-      .select(`
-        *,
-        customer:customer_id (customer_id, name)
-      `)
+      .select('*')
       .single()
 
     if (error) throw error

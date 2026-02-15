@@ -18,13 +18,10 @@ export async function GET(
     const supabase = getServerSupabase()
     const projectId = params.id
 
-    // Fetch project with customer
+    // Fetch project
     const { data: project, error } = await supabase
       .from('project')
-      .select(`
-        *,
-        customer:customer_id (customer_id, name, phone_number, email, address_line)
-      `)
+      .select('*')
       .eq('project_id', projectId)
       .eq('business_id', business.business_id)
       .single()
@@ -32,6 +29,18 @@ export async function GET(
     if (error || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
+
+    // Fetch customer separately (no FK on project table)
+    let customer = null
+    if (project.customer_id) {
+      const { data } = await supabase
+        .from('customer')
+        .select('customer_id, name, phone_number, email, address_line')
+        .eq('customer_id', project.customer_id)
+        .single()
+      customer = data
+    }
+    project.customer = customer
 
     // Fetch milestones
     const { data: milestones } = await supabase
@@ -50,11 +59,7 @@ export async function GET(
     // Fetch time entries
     const { data: timeEntries } = await supabase
       .from('time_entry')
-      .select(`
-        *,
-        customer:customer_id (name),
-        work_type:work_type_id (name, multiplier)
-      `)
+      .select('*')
       .eq('project_id', projectId)
       .order('work_date', { ascending: false })
 
