@@ -507,67 +507,116 @@ export default function DashboardPage() {
 
             {/* Pipeline Funnel */}
             {pipelineStats && pipelineStats.byStage && pipelineStats.byStage.length > 0 && (
-              <Link href="/dashboard/pipeline" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-blue-600" />
                     Säljtratt
                   </h3>
-                  <ArrowRight className="w-3 h-3 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                  <Link href="/dashboard/pipeline" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                    Pipeline <ArrowRight className="w-3 h-3" />
+                  </Link>
                 </div>
 
-                {/* Funnel visualization */}
-                <div className="space-y-1">
-                  {(() => {
-                    const funnelStages = pipelineStats.byStage.filter(s => s.slug !== 'lost')
-                    const maxCount = Math.max(...funnelStages.map(s => s.count), 1)
-                    const colors = ['#06b6d4', '#0891b2', '#0e7490', '#155e75', '#22c55e']
+                {/* Dynamic proportional funnel */}
+                {(() => {
+                  const funnelStages = pipelineStats.byStage.filter(s => s.slug !== 'lost')
+                  const allZero = funnelStages.every(s => s.count === 0)
 
-                    return funnelStages.map((stage, idx) => {
-                      const widthPercent = Math.max((stage.count / maxCount) * 100, 20)
-                      const nextStage = funnelStages[idx + 1]
-                      const conversionRate = nextStage && stage.count > 0
-                        ? Math.round((nextStage.count / stage.count) * 100)
-                        : null
+                  if (allZero) {
+                    return (
+                      <div className="text-center py-6">
+                        <TrendingUp className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                        <p className="text-sm text-gray-400">Inga leads ännu</p>
+                        <p className="text-xs text-gray-300 mt-1">Din AI-assistent fyller på automatiskt</p>
+                      </div>
+                    )
+                  }
 
-                      return (
-                        <div key={stage.slug}>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="h-7 rounded-md flex items-center px-2 transition-all relative overflow-hidden"
-                              style={{
-                                width: `${widthPercent}%`,
-                                backgroundColor: colors[idx] || stage.color,
-                                marginLeft: `${(100 - widthPercent) / 2}%`,
-                              }}
+                  const maxCount = Math.max(...funnelStages.map(s => s.count), 1)
+
+                  // Proportional widths (percentage)
+                  const rawWidths = funnelStages.map(s =>
+                    s.count === 0 ? 12 : Math.max((s.count / maxCount) * 100, 18)
+                  )
+
+                  // Enforce strictly decreasing widths (funnel shape)
+                  const widths = [rawWidths[0]]
+                  for (let i = 1; i < rawWidths.length; i++) {
+                    const maxAllowed = widths[i - 1] - 4
+                    widths.push(Math.max(Math.min(rawWidths[i], maxAllowed), 12))
+                  }
+
+                  // Bottom edge of last stage tapers off
+                  const lastBottom = Math.max(widths[widths.length - 1] * 0.65, 10)
+
+                  // Gradient: light cyan → dark cyan, green for 'won'
+                  const palette = ['#67e8f9', '#22d3ee', '#06b6d4', '#0891b2', '#0e7490', '#155e75']
+                  const stageColors = funnelStages.map((s, i) =>
+                    s.slug === 'won' ? '#22c55e' : palette[Math.min(i, palette.length - 1)]
+                  )
+                  const textColors = funnelStages.map((s, i) =>
+                    s.slug === 'won' ? '#ffffff' : i < 2 ? '#0e7490' : '#ffffff'
+                  )
+
+                  return (
+                    <div>
+                      {funnelStages.map((stage, i) => {
+                        const topW = widths[i]
+                        const botW = i < widths.length - 1 ? widths[i + 1] : lastBottom
+                        const nextStage = funnelStages[i + 1]
+                        const conversion = nextStage && stage.count > 0
+                          ? Math.round((nextStage.count / stage.count) * 100)
+                          : null
+
+                        return (
+                          <div key={stage.slug}>
+                            <Link
+                              href={`/dashboard/pipeline?stage=${stage.slug}`}
+                              className="block relative"
+                              title={`${stage.stage}: ${stage.count} leads${stage.value > 0 ? ` \u00b7 ${formatCurrency(stage.value)} kr` : ''}`}
+                              style={{ height: '40px' }}
                             >
-                              <span className="text-xs font-medium text-white truncate">
-                                {stage.stage}
-                              </span>
-                            </div>
-                            <div className="flex-shrink-0 text-right min-w-[60px]">
-                              <span className="text-xs font-bold text-gray-900">{stage.count}</span>
-                              {stage.value > 0 && (
-                                <span className="text-xs text-gray-400 ml-1">
-                                  {formatCurrency(stage.value)}
+                              <div
+                                className="absolute inset-0 hover:brightness-110"
+                                style={{
+                                  background: stageColors[i],
+                                  clipPath: `polygon(${(100 - topW) / 2}% 0%, ${(100 + topW) / 2}% 0%, ${(100 + botW) / 2}% 100%, ${(100 - botW) / 2}% 100%)`,
+                                  transition: 'clip-path 0.7s ease-out, background 0.3s',
+                                }}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center gap-1.5 pointer-events-none">
+                                <span
+                                  className="text-xs font-semibold truncate"
+                                  style={{ color: textColors[i], maxWidth: `${topW * 0.45}%` }}
+                                >
+                                  {stage.stage}
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-xs font-bold" style={{ color: textColors[i] }}>
+                                  {stage.count}
+                                </span>
+                                {stage.value > 0 && topW > 50 && (
+                                  <span className="text-[10px] opacity-75 hidden sm:inline" style={{ color: textColors[i] }}>
+                                    {formatCurrency(stage.value)} kr
+                                  </span>
+                                )}
+                              </div>
+                            </Link>
+                            {conversion !== null && (
+                              <div className="flex justify-center -my-1 relative z-10">
+                                <span className="text-[10px] text-gray-400 bg-white px-1.5 rounded">
+                                  ↓ {conversion}%
+                                </span>
+                              </div>
+                            )}
                           </div>
-                          {conversionRate !== null && (
-                            <div className="text-center">
-                              <span className="text-[10px] text-gray-400">
-                                ↓ {conversionRate}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })
-                  })()}
-                </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
 
-                {/* Lost deals + summary */}
+                {/* Summary footer */}
                 <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="text-center">
@@ -597,7 +646,7 @@ export default function DashboardPage() {
                     )}
                   </div>
                 )}
-              </Link>
+              </div>
             )}
 
             {/* Snabblänkar */}
