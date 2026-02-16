@@ -13,6 +13,7 @@ import {
   Settings,
   Zap,
   LogOut,
+  HelpCircle,
   FileText,
   Receipt,
   ChevronDown,
@@ -261,6 +262,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           <div className="flex items-center gap-3">
             <Settings className={`w-5 h-5 ${isActive('/dashboard/settings') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Inställningar</span>
+          </div>
+        </Link>
+
+        {/* Hjälp */}
+        <Link href="/dashboard/help" className={navClass(isActive('/dashboard/help'))}>
+          <div className="flex items-center gap-3">
+            <HelpCircle className={`w-5 h-5 ${isActive('/dashboard/help') ? 'text-cyan-300' : ''}`} />
+            <span className="text-sm sm:text-base">Hjälp</span>
           </div>
         </Link>
       </nav>
