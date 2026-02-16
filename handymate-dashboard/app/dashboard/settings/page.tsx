@@ -2306,10 +2306,10 @@ export default function SettingsPage() {
 
         {activeTab === 'subscription' && (
           <div className="space-y-6">
-            {/* Nuvarande plan */}
+            {/* Nuvarande plan - snabbvy */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Din prenumeration</h2>
-              
+
               <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-300 rounded-xl mb-4 gap-4">
                 <div>
                   <p className="text-gray-900 font-semibold text-lg">{currentPlan}</p>
@@ -2329,51 +2329,35 @@ export default function SettingsPage() {
               </div>
 
               {config.subscription_status === 'trial' && trialDaysLeft !== null && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
                   <p className="text-amber-600 text-sm">
-                    ⏰ Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
+                    Din provperiod går ut om {trialDaysLeft} dagar. Uppgradera för att fortsätta använda tjänsten.
                   </p>
                 </div>
               )}
+
+              <Link
+                href="/dashboard/settings/billing"
+                className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Prenumeration & Fakturering</p>
+                    <p className="text-xs text-gray-500">Hantera plan, se användning och betalningshistorik</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+              </Link>
             </div>
 
             {/* SMS-användning */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">SMS-användning denna månad</h2>
-              
-              <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
-            </div>
 
-            {/* Planöversikt */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tillgängliga planer</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {[
-                  { name: 'Starter', price: '1 995', sms: 100, calls: 75 },
-                  { name: 'Professional', price: '4 995', sms: 500, calls: 300 },
-                  { name: 'Business', price: '9 995', sms: 2000, calls: 1000 }
-                ].map((plan) => (
-                  <div 
-                    key={plan.name}
-                    className={`p-4 rounded-xl border ${
-                      currentPlan === plan.name 
-                        ? 'bg-blue-50 border-blue-300' 
-                        : 'bg-gray-50 border-gray-300'
-                    }`}
-                  >
-                    <p className="font-semibold text-gray-900">{plan.name}</p>
-                    <p className="text-2xl font-bold text-gray-900 mt-1">{plan.price} <span className="text-sm text-gray-400">kr/mån</span></p>
-                    <div className="mt-3 space-y-1 text-sm text-gray-500">
-                      <p>✓ {plan.sms} SMS/mån</p>
-                      <p>✓ {plan.calls} samtal/mån</p>
-                    </div>
-                    {currentPlan === plan.name && (
-                      <p className="mt-3 text-xs text-blue-600 font-medium">Nuvarande plan</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
             </div>
           </div>
         )}
