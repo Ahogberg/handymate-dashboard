@@ -254,40 +254,55 @@ export default function NewQuotePage() {
     // Pre-fill form from template
     setTitle(template.name)
     setDescription(template.description || '')
-    const templateItems: QuoteItem[] = []
 
-    // Add labor item from template
-    if (template.estimated_hours && template.labor_cost) {
-      const hourlyRate = pricingSettings?.hourly_rate || 650
-      templateItems.push({
+    // Use rich items JSONB if available (new format)
+    if (template.items && Array.isArray(template.items) && template.items.length > 0) {
+      const richItems: QuoteItem[] = template.items.map((item: any) => ({
+        ...item,
         id: 'item_' + Math.random().toString(36).substr(2, 9),
-        type: 'labor',
-        name: template.name,
-        quantity: template.estimated_hours,
-        unit: 'hour',
-        unit_price: hourlyRate,
-        total: template.estimated_hours * hourlyRate
-      })
-    }
+        total: (item.quantity || 1) * (item.unit_price || 0)
+      }))
+      setItems(richItems)
+    } else {
+      // Fallback: old format with estimated_hours + materials array
+      const templateItems: QuoteItem[] = []
 
-    // Add material items from template
-    if (template.materials && Array.isArray(template.materials)) {
-      template.materials.forEach((mat: any) => {
+      if (template.estimated_hours && template.labor_cost) {
+        const hourlyRate = pricingSettings?.hourly_rate || 650
         templateItems.push({
           id: 'item_' + Math.random().toString(36).substr(2, 9),
-          type: 'material',
-          name: mat.name || mat.description || 'Material',
-          quantity: mat.quantity || 1,
-          unit: mat.unit || 'piece',
-          unit_price: mat.unitPrice || mat.unit_price || 0,
-          total: (mat.quantity || 1) * (mat.unitPrice || mat.unit_price || 0)
+          type: 'labor',
+          name: template.name,
+          quantity: template.estimated_hours,
+          unit: 'hour',
+          unit_price: hourlyRate,
+          total: template.estimated_hours * hourlyRate
         })
-      })
+      }
+
+      if (template.materials && Array.isArray(template.materials)) {
+        template.materials.forEach((mat: any) => {
+          templateItems.push({
+            id: 'item_' + Math.random().toString(36).substr(2, 9),
+            type: 'material',
+            name: mat.name || mat.description || 'Material',
+            quantity: mat.quantity || 1,
+            unit: mat.unit || 'piece',
+            unit_price: mat.unitPrice || mat.unit_price || 0,
+            total: (mat.quantity || 1) * (mat.unitPrice || mat.unit_price || 0)
+          })
+        })
+      }
+
+      setItems(templateItems)
     }
 
-    setItems(templateItems)
+    // Apply ROT/RUT type from template
+    if (template.rot_rut_type) {
+      setRotRutType(template.rot_rut_type)
+    }
 
-    // Increment usage count
+    // Increment usage count (fire-and-forget)
     fetch('/api/quotes/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
