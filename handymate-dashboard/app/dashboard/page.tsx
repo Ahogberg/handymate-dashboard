@@ -14,7 +14,8 @@ import {
   Mic,
   FolderKanban,
   MessageSquare,
-  Zap
+  Zap,
+  XCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -64,7 +65,10 @@ export default function DashboardPage() {
   const [callCount, setCallCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [activeProjects, setActiveProjects] = useState(0)
-  const [pipelineStats, setPipelineStats] = useState<{ totalDeals: number; totalValue: number; newLeadsToday: number; needsFollowUp: number } | null>(null)
+  const [pipelineStats, setPipelineStats] = useState<{
+    byStage: Array<{ stage: string; slug: string; color: string; count: number; value: number }>
+    totalDeals: number; totalValue: number; wonValue: number; lostCount: number; newLeadsToday: number; needsFollowUp: number
+  } | null>(null)
   const [scheduleToday, setScheduleToday] = useState<{ count: number; people: number; entries: { title: string; color: string; time: string }[] }>({ count: 0, people: 0, entries: [] })
   const [commStats, setCommStats] = useState<{ today: number; weekTotal: number; deliveryRate: number } | null>(null)
 
@@ -501,26 +505,88 @@ export default function DashboardPage() {
               )}
             </Link>
 
-            {/* Pipeline */}
-            {pipelineStats && (pipelineStats.totalDeals > 0 || pipelineStats.newLeadsToday > 0) && (
+            {/* Pipeline Funnel */}
+            {pipelineStats && pipelineStats.byStage && pipelineStats.byStage.length > 0 && (
               <Link href="/dashboard/pipeline" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
                     <TrendingUp className="w-4 h-4 text-blue-600" />
-                    Pipeline
+                    Säljtratt
                   </h3>
                   <ArrowRight className="w-3 h-3 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 bg-gray-50 rounded-lg text-center">
-                    <p className="text-lg font-bold text-gray-900">{pipelineStats.totalDeals}</p>
-                    <p className="text-xs text-gray-400">Aktiva deals</p>
-                  </div>
-                  <div className="p-2 bg-gray-50 rounded-lg text-center">
-                    <p className="text-lg font-bold text-gray-900">{formatCurrency(pipelineStats.totalValue)} kr</p>
-                    <p className="text-xs text-gray-400">Totalt värde</p>
-                  </div>
+
+                {/* Funnel visualization */}
+                <div className="space-y-1">
+                  {(() => {
+                    const funnelStages = pipelineStats.byStage.filter(s => s.slug !== 'lost')
+                    const maxCount = Math.max(...funnelStages.map(s => s.count), 1)
+                    const colors = ['#06b6d4', '#0891b2', '#0e7490', '#155e75', '#22c55e']
+
+                    return funnelStages.map((stage, idx) => {
+                      const widthPercent = Math.max((stage.count / maxCount) * 100, 20)
+                      const nextStage = funnelStages[idx + 1]
+                      const conversionRate = nextStage && stage.count > 0
+                        ? Math.round((nextStage.count / stage.count) * 100)
+                        : null
+
+                      return (
+                        <div key={stage.slug}>
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="h-7 rounded-md flex items-center px-2 transition-all relative overflow-hidden"
+                              style={{
+                                width: `${widthPercent}%`,
+                                backgroundColor: colors[idx] || stage.color,
+                                marginLeft: `${(100 - widthPercent) / 2}%`,
+                              }}
+                            >
+                              <span className="text-xs font-medium text-white truncate">
+                                {stage.stage}
+                              </span>
+                            </div>
+                            <div className="flex-shrink-0 text-right min-w-[60px]">
+                              <span className="text-xs font-bold text-gray-900">{stage.count}</span>
+                              {stage.value > 0 && (
+                                <span className="text-xs text-gray-400 ml-1">
+                                  {formatCurrency(stage.value)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {conversionRate !== null && (
+                            <div className="text-center">
+                              <span className="text-[10px] text-gray-400">
+                                ↓ {conversionRate}%
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
+
+                {/* Lost deals + summary */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-gray-900">{pipelineStats.totalDeals}</p>
+                      <p className="text-[10px] text-gray-400">Aktiva</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm font-bold text-emerald-600">{formatCurrency(pipelineStats.wonValue)} kr</p>
+                      <p className="text-[10px] text-gray-400">Vunnet</p>
+                    </div>
+                  </div>
+                  {pipelineStats.lostCount > 0 && (
+                    <div className="flex items-center gap-1 text-xs text-gray-400">
+                      <XCircle className="w-3 h-3 text-red-400" />
+                      {pipelineStats.lostCount} förlorade
+                    </div>
+                  )}
+                </div>
+
                 {(pipelineStats.newLeadsToday > 0 || pipelineStats.needsFollowUp > 0) && (
                   <div className="mt-2 space-y-1">
                     {pipelineStats.newLeadsToday > 0 && (

@@ -54,13 +54,11 @@ export interface PipelineActivity {
 }
 
 export const DEFAULT_STAGES = [
-  { slug: 'lead', name: 'Lead', color: '#8B5CF6', sort_order: 1, is_system: true, is_won: false, is_lost: false },
-  { slug: 'quote_sent', name: 'Offert skickad', color: '#F59E0B', sort_order: 2, is_system: true, is_won: false, is_lost: false },
-  { slug: 'accepted', name: 'Accepterad', color: '#10B981', sort_order: 3, is_system: true, is_won: false, is_lost: false },
-  { slug: 'in_progress', name: 'Pågår', color: '#3B82F6', sort_order: 4, is_system: true, is_won: false, is_lost: false },
-  { slug: 'ready_to_invoice', name: 'Faktureras', color: '#6366F1', sort_order: 5, is_system: true, is_won: false, is_lost: false },
-  { slug: 'invoiced', name: 'Fakturerad', color: '#EC4899', sort_order: 6, is_system: true, is_won: false, is_lost: false },
-  { slug: 'paid', name: 'Betalt', color: '#22C55E', sort_order: 7, is_system: true, is_won: true, is_lost: false },
+  { slug: 'lead', name: 'Ny lead', color: '#8B5CF6', sort_order: 1, is_system: true, is_won: false, is_lost: false },
+  { slug: 'contacted', name: 'Kontaktad', color: '#3B82F6', sort_order: 2, is_system: true, is_won: false, is_lost: false },
+  { slug: 'quote_sent', name: 'Offert skickad', color: '#F59E0B', sort_order: 3, is_system: true, is_won: false, is_lost: false },
+  { slug: 'negotiation', name: 'Förhandling', color: '#EC4899', sort_order: 4, is_system: true, is_won: false, is_lost: false },
+  { slug: 'won', name: 'Vunnen', color: '#22C55E', sort_order: 5, is_system: true, is_won: true, is_lost: false },
   { slug: 'lost', name: 'Förlorad', color: '#EF4444', sort_order: 99, is_system: true, is_won: false, is_lost: true },
 ]
 
@@ -73,7 +71,25 @@ export async function ensureDefaultStages(businessId: string): Promise<PipelineS
     .eq('business_id', businessId)
     .order('sort_order')
 
-  if (existing && existing.length > 0) return existing
+  if (existing && existing.length > 0) {
+    // Check if stages need migration (old 8-stage setup → new 6-stage)
+    const hasCurrent = existing.some((s: any) => s.slug === 'contacted' || s.slug === 'negotiation' || s.slug === 'won')
+    if (hasCurrent) return existing
+
+    // Check if any deals exist with old stages before migrating
+    const { count } = await supabase
+      .from('deal')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+
+    if (count && count > 0) {
+      // Deals exist — don't migrate, keep old stages
+      return existing
+    }
+
+    // No deals — safe to replace stages
+    await supabase.from('pipeline_stage').delete().eq('business_id', businessId)
+  }
 
   const stages = DEFAULT_STAGES.map(s => ({
     business_id: businessId,

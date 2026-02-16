@@ -22,37 +22,50 @@ export async function GET(request: NextRequest) {
     // Ensure stages exist
     const stages = await ensureDefaultStages(business.business_id)
 
-    // Fetch deals with customer join
+    // Fetch deals
     let query = supabase
       .from('deal')
-      .select('*, customer:customer_id(customer_id, name, phone_number, email)')
+      .select('*')
       .eq('business_id', business.business_id)
 
-    // Apply filters
     if (search) {
       query = query.ilike('title', `%${search}%`)
     }
-
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo)
     }
-
     if (priority) {
       query = query.eq('priority', priority)
     }
 
     const { data: deals, error } = await query
-
     if (error) throw error
 
-    // Group deals by stage_id
+    // Fetch customer data separately (no FK on deal table)
+    const customerIds = Array.from(new Set((deals || []).map((d: any) => d.customer_id).filter(Boolean)))
+    const customerMap: Record<string, any> = {}
+    if (customerIds.length > 0) {
+      const { data: customers } = await supabase
+        .from('customer')
+        .select('customer_id, name, phone_number, email')
+        .in('customer_id', customerIds)
+      for (const c of (customers || [])) {
+        customerMap[c.customer_id] = c
+      }
+    }
+
+    // Group deals by stage_id and attach customer
     const dealsByStage: Record<string, any[]> = {}
     for (const stage of stages) {
       dealsByStage[stage.id] = []
     }
     for (const deal of deals || []) {
+      const enrichedDeal = {
+        ...deal,
+        customer: deal.customer_id ? customerMap[deal.customer_id] || null : null
+      }
       if (dealsByStage[deal.stage_id]) {
-        dealsByStage[deal.stage_id].push(deal)
+        dealsByStage[deal.stage_id].push(enrichedDeal)
       }
     }
 
