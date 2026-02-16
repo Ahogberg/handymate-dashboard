@@ -26,27 +26,35 @@ export default function QuotesPage() {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'accepted'>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetchQuotes()
   }, [business.business_id])
 
   async function fetchQuotes() {
-    const { data } = await supabase
-      .from('quotes')
-      .select('*, customer(name, phone_number)')
-      .eq('business_id', business.business_id)
-      .order('created_at', { ascending: false })
-
-    setQuotes(data || [])
+    try {
+      const res = await fetch('/api/quotes')
+      if (res.ok) {
+        const data = await res.json()
+        setQuotes(data.quotes || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch quotes:', err)
+    }
     setLoading(false)
   }
 
   const filteredQuotes = quotes.filter(q => {
-    if (filter === 'all') return true
-    if (filter === 'draft') return q.status === 'draft'
-    if (filter === 'sent') return ['sent', 'opened'].includes(q.status)
-    if (filter === 'accepted') return q.status === 'accepted'
+    if (filter === 'draft' && q.status !== 'draft') return false
+    if (filter === 'sent' && !['sent', 'opened'].includes(q.status)) return false
+    if (filter === 'accepted' && q.status !== 'accepted') return false
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      const matchTitle = q.title?.toLowerCase().includes(query)
+      const matchCustomer = q.customer?.name?.toLowerCase().includes(query)
+      if (!matchTitle && !matchCustomer) return false
+    }
     return true
   })
 
@@ -151,21 +159,33 @@ export default function QuotesPage() {
           </div>
         </div>
 
-        {/* Filter */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          {(['all', 'draft', 'sent', 'accepted'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
-                filter === f
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:text-white'
-              }`}
-            >
-              {f === 'all' ? 'Alla' : f === 'draft' ? 'Utkast' : f === 'sent' ? 'Skickade' : 'Accepterade'}
-            </button>
-          ))}
+        {/* Search + Filter */}
+        <div className="flex flex-col sm:flex-row gap-3 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Sök offert eller kund..."
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+          <div className="flex gap-2 overflow-x-auto">
+            {(['all', 'draft', 'sent', 'accepted'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                  filter === f
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {f === 'all' ? 'Alla' : f === 'draft' ? 'Utkast' : f === 'sent' ? 'Skickade' : 'Accepterade'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Quotes List */}

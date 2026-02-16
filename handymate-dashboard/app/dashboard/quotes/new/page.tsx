@@ -385,51 +385,46 @@ export default function NewQuotePage() {
   const customerPays = total - rotRutDeduction
 
   const saveQuote = async (send: boolean = false) => {
-    if (!selectedCustomer) {
-      alert('Välj en kund först')
+    if (send && !selectedCustomer) {
+      alert('Välj en kund först för att skicka offerten')
       return
     }
 
     setSaving(true)
-    const quoteId = 'quote_' + Math.random().toString(36).substr(2, 9)
-    const validUntil = new Date()
-    validUntil.setDate(validUntil.getDate() + validDays)
-
-    const { error } = await supabase.from('quotes').insert({
-      quote_id: quoteId,
-      business_id: business.business_id,
-      customer_id: selectedCustomer,
-      status: send ? 'sent' : 'draft',
-      title,
-      description,
-      items,
-      labor_total: laborTotal,
-      material_total: materialTotal,
-      subtotal,
-      discount_percent: discountPercent,
-      discount_amount: discountAmount,
-      vat_rate: pricingSettings?.vat_rate || 25,
-      vat_amount: vatAmount,
-      total,
-      rot_rut_type: rotRutType || null,
-      rot_rut_eligible: rotRutEligible,
-      rot_rut_deduction: rotRutDeduction,
-      customer_pays: customerPays,
-      personnummer: rotRutType ? personnummer || null : null,
-      fastighetsbeteckning: rotRutType ? fastighetsbeteckning || null : null,
-      valid_until: validUntil.toISOString().split('T')[0],
-      sent_at: send ? new Date().toISOString() : null,
-      ai_generated: aiGenerated || null,
-      ai_confidence: aiResult?.confidence || null,
-      source_image_url: null,
-      source_transcript: sourceTranscript || null
-    })
-
-    if (error) {
-      console.error('Save failed:', error)
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: selectedCustomer || null,
+          status: send ? 'sent' : 'draft',
+          title,
+          description,
+          items,
+          vat_rate: pricingSettings?.vat_rate || 25,
+          discount_percent: discountPercent,
+          rot_rut_type: rotRutType || null,
+          personnummer: rotRutType ? personnummer || null : null,
+          fastighetsbeteckning: rotRutType ? fastighetsbeteckning || null : null,
+          valid_days: validDays,
+          ai_generated: aiGenerated || false,
+          ai_confidence: aiResult?.confidence || null,
+          source_transcript: sourceTranscript || null,
+          terms: {
+            payment_terms: pricingSettings?.payment_terms || 30,
+            warranty_years: pricingSettings?.warranty_years || 2,
+          },
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        alert(data.error || 'Kunde inte spara offerten')
+      } else {
+        router.push(`/dashboard/quotes/${data.quote.quote_id}`)
+      }
+    } catch (err) {
+      console.error('Save failed:', err)
       alert('Kunde inte spara offerten')
-    } else {
-      router.push('/dashboard/quotes')
     }
     setSaving(false)
   }
@@ -438,15 +433,11 @@ export default function NewQuotePage() {
     if (!templateName.trim()) return
     setSavingTemplate(true)
 
-    const materialItems = items.filter(i => i.type === 'material').map(i => ({
-      name: i.name,
-      quantity: i.quantity,
-      unit: i.unit,
-      unitPrice: i.unit_price
-    }))
-
     const laborItems = items.filter(i => i.type === 'labor')
     const totalHours = laborItems.reduce((sum, i) => sum + i.quantity, 0)
+    const materialItems = items.filter(i => i.type === 'material').map(i => ({
+      name: i.name, quantity: i.quantity, unit: i.unit, unitPrice: i.unit_price
+    }))
 
     try {
       await fetch('/api/quotes/templates', {
@@ -458,7 +449,13 @@ export default function NewQuotePage() {
           estimatedHours: totalHours,
           laborCost: laborTotal,
           materials: materialItems,
-          totalEstimate: subtotal
+          totalEstimate: subtotal,
+          items,
+          rot_rut_type: rotRutType || null,
+          terms: {
+            payment_terms: pricingSettings?.payment_terms || 30,
+            warranty_years: pricingSettings?.warranty_years || 2,
+          },
         })
       })
       setShowSaveTemplateModal(false)
@@ -770,7 +767,18 @@ export default function NewQuotePage() {
                         onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
                         className="w-16 px-2 py-1.5 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                       />
-                      <span className="text-gray-400 text-sm w-8">{item.unit === 'hour' ? 'h' : 'st'}</span>
+                      <select
+                        value={item.unit}
+                        onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
+                        className="w-20 px-1 py-1.5 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      >
+                        <option value="hour">tim</option>
+                        <option value="piece">st</option>
+                        <option value="m2">m²</option>
+                        <option value="m">m</option>
+                        <option value="lm">lm</option>
+                        <option value="pauschal">pauschal</option>
+                      </select>
                       <input
                         type="number"
                         value={item.unit_price}
