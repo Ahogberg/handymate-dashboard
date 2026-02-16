@@ -1,16 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 
 // Force dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 interface InvoiceItem {
   description: string
@@ -32,7 +25,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const invoiceId = request.nextUrl.searchParams.get('invoiceId')
 
     if (!invoiceId) {

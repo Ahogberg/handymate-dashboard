@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 /**
  * GET - Hämta sammanfattad tidrapport
@@ -22,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const startDate = request.nextUrl.searchParams.get('startDate')
     const endDate = request.nextUrl.searchParams.get('endDate')
     const groupBy = request.nextUrl.searchParams.get('groupBy') || 'date'

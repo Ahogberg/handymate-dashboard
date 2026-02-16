@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useVoiceCommand } from '@/hooks/useVoiceCommand'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 
 interface CommandHistory {
   id: string
@@ -44,6 +45,7 @@ const quickCommands = [
 export default function AssistantPage() {
   const router = useRouter()
   const business = useBusiness()
+  const toast = useToast()
 
   const [isProcessing, setIsProcessing] = useState(false)
   const [currentResponse, setCurrentResponse] = useState<CommandResponse | null>(null)
@@ -133,7 +135,7 @@ export default function AssistantPage() {
 
         case 'send_reminder':
           // TODO: Implement send reminder action
-          alert('Påminnelse-funktion kommer snart!')
+          toast.info('Påminnelse-funktion kommer snart!')
           break
 
         case 'get_stats':

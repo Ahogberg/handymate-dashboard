@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Loader2,
 } from 'lucide-react'
+import { useToast } from '@/components/Toast'
 
 interface OnboardingChecklistProps {
   businessId: string
@@ -54,6 +55,7 @@ export default function OnboardingChecklist({
   onDismiss,
   onUpdate,
 }: OnboardingChecklistProps) {
+  const toast = useToast()
   const [loading, setLoading] = useState<string | null>(null)
   const [resendingEmail, setResendingEmail] = useState(false)
 
@@ -85,9 +87,9 @@ export default function OnboardingChecklist({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ action: 'resend_verification' }),
             })
-            alert('Verifieringsmail skickat!')
+            toast.success('Verifieringsmail skickat!')
           } catch (e) {
-            alert('Kunde inte skicka mail')
+            toast.error('Kunde inte skicka mail')
           }
           setResendingEmail(false)
         },
@@ -164,7 +166,7 @@ export default function OnboardingChecklist({
         href: '#test-call-instructions',
         onClick: () => {
           // Show test call modal or instructions
-          alert(`Ring ${businessConfig.assigned_phone_number || 'ditt tilldelade nummer'} för att testa AI-assistenten.`)
+          toast.info(`Ring ${businessConfig.assigned_phone_number || 'ditt tilldelade nummer'} för att testa AI-assistenten.`)
         },
       },
     },

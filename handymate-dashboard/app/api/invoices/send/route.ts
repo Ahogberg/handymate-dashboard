@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -25,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const resend = getResend()
     const body = await request.json()
     const { invoice_id, send_sms = false, send_email = true } = body

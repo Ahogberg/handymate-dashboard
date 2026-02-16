@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 
 interface Customer {
@@ -804,6 +805,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
   onClose: () => void
   onSaved: () => void
 }) {
+  const toast = useToast()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
 
@@ -839,11 +841,11 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
 
         onSaved()
       } else {
-        alert('Kunde inte skicka SMS')
+        toast.error('Kunde inte skicka SMS')
         setSending(false)
       }
     } catch {
-      alert('Något gick fel')
+      toast.error('Något gick fel')
       setSending(false)
     }
   }

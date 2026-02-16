@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 /**
  * GET - Hämta arbetstyper för företaget
@@ -19,7 +12,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { data, error } = await supabase
       .from('work_type')
       .select('*')
@@ -45,7 +38,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { name, multiplier, billable_default } = await request.json()
 
     if (!name?.trim()) {
@@ -93,7 +86,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { work_type_id, name, multiplier, billable_default } = await request.json()
 
     if (!work_type_id) {
@@ -131,7 +124,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const workTypeId = request.nextUrl.searchParams.get('id')
 
     if (!workTypeId) {

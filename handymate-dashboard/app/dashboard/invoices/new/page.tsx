@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 
 interface Customer {
@@ -48,6 +49,7 @@ export default function NewInvoicePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
+  const toast = useToast()
 
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -171,7 +173,7 @@ export default function NewInvoicePage() {
 
   const handleCreate = async () => {
     if (items.length === 0) {
-      alert('Lägg till minst en rad')
+      toast.warning('Lägg till minst en rad')
       return
     }
 
@@ -196,7 +198,7 @@ export default function NewInvoicePage() {
       const data = await response.json()
       router.push(`/dashboard/invoices/${data.invoice.invoice_id}`)
     } catch (error) {
-      alert('Något gick fel')
+      toast.error('Något gick fel')
     } finally {
       setCreating(false)
     }

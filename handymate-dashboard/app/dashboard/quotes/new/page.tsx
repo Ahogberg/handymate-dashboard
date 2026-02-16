@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
@@ -75,6 +76,7 @@ export default function NewQuotePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
+  const toast = useToast()
 
   const [customers, setCustomers] = useState<Customer[]>([])
   const [priceList, setPriceList] = useState<PriceItem[]>([])
@@ -197,12 +199,12 @@ export default function NewQuotePage() {
         setAiGenerated(true)
         setWizardStep('ai-preview')
       } else {
-        alert(data.error || 'AI-generering misslyckades')
+        toast.error(data.error || 'AI-generering misslyckades')
         setWizardStep('select')
       }
     } catch (err) {
       console.error('AI generation failed:', err)
-      alert('Nätverksfel vid AI-generering')
+      toast.error('Nätverksfel vid AI-generering')
       setWizardStep('select')
     }
     setGenerating(false)
@@ -239,12 +241,12 @@ export default function NewQuotePage() {
         setPriceComparison(data.priceComparison)
         setAiGenerated(true)
       } else {
-        alert(data.error || 'AI-generering misslyckades')
+        toast.error(data.error || 'AI-generering misslyckades')
         setWizardStep('text')
       }
     } catch (err) {
       console.error('AI generation failed:', err)
-      alert('Nätverksfel vid AI-generering')
+      toast.error('Nätverksfel vid AI-generering')
       setWizardStep('text')
     }
     setGenerating(false)
@@ -401,7 +403,7 @@ export default function NewQuotePage() {
 
   const saveQuote = async (send: boolean = false) => {
     if (send && !selectedCustomer) {
-      alert('Välj en kund först för att skicka offerten')
+      toast.warning('Välj en kund först för att skicka offerten')
       return
     }
 
@@ -433,13 +435,13 @@ export default function NewQuotePage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        alert(data.error || 'Kunde inte spara offerten')
+        toast.error(data.error || 'Kunde inte spara offerten')
       } else {
         router.push(`/dashboard/quotes/${data.quote.quote_id}`)
       }
     } catch (err) {
       console.error('Save failed:', err)
-      alert('Kunde inte spara offerten')
+      toast.error('Kunde inte spara offerten')
     }
     setSaving(false)
   }

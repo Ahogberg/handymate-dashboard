@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 
 interface Supplier {
@@ -44,6 +45,7 @@ export default function NewOrderPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
+  const toast = useToast()
 
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -174,7 +176,7 @@ export default function NewOrderPage() {
 
   const handleCreate = async () => {
     if (items.length === 0) {
-      alert('Lägg till minst en produkt')
+      toast.warning('Lägg till minst en produkt')
       return
     }
 
@@ -196,7 +198,7 @@ export default function NewOrderPage() {
 
       router.push('/dashboard/orders')
     } catch (error) {
-      alert('Något gick fel')
+      toast.error('Något gick fel')
     } finally {
       setCreating(false)
     }

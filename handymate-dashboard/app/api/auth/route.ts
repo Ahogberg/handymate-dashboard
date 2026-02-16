@@ -1,16 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
-
-// Admin client för att skapa business_config (runtime initialization)
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +53,7 @@ if (action === 'register') {
   // Get branch-specific knowledge base defaults
   const knowledgeBase = getKnowledgeForBranch(branch)
 
-  const supabaseAdmin = getSupabaseAdmin()
+  const supabaseAdmin = getServerSupabase()
   const { error: businessError } = await supabaseAdmin
     .from('business_config')
     .insert({
@@ -84,7 +76,7 @@ if (action === 'register') {
 
   if (businessError) {
     console.error('Business error:', businessError)
-    await getSupabaseAdmin().auth.admin.deleteUser(authData.user.id)
+    await getServerSupabase().auth.admin.deleteUser(authData.user.id)
     return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
   }
 
@@ -116,7 +108,7 @@ if (action === 'login') {
   }
 
   // Hämta business_config
-  const { data: business, error: businessError } = await getSupabaseAdmin()
+  const { data: business, error: businessError } = await getServerSupabase()
     .from('business_config')
     .select('business_id, business_name, contact_name')
     .eq('user_id', authData.user.id)
@@ -149,7 +141,7 @@ if (action === 'login') {
       }
 
       // Hämta business_config
-      const { data: business } = await getSupabaseAdmin()
+      const { data: business } = await getServerSupabase()
         .from('business_config')
         .select('business_id, business_name, contact_name, contact_email')
         .eq('user_id', session.user.id)

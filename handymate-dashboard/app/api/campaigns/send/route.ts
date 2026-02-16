@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -47,7 +40,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { campaignId } = await request.json()
 
     // Hämta kampanj och verifiera ägarskap

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 
 interface Customer {
@@ -36,7 +37,8 @@ type FilterType = 'all' | 'inactive_30' | 'inactive_90' | 'manual'
 export default function NewCampaignPage() {
   const router = useRouter()
   const business = useBusiness()
-  
+  const toast = useToast()
+
   const [step, setStep] = useState(1)
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -207,7 +209,7 @@ const { error: campaignError } = await supabase
 
     } catch (error) {
       console.error('Error sending campaign:', error)
-      alert('Något gick fel. Försök igen.')
+      toast.error('Något gick fel. Försök igen.')
     } finally {
       setSending(false)
     }

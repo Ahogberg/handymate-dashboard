@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
 
 /**
  * POST - Uppdatera öppettider under onboarding
@@ -14,7 +7,7 @@ function getSupabase() {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { businessId, working_hours } = await request.json()
 
     if (!businessId) {

@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import {
   isFortnoxConnected,
   createFortnoxCustomer,
   FortnoxCustomer
 } from '@/lib/fortnox'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 interface Customer {
   customer_id: string
@@ -30,7 +24,7 @@ interface Customer {
 export async function POST(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
 
     // Get user from auth cookie
     const authCookie = cookieStore.get('sb-access-token')?.value ||

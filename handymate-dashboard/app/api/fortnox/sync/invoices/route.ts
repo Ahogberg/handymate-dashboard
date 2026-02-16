@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { isFortnoxConnected, syncInvoiceToFortnox } from '@/lib/fortnox'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 /**
  * POST /api/fortnox/sync/invoices
@@ -24,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const adminSupabase = getSupabase()
+    const adminSupabase = getServerSupabase()
     const { data: business } = await adminSupabase
       .from('business_config')
       .select('business_id')

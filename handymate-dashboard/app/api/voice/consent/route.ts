@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
 
@@ -16,34 +9,34 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
-    const { searchParams } = new URL(request.url)
-    const business_id = searchParams.get('business_id')
+    const supabase = getServerSupabase()
 
     const formData = await request.formData()
     const from = formData.get('from') as string
     const to = formData.get('to') as string
     const callId = formData.get('callid') as string
 
-    console.log('Consent IVR:', { business_id, from, to, callId })
+    console.log('Consent IVR:', { from, to, callId })
 
-    if (!business_id) {
-      return NextResponse.json({ "hangup": "no_business_id" })
+    if (!to) {
+      return NextResponse.json({ "hangup": "no_called_number" })
     }
 
-    // Hämta business-config
+    // Derive business_id from the called phone number (assigned_phone_number)
+    // instead of trusting the query parameter, to prevent business_id injection
     const { data: business, error } = await supabase
       .from('business_config')
       .select(`
+        business_id,
         forward_phone_number,
         call_recording_consent_message,
         assigned_phone_number
       `)
-      .eq('business_id', business_id)
+      .eq('assigned_phone_number', to)
       .single()
 
     if (error || !business) {
-      console.error('Business not found:', business_id)
+      console.error('Business not found for phone number:', to)
       return NextResponse.json({ "hangup": "business_not_found" })
     }
 

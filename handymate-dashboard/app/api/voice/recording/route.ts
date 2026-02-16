@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
 
@@ -16,7 +9,7 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const formData = await request.formData()
 
     const callId = formData.get('callid') as string

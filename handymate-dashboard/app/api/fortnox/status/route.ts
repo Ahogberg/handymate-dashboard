@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getFortnoxConfig } from '@/lib/fortnox'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 /**
  * GET /api/fortnox/status
@@ -17,7 +11,7 @@ function getSupabase() {
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
 
     // Get user from auth cookie
     const authCookie = cookieStore.get('sb-access-token')?.value ||

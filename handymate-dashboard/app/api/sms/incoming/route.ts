@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 function getAnthropic() {
   return new Anthropic({
@@ -40,7 +33,7 @@ async function sendSMS(to: string, message: string, from: string): Promise<boole
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const anthropic = getAnthropic()
     // 46elks skickar form-data
     const formData = await request.formData()

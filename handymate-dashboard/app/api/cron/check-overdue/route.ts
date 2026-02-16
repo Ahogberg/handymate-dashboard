@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 
 interface OverdueInvoice {
   invoice_id: string
@@ -7,28 +7,29 @@ interface OverdueInvoice {
   due_date: string
 }
 
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
 /**
  * GET/POST - Check and mark overdue invoices
  * Can be called by Vercel Cron or manually
  */
 export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return checkOverdueInvoices()
 }
 
 export async function POST(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return checkOverdueInvoices()
 }
 
 async function checkOverdueInvoices() {
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const today = new Date().toISOString().split('T')[0]
 
     // Find all sent invoices where due_date has passed

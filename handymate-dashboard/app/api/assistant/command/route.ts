@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 function getAnthropic() {
   return new Anthropic({
@@ -48,7 +41,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing text' }, { status: 400 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const anthropic = getAnthropic()
 
     // Hämta kontext om företaget och kunder

@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -18,22 +11,56 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const { businessId, forward_phone_number, call_mode, phone_setup_type } = await request.json()
 
     if (!businessId) {
       return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
     }
 
-    // Verifiera att businessId finns och skapades nyligen (inom 1 timme)
+    // Authenticate the user via Supabase auth token
+    const authHeader = request.headers.get('authorization')
+    const cookieHeader = request.headers.get('cookie')
+    let accessToken: string | null = null
+
+    if (authHeader?.startsWith('Bearer ')) {
+      accessToken = authHeader.substring(7)
+    } else if (cookieHeader) {
+      const sbCookie = cookieHeader.match(/sb-[^=]+-auth-token=([^;]+)/)
+      if (sbCookie) {
+        try {
+          const decoded = decodeURIComponent(sbCookie[1])
+          const parsed = JSON.parse(decoded)
+          accessToken = parsed[0]
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken)
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Verifiera att businessId finns, belongs to the authenticated user, och skapades nyligen
     const { data: business, error: fetchError } = await supabase
       .from('business_config')
-      .select('business_id, assigned_phone_number, business_name, created_at')
+      .select('business_id, assigned_phone_number, business_name, created_at, user_id')
       .eq('business_id', businessId)
       .single()
 
     if (fetchError || !business) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    }
+
+    // Verify that the authenticated user owns this business
+    if (business.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
     // Kolla att kontot skapades nyligen (inom 1 timme)

@@ -1,13 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
 
 /**
  * GET - Hämta telefoninställningar för ett företag
@@ -20,7 +13,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
 
     const { data, error } = await supabase
       .from('business_config')
@@ -63,7 +56,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }
 
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     const body = await request.json()
     const {
       forward_phone_number,

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
@@ -68,6 +69,7 @@ export default function EditQuotePage() {
   const params = useParams()
   const router = useRouter()
   const business = useBusiness()
+  const toast = useToast()
   const quoteId = params.id as string
 
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -274,7 +276,7 @@ export default function EditQuotePage() {
 
   const saveQuote = async (send: boolean = false) => {
     if (send && !selectedCustomer) {
-      alert('Välj en kund först för att skicka offerten')
+      toast.warning('Välj en kund först för att skicka offerten')
       return
     }
 
@@ -302,14 +304,14 @@ export default function EditQuotePage() {
       })
       if (!res.ok) {
         const data = await res.json()
-        alert(data.error || 'Kunde inte spara offerten')
+        toast.error(data.error || 'Kunde inte spara offerten')
       } else {
         dirtyRef.current = false
         router.push(`/dashboard/quotes/${quoteId}`)
       }
     } catch (err) {
       console.error('Save failed:', err)
-      alert('Kunde inte spara offerten')
+      toast.error('Kunde inte spara offerten')
     }
     setSaving(false)
   }

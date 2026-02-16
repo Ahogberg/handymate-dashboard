@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
+import { getServerSupabase } from '@/lib/supabase'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -54,7 +47,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabase()
+    const supabase = getServerSupabase()
     // Hitta bokningar som är 24h fram (med 1h marginal)
     const now = new Date()
     const in23Hours = new Date(now.getTime() + 23 * 60 * 60 * 1000)
