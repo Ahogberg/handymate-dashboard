@@ -23,7 +23,8 @@ import {
   FolderKanban,
   Link2,
   PenTool,
-  Bookmark
+  Bookmark,
+  Copy
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -85,6 +86,7 @@ export default function QuoteDetailPage() {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
+  const [duplicating, setDuplicating] = useState(false)
 
   const saveAsTemplate = async () => {
     if (!quote || !templateName.trim()) return
@@ -120,13 +122,15 @@ export default function QuoteDetailPage() {
   }, [quoteId])
 
   async function fetchQuote() {
-    const { data } = await supabase
-      .from('quotes')
-      .select('*, customer(*)')
-      .eq('quote_id', quoteId)
-      .single()
-
-    setQuote(data)
+    try {
+      const res = await fetch(`/api/quotes?quoteId=${quoteId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setQuote(data.quote || null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch quote:', err)
+    }
     setLoading(false)
   }
 
@@ -199,8 +203,57 @@ export default function QuoteDetailPage() {
   const deleteQuote = async () => {
     if (!confirm('Är du säker på att du vill ta bort denna offert?')) return
 
-    await supabase.from('quotes').delete().eq('quote_id', quoteId)
-    router.push('/dashboard/quotes')
+    try {
+      await fetch(`/api/quotes?quoteId=${quoteId}`, { method: 'DELETE' })
+      router.push('/dashboard/quotes')
+    } catch {
+      showToast('Kunde inte ta bort offerten', 'error')
+    }
+  }
+
+  const duplicateQuote = async () => {
+    if (!quote) return
+    setDuplicating(true)
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ duplicate_from: quote.quote_id })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        showToast('Offert duplicerad!', 'success')
+        router.push(`/dashboard/quotes/${data.quote.quote_id}/edit`)
+      } else {
+        showToast('Kunde inte duplicera offerten', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setDuplicating(false)
+  }
+
+  const previewPDF = async () => {
+    if (!quote) return
+    setGeneratingPdf(true)
+    try {
+      const response = await fetch('/api/quotes/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote.quote_id })
+      })
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        window.open(url, '_blank')
+        showToast('PDF öppnad i ny flik', 'success')
+      } else {
+        showToast('Kunde inte generera förhandsgranskning', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setGeneratingPdf(false)
   }
 
   const createInvoiceFromQuote = async () => {
@@ -293,6 +346,18 @@ export default function QuoteDetailPage() {
     return new Date(date).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 
+  const getUnitLabel = (unit: string) => {
+    switch (unit) {
+      case 'hour': return 'tim'
+      case 'piece': return 'st'
+      case 'm2': return 'm²'
+      case 'm': return 'm'
+      case 'lm': return 'lm'
+      case 'pauschal': return 'pauschal'
+      default: return unit || 'st'
+    }
+  }
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
@@ -354,7 +419,12 @@ export default function QuoteDetailPage() {
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{quote.title || 'Offert'}</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                {quote.title || 'Offert'}
+                {(quote as any).quote_number && (
+                  <span className="ml-2 text-sm font-normal text-gray-400">{(quote as any).quote_number}</span>
+                )}
+              </h1>
               <p className="text-sm text-gray-500">Skapad {formatDate(quote.created_at)}</p>
             </div>
           </div>
@@ -415,12 +485,35 @@ export default function QuoteDetailPage() {
               </button>
             </>
           )}
+          <Link
+            href={`/dashboard/quotes/${quote.quote_id}/edit`}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+          >
+            <Edit className="w-4 h-4" />
+            Redigera
+          </Link>
+          <button
+            onClick={duplicateQuote}
+            disabled={duplicating}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+          >
+            {duplicating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
+            Duplicera
+          </button>
+          <button
+            onClick={previewPDF}
+            disabled={generatingPdf}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+          >
+            {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
+            Förhandsgranska
+          </button>
           <button
             onClick={generatePDF}
             disabled={generatingPdf}
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
-            {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            <Download className="w-4 h-4" />
             Ladda ner PDF
           </button>
           <button
@@ -431,22 +524,13 @@ export default function QuoteDetailPage() {
             Spara mall
           </button>
           {quote.status === 'draft' && (
-            <>
-              <Link
-                href={`/dashboard/quotes/${quote.quote_id}/edit`}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
-              >
-                <Edit className="w-4 h-4" />
-                Redigera
-              </Link>
-              <button
-                onClick={deleteQuote}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-red-600 hover:bg-red-500/10 hover:border-red-500/30"
-              >
-                <Trash2 className="w-4 h-4" />
-                Ta bort
-              </button>
-            </>
+            <button
+              onClick={deleteQuote}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-red-600 hover:bg-red-500/10 hover:border-red-500/30"
+            >
+              <Trash2 className="w-4 h-4" />
+              Ta bort
+            </button>
           )}
         </div>
 
@@ -511,7 +595,7 @@ export default function QuoteDetailPage() {
                       <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                         <div>
                           <p className="text-gray-900">{item.name}</p>
-                          <p className="text-sm text-gray-400">{item.quantity} {item.unit === 'hour' ? 'timmar' : 'st'} × {formatCurrency(item.unit_price)}</p>
+                          <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
                         </div>
                         <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                       </div>
@@ -529,7 +613,7 @@ export default function QuoteDetailPage() {
                       <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                         <div>
                           <p className="text-gray-900">{item.name}</p>
-                          <p className="text-sm text-gray-400">{item.quantity} st × {formatCurrency(item.unit_price)}</p>
+                          <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
                         </div>
                         <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                       </div>
@@ -606,6 +690,30 @@ export default function QuoteDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Signature Info */}
+            {(quote as any).signature_data && (
+              <div className="bg-white shadow-sm rounded-xl border border-emerald-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <PenTool className="w-5 h-5 text-emerald-600" />
+                  E-signerad
+                </h2>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{(quote as any).signed_by_name}</p>
+                    <p className="text-xs text-gray-500">{(quote as any).signed_at && formatDate((quote as any).signed_at)}</p>
+                  </div>
+                </div>
+                {(quote as any).signature_data && (
+                  <div className="bg-gray-50 rounded-lg p-2">
+                    <img src={(quote as any).signature_data} alt="Signatur" className="max-h-16 mx-auto" />
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Timeline */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
