@@ -3,6 +3,7 @@
 import Sidebar from '@/components/Sidebar'
 import AICopilot from '@/components/AICopilot'
 import WelcomeModal from '@/components/WelcomeModal'
+import FeedbackWidget from '@/components/FeedbackWidget'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { useAuth } from '@/lib/useAuth'
@@ -40,6 +41,7 @@ export default function DashboardLayout({
               </main>
               <AICopilot />
               <WelcomeModal businessName={business.business_name} />
+              <FeedbackWidget />
             </div>
           </ToastProvider>
         </ErrorBoundary>
