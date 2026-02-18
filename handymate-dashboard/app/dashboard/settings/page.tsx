@@ -74,6 +74,10 @@ interface BusinessConfig {
   default_hourly_rate: number
   time_rounding_minutes: number
   time_require_description: boolean
+  // Auto-faktura
+  auto_invoice_enabled: boolean
+  auto_invoice_send: boolean
+  auto_invoice_max_amount: number
 }
 
 interface FortnoxStatus {
@@ -117,6 +121,66 @@ const SERVICE_SUGGESTIONS = [
   'Målning', 'Tapetsering', 'Snickeri', 'Golvläggning',
   'Låsbyte', 'Inbrottsskydd', 'Städning', 'Fönsterputs'
 ]
+
+function AutoInvoiceButton({ businessId, autoSend, maxAmount }: { businessId: string; autoSend: boolean; maxAmount: number }) {
+  const [running, setRunning] = useState(false)
+  const [result, setResult] = useState<{ invoices_created: number; invoices: { customer_name: string; total: number }[]; errors: string[] } | null>(null)
+
+  async function runAutoGenerate() {
+    setRunning(true)
+    setResult(null)
+    try {
+      const res = await fetch('/api/invoices/auto-generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ auto_send: autoSend, max_amount: maxAmount }),
+      })
+      const data = await res.json()
+      setResult(data)
+    } catch {
+      setResult({ invoices_created: 0, invoices: [], errors: ['Nätverksfel'] })
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div>
+      <button
+        onClick={runAutoGenerate}
+        disabled={running}
+        className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+      >
+        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+        {running ? 'Genererar...' : 'Generera fakturor nu'}
+      </button>
+
+      {result && (
+        <div className="mt-3 p-3 bg-gray-50 rounded-xl text-sm">
+          {result.invoices_created > 0 ? (
+            <>
+              <p className="font-medium text-emerald-700">
+                {result.invoices_created} faktura{result.invoices_created > 1 ? 'or' : ''} skapad{result.invoices_created > 1 ? 'e' : ''}
+              </p>
+              <ul className="mt-1 space-y-0.5 text-gray-600">
+                {result.invoices.map((inv, i) => (
+                  <li key={i}>{inv.customer_name}: {inv.total.toLocaleString('sv-SE')} kr</li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="text-gray-500">Inga fakturor att skapa (inga ofakturerade tidrapporter)</p>
+          )}
+          {result.errors.length > 0 && (
+            <div className="mt-2 text-red-600">
+              {result.errors.map((err, i) => <p key={i}>{err}</p>)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string }) {
   const [usage, setUsage] = useState({ sent: 0, delivered: 0, failed: 0 })
@@ -406,6 +470,10 @@ export default function SettingsPage() {
           default_hourly_rate: config.default_hourly_rate || 500,
           time_rounding_minutes: config.time_rounding_minutes || 15,
           time_require_description: config.time_require_description || false,
+          // Auto-faktura
+          auto_invoice_enabled: config.auto_invoice_enabled || false,
+          auto_invoice_send: config.auto_invoice_send || false,
+          auto_invoice_max_amount: config.auto_invoice_max_amount || 50000,
           updated_at: new Date().toISOString(),
         })
         .eq('business_id', business.business_id)
@@ -1710,6 +1778,84 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Auto-faktura */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-emerald-100">
+                  <Receipt className="w-6 h-6 text-emerald-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Auto-faktura</h2>
+                  <p className="text-sm text-gray-400">Skapa fakturor automatiskt från tidrapporter</p>
+                </div>
+              </div>
+
+              {/* Master toggle */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl mb-4">
+                <div>
+                  <p className="font-medium text-gray-900">Aktivera auto-faktura</p>
+                  <p className="text-sm text-gray-400">Samla tidrapporter per kund och skapa fakturautkast automatiskt</p>
+                </div>
+                <button
+                  onClick={() => setConfig({ ...config, auto_invoice_enabled: !config.auto_invoice_enabled })}
+                  className={`w-12 h-6 rounded-full transition-all ${
+                    config.auto_invoice_enabled
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                      : 'bg-gray-200'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                    config.auto_invoice_enabled ? 'translate-x-6' : 'translate-x-0.5'
+                  }`} />
+                </button>
+              </div>
+
+              {config.auto_invoice_enabled && (
+                <div className="space-y-4">
+                  {/* Auto-send toggle */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                    <div>
+                      <p className="font-medium text-gray-900">Skicka automatiskt</p>
+                      <p className="text-sm text-gray-400">Skicka fakturan via e-post direkt efter skapande</p>
+                    </div>
+                    <button
+                      onClick={() => setConfig({ ...config, auto_invoice_send: !config.auto_invoice_send })}
+                      className={`w-12 h-6 rounded-full transition-all ${
+                        config.auto_invoice_send
+                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                          : 'bg-gray-200'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
+                        config.auto_invoice_send ? 'translate-x-6' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+
+                  {/* Max amount */}
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">Max belopp per faktura (säkerhetsgräns)</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={config.auto_invoice_max_amount || 50000}
+                        onChange={(e) => setConfig({ ...config, auto_invoice_max_amount: parseFloat(e.target.value) || 50000 })}
+                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 pr-12"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">Fakturor över detta belopp skapas inte automatiskt</p>
+                  </div>
+
+                  {/* Manual trigger button */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <p className="text-sm text-gray-500 mb-3">Generera fakturor nu från alla ofakturerade tidrapporter:</p>
+                    <AutoInvoiceButton businessId={business.business_id} autoSend={config.auto_invoice_send} maxAmount={config.auto_invoice_max_amount || 50000} />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
