@@ -4,6 +4,45 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getStageBySlug } from '@/lib/pipeline'
 
 /**
+ * GET - Lista deals för ett företag
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServerSupabase()
+    const stageId = request.nextUrl.searchParams.get('stageId')
+    const customerId = request.nextUrl.searchParams.get('customerId')
+
+    let query = supabase
+      .from('deal')
+      .select('*')
+      .eq('business_id', business.business_id)
+      .order('created_at', { ascending: false })
+
+    if (stageId) {
+      query = query.eq('stage_id', stageId)
+    }
+
+    if (customerId) {
+      query = query.eq('customer_id', customerId)
+    }
+
+    const { data: deals, error } = await query
+
+    if (error) throw error
+
+    return NextResponse.json({ deals: deals || [] })
+  } catch (error: any) {
+    console.error('Get deals error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
  * POST - Skapa en ny deal manuellt
  */
 export async function POST(request: NextRequest) {

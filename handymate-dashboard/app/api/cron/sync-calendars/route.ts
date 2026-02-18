@@ -7,6 +7,7 @@ import {
 } from '@/lib/google-calendar'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60
 
 const MAX_CONNECTIONS_PER_RUN = 10
 

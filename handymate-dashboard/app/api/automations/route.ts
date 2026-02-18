@@ -95,6 +95,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * POST - Alias for PATCH (update automation settings)
+ */
+export async function POST(request: NextRequest) {
+  return PATCH(request)
+}
+
 export async function PATCH(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
