@@ -438,6 +438,37 @@ export async function triggerEventCommunication(params: {
         context: fullContext,
       })
     }
+    // Nurture sequence: enroll or cancel based on event
+    try {
+      const { enrollInSequence, cancelEnrollmentsForEvent } = await import('@/lib/nurture')
+
+      // Events that trigger enrollment
+      const enrollTriggers = ['quote_sent', 'lead_created', 'job_completed', 'invoice_overdue']
+      if (enrollTriggers.includes(params.event)) {
+        await enrollInSequence({
+          businessId: params.businessId,
+          triggerType: params.event,
+          customerId: params.customerId,
+        })
+      }
+
+      // Events that cancel enrollments
+      const cancelMap: Record<string, string> = {
+        quote_accepted: 'quote_accepted',
+        quote_declined: 'quote_declined',
+        booking_created: 'booking_created',
+        invoice_paid: 'invoice_paid',
+      }
+      if (cancelMap[params.event]) {
+        await cancelEnrollmentsForEvent({
+          businessId: params.businessId,
+          customerId: params.customerId,
+          cancelEvent: cancelMap[params.event],
+        })
+      }
+    } catch (nurtureErr) {
+      console.error('Nurture trigger error (non-blocking):', nurtureErr)
+    }
   } catch (err) {
     console.error('Event communication trigger error (non-blocking):', err)
   }

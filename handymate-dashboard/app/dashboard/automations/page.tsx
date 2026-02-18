@@ -24,6 +24,13 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
+  Mail,
+  Users,
+  Pause,
+  RotateCcw,
+  Trash2,
+  Plus,
+  Edit3,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
@@ -112,6 +119,39 @@ interface AutomationCategory {
   integrationKey?: keyof Integrations
   integrationLabel?: string
   settingsLink?: string
+}
+
+interface NurtureStep {
+  delay_days: number
+  channel: 'sms' | 'email'
+  template: string
+  subject?: string
+}
+
+interface NurtureSequence {
+  id: string
+  name: string
+  trigger_type: string
+  is_active: boolean
+  steps: NurtureStep[]
+  cancel_on?: string[]
+}
+
+interface NurtureEnrollment {
+  id: string
+  sequence_id: string
+  customer_id: string
+  current_step: number
+  status: string
+  next_action_at: string | null
+  customer?: { name: string; phone_number: string; email: string }
+}
+
+interface NurtureStats {
+  active_enrollments: number
+  completed_this_week: number
+  cancelled_this_week: number
+  sequences: { id: string; name: string; trigger_type: string; is_active: boolean; enrolled_count: number }[]
 }
 
 // ── Categories Definition ──────────────────────────────────────
@@ -213,6 +253,15 @@ export default function AutomationsPage() {
   const [smsSettingsOpen, setSmsSettingsOpen] = useState(false)
   const [autoApproveRecent, setAutoApproveRecent] = useState<AutoApproveRecentItem[]>([])
   const [autoApproveOpen, setAutoApproveOpen] = useState(false)
+  // Nurture state
+  const [nurtureSequences, setNurtureSequences] = useState<NurtureSequence[]>([])
+  const [nurtureEnrollments, setNurtureEnrollments] = useState<NurtureEnrollment[]>([])
+  const [nurtureStats, setNurtureStats] = useState<NurtureStats | null>(null)
+  const [nurtureOpen, setNurtureOpen] = useState(false)
+  const [nurtureLoading, setNurtureLoading] = useState(false)
+  const [editingSequence, setEditingSequence] = useState<string | null>(null)
+  const [editingSteps, setEditingSteps] = useState<NurtureStep[]>([])
+  const [nurtureSaving, setNurtureSaving] = useState(false)
 
   useEffect(() => {
     if (businessId) fetchData()
@@ -338,6 +387,116 @@ export default function AutomationsPage() {
   function getCategoryActiveCount(category: AutomationCategory): number {
     if (!settings) return 0
     return category.cards.filter(c => settings[c.key] === true).length
+  }
+
+  // ── Nurture Functions ──────────────────────────────────────
+
+  async function fetchNurtureData() {
+    setNurtureLoading(true)
+    try {
+      const res = await fetch('/api/nurture')
+      if (res.ok) {
+        const data = await res.json()
+        setNurtureSequences(data.sequences || [])
+        setNurtureEnrollments(data.active_enrollments || [])
+        setNurtureStats(data.stats || null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch nurture data:', err)
+    } finally {
+      setNurtureLoading(false)
+    }
+  }
+
+  async function toggleSequenceActive(seqId: string, currentActive: boolean) {
+    try {
+      const res = await fetch('/api/nurture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_sequence', sequence_id: seqId, is_active: !currentActive }),
+      })
+      if (res.ok) {
+        setNurtureSequences(prev => prev.map(s => s.id === seqId ? { ...s, is_active: !currentActive } : s))
+        showToast(currentActive ? 'Sekvens pausad' : 'Sekvens aktiverad')
+      }
+    } catch {
+      showToast('Kunde inte uppdatera', 'error')
+    }
+  }
+
+  function startEditSequence(seq: NurtureSequence) {
+    setEditingSequence(seq.id)
+    setEditingSteps([...seq.steps])
+  }
+
+  function cancelEditSequence() {
+    setEditingSequence(null)
+    setEditingSteps([])
+  }
+
+  function updateEditingStep(index: number, field: keyof NurtureStep, value: any) {
+    setEditingSteps(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s))
+  }
+
+  function addEditingStep() {
+    setEditingSteps(prev => [...prev, { delay_days: 7, channel: 'sms', template: '' }])
+  }
+
+  function removeEditingStep(index: number) {
+    setEditingSteps(prev => prev.filter((_, i) => i !== index))
+  }
+
+  async function saveSequenceSteps(seqId: string) {
+    setNurtureSaving(true)
+    try {
+      const res = await fetch('/api/nurture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update_sequence', sequence_id: seqId, steps: editingSteps }),
+      })
+      if (res.ok) {
+        setNurtureSequences(prev => prev.map(s => s.id === seqId ? { ...s, steps: editingSteps } : s))
+        setEditingSequence(null)
+        setEditingSteps([])
+        showToast('Sekvens sparad')
+      } else {
+        showToast('Kunde inte spara', 'error')
+      }
+    } catch {
+      showToast('Nätverksfel', 'error')
+    } finally {
+      setNurtureSaving(false)
+    }
+  }
+
+  async function cancelEnrollment(enrollmentId: string) {
+    try {
+      const res = await fetch('/api/nurture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel_enrollment', enrollment_id: enrollmentId, reason: 'manual' }),
+      })
+      if (res.ok) {
+        setNurtureEnrollments(prev => prev.filter(e => e.id !== enrollmentId))
+        showToast('Enrollment avbruten')
+      }
+    } catch {
+      showToast('Kunde inte avbryta', 'error')
+    }
+  }
+
+  const triggerLabels: Record<string, string> = {
+    quote_sent: 'Offert skickad',
+    lead_created: 'Ny lead',
+    job_completed: 'Jobb klart',
+    invoice_overdue: 'Faktura förfallen',
+  }
+
+  const triggerColors: Record<string, string> = {
+    quote_sent: 'bg-blue-50 text-blue-700',
+    lead_created: 'bg-emerald-50 text-emerald-700',
+    job_completed: 'bg-violet-50 text-violet-700',
+    invoice_overdue: 'bg-red-50 text-red-700',
   }
 
   if (loading) {
@@ -736,6 +895,285 @@ export default function AutomationsPage() {
             )}
           </div>
         )}
+
+        {/* Uppföljningssekvenser (Nurture) */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
+                <Mail className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900">Uppföljningssekvenser</h3>
+                <p className="text-sm text-gray-500">Automatiska SMS- och e-postflöden som följer upp kunder</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {nurtureStats && nurtureStats.active_enrollments > 0 && (
+                <span className="text-xs text-pink-600 font-medium bg-pink-50 px-2 py-1 rounded-full flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {nurtureStats.active_enrollments} aktiva
+                </span>
+              )}
+              <button
+                onClick={() => { setNurtureOpen(!nurtureOpen); if (!nurtureOpen && nurtureSequences.length === 0) fetchNurtureData() }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                {nurtureOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+
+          {nurtureOpen && (
+            <div className="border-t border-gray-100">
+              {nurtureLoading ? (
+                <div className="p-8 text-center">
+                  <Loader2 className="w-6 h-6 animate-spin text-pink-500 mx-auto" />
+                  <p className="text-sm text-gray-400 mt-2">Laddar sekvenser...</p>
+                </div>
+              ) : (
+                <>
+                  {/* Stats row */}
+                  {nurtureStats && (
+                    <div className="grid grid-cols-3 gap-3 p-4 bg-gray-50/50">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900">{nurtureStats.active_enrollments}</div>
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider">Aktiva</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-emerald-600">{nurtureStats.completed_this_week}</div>
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider">Klara (vecka)</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-400">{nurtureStats.cancelled_this_week}</div>
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wider">Avbrutna</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Sequences */}
+                  <div className="p-4 space-y-3">
+                    {nurtureSequences.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <Mail className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Inga sekvenser ännu</p>
+                      </div>
+                    ) : (
+                      nurtureSequences.map(seq => {
+                        const isEditing = editingSequence === seq.id
+                        const enrolledCount = nurtureStats?.sequences.find(s => s.id === seq.id)?.enrolled_count || 0
+
+                        return (
+                          <div key={seq.id} className={`rounded-xl border transition-all ${
+                            seq.is_active ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'
+                          }`}>
+                            {/* Sequence header */}
+                            <div className="px-4 py-3 flex items-center justify-between">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-semibold text-gray-900">{seq.name}</h4>
+                                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${triggerColors[seq.trigger_type] || 'bg-gray-100 text-gray-600'}`}>
+                                      {triggerLabels[seq.trigger_type] || seq.trigger_type}
+                                    </span>
+                                    {enrolledCount > 0 && (
+                                      <span className="text-[10px] text-gray-400">{enrolledCount} inskrivna</span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {seq.steps.length} steg &middot; {seq.steps.map(s => s.channel === 'sms' ? 'SMS' : 'E-post').join(' → ')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => isEditing ? cancelEditSequence() : startEditSequence(seq)}
+                                  className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
+                                  title={isEditing ? 'Avbryt redigering' : 'Redigera steg'}
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => toggleSequenceActive(seq.id, seq.is_active)}
+                                  className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors flex-shrink-0 ${
+                                    seq.is_active ? 'bg-pink-500' : 'bg-gray-300'
+                                  }`}
+                                >
+                                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                                    seq.is_active ? 'translate-x-5' : 'translate-x-1'
+                                  }`} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Step timeline (collapsed view) */}
+                            {!isEditing && (
+                              <div className="px-4 pb-3">
+                                <div className="flex items-center gap-1">
+                                  {seq.steps.map((step, i) => (
+                                    <div key={i} className="flex items-center gap-1">
+                                      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium ${
+                                        step.channel === 'sms' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                                      }`}>
+                                        {step.channel === 'sms' ? <MessageSquare className="w-2.5 h-2.5" /> : <Mail className="w-2.5 h-2.5" />}
+                                        Dag {step.delay_days}
+                                      </div>
+                                      {i < seq.steps.length - 1 && (
+                                        <div className="w-3 h-px bg-gray-300" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Edit mode */}
+                            {isEditing && (
+                              <div className="border-t border-gray-100 p-4 space-y-3 bg-gray-50/50">
+                                {editingSteps.map((step, i) => (
+                                  <div key={i} className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-500">Steg {i + 1}</span>
+                                      <button
+                                        onClick={() => removeEditingStep(i)}
+                                        className="p-1 text-gray-400 hover:text-red-500"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                      <div>
+                                        <label className="text-[10px] text-gray-400 uppercase block mb-0.5">Kanal</label>
+                                        <select
+                                          value={step.channel}
+                                          onChange={(e) => updateEditingStep(i, 'channel', e.target.value)}
+                                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                                        >
+                                          <option value="sms">SMS</option>
+                                          <option value="email">E-post</option>
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-gray-400 uppercase block mb-0.5">Fördröjning (dagar)</label>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={90}
+                                          value={step.delay_days}
+                                          onChange={(e) => updateEditingStep(i, 'delay_days', parseInt(e.target.value) || 0)}
+                                          className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                                        />
+                                      </div>
+                                      {step.channel === 'email' && (
+                                        <div className="col-span-2 sm:col-span-1">
+                                          <label className="text-[10px] text-gray-400 uppercase block mb-0.5">Ämne</label>
+                                          <input
+                                            type="text"
+                                            value={step.subject || ''}
+                                            onChange={(e) => updateEditingStep(i, 'subject', e.target.value)}
+                                            placeholder="Ämnesrad..."
+                                            className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs"
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div>
+                                      <label className="text-[10px] text-gray-400 uppercase block mb-0.5">Meddelande</label>
+                                      <textarea
+                                        value={step.template}
+                                        onChange={(e) => updateEditingStep(i, 'template', e.target.value)}
+                                        rows={3}
+                                        placeholder="Hej {customer_name}..."
+                                        className="w-full px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs resize-none"
+                                      />
+                                      <p className="text-[10px] text-gray-400 mt-0.5">
+                                        Variabler: {'{customer_name}'}, {'{business_name}'}, {'{project_title}'}, {'{services}'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                <button
+                                  onClick={addEditingStep}
+                                  className="w-full py-2 border border-dashed border-gray-300 rounded-lg text-xs text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-all flex items-center justify-center gap-1"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  Lägg till steg
+                                </button>
+
+                                <div className="flex items-center justify-end gap-2 pt-2">
+                                  <button
+                                    onClick={cancelEditSequence}
+                                    className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-all"
+                                  >
+                                    Avbryt
+                                  </button>
+                                  <button
+                                    onClick={() => saveSequenceSteps(seq.id)}
+                                    disabled={nurtureSaving}
+                                    className="px-4 py-1.5 bg-pink-500 text-white text-xs font-medium rounded-lg hover:bg-pink-600 transition-all disabled:opacity-50 flex items-center gap-1"
+                                  >
+                                    {nurtureSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                                    Spara
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  {/* Active enrollments */}
+                  {nurtureEnrollments.length > 0 && (
+                    <div className="border-t border-gray-100 p-4">
+                      <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5" />
+                        Aktiva uppföljningar
+                      </h4>
+                      <div className="space-y-2">
+                        {nurtureEnrollments.slice(0, 10).map(enrollment => {
+                          const seq = nurtureSequences.find(s => s.id === enrollment.sequence_id)
+                          return (
+                            <div key={enrollment.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-900 truncate">
+                                    {enrollment.customer?.name || 'Okänd kund'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    Steg {enrollment.current_step + 1}/{seq?.steps.length || '?'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] text-gray-400">{seq?.name || 'Sekvens'}</span>
+                                  {enrollment.next_action_at && (
+                                    <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                                      <Clock className="w-2.5 h-2.5" />
+                                      {new Date(enrollment.next_action_at).toLocaleDateString('sv-SE', { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => cancelEnrollment(enrollment.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg hover:bg-white transition-all"
+                                title="Avbryt uppföljning"
+                              >
+                                <XCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Automation Categories */}
         <div className="space-y-4">

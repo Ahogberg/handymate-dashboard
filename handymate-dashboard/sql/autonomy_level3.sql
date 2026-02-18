@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS nurture_sequence (
   trigger_type TEXT NOT NULL,
   is_active BOOLEAN DEFAULT true,
   steps JSONB NOT NULL DEFAULT '[]',
+  cancel_on JSONB DEFAULT '[]',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
