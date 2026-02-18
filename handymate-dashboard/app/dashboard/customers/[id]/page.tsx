@@ -25,7 +25,16 @@ import {
   Globe,
   Copy,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Upload,
+  X,
+  Save,
+  Building2,
+  User,
+  Home,
+  File,
+  Image,
+  Download
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -39,6 +48,25 @@ interface Customer {
   email: string
   address_line: string
   created_at: string
+  customer_type?: 'private' | 'company' | 'brf'
+  org_number?: string
+  contact_person?: string
+  personal_number?: string
+  property_designation?: string
+  invoice_address?: string
+  visit_address?: string
+  reference?: string
+  apartment_count?: number
+}
+
+interface CustomerDocument {
+  id: string
+  file_name: string
+  file_url: string
+  file_type: string | null
+  file_size: number | null
+  category: string
+  uploaded_at: string
 }
 
 interface Activity {
@@ -75,9 +103,19 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
+  const [documents, setDocuments] = useState<CustomerDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings'>('timeline')
-  
+  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents'>('timeline')
+
+  // Edit mode
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState<Record<string, any>>({})
+  const [editSaving, setEditSaving] = useState(false)
+
+  // Documents
+  const [uploading, setUploading] = useState(false)
+  const [uploadCategory, setUploadCategory] = useState('other')
+
   // Modals
   const [showLogCallModal, setShowLogCallModal] = useState(false)
   const [showAddNoteModal, setShowAddNoteModal] = useState(false)
@@ -128,7 +166,126 @@ export default function CustomerDetailPage() {
       setPortalLastVisited(customerData.portal_last_visited_at || null)
     }
 
+    // Fetch documents
+    try {
+      const docRes = await fetch(`/api/customers/${customerId}/documents`, {
+        headers: { 'Content-Type': 'application/json' }
+      })
+      if (docRes.ok) {
+        const docData = await docRes.json()
+        setDocuments(docData.documents || [])
+      }
+    } catch {
+      // Documents table may not exist yet
+    }
+
     setLoading(false)
+  }
+
+  // Edit functions
+  function startEditing() {
+    if (!customer) return
+    setEditForm({
+      name: customer.name || '',
+      phone_number: customer.phone_number || '',
+      email: customer.email || '',
+      address_line: customer.address_line || '',
+      customer_type: customer.customer_type || 'private',
+      org_number: customer.org_number || '',
+      contact_person: customer.contact_person || '',
+      personal_number: customer.personal_number || '',
+      property_designation: customer.property_designation || '',
+      invoice_address: customer.invoice_address || '',
+      visit_address: customer.visit_address || '',
+      reference: customer.reference || '',
+      apartment_count: customer.apartment_count ? String(customer.apartment_count) : '',
+    })
+    setIsEditing(true)
+  }
+
+  async function saveEdit() {
+    if (!editForm.name || !editForm.phone_number) return
+    setEditSaving(true)
+    try {
+      const res = await fetch('/api/actions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_customer',
+          data: { customerId, ...editForm }
+        })
+      })
+      if (res.ok) {
+        setIsEditing(false)
+        fetchData()
+      }
+    } catch {
+      // Error
+    }
+    setEditSaving(false)
+  }
+
+  // Document functions
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setUploading(true)
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        continue // Skip files > 10MB
+      }
+
+      const fileExt = file.name.split('.').pop()
+      const filePath = `${business.business_id}/${customerId}/${Date.now()}_${file.name}`
+
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('customer-documents')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        continue
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('customer-documents')
+        .getPublicUrl(filePath)
+
+      // Save document metadata
+      await fetch(`/api/customers/${customerId}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_type: file.type,
+          file_size: file.size,
+          category: uploadCategory,
+        })
+      })
+    }
+
+    setUploading(false)
+    e.target.value = ''
+    fetchData()
+  }
+
+  async function deleteDocument(docId: string) {
+    if (!confirm('Ta bort detta dokument?')) return
+    await fetch(`/api/customers/${customerId}/documents?docId=${docId}`, {
+      method: 'DELETE'
+    })
+    fetchData()
+  }
+
+  function formatFileSize(bytes: number | null) {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   async function generatePortalLink() {
@@ -252,9 +409,24 @@ export default function CustomerDetailPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex-1">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{customer.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{customer.name}</h1>
+              {customer.customer_type === 'company' && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200 rounded-md">Företag</span>
+              )}
+              {customer.customer_type === 'brf' && (
+                <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
+              )}
+            </div>
             <p className="text-sm text-gray-500">Kund sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
           </div>
+          <button
+            onClick={startEditing}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all min-h-[44px]"
+          >
+            <Edit className="w-4 h-4" />
+            <span className="hidden sm:inline">Redigera</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -263,7 +435,7 @@ export default function CustomerDetailPage() {
             {/* Kundinfo */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Kontaktinfo</h2>
-              
+
               <div className="space-y-3">
                 {customer.phone_number && (
                   <a href={`tel:${customer.phone_number}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
@@ -271,18 +443,58 @@ export default function CustomerDetailPage() {
                     <span className="text-gray-900 text-sm">{customer.phone_number}</span>
                   </a>
                 )}
-                
+
                 {customer.email && (
                   <a href={`mailto:${customer.email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
                     <Mail className="w-4 h-4 text-blue-400" />
                     <span className="text-gray-900 text-sm truncate">{customer.email}</span>
                   </a>
                 )}
-                
+
                 {customer.address_line && (
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
                     <MapPin className="w-4 h-4 text-amber-400" />
                     <span className="text-gray-900 text-sm">{customer.address_line}</span>
+                  </div>
+                )}
+
+                {(customer.customer_type === 'company' || customer.customer_type === 'brf') && customer.org_number && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <Building2 className="w-4 h-4 text-gray-400" />
+                    <div>
+                      <span className="text-gray-900 text-sm">{customer.org_number}</span>
+                      <p className="text-xs text-gray-400">Org.nummer</p>
+                    </div>
+                  </div>
+                )}
+
+                {customer.contact_person && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <div>
+                      <span className="text-gray-900 text-sm">{customer.contact_person}</span>
+                      <p className="text-xs text-gray-400">Kontaktperson</p>
+                    </div>
+                  </div>
+                )}
+
+                {customer.personal_number && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <User className="w-4 h-4 text-gray-400" />
+                    <div>
+                      <span className="text-gray-900 text-sm">{customer.personal_number}</span>
+                      <p className="text-xs text-gray-400">Personnummer</p>
+                    </div>
+                  </div>
+                )}
+
+                {customer.property_designation && (
+                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                    <Home className="w-4 h-4 text-gray-400" />
+                    <div>
+                      <span className="text-gray-900 text-sm">{customer.property_designation}</span>
+                      <p className="text-xs text-gray-400">Fastighetsbeteckning</p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -439,26 +651,36 @@ export default function CustomerDetailPage() {
           {/* Höger kolumn - Tidslinje/Bokningar */}
           <div className="lg:col-span-2">
             {/* Tabs */}
-            <div className="flex gap-2 mb-4">
+            <div className="flex gap-2 mb-4 overflow-x-auto">
               <button
                 onClick={() => setActiveTab('timeline')}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'timeline'
                     ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Tidslinje
               </button>
               <button
                 onClick={() => setActiveTab('bookings')}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'bookings'
                     ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                    : 'bg-gray-100 text-gray-500 hover:text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
                 Bokningar ({bookings.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('documents')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
+                  activeTab === 'documents'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Dokument ({documents.length})
               </button>
             </div>
 
@@ -578,9 +800,244 @@ export default function CustomerDetailPage() {
                 )}
               </div>
             )}
+
+            {/* Documents */}
+            {activeTab === 'documents' && (
+              <div className="space-y-4">
+                {/* Upload area */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                    <select
+                      value={uploadCategory}
+                      onChange={(e) => setUploadCategory(e.target.value)}
+                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[44px]"
+                    >
+                      <option value="drawing">Ritning</option>
+                      <option value="sketch">Skiss</option>
+                      <option value="description">Beskrivning</option>
+                      <option value="contract">Kontrakt</option>
+                      <option value="photo">Foto</option>
+                      <option value="other">Övrigt</option>
+                    </select>
+
+                    <label className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90 cursor-pointer transition-all min-h-[44px]">
+                      {uploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4" />
+                      )}
+                      {uploading ? 'Laddar upp...' : 'Ladda upp fil'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                      />
+                    </label>
+
+                    <p className="text-xs text-gray-400 sm:ml-auto">Max 10 MB per fil</p>
+                  </div>
+                </div>
+
+                {/* Document list */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  {documents.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                      <p className="text-gray-400">Inga dokument</p>
+                      <p className="text-xs text-gray-400 mt-1">Ladda upp ritningar, skisser, kontrakt med mera</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-200">
+                      {documents.map((doc) => (
+                        <div key={doc.id} className="p-4 hover:bg-gray-50 transition-all flex items-center gap-4">
+                          <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                            {doc.file_type?.startsWith('image/') ? (
+                              <Image className="w-5 h-5 text-blue-500" />
+                            ) : doc.file_type?.includes('pdf') ? (
+                              <FileText className="w-5 h-5 text-red-500" />
+                            ) : (
+                              <File className="w-5 h-5 text-gray-400" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 text-sm truncate">{doc.file_name}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+                                {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
+                              </span>
+                              {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                              <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <a
+                              href={doc.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              title="Öppna"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                            <button
+                              onClick={() => deleteDocument(doc.id)}
+                              className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              title="Ta bort"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Edit Customer Modal */}
+      {isEditing && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
+          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Redigera kund</h3>
+              <button onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-gray-900">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Customer type selector */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">Kundtyp</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'private', label: 'Privatperson', icon: User },
+                    { value: 'company', label: 'Företag', icon: Building2 },
+                    { value: 'brf', label: 'BRF', icon: Home },
+                  ] as const).map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setEditForm({ ...editForm, customer_type: value })}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm font-medium transition-all min-h-[44px] ${
+                        editForm.customer_type === value
+                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  {editForm.customer_type === 'private' ? 'Namn *' : editForm.customer_type === 'company' ? 'Företagsnamn *' : 'Föreningsnamn *'}
+                </label>
+                <input
+                  type="text"
+                  value={editForm.name || ''}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                />
+              </div>
+
+              {(editForm.customer_type === 'company' || editForm.customer_type === 'brf') && (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Organisationsnummer</label>
+                    <input type="text" value={editForm.org_number || ''} onChange={(e) => setEditForm({ ...editForm, org_number: e.target.value })} placeholder="XXXXXX-XXXX"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Kontaktperson</label>
+                    <input type="text" value={editForm.contact_person || ''} onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">Telefon *</label>
+                <input type="tel" value={editForm.phone_number || ''} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} placeholder="+46..."
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">E-post</label>
+                <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">Adress</label>
+                <input type="text" value={editForm.address_line || ''} onChange={(e) => setEditForm({ ...editForm, address_line: e.target.value })}
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+              </div>
+
+              {(editForm.customer_type === 'company' || editForm.customer_type === 'brf') && (
+                <>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Referens / Er märkning</label>
+                    <input type="text" value={editForm.reference || ''} onChange={(e) => setEditForm({ ...editForm, reference: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
+                    <input type="text" value={editForm.invoice_address || ''} onChange={(e) => setEditForm({ ...editForm, invoice_address: e.target.value })} placeholder="Om annan än besöksadress"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  </div>
+                </>
+              )}
+
+              {editForm.customer_type === 'brf' && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Antal lägenheter</label>
+                  <input type="number" value={editForm.apartment_count || ''} onChange={(e) => setEditForm({ ...editForm, apartment_count: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                </div>
+              )}
+
+              {editForm.customer_type === 'private' && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
+                  <input type="text" value={editForm.personal_number || ''} onChange={(e) => setEditForm({ ...editForm, personal_number: e.target.value })} placeholder="YYYYMMDD-XXXX"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">Fastighetsbeteckning</label>
+                <input type="text" value={editForm.property_designation || ''} onChange={(e) => setEditForm({ ...editForm, property_designation: e.target.value })} placeholder="T.ex. Stockholm Söder 1:23"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setIsEditing(false)} className="px-4 py-2.5 text-gray-500 hover:text-gray-900 min-h-[44px]">
+                Avbryt
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={editSaving}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+              >
+                {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Spara
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Log Call Modal */}
       {showLogCallModal && (

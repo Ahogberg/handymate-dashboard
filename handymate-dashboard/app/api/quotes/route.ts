@@ -123,37 +123,41 @@ export async function POST(request: NextRequest) {
       const validUntil = new Date()
       validUntil.setDate(validUntil.getDate() + 30)
 
+      const dupData: Record<string, any> = {
+        quote_id: newId,
+        business_id: businessId,
+        customer_id: source.customer_id,
+        quote_number: quoteNumber,
+        status: 'draft',
+        title: source.title ? source.title + ' (kopia)' : 'Kopia',
+        description: source.description,
+        items: source.items,
+        labor_total: source.labor_total,
+        material_total: source.material_total,
+        subtotal: source.subtotal,
+        discount_percent: source.discount_percent,
+        discount_amount: source.discount_amount,
+        vat_rate: source.vat_rate,
+        vat_amount: source.vat_amount,
+        total: source.total,
+        rot_rut_type: source.rot_rut_type,
+        rot_rut_eligible: source.rot_rut_eligible,
+        rot_rut_deduction: source.rot_rut_deduction,
+        customer_pays: source.customer_pays,
+        terms: source.terms,
+        images: source.images,
+        valid_until: validUntil.toISOString().split('T')[0],
+        duplicated_from: body.duplicate_from,
+        ai_generated: source.ai_generated,
+      }
+
+      // Only include ROT/RUT personal fields when they have values
+      if (source.personnummer) dupData.personnummer = source.personnummer
+      if (source.fastighetsbeteckning) dupData.fastighetsbeteckning = source.fastighetsbeteckning
+
       const { data: newQuote, error: dupErr } = await supabase
         .from('quotes')
-        .insert({
-          quote_id: newId,
-          business_id: businessId,
-          customer_id: source.customer_id,
-          quote_number: quoteNumber,
-          status: 'draft',
-          title: source.title ? source.title + ' (kopia)' : 'Kopia',
-          description: source.description,
-          items: source.items,
-          labor_total: source.labor_total,
-          material_total: source.material_total,
-          subtotal: source.subtotal,
-          discount_percent: source.discount_percent,
-          discount_amount: source.discount_amount,
-          vat_rate: source.vat_rate,
-          vat_amount: source.vat_amount,
-          total: source.total,
-          rot_rut_type: source.rot_rut_type,
-          rot_rut_eligible: source.rot_rut_eligible,
-          rot_rut_deduction: source.rot_rut_deduction,
-          customer_pays: source.customer_pays,
-          personnummer: source.personnummer,
-          fastighetsbeteckning: source.fastighetsbeteckning,
-          terms: source.terms,
-          images: source.images,
-          valid_until: validUntil.toISOString().split('T')[0],
-          duplicated_from: body.duplicate_from,
-          ai_generated: source.ai_generated,
-        })
+        .insert(dupData)
         .select()
         .single()
 
@@ -200,40 +204,45 @@ export async function POST(request: NextRequest) {
       total: (i.quantity || 0) * (i.unit_price || 0)
     }))
 
+    const insertData: Record<string, any> = {
+      quote_id: quoteId,
+      business_id: businessId,
+      customer_id: body.customer_id || null,
+      quote_number: quoteNumber,
+      status: body.status || 'draft',
+      title: body.title || '',
+      description: body.description || null,
+      items: processedItems,
+      labor_total: laborTotal,
+      material_total: materialTotal,
+      subtotal,
+      discount_percent: discountPercent,
+      discount_amount: discountAmount,
+      vat_rate: vatRate,
+      vat_amount: vatAmount,
+      total,
+      rot_rut_type: body.rot_rut_type || null,
+      rot_rut_eligible: rotRutEligible,
+      rot_rut_deduction: rotRutDeduction,
+      customer_pays: customerPays,
+      terms: body.terms || {},
+      images: body.images || [],
+      valid_until: validUntil.toISOString().split('T')[0],
+      sent_at: body.status === 'sent' ? new Date().toISOString() : null,
+      ai_generated: body.ai_generated || false,
+      ai_confidence: body.ai_confidence || null,
+      source_transcript: body.source_transcript || null,
+      template_id: body.template_id || null,
+    }
+
+    // Only include ROT/RUT personal fields when they have values
+    // (columns may not exist if migration hasn't been run yet)
+    if (body.personnummer) insertData.personnummer = body.personnummer
+    if (body.fastighetsbeteckning) insertData.fastighetsbeteckning = body.fastighetsbeteckning
+
     const { data: quote, error: insertError } = await supabase
       .from('quotes')
-      .insert({
-        quote_id: quoteId,
-        business_id: businessId,
-        customer_id: body.customer_id || null,
-        quote_number: quoteNumber,
-        status: body.status || 'draft',
-        title: body.title || '',
-        description: body.description || null,
-        items: processedItems,
-        labor_total: laborTotal,
-        material_total: materialTotal,
-        subtotal,
-        discount_percent: discountPercent,
-        discount_amount: discountAmount,
-        vat_rate: vatRate,
-        vat_amount: vatAmount,
-        total,
-        rot_rut_type: body.rot_rut_type || null,
-        rot_rut_eligible: rotRutEligible,
-        rot_rut_deduction: rotRutDeduction,
-        customer_pays: customerPays,
-        personnummer: body.personnummer || null,
-        fastighetsbeteckning: body.fastighetsbeteckning || null,
-        terms: body.terms || {},
-        images: body.images || [],
-        valid_until: validUntil.toISOString().split('T')[0],
-        sent_at: body.status === 'sent' ? new Date().toISOString() : null,
-        ai_generated: body.ai_generated || false,
-        ai_confidence: body.ai_confidence || null,
-        source_transcript: body.source_transcript || null,
-        template_id: body.template_id || null,
-      })
+      .insert(insertData)
       .select()
       .single()
 
@@ -287,8 +296,9 @@ export async function PUT(request: NextRequest) {
     if (body.customer_id !== undefined) updates.customer_id = body.customer_id
     if (body.title !== undefined) updates.title = body.title
     if (body.description !== undefined) updates.description = body.description
-    if (body.personnummer !== undefined) updates.personnummer = body.personnummer
-    if (body.fastighetsbeteckning !== undefined) updates.fastighetsbeteckning = body.fastighetsbeteckning
+    // Only include ROT/RUT personal fields when explicitly provided with values
+    if (body.personnummer !== undefined && body.personnummer !== null) updates.personnummer = body.personnummer
+    if (body.fastighetsbeteckning !== undefined && body.fastighetsbeteckning !== null) updates.fastighetsbeteckning = body.fastighetsbeteckning
     if (body.terms !== undefined) updates.terms = body.terms
     if (body.images !== undefined) updates.images = body.images
     if (body.status !== undefined) {

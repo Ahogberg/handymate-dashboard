@@ -103,37 +103,65 @@ export async function POST(request: NextRequest) {
       }
 
       case 'create_customer': {
-        const { name, phone_number, email, address_line } = data
+        const { name, phone_number, email, address_line, personal_number, property_designation,
+                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count } = data
 
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
 
+        const insertData: Record<string, any> = {
+          customer_id: customerId,
+          business_id: authBusiness.business_id,
+          name,
+          phone_number,
+          email: email || null,
+          address_line: address_line || null,
+          created_at: new Date().toISOString(),
+        }
+
+        // Optional fields - only include if they have values
+        if (personal_number) insertData.personal_number = personal_number
+        if (property_designation) insertData.property_designation = property_designation
+        if (customer_type) insertData.customer_type = customer_type
+        if (org_number) insertData.org_number = org_number
+        if (contact_person) insertData.contact_person = contact_person
+        if (invoice_address) insertData.invoice_address = invoice_address
+        if (visit_address) insertData.visit_address = visit_address
+        if (reference) insertData.reference = reference
+        if (apartment_count) insertData.apartment_count = parseInt(apartment_count)
+
         const { error } = await supabase
           .from('customer')
-          .insert({
-            customer_id: customerId,
-            business_id: authBusiness.business_id,
-            name,
-            phone_number,
-            email: email || null,
-            address_line: address_line || null,
-            created_at: new Date().toISOString(),
-          })
+          .insert(insertData)
 
         if (error) throw error
         return NextResponse.json({ success: true, customerId })
       }
 
       case 'update_customer': {
-        const { customerId, name, phone_number, email, address_line } = data
-        
+        const { customerId, name, phone_number, email, address_line, personal_number, property_designation,
+                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count } = data
+
+        const updateData: Record<string, any> = {
+          name,
+          phone_number,
+          email: email || null,
+          address_line: address_line || null,
+        }
+
+        // Optional fields - include even if empty to allow clearing
+        if (personal_number !== undefined) updateData.personal_number = personal_number || null
+        if (property_designation !== undefined) updateData.property_designation = property_designation || null
+        if (customer_type !== undefined) updateData.customer_type = customer_type || 'private'
+        if (org_number !== undefined) updateData.org_number = org_number || null
+        if (contact_person !== undefined) updateData.contact_person = contact_person || null
+        if (invoice_address !== undefined) updateData.invoice_address = invoice_address || null
+        if (visit_address !== undefined) updateData.visit_address = visit_address || null
+        if (reference !== undefined) updateData.reference = reference || null
+        if (apartment_count !== undefined) updateData.apartment_count = apartment_count ? parseInt(apartment_count) : null
+
         const { error } = await supabase
           .from('customer')
-          .update({
-            name,
-            phone_number,
-            email: email || null,
-            address_line: address_line || null,
-          })
+          .update(updateData)
           .eq('customer_id', customerId)
 
         if (error) throw error

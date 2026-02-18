@@ -17,7 +17,10 @@ import {
   Send,
   CheckCircle,
   MessageSquare,
-  Eye
+  Eye,
+  Building2,
+  User,
+  Home
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -30,6 +33,15 @@ interface Customer {
   email: string | null
   address_line: string | null
   created_at: string
+  customer_type?: 'private' | 'company' | 'brf'
+  org_number?: string | null
+  contact_person?: string | null
+  invoice_address?: string | null
+  visit_address?: string | null
+  reference?: string | null
+  apartment_count?: number | null
+  personal_number?: string | null
+  property_designation?: string | null
 }
 
 interface Campaign {
@@ -53,7 +65,11 @@ export default function CustomersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
-  const [form, setForm] = useState({ name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '' })
+  const [form, setForm] = useState({
+    name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '',
+    customer_type: 'private' as 'private' | 'company' | 'brf',
+    org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: ''
+  })
 
   // Campaigns state
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -100,7 +116,10 @@ export default function CustomersPage() {
   // === CUSTOMER FUNCTIONS ===
   const openCreateModal = () => {
     setEditingCustomer(null)
-    setForm({ name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '' })
+    setForm({
+      name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '',
+      customer_type: 'private', org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: ''
+    })
     setModalOpen(true)
   }
 
@@ -113,8 +132,15 @@ export default function CustomersPage() {
       phone_number: customer.phone_number || '',
       email: customer.email || '',
       address_line: customer.address_line || '',
-      personal_number: (customer as any).personal_number || '',
-      property_designation: (customer as any).property_designation || '',
+      personal_number: customer.personal_number || '',
+      property_designation: customer.property_designation || '',
+      customer_type: customer.customer_type || 'private',
+      org_number: customer.org_number || '',
+      contact_person: customer.contact_person || '',
+      invoice_address: customer.invoice_address || '',
+      visit_address: customer.visit_address || '',
+      reference: customer.reference || '',
+      apartment_count: customer.apartment_count ? String(customer.apartment_count) : '',
     })
     setModalOpen(true)
   }
@@ -262,8 +288,36 @@ export default function CustomersPage() {
             </div>
 
             <div className="space-y-4">
+              {/* Customer type selector */}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Namn *</label>
+                <label className="block text-sm text-gray-500 mb-2">Kundtyp</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { value: 'private', label: 'Privatperson', icon: User },
+                    { value: 'company', label: 'Företag', icon: Building2 },
+                    { value: 'brf', label: 'BRF', icon: Home },
+                  ] as const).map(({ value, label, icon: Icon }) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setForm({ ...form, customer_type: value })}
+                      className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm font-medium transition-all min-h-[44px] ${
+                        form.customer_type === value
+                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-500 mb-1">
+                  {form.customer_type === 'private' ? 'Namn *' : form.customer_type === 'company' ? 'Företagsnamn *' : 'Föreningsnamn *'}
+                </label>
                 <input
                   type="text"
                   value={form.name}
@@ -271,6 +325,34 @@ export default function CustomersPage() {
                   className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
+
+              {/* Org number for company/BRF */}
+              {(form.customer_type === 'company' || form.customer_type === 'brf') && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Organisationsnummer</label>
+                  <input
+                    type="text"
+                    value={form.org_number}
+                    onChange={(e) => setForm({ ...form, org_number: e.target.value })}
+                    placeholder="XXXXXX-XXXX"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              )}
+
+              {/* Contact person for company/BRF */}
+              {(form.customer_type === 'company' || form.customer_type === 'brf') && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Kontaktperson</label>
+                  <input
+                    type="text"
+                    value={form.contact_person}
+                    onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Telefon *</label>
                 <input
@@ -299,17 +381,62 @@ export default function CustomersPage() {
                   className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
-                <input
-                  type="text"
-                  value={form.personal_number}
-                  onChange={(e) => setForm({ ...form, personal_number: e.target.value })}
-                  placeholder="YYYYMMDD-XXXX"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
-                <p className="text-xs text-gray-400 mt-1">Krävs för ROT/RUT-avdrag</p>
-              </div>
+
+              {/* Reference for company/BRF */}
+              {(form.customer_type === 'company' || form.customer_type === 'brf') && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Referens / Er märkning</label>
+                  <input
+                    type="text"
+                    value={form.reference}
+                    onChange={(e) => setForm({ ...form, reference: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              )}
+
+              {/* Invoice address for company/BRF */}
+              {(form.customer_type === 'company' || form.customer_type === 'brf') && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
+                  <input
+                    type="text"
+                    value={form.invoice_address}
+                    onChange={(e) => setForm({ ...form, invoice_address: e.target.value })}
+                    placeholder="Om annan än besöksadress"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              )}
+
+              {/* Apartment count for BRF */}
+              {form.customer_type === 'brf' && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Antal lägenheter</label>
+                  <input
+                    type="number"
+                    value={form.apartment_count}
+                    onChange={(e) => setForm({ ...form, apartment_count: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              )}
+
+              {/* Personal number only for private */}
+              {form.customer_type === 'private' && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
+                  <input
+                    type="text"
+                    value={form.personal_number}
+                    onChange={(e) => setForm({ ...form, personal_number: e.target.value })}
+                    placeholder="YYYYMMDD-XXXX"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Krävs för ROT/RUT-avdrag</p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Fastighetsbeteckning</label>
                 <input
@@ -509,13 +636,25 @@ export default function CustomersPage() {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                        <span className="text-gray-900 font-bold text-base sm:text-lg">
+                      <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
+                        customer.customer_type === 'company' ? 'bg-gradient-to-br from-amber-400 to-orange-500' :
+                        customer.customer_type === 'brf' ? 'bg-gradient-to-br from-emerald-400 to-teal-500' :
+                        'bg-gradient-to-br from-blue-500 to-cyan-500'
+                      }`}>
+                        <span className="text-white font-bold text-base sm:text-lg">
                           {customer.name ? customer.name.split(' ').map(n => n[0]).join('').substring(0, 2) : '?'}
                         </span>
                       </div>
                       <div className="ml-3 sm:ml-4">
-                        <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{customer.name || 'Okänd'}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{customer.name || 'Okänd'}</h3>
+                          {customer.customer_type === 'company' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 rounded-md">Företag</span>
+                          )}
+                          {customer.customer_type === 'brf' && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
+                          )}
+                        </div>
                         <p className="text-xs sm:text-sm text-gray-400">Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
                       </div>
                     </div>
