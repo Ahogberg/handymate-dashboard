@@ -81,6 +81,13 @@ export async function GET(request: NextRequest) {
       dealsMoved = count || 0
     } catch { /* table may not exist */ }
 
+    // Get auto-approve stats
+    let autoApproveStats = { today: 0, week: 0, recent: [] as any[] }
+    try {
+      const { getAutoApproveStats } = await import('@/lib/auto-approve')
+      autoApproveStats = await getAutoApproveStats(business.business_id)
+    } catch { /* auto-approve tables may not exist yet */ }
+
     return NextResponse.json({
       settings,
       integrations,
@@ -88,7 +95,10 @@ export async function GET(request: NextRequest) {
         sms_sent_week: smsCount || 0,
         leads_created_week: leadsCreated || 0,
         deals_moved_week: dealsMoved || 0,
+        auto_approved_today: autoApproveStats.today,
+        auto_approved_week: autoApproveStats.week,
       },
+      auto_approve_recent: autoApproveStats.recent,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -31,6 +31,9 @@ export interface AutomationSettings {
   // Fortnox
   fortnox_sync_invoices: boolean
   fortnox_sync_customers: boolean
+  // Auto-approve
+  auto_approve_enabled: boolean
+  auto_approve_config: Record<string, any>
 }
 
 const DEFAULT_SETTINGS: Omit<AutomationSettings, 'id' | 'business_id'> = {
@@ -57,6 +60,18 @@ const DEFAULT_SETTINGS: Omit<AutomationSettings, 'id' | 'business_id'> = {
   calendar_create_from_booking: true,
   fortnox_sync_invoices: false,
   fortnox_sync_customers: false,
+  auto_approve_enabled: false,
+  auto_approve_config: {
+    sms:             { enabled: false, min_confidence: 85, daily_limit: 50, risk: 'low' },
+    callback:        { enabled: false, min_confidence: 85, daily_limit: 50, risk: 'low' },
+    create_customer: { enabled: false, min_confidence: 85, daily_limit: 30, risk: 'low' },
+    follow_up:       { enabled: false, min_confidence: 85, daily_limit: 30, risk: 'low' },
+    reminder:        { enabled: false, min_confidence: 85, daily_limit: 30, risk: 'low' },
+    booking:         { enabled: false, min_confidence: 92, daily_limit: 10, risk: 'medium' },
+    reschedule:      { enabled: false, min_confidence: 92, daily_limit: 10, risk: 'medium' },
+    quote:           { enabled: false, min_confidence: 100, daily_limit: 0, risk: 'high' },
+    other:           { enabled: false, min_confidence: 100, daily_limit: 0, risk: 'high' },
+  },
 }
 
 export async function getAutomationSettings(businessId: string): Promise<AutomationSettings> {

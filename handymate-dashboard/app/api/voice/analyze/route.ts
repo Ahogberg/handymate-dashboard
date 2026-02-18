@@ -321,6 +321,24 @@ Svara ENDAST med JSON i följande format:
       }
     }
 
+    // Auto-approve: try to auto-execute low-risk suggestions
+    const autoApproveResults = []
+    try {
+      const { tryAutoApprove } = await import('@/lib/auto-approve')
+      for (const created of createdSuggestions) {
+        const result = await tryAutoApprove({
+          suggestionId: created.suggestion_id,
+          businessId: recording.business_id,
+          actionType: created.suggestion_type,
+          confidence: created.confidence_score || 0,
+          suggestion: created,
+        })
+        autoApproveResults.push(result)
+      }
+    } catch (autoErr) {
+      console.error('Auto-approve error (non-blocking):', autoErr)
+    }
+
     // Pipeline integration: process call for pipeline deals
     try {
       const { processCallForPipeline } = await import('@/lib/pipeline-ai')
@@ -350,6 +368,8 @@ Svara ENDAST med JSON i följande format:
       console.error('Communication trigger error (non-blocking):', commErr)
     }
 
+    const autoApprovedCount = autoApproveResults.filter(r => r.auto_approved).length
+
     return NextResponse.json({
       success: true,
       recording_id,
@@ -358,7 +378,9 @@ Svara ENDAST med JSON i följande format:
       urgency: analysisResult.urgency,
       extracted_info: extractedInfo,
       suggestions_created: createdSuggestions.length,
-      suggestions: createdSuggestions
+      suggestions: createdSuggestions,
+      auto_approved: autoApprovedCount,
+      auto_approve_results: autoApproveResults,
     })
 
   } catch (error: any) {

@@ -20,11 +20,22 @@ import {
   ExternalLink,
   Loader2,
   Save,
+  Bot,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 
 // ── Types ──────────────────────────────────────────────────────
+
+interface AutoApproveActionConfig {
+  enabled: boolean
+  min_confidence: number
+  daily_limit: number
+  risk: 'low' | 'medium' | 'high'
+}
 
 interface AutomationSettings {
   ai_analyze_calls: boolean
@@ -50,6 +61,8 @@ interface AutomationSettings {
   calendar_create_from_booking: boolean
   fortnox_sync_invoices: boolean
   fortnox_sync_customers: boolean
+  auto_approve_enabled: boolean
+  auto_approve_config: Record<string, AutoApproveActionConfig>
 }
 
 interface Integrations {
@@ -62,6 +75,15 @@ interface Stats {
   sms_sent_week: number
   leads_created_week: number
   deals_moved_week: number
+  auto_approved_today: number
+  auto_approved_week: number
+}
+
+interface AutoApproveRecentItem {
+  type: string
+  title: string
+  time: string
+  success: boolean
 }
 
 interface ActivityItem {
@@ -189,6 +211,8 @@ export default function AutomationsPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
   const [pendingChanges, setPendingChanges] = useState(false)
   const [smsSettingsOpen, setSmsSettingsOpen] = useState(false)
+  const [autoApproveRecent, setAutoApproveRecent] = useState<AutoApproveRecentItem[]>([])
+  const [autoApproveOpen, setAutoApproveOpen] = useState(false)
 
   useEffect(() => {
     if (businessId) fetchData()
@@ -206,6 +230,7 @@ export default function AutomationsPage() {
         setSettings(data.settings)
         setIntegrations(data.integrations)
         setStats(data.stats)
+        setAutoApproveRecent(data.auto_approve_recent || [])
       }
 
       if (activityRes.ok) {
@@ -283,6 +308,33 @@ export default function AutomationsPage() {
     }
   }
 
+  function toggleAutoApproveAction(actionType: string) {
+    if (!settings) return
+    const config = { ...(settings.auto_approve_config || {}) }
+    const current = config[actionType] || { enabled: false, min_confidence: 85, daily_limit: 50, risk: 'low' }
+    config[actionType] = { ...current, enabled: !current.enabled }
+    setSettings({ ...settings, auto_approve_config: config })
+    setPendingChanges(true)
+  }
+
+  function updateAutoApproveConfidence(actionType: string, value: number) {
+    if (!settings) return
+    const config = { ...(settings.auto_approve_config || {}) }
+    const current = config[actionType] || { enabled: false, min_confidence: 85, daily_limit: 50, risk: 'low' }
+    config[actionType] = { ...current, min_confidence: value }
+    setSettings({ ...settings, auto_approve_config: config })
+    setPendingChanges(true)
+  }
+
+  function updateAutoApproveDailyLimit(actionType: string, value: number) {
+    if (!settings) return
+    const config = { ...(settings.auto_approve_config || {}) }
+    const current = config[actionType] || { enabled: false, min_confidence: 85, daily_limit: 50, risk: 'low' }
+    config[actionType] = { ...current, daily_limit: value }
+    setSettings({ ...settings, auto_approve_config: config })
+    setPendingChanges(true)
+  }
+
   function getCategoryActiveCount(category: AutomationCategory): number {
     if (!settings) return 0
     return category.cards.filter(c => settings[c.key] === true).length
@@ -333,7 +385,7 @@ export default function AutomationsPage() {
 
         {/* Stats */}
         {stats && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
                 <MessageSquare className="w-4 h-4" />
@@ -354,6 +406,13 @@ export default function AutomationsPage() {
                 Deals flyttade
               </div>
               <div className="text-2xl font-bold text-gray-900">{stats.deals_moved_week}</div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+              <div className="flex items-center gap-2 text-gray-500 text-sm mb-1">
+                <Bot className="w-4 h-4" />
+                AI auto-godkänt
+              </div>
+              <div className="text-2xl font-bold text-amber-600">{stats.auto_approved_week}</div>
             </div>
           </div>
         )}
@@ -511,6 +570,170 @@ export default function AutomationsPage() {
                 <span className="text-sm font-bold text-violet-600 w-10 text-right">{settings.ai_confidence_threshold}%</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* AI Autonomi - Auto-approve section */}
+        {settings && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
+            {/* Header with master toggle */}
+            <div className="px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900">AI Autonomi</h3>
+                  <p className="text-sm text-gray-500">Låt AI utföra lågrisk-åtgärder automatiskt</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {stats && settings.auto_approve_enabled && (stats.auto_approved_today > 0) && (
+                  <span className="text-xs text-amber-600 font-medium bg-amber-50 px-2 py-1 rounded-full">
+                    {stats.auto_approved_today} idag
+                  </span>
+                )}
+                <button
+                  onClick={() => { toggleSetting('auto_approve_enabled'); setPendingChanges(true) }}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                    settings.auto_approve_enabled ? 'bg-amber-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-sm ${
+                    settings.auto_approve_enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+            </div>
+
+            {/* Expand/collapse */}
+            <button
+              onClick={() => setAutoApproveOpen(!autoApproveOpen)}
+              className="w-full px-5 py-2 border-t border-gray-100 flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 transition-all"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Konfigurera åtgärder
+              {autoApproveOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            </button>
+
+            {autoApproveOpen && (
+              <div className="border-t border-gray-100">
+                {/* Risk categories */}
+                {(['low', 'medium', 'high'] as const).map(risk => {
+                  const riskLabel = risk === 'low' ? 'Lågrisk' : risk === 'medium' ? 'Mellanrisk' : 'Högrisk'
+                  const riskColor = risk === 'low' ? 'text-emerald-600' : risk === 'medium' ? 'text-amber-600' : 'text-red-600'
+                  const riskBg = risk === 'low' ? 'bg-emerald-50' : risk === 'medium' ? 'bg-amber-50' : 'bg-red-50'
+                  const RiskIcon = risk === 'low' ? ShieldCheck : risk === 'medium' ? Shield : ShieldAlert
+
+                  const actionTypes = Object.entries(settings.auto_approve_config || {})
+                    .filter(([, conf]) => (conf as AutoApproveActionConfig).risk === risk)
+
+                  if (actionTypes.length === 0) return null
+
+                  const actionLabels: Record<string, string> = {
+                    sms: 'Skicka callback-SMS',
+                    callback: 'Logga callback-förslag',
+                    create_customer: 'Registrera ny kund',
+                    follow_up: 'Skapa uppföljning',
+                    reminder: 'Skapa påminnelse',
+                    booking: 'Boka tid automatiskt',
+                    reschedule: 'Flytta bokning',
+                    quote: 'Skapa offert',
+                    other: 'Övriga åtgärder',
+                  }
+
+                  return (
+                    <div key={risk} className="p-4 border-b border-gray-50 last:border-b-0">
+                      <div className="flex items-center gap-2 mb-3">
+                        <RiskIcon className={`w-4 h-4 ${riskColor}`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wider ${riskColor}`}>{riskLabel}</span>
+                        {risk === 'high' && (
+                          <span className="text-[10px] text-gray-400 ml-1">Kräver alltid godkännande</span>
+                        )}
+                      </div>
+                      <div className="space-y-2">
+                        {actionTypes.map(([actionType, rawConf]) => {
+                          const conf = rawConf as AutoApproveActionConfig
+                          const isHigh = risk === 'high'
+
+                          return (
+                            <div key={actionType} className={`flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
+                              conf.enabled && !isHigh ? `${riskBg} border-gray-200` : 'bg-white border-gray-100'
+                            }`}>
+                              <div className="flex-1 min-w-0 mr-4">
+                                <h4 className="text-sm font-medium text-gray-900">{actionLabels[actionType] || actionType}</h4>
+                                {conf.enabled && !isHigh && (
+                                  <div className="flex items-center gap-4 mt-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-gray-400 uppercase">Konfidens</span>
+                                      <input
+                                        type="range"
+                                        min={60}
+                                        max={100}
+                                        step={1}
+                                        value={conf.min_confidence}
+                                        onChange={(e) => updateAutoApproveConfidence(actionType, parseInt(e.target.value))}
+                                        className="w-16 accent-amber-500"
+                                      />
+                                      <span className="text-xs font-bold text-amber-600 w-8">{conf.min_confidence}%</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[10px] text-gray-400 uppercase">Max/dag</span>
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={100}
+                                        value={conf.daily_limit}
+                                        onChange={(e) => updateAutoApproveDailyLimit(actionType, parseInt(e.target.value) || 1)}
+                                        className="w-14 px-2 py-0.5 bg-gray-50 border border-gray-200 rounded text-xs text-center"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => !isHigh && toggleAutoApproveAction(actionType)}
+                                disabled={isHigh}
+                                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors flex-shrink-0 ${
+                                  isHigh ? 'bg-gray-200 cursor-not-allowed opacity-50' :
+                                  conf.enabled ? 'bg-amber-500' : 'bg-gray-300'
+                                }`}
+                              >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                                  conf.enabled && !isHigh ? 'translate-x-5' : 'translate-x-1'
+                                }`} />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {/* Recent auto-approved actions */}
+                {autoApproveRecent.length > 0 && (
+                  <div className="p-4 border-t border-gray-100 bg-gray-50/50">
+                    <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Senast auto-godkända</h4>
+                    <div className="space-y-1.5">
+                      {autoApproveRecent.map((item, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          {item.success ? (
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                          ) : (
+                            <XCircle className="w-3.5 h-3.5 text-red-500" />
+                          )}
+                          <span className="text-gray-700 truncate flex-1">{item.title}</span>
+                          <span className="text-gray-400 whitespace-nowrap">
+                            {new Date(item.time).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
