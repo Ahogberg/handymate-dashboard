@@ -10,7 +10,13 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerSupabase()
-    const formData = await request.formData()
+
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch {
+      return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
+    }
 
     const callId = formData.get('callid') as string
     const recordingId = formData.get('recordingid') as string

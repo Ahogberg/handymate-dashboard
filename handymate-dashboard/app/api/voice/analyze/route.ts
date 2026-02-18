@@ -24,13 +24,21 @@ interface AISuggestion {
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getServerSupabase()
-    const anthropic = getAnthropic()
-    const { recording_id } = await request.json()
+    let supabase
+    try {
+      supabase = getServerSupabase()
+    } catch {
+      return NextResponse.json({ error: 'Database not configured' }, { status: 503 })
+    }
+
+    const body = await request.json().catch(() => null)
+    const recording_id = body?.recording_id
 
     if (!recording_id) {
       return NextResponse.json({ error: 'Missing recording_id' }, { status: 400 })
     }
+
+    const anthropic = getAnthropic()
 
     // Hämta inspelningen med transkript
     const { data: recording, error: fetchError } = await supabase

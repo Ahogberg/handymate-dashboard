@@ -20,7 +20,6 @@ import {
   CheckCircle,
   XCircle
 } from 'lucide-react'
-import { useToast } from '@/components/Toast'
 
 const BRANCHES = [
   { value: 'electrician', label: 'Elektriker' },
@@ -64,7 +63,6 @@ interface CreateResult {
 
 export default function AdminOnboardPage() {
   const router = useRouter()
-  const toast = useToast()
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -209,18 +207,18 @@ export default function AdminOnboardPage() {
       const result = await response.json()
 
       if (!response.ok) {
-        toast.error(result.error || 'Kunde inte logga in som användare')
+        setError(result.error || 'Kunde inte logga in som användare')
         return
       }
 
       if (result.method === 'token' && result.impersonationUrl) {
         window.open(result.impersonationUrl, '_blank')
       } else {
-        toast.info(`Logga in manuellt med: ${result.userEmail}`)
+        setError(`Logga in manuellt med: ${result.userEmail}`)
       }
     } catch (err) {
       console.error('Impersonate error:', err)
-      toast.error('Något gick fel')
+      setError('Något gick fel')
     }
   }
 

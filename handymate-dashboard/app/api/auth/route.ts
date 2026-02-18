@@ -6,13 +6,20 @@ import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 
 export async function POST(request: NextRequest) {
   try {
-    const { action, data } = await request.json()
+    const body = await request.json().catch(() => null)
+    if (!body || !body.action) {
+      return NextResponse.json({ error: 'Missing action' }, { status: 400 })
+    }
+    const { action, data } = body
 
     // Skapa Supabase client med cookies (pass function reference so cookies can be written)
     const supabase = createRouteHandlerClient({ cookies })
 
 // ==================== REGISTER ====================
 if (action === 'register') {
+  if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
+    return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
+  }
   const { email, password, businessName, displayName, contactName, phone, branch, serviceArea } = data
 
   // 1. Skapa auth user
@@ -95,6 +102,9 @@ if (action === 'register') {
 
 // ==================== LOGIN ====================
 if (action === 'login') {
+  if (!data?.email || !data?.password) {
+    return NextResponse.json({ error: 'Ange e-post och lösenord' }, { status: 400 })
+  }
   const { email, password } = data
 
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
