@@ -30,7 +30,12 @@ import {
   Settings,
   Trash2,
   MoveUp,
-  MoveDown
+  MoveDown,
+  Upload,
+  MapPin,
+  File as FileIcon,
+  Image as ImageIcon,
+  Download
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -71,7 +76,18 @@ interface Deal {
     name: string
     phone_number: string
     email: string
+    address_line: string | null
   } | null
+}
+
+interface CustomerDocument {
+  id: string
+  file_name: string
+  file_url: string
+  file_type: string | null
+  file_size: number | null
+  category: string
+  uploaded_at: string
 }
 
 interface Activity {
@@ -223,6 +239,11 @@ export default function PipelinePage() {
   const [editValueInput, setEditValueInput] = useState('')
   const [editingPriority, setEditingPriority] = useState(false)
 
+  // Deal documents
+  const [dealDocuments, setDealDocuments] = useState<CustomerDocument[]>([])
+  const [dealUploading, setDealUploading] = useState(false)
+  const [dealUploadCategory, setDealUploadCategory] = useState('other')
+
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '' })
   const [newDealSubmitting, setNewDealSubmitting] = useState(false)
@@ -292,6 +313,65 @@ export default function PipelinePage() {
       setDetailLoading(false)
     }
   }, [business.business_id])
+
+  const fetchDealDocuments = useCallback(async (customerId: string) => {
+    try {
+      const res = await fetch(`/api/customers/${customerId}/documents`)
+      if (!res.ok) return
+      const data = await res.json()
+      setDealDocuments(data.documents || [])
+    } catch {
+      setDealDocuments([])
+    }
+  }, [])
+
+  async function handleDealFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0 || !selectedDeal?.customer_id) return
+
+    setDealUploading(true)
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) continue
+
+      const filePath = `${business.business_id}/${selectedDeal.customer_id}/${Date.now()}_${file.name}`
+      const { error: uploadError } = await supabase.storage
+        .from('customer-documents')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        continue
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('customer-documents')
+        .getPublicUrl(filePath)
+
+      await fetch(`/api/customers/${selectedDeal.customer_id}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: file.name,
+          file_url: urlData.publicUrl,
+          file_type: file.type,
+          file_size: file.size,
+          category: dealUploadCategory,
+        })
+      })
+    }
+
+    setDealUploading(false)
+    e.target.value = ''
+    fetchDealDocuments(selectedDeal.customer_id)
+    showToast('Dokument uppladdat', 'success')
+  }
+
+  function formatFileSize(bytes: number | null) {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   const fetchCustomers = useCallback(async () => {
     const { data } = await supabase
@@ -534,12 +614,18 @@ export default function PipelinePage() {
     setEditingPriority(false)
     setEditTitleValue(deal.title)
     setEditValueInput(deal.value?.toString() || '')
+    setDealDocuments([])
+    setDealUploadCategory('other')
     fetchDealActivities(deal.id)
+    if (deal.customer_id) {
+      fetchDealDocuments(deal.customer_id)
+    }
   }
 
   function closeDealDetail() {
     setSelectedDeal(null)
     setDetailActivities([])
+    setDealDocuments([])
     setEditingTitle(false)
     setEditingValue(false)
     setEditingPriority(false)
@@ -938,14 +1024,92 @@ export default function PipelinePage() {
 
                 {/* Customer */}
                 {selectedDeal.customer && (
-                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-50/50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
-                      <Link href={`/dashboard/customers?id=${selectedDeal.customer.customer_id}`} className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">Visa <ExternalLink className="w-3 h-3" /></Link>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/50 overflow-hidden">
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
+                      </div>
+                      <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" /><span className="text-sm font-medium text-gray-900">{selectedDeal.customer.name}</span></div>
+                      {selectedDeal.customer.phone_number && <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span></div>}
+                      {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.email}</span></div>}
+                      {selectedDeal.customer.address_line && <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.address_line}</span></div>}
                     </div>
-                    <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-900">{selectedDeal.customer.name}</span></div>
-                    {selectedDeal.customer.phone_number && <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span></div>}
-                    {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.email}</span></div>}
+                    <Link
+                      href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
+                      className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                    >
+                      <span className="font-medium">Visa kundkort</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </Link>
+                  </div>
+                )}
+
+                {/* Documents */}
+                {selectedDeal.customer_id && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider">Dokument</h4>
+                      {selectedDeal.customer_id && (
+                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="text-xs text-blue-600 hover:text-blue-500">
+                          Visa alla
+                        </Link>
+                      )}
+                    </div>
+
+                    {/* Upload area */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={dealUploadCategory}
+                        onChange={(e) => setDealUploadCategory(e.target.value)}
+                        className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-xs focus:outline-none focus:border-blue-400"
+                      >
+                        <option value="drawing">Ritning</option>
+                        <option value="sketch">Skiss</option>
+                        <option value="description">Beskrivning</option>
+                        <option value="contract">Kontrakt</option>
+                        <option value="photo">Foto</option>
+                        <option value="other">Övrigt</option>
+                      </select>
+                      <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-600 font-medium hover:bg-blue-100 cursor-pointer transition-colors">
+                        {dealUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        {dealUploading ? 'Laddar upp...' : 'Ladda upp'}
+                        <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
+                      </label>
+                    </div>
+
+                    {/* Document list */}
+                    {dealDocuments.length > 0 && (
+                      <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                        {dealDocuments.slice(0, 5).map((doc) => (
+                          <div key={doc.id} className="flex items-center gap-3 px-3 py-2">
+                            <div className="w-7 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
+                              {doc.file_type?.startsWith('image/') ? (
+                                <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
+                              ) : doc.file_type?.includes('pdf') ? (
+                                <FileText className="w-3.5 h-3.5 text-red-500" />
+                              ) : (
+                                <FileIcon className="w-3.5 h-3.5 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-gray-900 truncate">{doc.file_name}</p>
+                              <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                                <span className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">
+                                  {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
+                                </span>
+                                {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                              </div>
+                            </div>
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors" title="Öppna">
+                              <Download className="w-3.5 h-3.5" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {dealDocuments.length === 0 && (
+                      <p className="text-xs text-gray-400 text-center py-2">Inga dokument ännu</p>
+                    )}
                   </div>
                 )}
 

@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Phone,
@@ -97,15 +97,18 @@ interface Booking {
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const business = useBusiness()
   const customerId = params.id as string
+
+  const initialTab = searchParams.get('tab') === 'documents' ? 'documents' : searchParams.get('tab') === 'bookings' ? 'bookings' : 'timeline'
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [documents, setDocuments] = useState<CustomerDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents'>('timeline')
+  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents'>(initialTab)
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
