@@ -1,5 +1,20 @@
 {
-  "installCommand": "npm install",
-  "buildCommand": "npm run build",
-  "framework": "nextjs"
+  "crons": [
+    {
+      "path": "/api/cron/nurture",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/check-overdue",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/communication-check",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/sync-calendars",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }
