@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isFortnoxConnected, getFortnoxCustomers } from '@/lib/fortnox'
 
 interface ExistingCustomer {
@@ -16,55 +15,26 @@ interface ExistingCustomer {
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
-
-    // Get user from auth cookie
-    const authCookie = cookieStore.get('sb-access-token')?.value ||
-                       cookieStore.get('supabase-auth-token')?.value
-
-    if (!authCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: { user }, error: authError } = await createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ).auth.getUser(authCookie)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get business_id
-    const { data: business, error: businessError } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (businessError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
     const businessId = business.business_id
 
-    // Check Fortnox connection
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
       return NextResponse.json({ error: 'Fortnox not connected' }, { status: 400 })
     }
 
-    // Get customers from Fortnox
     const fortnoxCustomers = await getFortnoxCustomers(businessId)
 
-    // Get existing customers from Handymate
     const { data: existingCustomers } = await supabase
       .from('customer')
       .select('email, phone_number, fortnox_customer_number')
       .eq('business_id', businessId)
 
-    // Create lookup sets for matching
     const typedCustomers = existingCustomers as ExistingCustomer[] | null
     const existingEmails = new Set(
       typedCustomers?.map(c => c.email?.toLowerCase()).filter(Boolean) || []
@@ -82,15 +52,12 @@ export async function POST(request: NextRequest) {
       errors: [] as { customerNumber: string; name: string; error: string }[]
     }
 
-    // Import each customer
     for (const fc of fortnoxCustomers) {
-      // Skip if already linked
       if (fc.CustomerNumber && existingFortnoxNumbers.has(fc.CustomerNumber)) {
         results.skipped++
         continue
       }
 
-      // Skip if matching email or phone exists
       if (fc.Email && existingEmails.has(fc.Email.toLowerCase())) {
         results.skipped++
         continue
@@ -101,7 +68,6 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        // Build address line
         let addressLine = ''
         if (fc.Address1) {
           addressLine = fc.Address1
@@ -110,7 +76,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create customer in Handymate
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 12)
 
         const { error: insertError } = await supabase
@@ -157,9 +122,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * Normalize phone number for comparison
- */
 function normalizePhone(phone: string | null | undefined): string {
   if (!phone) return ''
   return phone.replace(/[\s\-\(\)]/g, '').replace(/^00/, '+')

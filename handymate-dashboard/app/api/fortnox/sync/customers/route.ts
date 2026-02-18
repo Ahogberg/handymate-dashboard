@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import {
   isFortnoxConnected,
   createFortnoxCustomer,
-  FortnoxCustomer
 } from '@/lib/fortnox'
 
 interface Customer {
@@ -23,46 +21,19 @@ interface Customer {
  */
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = getServerSupabase()
-
-    // Get user from auth cookie
-    const authCookie = cookieStore.get('sb-access-token')?.value ||
-                       cookieStore.get('supabase-auth-token')?.value
-
-    if (!authCookie) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { data: { user }, error: authError } = await createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ).auth.getUser(authCookie)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get business_id
-    const { data: business, error: businessError } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (businessError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
-
     const businessId = business.business_id
 
-    // Check Fortnox connection
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
       return NextResponse.json({ error: 'Fortnox not connected' }, { status: 400 })
     }
 
-    // Get all customers without fortnox_customer_number
     const { data: customers, error: fetchError } = await supabase
       .from('customer')
       .select('customer_id, name, email, phone_number, address_line, fortnox_customer_number')
@@ -79,10 +50,8 @@ export async function POST(request: NextRequest) {
       errors: [] as { customerId: string; name: string; error: string }[]
     }
 
-    // Sync each customer
     for (const customer of (customers as Customer[]) || []) {
       try {
-        // Parse address
         let address1 = ''
         let zipCode = ''
         let city = ''
@@ -100,7 +69,6 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Create in Fortnox
         const fortnoxCustomer = await createFortnoxCustomer(businessId, {
           Name: customer.name,
           Email: customer.email || undefined,
@@ -110,7 +78,6 @@ export async function POST(request: NextRequest) {
           City: city || undefined
         })
 
-        // Update customer in DB
         await supabase
           .from('customer')
           .update({
@@ -131,7 +98,6 @@ export async function POST(request: NextRequest) {
           error: errorMessage
         })
 
-        // Log error to customer record
         await supabase
           .from('customer')
           .update({ fortnox_sync_error: errorMessage })
