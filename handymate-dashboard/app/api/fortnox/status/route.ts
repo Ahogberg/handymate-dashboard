@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
-import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getFortnoxConfig } from '@/lib/fortnox'
 
 /**
@@ -10,36 +8,9 @@ import { getFortnoxConfig } from '@/lib/fortnox'
  */
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const supabase = getServerSupabase()
-
-    // Get user from auth cookie
-    const authCookie = cookieStore.get('sb-access-token')?.value ||
-                       cookieStore.get('supabase-auth-token')?.value
-
-    if (!authCookie) {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Parse the auth token to get user ID
-    const { data: { user }, error: authError } = await createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ).auth.getUser(authCookie)
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Get business_id for this user
-    const { data: business, error: businessError } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (businessError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
     // Get Fortnox config

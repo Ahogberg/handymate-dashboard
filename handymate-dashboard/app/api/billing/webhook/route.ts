@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-01-28.clover' as any
-})
-
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not configured')
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: '2026-01-28.clover' as any
+  })
+}
 
 /**
  * POST /api/billing/webhook - Stripe webhook handler
@@ -15,6 +18,12 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
  */
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe()
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 })
+    }
+
     const body = await request.text()
     const signature = request.headers.get('stripe-signature')
 
@@ -35,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        await handleCheckoutCompleted(supabase, event)
+        await handleCheckoutCompleted(supabase, event, stripe)
         break
       }
 
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
  * checkout.session.completed
  * Kunden har slutfört betalningen -- uppdatera plan, Stripe-IDs.
  */
-async function handleCheckoutCompleted(supabase: any, event: Stripe.Event) {
+async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, stripe: Stripe) {
   const session = event.data.object as Stripe.Checkout.Session
   const businessId = session.metadata?.business_id
   const planId = session.metadata?.plan_id
