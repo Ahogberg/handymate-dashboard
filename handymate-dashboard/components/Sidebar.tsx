@@ -23,6 +23,7 @@ import {
   User,
   TrendingUp,
   Bell,
+  Package,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -420,6 +421,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           <div className="flex items-center gap-3">
             <Clock className={`w-5 h-5 ${isActive('/dashboard/time') ? 'text-cyan-300' : ''}`} />
             <span className="text-sm sm:text-base">Tid</span>
+          </div>
+        </Link>
+
+        {/* Lager */}
+        <Link href="/dashboard/inventory" className={navClass(isActive('/dashboard/inventory'))}>
+          <div className="flex items-center gap-3">
+            <Package className={`w-5 h-5 ${isActive('/dashboard/inventory') ? 'text-cyan-300' : ''}`} />
+            <span className="text-sm sm:text-base">Lager</span>
           </div>
         </Link>
 
