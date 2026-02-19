@@ -182,6 +182,17 @@ Viktigt: Håll svaren korta - detta är SMS!`
     // Skicka SMS-svar
     await sendSMS(from, aiResponse, business.business_name)
 
+    // Pause nurture sequences on customer response
+    try {
+      const { pauseEnrollmentForResponse } = await import('@/lib/nurture')
+      await pauseEnrollmentForResponse({
+        businessId: business.business_id,
+        customerId: customer.customer_id,
+        responseChannel: 'sms',
+        responseText: message,
+      })
+    } catch { /* non-blocking */ }
+
     // Skapa inbox-item för översikt
     await supabase
       .from('inbox_item')

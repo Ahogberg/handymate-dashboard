@@ -45,6 +45,14 @@ export async function POST(request: NextRequest) {
 
     if (!business.forward_phone_number) {
       console.error('No forward number configured for business:', business.business_id)
+      // Notify about missed call
+      try {
+        const { notifyMissedCall } = await import('@/lib/notifications')
+        await notifyMissedCall({
+          businessId: business.business_id,
+          phoneNumber: from,
+        })
+      } catch { /* non-blocking */ }
       return NextResponse.json({ "hangup": "no_forward_number" })
     }
 
@@ -72,6 +80,18 @@ export async function POST(request: NextRequest) {
       })
       .select('recording_id')
       .single()
+
+    // Pause nurture sequences when customer calls
+    if (customerId) {
+      try {
+        const { pauseEnrollmentForResponse } = await import('@/lib/nurture')
+        await pauseEnrollmentForResponse({
+          businessId: business.business_id,
+          customerId,
+          responseChannel: 'call',
+        })
+      } catch { /* non-blocking */ }
+    }
 
     // Bygg svaret till 46elks
     const response: any = {}

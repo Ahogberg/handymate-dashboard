@@ -323,12 +323,21 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
   const currentStep = enrollment.current_step || 0
 
   if (currentStep >= steps.length) {
-    // All steps done
+    // All steps done — escalate if no conversion
     await supabase
       .from('nurture_enrollment')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', enrollmentId)
-    return { success: true, action: 'completed' }
+
+    // Escalation: create notification + AI suggestion for manual follow-up
+    await escalateCompletedSequence({
+      businessId: enrollment.business_id,
+      customerId: enrollment.customer_id,
+      sequenceId: enrollment.sequence_id,
+      enrollmentId,
+    })
+
+    return { success: true, action: 'completed_and_escalated' }
   }
 
   const step = steps[currentStep]
@@ -410,7 +419,7 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
   // Advance to next step
   const nextStep = currentStep + 1
   if (nextStep >= steps.length) {
-    // Last step done
+    // Last step done — escalate if no conversion
     await supabase
       .from('nurture_enrollment')
       .update({
@@ -420,7 +429,16 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
         next_action_at: null,
       })
       .eq('id', enrollmentId)
-    return { success: true, action: `step_${currentStep}_sent_and_completed` }
+
+    // Escalation: notify + create AI suggestion
+    await escalateCompletedSequence({
+      businessId: enrollment.business_id,
+      customerId: enrollment.customer_id,
+      sequenceId: enrollment.sequence_id,
+      enrollmentId,
+    })
+
+    return { success: true, action: `step_${currentStep}_sent_and_escalated` }
   }
 
   // Calculate next action time
@@ -524,6 +542,135 @@ export async function getNurtureStats(businessId: string): Promise<{
     cancelled_this_week: cancelledCount || 0,
     sequences: seqList,
   }
+}
+
+// ── Escalation & Pause ────────────────────────────────────────
+
+/**
+ * Escalate when a nurture sequence completes without customer conversion.
+ * Creates a notification + an AI suggestion for manual follow-up.
+ */
+async function escalateCompletedSequence(params: {
+  businessId: string
+  customerId: string
+  sequenceId: string
+  enrollmentId: string
+}): Promise<void> {
+  const supabase = getServerSupabase()
+
+  try {
+    // Get sequence and customer info
+    const [{ data: sequence }, { data: customer }] = await Promise.all([
+      supabase.from('nurture_sequence').select('name, trigger_type').eq('id', params.sequenceId).single(),
+      supabase.from('customer').select('name, phone_number, email').eq('customer_id', params.customerId).single(),
+    ])
+
+    const sequenceName = sequence?.name || 'Okänd sekvens'
+    const customerName = customer?.name || 'Okänd kund'
+
+    // Create notification
+    try {
+      const { notifyNurtureComplete, notifyEscalation } = await import('@/lib/notifications')
+      await notifyNurtureComplete({
+        businessId: params.businessId,
+        customerName,
+        customerId: params.customerId,
+        sequenceName,
+      })
+      await notifyEscalation({
+        businessId: params.businessId,
+        title: `Eskalering: ${customerName} svarade inte`,
+        message: `"${sequenceName}" avslutades utan konvertering. Kunden har inte svarat på ${sequence?.trigger_type === 'quote_sent' ? 'offerten' : 'kontaktförsöken'}. Manuell uppföljning krävs.`,
+        link: `/dashboard/customers/${params.customerId}`,
+        metadata: { customer_id: params.customerId, sequence_id: params.sequenceId, enrollment_id: params.enrollmentId },
+      })
+    } catch { /* non-blocking */ }
+
+    // Create AI suggestion for follow-up
+    await supabase.from('ai_suggestion').insert({
+      business_id: params.businessId,
+      customer_id: params.customerId,
+      suggestion_type: 'follow_up',
+      title: `Manuell uppföljning: ${customerName}`,
+      description: `Uppföljningssekvensen "${sequenceName}" slutfördes utan att kunden svarade. Ring eller besök kunden för personlig kontakt.`,
+      priority: 'high',
+      status: 'pending',
+      suggested_data: {
+        reason: 'nurture_sequence_completed_without_conversion',
+        sequence_name: sequenceName,
+        sequence_id: params.sequenceId,
+        customer_phone: customer?.phone_number,
+        customer_email: customer?.email,
+      },
+      source_text: `Automatisk eskalering från "${sequenceName}"`,
+    })
+  } catch (err: any) {
+    console.error('Escalation error (non-blocking):', err.message)
+  }
+}
+
+/**
+ * Pause an active enrollment when a customer responds mid-sequence.
+ * Call this from SMS/email incoming handlers when a response is detected.
+ */
+export async function pauseEnrollmentForResponse(params: {
+  businessId: string
+  customerId: string
+  responseChannel: 'sms' | 'email' | 'call'
+  responseText?: string
+}): Promise<{ paused: number }> {
+  const supabase = getServerSupabase()
+
+  // Find active enrollments for this customer
+  const { data: activeEnrollments } = await supabase
+    .from('nurture_enrollment')
+    .select('id, sequence_id')
+    .eq('business_id', params.businessId)
+    .eq('customer_id', params.customerId)
+    .eq('status', 'active')
+
+  if (!activeEnrollments || activeEnrollments.length === 0) {
+    return { paused: 0 }
+  }
+
+  // Pause all active enrollments
+  const enrollmentIds = activeEnrollments.map((e: any) => e.id)
+  await supabase
+    .from('nurture_enrollment')
+    .update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancel_reason: `customer_responded_via_${params.responseChannel}`,
+    })
+    .in('id', enrollmentIds)
+
+  // Get customer name for notification
+  const { data: customer } = await supabase
+    .from('customer')
+    .select('name')
+    .eq('customer_id', params.customerId)
+    .single()
+
+  const customerName = customer?.name || 'Kund'
+
+  // Create notification
+  try {
+    const { createNotification } = await import('@/lib/notifications')
+    await createNotification({
+      businessId: params.businessId,
+      type: 'nurture_response',
+      title: `${customerName} svarade under aktiv sekvens`,
+      message: `Uppföljningssekvensen pausades automatiskt. ${params.responseText ? `Svar: "${params.responseText.substring(0, 100)}"` : `Svarade via ${params.responseChannel}`}`,
+      link: `/dashboard/customers/${params.customerId}`,
+      metadata: {
+        customer_id: params.customerId,
+        response_channel: params.responseChannel,
+        paused_enrollments: enrollmentIds,
+      },
+    })
+  } catch { /* non-blocking */ }
+
+  return { paused: enrollmentIds.length }
 }
 
 // ── Internal Helpers ───────────────────────────────────────────
