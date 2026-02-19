@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 interface InvoiceItem {
   description: string
@@ -172,17 +173,31 @@ export async function POST(request: NextRequest) {
     const vatAmount = subtotal * (vat_rate / 100)
     let total = subtotal + vatAmount
 
-    // ROT/RUT-avdrag
+    // ROT/RUT-avdrag med årstaksvalidering
     let rotRutDeduction = 0
     let customerPays = total
+    let rotRutWarning: string | undefined
 
-    if (rot_rut_type) {
-      // ROT: 30% avdrag på arbetskostnad, max 50 000 kr/år
-      // RUT: 50% avdrag på arbetskostnad, max 75 000 kr/år
+    if (rot_rut_type && customer_id) {
       const laborCost = items
         .filter((i: InvoiceItem) => i.type === 'labor')
         .reduce((sum: number, i: InvoiceItem) => sum + i.total, 0)
 
+      const cappedResult = await calculateCappedDeduction(
+        customer_id,
+        business_id,
+        rot_rut_type as 'rot' | 'rut',
+        laborCost
+      )
+
+      rotRutDeduction = cappedResult.deduction
+      customerPays = total - rotRutDeduction
+      rotRutWarning = cappedResult.warning
+    } else if (rot_rut_type && !customer_id) {
+      // Fallback utan kundkoppling
+      const laborCost = items
+        .filter((i: InvoiceItem) => i.type === 'labor')
+        .reduce((sum: number, i: InvoiceItem) => sum + i.total, 0)
       const deductionRate = rot_rut_type === 'rot' ? 0.30 : 0.50
       rotRutDeduction = Math.round(laborCost * deductionRate * 100) / 100
       customerPays = total - rotRutDeduction
@@ -341,7 +356,10 @@ export async function POST(request: NextRequest) {
         .in('material_id', project_material_ids)
     }
 
-    return NextResponse.json({ invoice })
+    return NextResponse.json({
+      invoice,
+      ...(rotRutWarning ? { rot_rut_warning: rotRutWarning } : {}),
+    })
 
   } catch (error: any) {
     console.error('Create invoice error:', error)
