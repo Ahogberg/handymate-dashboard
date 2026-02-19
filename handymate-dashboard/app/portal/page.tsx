@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   Calendar,
@@ -55,7 +55,19 @@ interface PortalData {
   }>
 }
 
-export default function CustomerPortalPage() {
+export default function CustomerPortalPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+      </div>
+    }>
+      <CustomerPortalPage />
+    </Suspense>
+  )
+}
+
+function CustomerPortalPage() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   const [data, setData] = useState<PortalData | null>(null)
