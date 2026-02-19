@@ -20,7 +20,8 @@ import {
   LayoutGrid,
   FileText,
   Filter,
-  CheckSquare
+  CheckSquare,
+  MapPin
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -56,6 +57,12 @@ interface TimeEntry {
   invoiced: boolean
   invoice_id: string | null
   created_at: string
+  start_latitude?: number | null
+  start_longitude?: number | null
+  start_address?: string | null
+  end_latitude?: number | null
+  end_longitude?: number | null
+  end_address?: string | null
   customer?: { customer_id: string; name: string }
   booking?: { booking_id: string; notes: string }
   work_type?: { work_type_id: string; name: string; multiplier: number }
@@ -122,6 +129,10 @@ export default function TimePage() {
   const [activeTimer, setActiveTimer] = useState(false)
   const [timerStart, setTimerStart] = useState<Date | null>(null)
   const [timerElapsed, setTimerElapsed] = useState(0)
+
+  // Geo
+  const [startGeo, setStartGeo] = useState<{ lat: number; lng: number } | null>(null)
+  const [endGeo, setEndGeo] = useState<{ lat: number; lng: number } | null>(null)
 
   // Modal
   const [showModal, setShowModal] = useState(false)
@@ -318,9 +329,30 @@ export default function TimePage() {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
   }
 
+  // GPS helper
+  const getGeoLocation = (): Promise<{ lat: number; lng: number } | null> => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null)
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => resolve(null),
+        { timeout: 5000, enableHighAccuracy: true }
+      )
+    })
+  }
+
   // Timer
-  const startTimer = () => { setActiveTimer(true); setTimerStart(new Date()); setTimerElapsed(0) }
-  const stopTimer = () => {
+  const startTimer = async () => {
+    setActiveTimer(true)
+    setTimerStart(new Date())
+    setTimerElapsed(0)
+    const geo = await getGeoLocation()
+    setStartGeo(geo)
+    setEndGeo(null)
+  }
+  const stopTimer = async () => {
+    const geo = await getGeoLocation()
+    setEndGeo(geo)
     if (timerStart) {
       const mins = Math.floor((Date.now() - timerStart.getTime()) / 60000)
       setFormData(prev => ({ ...prev, duration_hours: Math.floor(mins / 60), duration_minutes: mins % 60, work_date: format(new Date(), 'yyyy-MM-dd') }))
@@ -377,7 +409,7 @@ export default function TimePage() {
       // Determine which user to assign the entry to
       const assignToUser = isOwnerOrAdmin && formPersonId ? formPersonId : currentUser?.id || null
 
-      const entryData = {
+      const entryData: any = {
         business_id: business.business_id,
         customer_id: formData.customer_id || null,
         booking_id: formData.booking_id || null,
@@ -390,6 +422,16 @@ export default function TimePage() {
         is_billable: formData.is_billable
       }
 
+      // Add GPS data if captured from timer
+      if (startGeo) {
+        entryData.start_latitude = startGeo.lat
+        entryData.start_longitude = startGeo.lng
+      }
+      if (endGeo) {
+        entryData.end_latitude = endGeo.lat
+        entryData.end_longitude = endGeo.lng
+      }
+
       if (editingEntry) {
         const { error } = await supabase.from('time_entry').update(entryData).eq('time_entry_id', editingEntry.time_entry_id)
         if (error) throw error
@@ -399,6 +441,9 @@ export default function TimePage() {
         if (error) throw error
         showToast('Tid registrerad!', 'success')
       }
+      // Clear geo state after save
+      setStartGeo(null)
+      setEndGeo(null)
 
       setShowModal(false)
       fetchEntries()
@@ -1067,6 +1112,19 @@ export default function TimePage() {
                               <User className="w-3 h-3" />
                               {entry.customer.name}
                             </span>
+                          )}
+                          {(entry as any).start_latitude && (
+                            <a
+                              href={`https://www.google.com/maps?q=${(entry as any).start_latitude},${(entry as any).start_longitude}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-blue-500 hover:text-blue-600"
+                              title={entry.start_address || 'Visa på karta'}
+                              onClick={e => e.stopPropagation()}
+                            >
+                              <MapPin className="w-3 h-3" />
+                              GPS
+                            </a>
                           )}
                           {entry.hourly_rate && (
                             <span className="flex items-center gap-1">
