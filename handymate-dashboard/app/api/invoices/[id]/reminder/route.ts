@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { generateOCR } from '@/lib/ocr'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -76,7 +77,7 @@ export async function POST(
     const defaultTemplate = `Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till ${bankgiro ? `bankgiro ${bankgiro}` : ''}${bankgiro && swishNumber ? ' eller ' : ''}${swishNumber ? `Swish ${swishNumber}` : ''}. OCR: {ocr}. Frågor? Ring ${businessConfig?.phone_number || ''}. //${businessName}`
 
     const template = businessConfig?.reminder_sms_template || defaultTemplate
-    const ocrNumber = invoice.invoice_number?.replace('-', '') + '0'
+    const ocrNumber = generateOCR(invoice.invoice_number || '')
 
     const message = template
       .replace('{invoice_number}', invoice.invoice_number || '')

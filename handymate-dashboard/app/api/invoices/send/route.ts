@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
+import { generateOCR } from '@/lib/ocr'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -141,7 +142,7 @@ export async function POST(request: NextRequest) {
       <p><strong>Betalningsinformation:</strong></p>
       <p>
         Bankgiro: ${business?.bankgiro || 'Ej angivet'}<br>
-        OCR: ${invoice.invoice_number?.replace('-', '')}0
+        OCR: ${generateOCR(invoice.invoice_number || '')}
       </p>
 
       <center>

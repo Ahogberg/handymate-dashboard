@@ -21,6 +21,7 @@ import {
   Bell
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { generateOCR } from '@/lib/ocr'
 import Link from 'next/link'
 
 interface InvoiceItem {
@@ -257,7 +258,7 @@ export default function InvoiceDetailPage() {
   }
 
   const items = invoice.items || []
-  const ocrNumber = invoice.invoice_number?.replace('-', '') + '0'
+  const ocrNumber = generateOCR(invoice.invoice_number || '')
 
   // Build timeline events
   const timelineEvents = [

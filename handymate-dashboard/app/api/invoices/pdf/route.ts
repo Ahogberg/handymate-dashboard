@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { generateOCR } from '@/lib/ocr'
 
 // Force dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
@@ -61,8 +62,8 @@ export async function GET(request: NextRequest) {
 
     const items = (invoice.items || []) as InvoiceItem[]
 
-    // Generera OCR-nummer (baserat på fakturanummer)
-    const ocrNumber = invoice.invoice_number?.replace('-', '') + '0' // Enkel checksumma
+    // Generera OCR-nummer med Luhn mod 10 checksumma
+    const ocrNumber = generateOCR(invoice.invoice_number || '')
 
     // Skapa HTML för PDF
     const html = `
