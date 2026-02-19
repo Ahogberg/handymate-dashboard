@@ -19,7 +19,8 @@ import {
   Smartphone,
   Building,
   Bell,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
@@ -528,13 +529,22 @@ export default function InvoiceDetailPage() {
 
           <div className="flex items-center gap-2 flex-wrap">
             <a
-              href={`/api/invoices/pdf?invoiceId=${invoiceId}`}
+              href={`/api/invoices/pdf?invoiceId=${invoiceId}&format=pdf`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
             >
               <Download className="w-4 h-4" />
               PDF
+            </a>
+            <a
+              href={`/api/invoices/pdf?invoiceId=${invoiceId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:bg-gray-200 text-sm"
+            >
+              <Eye className="w-4 h-4" />
+              Förhandsgranska
             </a>
 
             {invoice.status === 'draft' && (

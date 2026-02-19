@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
+import { generateInvoicePDF } from '@/lib/pdf-generator'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -61,6 +62,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     }
 
+    // Hämta företagsconfig för PDF-generering
+    const { data: businessConfig } = await supabase
+      .from('business_config')
+      .select('*')
+      .eq('business_id', business.business_id)
+      .single()
+
     const results: { sms?: boolean; email?: boolean; errors: string[] } = { errors: [] }
 
     // Skicka email
@@ -68,6 +76,36 @@ export async function POST(request: NextRequest) {
       try {
         const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate.se'}/api/invoices/pdf?invoiceId=${invoice_id}`
         const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
+
+        // Generera PDF-bilaga
+        const pdfBuffer = generateInvoicePDF(
+          {
+            invoice_number: invoice.invoice_number,
+            invoice_date: invoice.invoice_date,
+            due_date: invoice.due_date,
+            status: invoice.status,
+            items: invoice.items || [],
+            subtotal: invoice.subtotal,
+            vat_rate: invoice.vat_rate,
+            vat_amount: invoice.vat_amount,
+            total: invoice.total,
+            rot_rut_type: invoice.rot_rut_type,
+            rot_rut_deduction: invoice.rot_rut_deduction,
+            customer_pays: invoice.customer_pays,
+            is_credit_note: invoice.is_credit_note,
+            credit_reason: invoice.credit_reason,
+            customer: invoice.customer,
+          },
+          {
+            business_name: businessConfig?.business_name || business?.business_name,
+            org_number: businessConfig?.org_number,
+            contact_email: businessConfig?.contact_email,
+            contact_phone: businessConfig?.contact_phone,
+            address: businessConfig?.address,
+            bankgiro: businessConfig?.bankgiro,
+            f_skatt_registered: businessConfig?.f_skatt_registered,
+          }
+        )
 
         await resend.emails.send({
           from: `${business?.business_name || 'Handymate'} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
@@ -156,7 +194,13 @@ export async function POST(request: NextRequest) {
   </div>
 </body>
 </html>
-          `
+          `,
+          attachments: [
+            {
+              filename: `faktura-${invoice.invoice_number}.pdf`,
+              content: pdfBuffer,
+            }
+          ]
         })
 
         results.email = true

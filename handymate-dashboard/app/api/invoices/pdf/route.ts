@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
+import { generateInvoicePDF } from '@/lib/pdf-generator'
 
 // Force dynamic to prevent static generation
 export const dynamic = 'force-dynamic'
@@ -61,11 +62,54 @@ export async function GET(request: NextRequest) {
       .single()
 
     const items = (invoice.items || []) as InvoiceItem[]
+    const format = request.nextUrl.searchParams.get('format') || 'html'
+
+    // Generera binär PDF
+    if (format === 'pdf') {
+      const pdfBuffer = generateInvoicePDF(
+        {
+          invoice_number: invoice.invoice_number,
+          invoice_date: invoice.invoice_date,
+          due_date: invoice.due_date,
+          status: invoice.status,
+          items,
+          subtotal: invoice.subtotal,
+          vat_rate: invoice.vat_rate,
+          vat_amount: invoice.vat_amount,
+          total: invoice.total,
+          rot_rut_type: invoice.rot_rut_type,
+          rot_rut_deduction: invoice.rot_rut_deduction,
+          customer_pays: invoice.customer_pays,
+          is_credit_note: invoice.is_credit_note,
+          credit_reason: invoice.credit_reason,
+          original_invoice_id: invoice.original_invoice_id,
+          personnummer: invoice.personnummer,
+          fastighetsbeteckning: invoice.fastighetsbeteckning,
+          customer: invoice.customer,
+        },
+        {
+          business_name: businessConfig?.business_name,
+          org_number: businessConfig?.org_number,
+          contact_email: businessConfig?.contact_email,
+          contact_phone: businessConfig?.contact_phone,
+          address: businessConfig?.address,
+          bankgiro: businessConfig?.bankgiro,
+          f_skatt_registered: businessConfig?.f_skatt_registered,
+        }
+      )
+
+      return new NextResponse(pdfBuffer, {
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `inline; filename="faktura-${invoice.invoice_number}.pdf"`,
+        },
+      })
+    }
 
     // Generera OCR-nummer med Luhn mod 10 checksumma
     const ocrNumber = generateOCR(invoice.invoice_number || '')
 
-    // Skapa HTML för PDF
+    // Skapa HTML för PDF (legacy format=html)
     const html = `
 <!DOCTYPE html>
 <html>
