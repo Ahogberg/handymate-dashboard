@@ -122,6 +122,18 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
         source_text: suggestion.source_text || '',
       })
 
+      // Create notification for the conflict
+      try {
+        const { notifyBookingConflict } = await import('@/lib/notifications')
+        await notifyBookingConflict({
+          businessId,
+          customerName: actionData.customer_name || 'Kund',
+          requestedDate,
+          requestedTime,
+          conflicts,
+        })
+      } catch { /* non-blocking */ }
+
       return {
         success: false,
         error: `Bokningskonflikt: krockar med ${conflicts.length} befintlig(a) post(er). Konfliktnotis skapad.`,
@@ -390,6 +402,20 @@ async function createCustomer(supabase: SupabaseClient, suggestion: any, actionD
       .single()
 
     if (error) throw error
+
+    // Notify new lead
+    if (customer?.customer_id) {
+      try {
+        const { notifyNewLead } = await import('@/lib/notifications')
+        await notifyNewLead({
+          businessId,
+          customerName: actionData.customer_name || 'Ny kund',
+          customerId: customer.customer_id,
+          source: 'samtal',
+        })
+      } catch { /* non-blocking */ }
+    }
+
     return { success: true, customer_id: customer?.customer_id }
   } catch (error: any) {
     return { success: false, error: error.message }

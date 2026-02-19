@@ -5,6 +5,9 @@ interface OverdueInvoice {
   invoice_id: string
   invoice_number: string
   due_date: string
+  business_id: string
+  total: number
+  customer?: { name: string } | null
 }
 
 /**
@@ -35,7 +38,7 @@ async function checkOverdueInvoices() {
     // Find all sent invoices where due_date has passed
     const { data: overdueInvoices, error: fetchError } = await supabase
       .from('invoice')
-      .select('invoice_id, invoice_number, due_date')
+      .select('invoice_id, invoice_number, due_date, business_id, total, customer:customer_id(name)')
       .eq('status', 'sent')
       .lt('due_date', today)
 
@@ -66,6 +69,25 @@ async function checkOverdueInvoices() {
     }
 
     console.log(`Marked ${invoiceIds.length} invoices as overdue`)
+
+    // Create notifications for each overdue invoice
+    try {
+      const { notifyInvoiceOverdue } = await import('@/lib/notifications')
+      for (const inv of overdueInvoices as OverdueInvoice[]) {
+        const daysPastDue = Math.floor(
+          (new Date(today).getTime() - new Date(inv.due_date).getTime()) / (1000 * 60 * 60 * 24)
+        )
+        await notifyInvoiceOverdue({
+          businessId: inv.business_id,
+          invoiceNumber: inv.invoice_number,
+          customerName: (inv.customer as any)?.name || 'Okänd kund',
+          total: inv.total || 0,
+          daysPastDue,
+        })
+      }
+    } catch (notifErr: any) {
+      console.error('Notification error (non-blocking):', notifErr.message)
+    }
 
     return NextResponse.json({
       success: true,

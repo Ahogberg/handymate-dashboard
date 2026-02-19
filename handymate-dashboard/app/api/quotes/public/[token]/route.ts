@@ -185,7 +185,7 @@ export async function POST(
     try {
       const { data: signedQuote } = await supabase
         .from('quotes')
-        .select('quote_id, business_id, customer_id')
+        .select('quote_id, business_id, customer_id, total, customer:customer_id(name)')
         .eq('sign_token', token)
         .single()
 
@@ -197,6 +197,17 @@ export async function POST(
           customerId: signedQuote.customer_id,
           context: { quoteId: signedQuote.quote_id },
         })
+
+        // Notification: quote accepted
+        try {
+          const { notifyQuoteSigned } = await import('@/lib/notifications')
+          await notifyQuoteSigned({
+            businessId: signedQuote.business_id,
+            customerName: (signedQuote.customer as any)?.name || 'Kund',
+            quoteId: signedQuote.quote_id,
+            total: signedQuote.total || 0,
+          })
+        } catch { /* non-blocking */ }
       }
     } catch (commErr) {
       console.error('Communication trigger error (non-blocking):', commErr)

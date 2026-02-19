@@ -211,6 +211,18 @@ export async function tryAutoApprove(params: {
       status: 'success',
     })
 
+    // 10. Create notification
+    try {
+      const { notifyAutoApprove } = await import('@/lib/notifications')
+      await notifyAutoApprove({
+        businessId,
+        actionType,
+        title: suggestion.title || actionType,
+        confidence: confidencePercent,
+        resultId: result.booking_id || result.quote_id || result.customer_id,
+      })
+    } catch { /* non-blocking */ }
+
     return {
       suggestion_id: suggestionId,
       action_type: actionType,

@@ -22,6 +22,7 @@ import {
   X,
   User,
   TrendingUp,
+  Bell,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -36,13 +37,29 @@ function getInitials(name: string): string {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
 }
 
+interface NotificationItem {
+  id: string
+  type: string
+  title: string
+  message: string | null
+  icon: string
+  link: string | null
+  is_read: boolean
+  created_at: string
+}
+
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
   const [jobbOpen, setJobbOpen] = useState(false)
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const [notifCount, setNotifCount] = useState(0)
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [notifLoading, setNotifLoading] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
+  const notifRef = useRef<HTMLDivElement>(null)
   const { user: currentUser } = useCurrentUser()
 
   // Close mobile menu and user menu on route change
@@ -63,6 +80,91 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [userMenuOpen])
+
+  // Close notification panel on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    if (notifOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [notifOpen])
+
+  // Fetch notification count
+  useEffect(() => {
+    if (!businessId) return
+    fetchNotifCount()
+    const interval = setInterval(fetchNotifCount, 30000)
+    return () => clearInterval(interval)
+  }, [businessId])
+
+  async function fetchNotifCount() {
+    if (!businessId) return
+    try {
+      const { count } = await supabase
+        .from('notification')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .eq('is_read', false)
+      setNotifCount(count || 0)
+    } catch { /* silent */ }
+  }
+
+  async function openNotifications() {
+    setNotifOpen(!notifOpen)
+    if (!notifOpen && businessId) {
+      setNotifLoading(true)
+      try {
+        const { data } = await supabase
+          .from('notification')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false })
+          .limit(15)
+        setNotifications((data || []) as NotificationItem[])
+      } catch { /* silent */ }
+      setNotifLoading(false)
+    }
+  }
+
+  async function markAllRead() {
+    if (!businessId) return
+    try {
+      await supabase
+        .from('notification')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('business_id', businessId)
+        .eq('is_read', false)
+      setNotifCount(0)
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+    } catch { /* silent */ }
+  }
+
+  async function markOneRead(id: string) {
+    try {
+      await supabase
+        .from('notification')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', id)
+      setNotifCount(prev => Math.max(0, prev - 1))
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    } catch { /* silent */ }
+  }
+
+  function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'just nu'
+    if (mins < 60) return `${mins} min`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours} tim`
+    const days = Math.floor(hours / 24)
+    return `${days} dag${days > 1 ? 'ar' : ''}`
+  }
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -150,14 +252,86 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   const sidebarContent = (
     <>
-      {/* Logo */}
+      {/* Logo + Notification bell */}
       <div className="p-4 sm:p-6 border-b border-white/10">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-            <Zap className="w-5 h-5 text-white" />
+        <div className="flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <Zap className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-xl font-bold text-white">Handymate</span>
+          </Link>
+          <div className="relative" ref={notifRef}>
+            <button
+              onClick={openNotifications}
+              className="relative p-2 rounded-lg text-blue-200/70 hover:text-white hover:bg-white/10 transition-all"
+              aria-label="Notifikationer"
+            >
+              <Bell className="w-5 h-5" />
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-full">
+                  {notifCount > 99 ? '99+' : notifCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification dropdown */}
+            {notifOpen && (
+              <div className="absolute left-0 top-full mt-2 w-80 bg-[#0f2744] border border-white/10 rounded-xl shadow-2xl z-50 max-h-[70vh] flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <span className="text-sm font-semibold text-white">Notifikationer</span>
+                  {notifCount > 0 && (
+                    <button
+                      onClick={markAllRead}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      Markera alla som lästa
+                    </button>
+                  )}
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  {notifLoading ? (
+                    <div className="p-6 text-center text-blue-300/50 text-sm">Laddar...</div>
+                  ) : notifications.length === 0 ? (
+                    <div className="p-6 text-center text-blue-300/50 text-sm">Inga notifikationer</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div
+                        key={n.id}
+                        className={`px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-all cursor-pointer ${
+                          !n.is_read ? 'bg-white/[0.03]' : ''
+                        }`}
+                        onClick={() => {
+                          if (!n.is_read) markOneRead(n.id)
+                          if (n.link) {
+                            setNotifOpen(false)
+                            setIsMobileOpen(false)
+                            window.location.href = n.link
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {!n.is_read && (
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 flex-shrink-0" />
+                          )}
+                          <div className={`flex-1 min-w-0 ${n.is_read ? 'ml-5' : ''}`}>
+                            <p className={`text-sm truncate ${n.is_read ? 'text-blue-200/60' : 'text-white font-medium'}`}>
+                              {n.title}
+                            </p>
+                            {n.message && (
+                              <p className="text-xs text-blue-300/40 mt-0.5 truncate">{n.message}</p>
+                            )}
+                            <p className="text-[10px] text-blue-300/30 mt-1">{timeAgo(n.created_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-          <span className="text-xl font-bold text-white">Handymate</span>
-        </Link>
+        </div>
       </div>
 
       {/* Navigation */}
