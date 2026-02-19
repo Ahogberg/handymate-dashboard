@@ -51,9 +51,84 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
       customerId = newCustomer?.customer_id
     }
 
+    const durationMinutes = actionData.duration_minutes || 60
     const scheduledStart = actionData.date && actionData.time
       ? `${actionData.date}T${actionData.time}:00`
       : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const scheduledEnd = new Date(
+      new Date(scheduledStart).getTime() + durationMinutes * 60 * 1000
+    ).toISOString()
+
+    // Check for booking collisions
+    const { data: conflictingBookings } = await supabase
+      .from('booking')
+      .select('booking_id, scheduled_start, scheduled_end, notes, customer:customer_id(name)')
+      .eq('business_id', businessId)
+      .neq('status', 'cancelled')
+      .lt('scheduled_start', scheduledEnd)
+      .gt('scheduled_end', scheduledStart)
+
+    // Also check schedule_entry collisions
+    const { data: conflictingSchedule } = await supabase
+      .from('schedule_entry')
+      .select('id, title, start_datetime, end_datetime')
+      .eq('business_id', businessId)
+      .neq('status', 'cancelled')
+      .lt('start_datetime', scheduledEnd)
+      .gt('end_datetime', scheduledStart)
+
+    const hasBookingConflict = conflictingBookings && conflictingBookings.length > 0
+    const hasScheduleConflict = conflictingSchedule && conflictingSchedule.length > 0
+
+    if (hasBookingConflict || hasScheduleConflict) {
+      // Build conflict description
+      const conflicts: string[] = []
+      if (hasBookingConflict) {
+        for (const c of conflictingBookings!) {
+          const cStart = new Date(c.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          const cEnd = new Date(c.scheduled_end).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          const customerName = (c.customer as any)?.name || 'Okänd kund'
+          conflicts.push(`Bokning: ${customerName} (${cStart}-${cEnd})`)
+        }
+      }
+      if (hasScheduleConflict) {
+        for (const c of conflictingSchedule!) {
+          const cStart = new Date(c.start_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          const cEnd = new Date(c.end_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+          conflicts.push(`Schema: ${c.title} (${cStart}-${cEnd})`)
+        }
+      }
+
+      const requestedDate = new Date(scheduledStart).toLocaleDateString('sv-SE')
+      const requestedTime = new Date(scheduledStart).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+
+      // Create a conflict notification via ai_suggestion
+      await supabase.from('ai_suggestion').insert({
+        business_id: businessId,
+        customer_id: customerId,
+        suggestion_type: 'reschedule',
+        title: `Bokningskonflikt: ${actionData.service || 'Ny bokning'} ${requestedDate} kl ${requestedTime}`,
+        description: `AI försökte boka ${requestedDate} kl ${requestedTime} men det krockar med:\n${conflicts.join('\n')}\n\nVänligen välj en annan tid.`,
+        priority: 'high',
+        status: 'pending',
+        suggested_data: {
+          original_suggestion_id: suggestion.suggestion_id,
+          requested_start: scheduledStart,
+          requested_end: scheduledEnd,
+          conflicts: conflicts,
+          customer_id: customerId,
+          service: actionData.service,
+        },
+        source_text: suggestion.source_text || '',
+      })
+
+      return {
+        success: false,
+        error: `Bokningskonflikt: krockar med ${conflicts.length} befintlig(a) post(er). Konfliktnotis skapad.`,
+        conflict: true,
+        conflicts,
+      }
+    }
 
     const { data: booking, error } = await supabase
       .from('booking')
@@ -61,7 +136,7 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
         business_id: businessId,
         customer_id: customerId,
         scheduled_start: scheduledStart,
-        scheduled_end: new Date(new Date(scheduledStart).getTime() + 60 * 60 * 1000).toISOString(),
+        scheduled_end: scheduledEnd,
         status: 'pending',
         notes: `${actionData.service || 'Tjänst'} - Skapad från AI-förslag`,
         source: 'ai_suggestion',
@@ -95,23 +170,122 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       customerId = newCustomer?.customer_id
     }
 
+    // Try AI-generated quote with full line items
+    let aiQuote: any = null
+    try {
+      const { data: business } = await supabase
+        .from('business_config')
+        .select('branch, default_hourly_rate, pricing_settings')
+        .eq('business_id', businessId)
+        .single()
+
+      const hourlyRate = business?.default_hourly_rate
+        || (business?.pricing_settings as any)?.default_hourly_rate
+        || 500
+
+      // Fetch price list for this business
+      const { data: priceListRows } = await supabase
+        .from('price_list')
+        .select('name, unit, unit_price, category')
+        .eq('business_id', businessId)
+        .limit(100)
+
+      // Build description from suggestion context
+      const description = [
+        actionData.service,
+        actionData.description,
+        suggestion.description,
+        suggestion.source_text,
+      ].filter(Boolean).join('\n')
+
+      if (description) {
+        const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
+        aiQuote = await generateQuoteFromInput({
+          businessId,
+          branch: business?.branch || 'Bygg',
+          hourlyRate,
+          textDescription: description,
+          customerId: customerId || undefined,
+          priceList: priceListRows || undefined,
+        })
+      }
+    } catch (aiErr: any) {
+      console.error('AI quote generation failed, using fallback:', aiErr.message)
+    }
+
+    // Build quote data from AI result or fallback
+    const quoteData: any = {
+      business_id: businessId,
+      customer_id: customerId,
+      status: 'draft',
+      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      source: 'ai_suggestion',
+    }
+
+    if (aiQuote && aiQuote.items && aiQuote.items.length > 0) {
+      // Use AI-generated line items
+      const items = aiQuote.items.map((item: any) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unit: item.unit,
+        unit_price: item.unitPrice,
+        total: Math.round(item.quantity * item.unitPrice * 100) / 100,
+        type: item.type || 'material',
+      }))
+
+      const laborTotal = items
+        .filter((i: any) => i.type === 'labor')
+        .reduce((sum: number, i: any) => sum + i.total, 0)
+      const materialTotal = items
+        .filter((i: any) => i.type !== 'labor')
+        .reduce((sum: number, i: any) => sum + i.total, 0)
+      const subtotal = laborTotal + materialTotal
+      const vatRate = 25
+      const vat = Math.round(subtotal * (vatRate / 100) * 100) / 100
+      const total = subtotal + vat
+
+      // ROT/RUT calculation
+      let rotRutType = aiQuote.suggestedDeductionType || 'none'
+      let rotRutDeduction = 0
+      if (rotRutType === 'rot') {
+        rotRutDeduction = Math.min(Math.round(laborTotal * 0.3), 50000)
+      } else if (rotRutType === 'rut') {
+        rotRutDeduction = Math.min(Math.round(laborTotal * 0.5), 75000)
+      }
+
+      quoteData.title = aiQuote.jobTitle || actionData.service || 'Offert'
+      quoteData.description = aiQuote.jobDescription || actionData.description || 'AI-genererad offert'
+      quoteData.items = items
+      quoteData.labor_total = laborTotal
+      quoteData.material_total = materialTotal
+      quoteData.total = subtotal
+      quoteData.vat_rate = vatRate
+      quoteData.vat = vat
+      quoteData.total_with_vat = total
+      quoteData.rot_rut_type = rotRutType !== 'none' ? rotRutType : null
+      quoteData.rot_rut_deduction = rotRutDeduction
+      quoteData.customer_pays = total - rotRutDeduction
+      quoteData.notes = `AI-genererad offert (konfidens: ${aiQuote.confidence}%). ${aiQuote.reasoning || ''}`
+    } else {
+      // Fallback: basic quote without line items
+      quoteData.title = actionData.service || 'Offert'
+      quoteData.description = actionData.description || 'Offert skapad från samtalsanalys'
+      quoteData.total = actionData.estimated_price ? parseFloat(actionData.estimated_price) : null
+    }
+
     const { data: quote, error } = await supabase
       .from('quotes')
-      .insert({
-        business_id: businessId,
-        customer_id: customerId,
-        status: 'draft',
-        title: actionData.service || 'Offert',
-        description: actionData.description || 'Offert skapad från samtalsanalys',
-        total_amount: actionData.estimated_price ? parseFloat(actionData.estimated_price) : null,
-        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        source: 'ai_suggestion',
-      })
+      .insert(quoteData)
       .select()
       .single()
 
     if (error) throw error
-    return { success: true, quote_id: quote?.quote_id }
+    return {
+      success: true,
+      quote_id: quote?.quote_id,
+      ai_generated: !!aiQuote,
+      items_count: aiQuote?.items?.length || 0,
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
