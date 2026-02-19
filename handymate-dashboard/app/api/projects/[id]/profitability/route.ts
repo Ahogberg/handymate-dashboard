@@ -109,9 +109,23 @@ export async function GET(
       .filter((m: any) => !m.invoiced)
       .reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
 
-    // Calculate profitability (including materials)
+    // Fetch extra project costs (subcontractor, other)
+    const { data: extraCosts } = await supabase
+      .from('project_cost')
+      .select('id, category, description, amount, date')
+      .eq('project_id', projectId)
+
+    const costItems = extraCosts || []
+    const subcontractorCost = costItems
+      .filter((c: any) => c.category === 'subcontractor')
+      .reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+    const otherCost = costItems
+      .filter((c: any) => c.category === 'other')
+      .reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+
+    // Calculate profitability (including materials + extra costs)
     const totalRevenue = quoteAmount + ataAdditions - ataRemovals + materialSellTotal
-    const totalCosts = actualCost + materialPurchaseTotal
+    const totalCosts = actualCost + materialPurchaseTotal + subcontractorCost + otherCost
     const totalBudgetHours = (project.budget_hours || 0) + ataHours
     const marginAmount = totalRevenue - totalCosts
     const marginPercent = totalRevenue > 0 ? (marginAmount / totalRevenue) * 100 : 0
@@ -128,8 +142,11 @@ export async function GET(
         actual_hours: Math.round(actualMinutes / 60 * 100) / 100,
         actual_amount: Math.round(actualCost),
         material_purchase: Math.round(materialPurchaseTotal),
+        subcontractor: Math.round(subcontractorCost),
+        other: Math.round(otherCost),
         total: Math.round(totalCosts)
       },
+      extra_costs: costItems,
       budget: {
         hours: project.budget_hours || 0,
         hours_with_ata: Math.round(totalBudgetHours * 100) / 100,

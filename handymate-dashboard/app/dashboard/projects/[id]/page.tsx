@@ -137,14 +137,23 @@ interface Summary {
 }
 
 interface Profitability {
-  revenue: { quote_amount: number; ata_additions: number; ata_removals: number; total: number }
-  costs: { actual_hours: number; actual_amount: number }
+  revenue: { quote_amount: number; ata_additions: number; ata_removals: number; material_sell: number; total: number }
+  costs: { actual_hours: number; actual_amount: number; material_purchase: number; subcontractor: number; other: number; total: number }
+  extra_costs: ExtraCost[]
   budget: {
     hours: number; hours_with_ata: number; amount: number; amount_with_ata: number
     hours_usage_percent: number; amount_usage_percent: number
   }
-  invoicing: { invoiced_amount: number; invoiced_hours: number; uninvoiced_hours: number; uninvoiced_amount: number }
+  invoicing: { invoiced_amount: number; invoiced_hours: number; uninvoiced_hours: number; uninvoiced_amount: number; invoiced_material: number; uninvoiced_material: number }
   margin: { amount: number; percent: number }
+}
+
+interface ExtraCost {
+  id: string
+  category: string
+  description: string | null
+  amount: number
+  date: string
 }
 
 type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists'
@@ -312,6 +321,8 @@ export default function ProjectDetailPage() {
   // Modals
   const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; editing: Milestone | null }>({ open: false, editing: null })
   const [changeModal, setChangeModal] = useState(false)
+  const [costModal, setCostModal] = useState(false)
+  const [deletingCostId, setDeletingCostId] = useState<string | null>(null)
 
   // Profitability (lazy loaded)
   const [profitability, setProfitability] = useState<Profitability | null>(null)
@@ -2144,6 +2155,12 @@ export default function ProjectDetailPage() {
                           <span>-{formatCurrency(profitability.revenue.ata_removals)}</span>
                         </div>
                       )}
+                      {profitability.revenue.material_sell > 0 && (
+                        <div className="flex justify-between">
+                          <span>Material (forsaljning)</span>
+                          <span>{formatCurrency(profitability.revenue.material_sell)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2153,11 +2170,30 @@ export default function ProjectDetailPage() {
                       <Clock className="w-4 h-4 text-amber-400" />
                       <p className="text-sm font-medium text-gray-500">Kostnader</p>
                     </div>
-                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.costs.actual_amount)}</p>
-                    <div className="text-xs text-gray-400">
+                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.costs.total)}</p>
+                    <div className="space-y-1 text-xs text-gray-400">
                       <div className="flex justify-between">
-                        <span>{formatHours(profitability.costs.actual_hours)} arbetad tid</span>
+                        <span>Arbetstid ({formatHours(profitability.costs.actual_hours)})</span>
+                        <span>{formatCurrency(profitability.costs.actual_amount)}</span>
                       </div>
+                      {profitability.costs.material_purchase > 0 && (
+                        <div className="flex justify-between">
+                          <span>Material (inkop)</span>
+                          <span>{formatCurrency(profitability.costs.material_purchase)}</span>
+                        </div>
+                      )}
+                      {profitability.costs.subcontractor > 0 && (
+                        <div className="flex justify-between">
+                          <span>Underentreprenor</span>
+                          <span>{formatCurrency(profitability.costs.subcontractor)}</span>
+                        </div>
+                      )}
+                      {profitability.costs.other > 0 && (
+                        <div className="flex justify-between">
+                          <span>Ovriga kostnader</span>
+                          <span>{formatCurrency(profitability.costs.other)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2221,7 +2257,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-sm text-gray-500">Belopp</span>
                         <span className="text-sm text-gray-900">
-                          {formatCurrency(profitability.costs.actual_amount)} / {formatCurrency(profitability.budget.amount_with_ata)}
+                          {formatCurrency(profitability.costs.total)} / {formatCurrency(profitability.budget.amount_with_ata)}
                         </span>
                       </div>
                       <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
@@ -2233,6 +2269,85 @@ export default function ProjectDetailPage() {
                       <p className="text-xs text-gray-400 mt-1">{profitability.budget.amount_usage_percent}%</p>
                     </div>
                   </div>
+                </div>
+
+                {/* Extra costs section */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                      <Briefcase className="w-5 h-5 text-amber-500" />
+                      Projektkostnader
+                    </h2>
+                    <button
+                      onClick={() => setCostModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Lagg till kostnad
+                    </button>
+                  </div>
+
+                  {profitability.extra_costs && profitability.extra_costs.length > 0 ? (
+                    <div className="space-y-2">
+                      {profitability.extra_costs.map((cost) => (
+                        <div key={cost.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                                cost.category === 'subcontractor'
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : 'bg-gray-200 text-gray-600'
+                              }`}>
+                                {cost.category === 'subcontractor' ? 'UE' : 'Ovrigt'}
+                              </span>
+                              <span className="text-sm text-gray-900 truncate">{cost.description || 'Ingen beskrivning'}</span>
+                            </div>
+                            <p className="text-xs text-gray-400 mt-0.5">{formatDate(cost.date)}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-900">{formatCurrency(cost.amount)}</span>
+                            <button
+                              onClick={async () => {
+                                if (deletingCostId) return
+                                setDeletingCostId(cost.id)
+                                try {
+                                  const res = await fetch(`/api/projects/${projectId}/costs?cost_id=${cost.id}`, { method: 'DELETE' })
+                                  if (res.ok) {
+                                    setProfitability(null)
+                                    showToast('Kostnad borttagen', 'success')
+                                  } else {
+                                    showToast('Kunde inte ta bort kostnad', 'error')
+                                  }
+                                } catch {
+                                  showToast('Kunde inte ta bort kostnad', 'error')
+                                } finally {
+                                  setDeletingCostId(null)
+                                }
+                              }}
+                              className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                              title="Ta bort"
+                            >
+                              {deletingCostId === cost.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex justify-between pt-2 border-t border-gray-100 text-sm">
+                        <span className="text-gray-500 font-medium">Totalt</span>
+                        <span className="font-bold text-gray-900">
+                          {formatCurrency(profitability.extra_costs.reduce((s, c) => s + c.amount, 0))}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 text-center py-4">
+                      Inga extra kostnader registrerade
+                    </p>
+                  )}
                 </div>
 
                 {/* Create invoice button */}
@@ -2286,6 +2401,20 @@ export default function ProjectDetailPage() {
             setProfitability(null)
             fetchProjectData()
             showToast('ATA skapad', 'success')
+          }}
+          onError={(msg) => showToast(msg, 'error')}
+        />
+      )}
+
+      {/* === Cost Modal === */}
+      {costModal && (
+        <CostModal
+          projectId={projectId}
+          onClose={() => setCostModal(false)}
+          onSaved={() => {
+            setCostModal(false)
+            setProfitability(null)
+            showToast('Kostnad tillagd', 'success')
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -2567,6 +2696,140 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Skapa
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Cost Modal (Lägg till kostnad) ---
+
+function CostModal({ projectId, onClose, onSaved, onError }: {
+  projectId: string
+  onClose: () => void
+  onSaved: () => void
+  onError: (msg: string) => void
+}) {
+  const [category, setCategory] = useState<'subcontractor' | 'other'>('subcontractor')
+  const [description, setDescription] = useState('')
+  const [amount, setAmount] = useState('')
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      onError('Ange ett belopp')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/costs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category,
+          description: description.trim() || null,
+          amount: parseFloat(amount),
+          date
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error')
+      }
+      onSaved()
+    } catch (err: any) {
+      onError(err.message || 'Kunde inte lagga till kostnad')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Lagg till kostnad</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-500 mb-2 block">Kategori</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setCategory('subcontractor')}
+                className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
+                  category === 'subcontractor'
+                    ? 'bg-purple-100 border-purple-500/30 text-purple-700'
+                    : 'bg-gray-100 border-gray-300 text-gray-500'
+                }`}
+              >
+                Underentreprenor
+              </button>
+              <button
+                onClick={() => setCategory('other')}
+                className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
+                  category === 'other'
+                    ? 'bg-amber-100 border-amber-500/30 text-amber-700'
+                    : 'bg-gray-100 border-gray-300 text-gray-500'
+                }`}
+              >
+                Ovrigt
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-gray-500 mb-2 block">Beskrivning</label>
+            <input
+              type="text"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="T.ex. Elektriker AB, hyra stegar..."
+              autoFocus
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-sm text-gray-500 mb-2 block">Belopp (kr) *</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                placeholder="0"
+                min="0"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-500 mb-2 block">Datum</label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !amount}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Lagg till
           </button>
         </div>
       </div>

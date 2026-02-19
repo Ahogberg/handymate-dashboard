@@ -15,7 +15,8 @@ import {
   FolderKanban,
   MessageSquare,
   Zap,
-  XCircle
+  XCircle,
+  BarChart3
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -71,6 +72,12 @@ export default function DashboardPage() {
   } | null>(null)
   const [scheduleToday, setScheduleToday] = useState<{ count: number; people: number; entries: { title: string; color: string; time: string }[] }>({ count: 0, people: 0, entries: [] })
   const [commStats, setCommStats] = useState<{ today: number; weekTotal: number; deliveryRate: number } | null>(null)
+  const [profitProjects, setProfitProjects] = useState<{
+    project_id: string; name: string; status: string
+    revenue: number; costs: number; margin_amount: number; margin_percent: number
+    hours_worked: number; budget_hours: number
+  }[]>([])
+
 
   useEffect(() => {
     fetchData()
@@ -188,6 +195,15 @@ export default function DashboardPage() {
           weekTotal: commData.week.total,
           deliveryRate: commData.week.deliveryRate,
         })
+      }
+    } catch { /* ignore */ }
+
+    // Hämta projektlönsamhet
+    try {
+      const profitRes = await fetch('/api/dashboard/profitability')
+      if (profitRes.ok) {
+        const profitData = await profitRes.json()
+        setProfitProjects(profitData.projects || [])
       }
     } catch { /* ignore */ }
 
@@ -646,6 +662,54 @@ export default function DashboardPage() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Projektlönsamhet */}
+            {profitProjects.length > 0 && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-blue-600" />
+                    Projektlonsamhet
+                  </h3>
+                  <Link href="/dashboard/projects" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                    Alla projekt <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="space-y-2">
+                  {profitProjects.map((p) => {
+                    const color = p.margin_percent >= 20 ? 'emerald' : p.margin_percent >= 5 ? 'amber' : 'red'
+                    return (
+                      <Link
+                        key={p.project_id}
+                        href={`/dashboard/projects/${p.project_id}`}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors group"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-gray-900 truncate">{p.name}</p>
+                          <p className="text-xs text-gray-400">
+                            {formatCurrency(p.revenue)} kr intakter
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <div className="text-right">
+                            <p className={`text-sm font-bold ${
+                              color === 'emerald' ? 'text-emerald-600' :
+                              color === 'amber' ? 'text-amber-600' : 'text-red-600'
+                            }`}>
+                              {p.margin_percent}%
+                            </p>
+                          </div>
+                          <div className={`w-2 h-2 rounded-full ${
+                            color === 'emerald' ? 'bg-emerald-500' :
+                            color === 'amber' ? 'bg-amber-500' : 'bg-red-500'
+                          }`} />
+                        </div>
+                      </Link>
+                    )
+                  })}
+                </div>
               </div>
             )}
 
