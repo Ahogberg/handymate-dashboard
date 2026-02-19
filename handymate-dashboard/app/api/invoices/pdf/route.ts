@@ -319,8 +319,10 @@ export async function GET(request: NextRequest) {
       </div>
     </div>
     <div class="invoice-title">
-      <h1>FAKTURA</h1>
+      <h1>${invoice.is_credit_note ? 'KREDITFAKTURA' : 'FAKTURA'}</h1>
       <div class="invoice-number">#${invoice.invoice_number}</div>
+      ${invoice.is_credit_note && invoice.credit_reason ? `<div style="font-size: 12px; color: #dc2626; margin-top: 4px;">Anledning: ${invoice.credit_reason}</div>` : ''}
+      ${invoice.is_credit_note && invoice.original_invoice_id ? `<div style="font-size: 12px; color: #666; margin-top: 2px;">Krediterar originalfaktura</div>` : ''}
     </div>
   </div>
 

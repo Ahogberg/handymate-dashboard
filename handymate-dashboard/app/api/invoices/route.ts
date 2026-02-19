@@ -84,7 +84,10 @@ export async function POST(request: NextRequest) {
       items: providedItems,
       vat_rate = 25,
       rot_rut_type,
-      due_days = 30
+      due_days = 30,
+      is_credit_note = false,
+      original_invoice_id,
+      credit_reason,
     } = body
 
     const business_id = business.business_id
@@ -183,6 +186,95 @@ export async function POST(request: NextRequest) {
       const deductionRate = rot_rut_type === 'rot' ? 0.30 : 0.50
       rotRutDeduction = Math.round(laborCost * deductionRate * 100) / 100
       customerPays = total - rotRutDeduction
+    }
+
+    // Kreditfaktura: hämta original och negera belopp
+    if (is_credit_note && original_invoice_id) {
+      const { data: originalInvoice, error: origError } = await supabase
+        .from('invoice')
+        .select('*')
+        .eq('invoice_id', original_invoice_id)
+        .eq('business_id', business_id)
+        .single()
+
+      if (origError || !originalInvoice) {
+        return NextResponse.json({ error: 'Originalfaktura hittades inte' }, { status: 404 })
+      }
+
+      // Använd originalfakturans poster om inga explicita items
+      if (items.length === 0 && originalInvoice.items) {
+        items = (originalInvoice.items as InvoiceItem[]).map((item: InvoiceItem) => ({
+          ...item,
+          total: -Math.abs(item.total),
+          unit_price: -Math.abs(item.unit_price),
+        }))
+      } else {
+        items = items.map((item: InvoiceItem) => ({
+          ...item,
+          total: -Math.abs(item.total),
+          unit_price: -Math.abs(item.unit_price),
+        }))
+      }
+
+      subtotal = items.reduce((sum: number, item: InvoiceItem) => sum + item.total, 0)
+      const creditVatRate = originalInvoice.vat_rate || vat_rate
+      const creditVatAmount = subtotal * (creditVatRate / 100)
+      const creditTotal = subtotal + creditVatAmount
+
+      // Generera kreditfakturanummer
+      const year = new Date().getFullYear()
+      const { count } = await supabase
+        .from('invoice')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business_id)
+        .gte('created_at', `${year}-01-01`)
+
+      const creditNumber = `KF-${year}-${String((count || 0) + 1).padStart(3, '0')}`
+      const invoiceDate = new Date()
+
+      const { data: creditNote, error: creditError } = await supabase
+        .from('invoice')
+        .insert({
+          business_id,
+          customer_id: originalInvoice.customer_id,
+          invoice_number: creditNumber,
+          status: 'sent',
+          items,
+          subtotal,
+          vat_rate: creditVatRate,
+          vat_amount: creditVatAmount,
+          total: creditTotal,
+          rot_rut_type: originalInvoice.rot_rut_type,
+          rot_rut_deduction: originalInvoice.rot_rut_deduction ? -Math.abs(originalInvoice.rot_rut_deduction) : 0,
+          customer_pays: originalInvoice.customer_pays ? -Math.abs(originalInvoice.customer_pays) : creditTotal,
+          invoice_date: invoiceDate.toISOString().split('T')[0],
+          due_date: invoiceDate.toISOString().split('T')[0],
+          is_credit_note: true,
+          original_invoice_id,
+          credit_reason: credit_reason || null,
+        })
+        .select(`
+          *,
+          customer:customer_id (
+            customer_id,
+            name,
+            phone_number,
+            email,
+            address_line
+          )
+        `)
+        .single()
+
+      if (creditError) throw creditError
+
+      // Markera originalfaktura som krediterad
+      await supabase
+        .from('invoice')
+        .update({ status: 'credited' })
+        .eq('invoice_id', original_invoice_id)
+        .eq('business_id', business_id)
+
+      return NextResponse.json({ invoice: creditNote })
     }
 
     // Generera fakturanummer

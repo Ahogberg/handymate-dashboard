@@ -22,7 +22,8 @@ import Link from 'next/link'
 interface Invoice {
   invoice_id: string
   invoice_number: string
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
+  is_credit_note?: boolean
   subtotal: number
   vat_amount: number
   total: number
@@ -153,6 +154,7 @@ export default function InvoicesPage() {
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-200'
       case 'cancelled': return 'bg-gray-100 text-gray-500 border-gray-300'
+      case 'credited': return 'bg-orange-100 text-orange-600 border-orange-200'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
@@ -164,6 +166,7 @@ export default function InvoicesPage() {
       case 'paid': return 'Betald'
       case 'overdue': return 'Förfallen'
       case 'cancelled': return 'Makulerad'
+      case 'credited': return 'Krediterad'
       default: return status
     }
   }
@@ -365,6 +368,11 @@ export default function InvoicesPage() {
                           <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-gray-900 hover:text-blue-600">
                             #{invoice.invoice_number}
                           </Link>
+                          {invoice.is_credit_note && (
+                            <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-100 text-red-600 border border-red-200 font-medium">
+                              KREDIT
+                            </span>
+                          )}
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
                             {getStatusIcon(invoice.status)}
                             {getStatusText(invoice.status)}
@@ -469,9 +477,16 @@ export default function InvoicesPage() {
                     {filteredInvoices.map((invoice) => (
                       <tr key={invoice.invoice_id} className="hover:bg-gray-100/30 transition-all">
                         <td className="px-6 py-4">
-                          <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-gray-900 hover:text-blue-600">
-                            #{invoice.invoice_number}
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-medium text-gray-900 hover:text-blue-600">
+                              #{invoice.invoice_number}
+                            </Link>
+                            {invoice.is_credit_note && (
+                              <span className="px-1.5 py-0.5 text-[10px] rounded bg-red-100 text-red-600 border border-red-200 font-medium">
+                                KREDIT
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-gray-900">{invoice.customer?.name || 'Ingen kund'}</p>

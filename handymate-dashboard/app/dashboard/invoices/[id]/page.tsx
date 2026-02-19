@@ -18,7 +18,8 @@ import {
   Banknote,
   Smartphone,
   Building,
-  Bell
+  Bell,
+  RotateCcw
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
@@ -36,7 +37,7 @@ interface InvoiceItem {
 interface Invoice {
   invoice_id: string
   invoice_number: string
-  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+  status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled' | 'credited'
   items: InvoiceItem[]
   subtotal: number
   vat_rate: number
@@ -54,6 +55,9 @@ interface Invoice {
   reminder_sent_at: string | null
   reminder_count: number
   created_at: string
+  is_credit_note?: boolean
+  original_invoice_id?: string | null
+  credit_reason?: string | null
   customer?: {
     customer_id: string
     name: string
@@ -88,6 +92,9 @@ export default function InvoiceDetailPage() {
   })
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
+  const [showCreditModal, setShowCreditModal] = useState(false)
+  const [creditReason, setCreditReason] = useState('')
+  const [creatingCredit, setCreatingCredit] = useState(false)
 
   useEffect(() => {
     fetchInvoice()
@@ -206,12 +213,45 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  const handleCreateCreditNote = async () => {
+    if (!creditReason.trim()) return
+    setCreatingCredit(true)
+    try {
+      const response = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_credit_note: true,
+          original_invoice_id: invoiceId,
+          credit_reason: creditReason,
+        })
+      })
+
+      if (!response.ok) {
+        const result = await response.json()
+        throw new Error(result.error || 'Kunde inte skapa kreditfaktura')
+      }
+
+      const result = await response.json()
+      showToast('Kreditfaktura skapad!', 'success')
+      setShowCreditModal(false)
+      setCreditReason('')
+      // Navigera till den nya kreditfakturan
+      router.push(`/dashboard/invoices/${result.invoice.invoice_id}`)
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
+    } finally {
+      setCreatingCredit(false)
+    }
+  }
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'sent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-500/30'
+      case 'credited': return 'bg-orange-100 text-orange-600 border-orange-500/30'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
   }
@@ -223,6 +263,7 @@ export default function InvoiceDetailPage() {
       case 'paid': return 'Betald'
       case 'overdue': return 'Förfallen'
       case 'cancelled': return 'Makulerad'
+      case 'credited': return 'Krediterad'
       default: return status
     }
   }
@@ -399,6 +440,70 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
+      {/* Credit Note Modal */}
+      {showCreditModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Skapa kreditfaktura</h3>
+              <button
+                onClick={() => setShowCreditModal(false)}
+                className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-500 mb-4">
+              En kreditfaktura skapas som motbokar faktura #{invoice.invoice_number}
+              ({invoice.total?.toLocaleString('sv-SE')} kr). Originalfakturan markeras som krediterad.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">Anledning *</label>
+                <select
+                  value={creditReason}
+                  onChange={(e) => setCreditReason(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="">Välj anledning...</option>
+                  <option value="Felaktig faktura">Felaktig faktura</option>
+                  <option value="Reklamation">Reklamation</option>
+                  <option value="Avbeställning">Avbeställning</option>
+                  <option value="Dubbelfakturering">Dubbelfakturering</option>
+                  <option value="Prisändring">Prisändring</option>
+                  <option value="Annat">Annat</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowCreditModal(false)}
+                className="flex-1 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleCreateCreditNote}
+                disabled={creatingCredit || !creditReason}
+                className="flex-1 py-3 bg-gradient-to-r from-red-500 to-orange-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {creatingCredit ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />
+                    Skapa kreditfaktura
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -408,7 +513,9 @@ export default function InvoiceDetailPage() {
             </Link>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">Faktura #{invoice.invoice_number}</h1>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {invoice.is_credit_note ? 'Kreditfaktura' : 'Faktura'} #{invoice.invoice_number}
+                </h1>
                 <span className={`px-3 py-1 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
                   {getStatusText(invoice.status)}
                 </span>
@@ -496,6 +603,17 @@ export default function InvoiceDetailPage() {
                 )}
               </>
             )}
+
+            {/* Kreditfaktura-knapp: visa för sent/paid/overdue fakturor som INTE redan är krediterade eller kreditnotor */}
+            {!invoice.is_credit_note && invoice.status !== 'credited' && invoice.status !== 'draft' && invoice.status !== 'cancelled' && (
+              <button
+                onClick={() => setShowCreditModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-100 border border-orange-500/30 rounded-xl text-orange-600 hover:bg-orange-500/20"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Kreditera
+              </button>
+            )}
           </div>
         </div>
 
@@ -529,6 +647,38 @@ export default function InvoiceDetailPage() {
             })}
           </div>
         </div>
+
+        {/* Credit Note Banner */}
+        {invoice.is_credit_note && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <RotateCcw className="w-5 h-5 text-red-500" />
+              <div>
+                <p className="text-red-700 font-medium">Kreditfaktura</p>
+                <p className="text-sm text-red-600">
+                  Krediterar faktura {invoice.original_invoice_id ? (
+                    <Link href={`/dashboard/invoices/${invoice.original_invoice_id}`} className="underline hover:no-underline">
+                      original
+                    </Link>
+                  ) : 'okänd'}
+                  {invoice.credit_reason && ` — ${invoice.credit_reason}`}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {invoice.status === 'credited' && (
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-orange-500" />
+              <div>
+                <p className="text-orange-700 font-medium">Denna faktura har krediterats</p>
+                <p className="text-sm text-orange-600">En kreditfaktura har skapats som motbokar denna faktura.</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Invoice Content */}
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
