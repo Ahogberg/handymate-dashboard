@@ -21,7 +21,8 @@ import {
   FileText,
   Filter,
   CheckSquare,
-  MapPin
+  MapPin,
+  Download
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -1016,6 +1017,25 @@ export default function TimePage() {
               className="p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900">
               <ChevronRight className="w-4 h-4" />
             </button>
+
+            <div className="ml-2 border-l border-gray-300 pl-2 flex items-center gap-1">
+              <a
+                href={`/api/time-entry/report?startDate=${format(weekStart, 'yyyy-MM-dd')}&endDate=${format(weekEnd, 'yyyy-MM-dd')}&format=csv&groupBy=day`}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs text-gray-500 hover:text-gray-900 hover:border-blue-300"
+                title="Exportera vecka som CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                CSV
+              </a>
+              <a
+                href={`/api/time-entry/report?startDate=${format(startOfMonth(currentWeek), 'yyyy-MM-dd')}&endDate=${format(endOfMonth(currentWeek), 'yyyy-MM-dd')}&format=csv&groupBy=day`}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs text-gray-500 hover:text-gray-900 hover:border-blue-300"
+                title="Exportera månad som CSV"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Månad
+              </a>
+            </div>
           </div>
         </div>
 
