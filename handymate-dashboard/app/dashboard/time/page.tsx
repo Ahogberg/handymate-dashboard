@@ -58,6 +58,7 @@ interface TimeEntry {
   invoice_id: string | null
   approval_status?: 'pending' | 'approved' | 'rejected'
   rejection_reason?: string | null
+  break_minutes?: number
   created_at: string
   start_latitude?: number | null
   start_longitude?: number | null
@@ -148,6 +149,7 @@ export default function TimePage() {
     work_date: format(new Date(), 'yyyy-MM-dd'),
     duration_hours: 0,
     duration_minutes: 0,
+    break_minutes: 0,
     hourly_rate: '',
     is_billable: true
   })
@@ -378,6 +380,7 @@ export default function TimePage() {
       work_date: prefillDate || format(new Date(), 'yyyy-MM-dd'),
       duration_hours: 0,
       duration_minutes: 0,
+      break_minutes: 0,
       hourly_rate: '',
       is_billable: true
     })
@@ -387,7 +390,9 @@ export default function TimePage() {
 
   const openEditModal = (entry: TimeEntry) => {
     setEditingEntry(entry)
-    const total = entry.duration_minutes || 0
+    const breakMins = entry.break_minutes || 0
+    const netMins = entry.duration_minutes || 0
+    const grossMins = netMins + breakMins
     setFormData({
       customer_id: entry.customer_id || '',
       booking_id: entry.booking_id || '',
@@ -395,8 +400,9 @@ export default function TimePage() {
       project_id: (entry as any).project_id || '',
       description: entry.description || '',
       work_date: entry.work_date,
-      duration_hours: Math.floor(total / 60),
-      duration_minutes: total % 60,
+      duration_hours: Math.floor(grossMins / 60),
+      duration_minutes: grossMins % 60,
+      break_minutes: breakMins,
       hourly_rate: entry.hourly_rate?.toString() || '',
       is_billable: entry.is_billable
     })
@@ -407,8 +413,10 @@ export default function TimePage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const totalMins = (formData.duration_hours * 60) + formData.duration_minutes
-      if (totalMins <= 0) { showToast('Ange en tid längre än 0', 'error'); setSaving(false); return }
+      const grossMins = (formData.duration_hours * 60) + formData.duration_minutes
+      const breakMins = formData.break_minutes || 0
+      const totalMins = Math.max(0, grossMins - breakMins)
+      if (totalMins <= 0) { showToast('Ange en tid längre än 0 (efter rast)', 'error'); setSaving(false); return }
 
       // Determine which user to assign the entry to
       const assignToUser = isOwnerOrAdmin && formPersonId ? formPersonId : currentUser?.id || null
@@ -422,6 +430,7 @@ export default function TimePage() {
         description: formData.description || null,
         work_date: formData.work_date,
         duration_minutes: totalMins,
+        break_minutes: breakMins,
         hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
         is_billable: formData.is_billable
       }
@@ -572,6 +581,7 @@ export default function TimePage() {
       work_date: format(new Date(), 'yyyy-MM-dd'),
       duration_hours: Math.floor(minutes / 60),
       duration_minutes: minutes % 60,
+      break_minutes: 0,
       hourly_rate: '',
       is_billable: true
     })
@@ -718,6 +728,36 @@ export default function TimePage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Rast */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">Rast/lunch (min)</label>
+                <div className="flex gap-2 items-center">
+                  <div className="flex-1 relative">
+                    <input type="number" min="0" max="180" value={formData.break_minutes}
+                      onChange={e => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">min</span>
+                  </div>
+                  <div className="flex gap-1">
+                    {[0, 30, 45, 60].map(mins => (
+                      <button key={mins} onClick={() => setFormData({ ...formData, break_minutes: mins })}
+                        className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+                          formData.break_minutes === mins
+                            ? 'bg-blue-100 border-blue-300 text-blue-600'
+                            : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
+                        }`}>
+                        {mins === 0 ? 'Ingen' : `${mins}m`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {formData.break_minutes > 0 && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Effektiv tid: {Math.floor(Math.max(0, (formData.duration_hours * 60 + formData.duration_minutes - formData.break_minutes)) / 60)}h {Math.max(0, (formData.duration_hours * 60 + formData.duration_minutes - formData.break_minutes)) % 60}m
+                  </p>
+                )}
               </div>
 
               {/* Kund */}
@@ -1131,7 +1171,12 @@ export default function TimePage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-gray-900">{fmtDuration(entry.duration_minutes)}</span>
+                          <span className="font-medium text-gray-900">
+                            {fmtDuration(entry.duration_minutes)}
+                            {(entry.break_minutes || 0) > 0 && (
+                              <span className="text-xs text-gray-400 font-normal ml-1">(rast {entry.break_minutes}m)</span>
+                            )}
+                          </span>
                           {entry.work_type && (
                             <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 border border-blue-500/20">
                               {entry.work_type.name}
