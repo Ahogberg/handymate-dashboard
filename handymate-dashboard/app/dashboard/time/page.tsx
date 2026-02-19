@@ -40,6 +40,7 @@ import {
   getISOWeek
 } from 'date-fns'
 import { sv } from 'date-fns/locale'
+import { calculateWeeklyOvertime, formatMinutes } from '@/lib/overtime'
 
 interface TimeEntry {
   time_entry_id: string
@@ -636,6 +637,20 @@ export default function TimePage() {
     })
   }, [entries, filterCustomer, filterWorkType, filterInvoiced, filterApproval])
 
+  // Övertidsberäkning för aktuell vecka
+  const weekOvertime = useMemo(() => {
+    const weekEntries = entries.filter(e => {
+      const d = parseISO(e.work_date)
+      return d >= weekStart && d <= weekEnd
+    })
+    if (weekEntries.length === 0) return null
+    return calculateWeeklyOvertime(weekEntries.map(e => ({
+      work_date: e.work_date,
+      duration_minutes: e.duration_minutes,
+      break_minutes: e.break_minutes,
+    })))
+  }, [entries, weekStart, weekEnd])
+
   if (loading) {
     return (
       <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
@@ -952,6 +967,28 @@ export default function TimePage() {
             <p className="text-xs text-gray-400">Total tid månad</p>
           </div>
         </div>
+
+        {/* Övertidsindikator */}
+        {weekOvertime && weekOvertime.total_overtime_minutes > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-orange-100">
+                  <Clock className="w-4 h-4 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-orange-700">Övertid vecka {weekOvertime.week_number}</p>
+                  <p className="text-xs text-orange-600">
+                    {weekOvertime.daily_overtime_minutes > 0 && `Daglig: ${formatMinutes(weekOvertime.daily_overtime_minutes)}`}
+                    {weekOvertime.daily_overtime_minutes > 0 && weekOvertime.weekly_overtime_minutes > 0 && ' · '}
+                    {weekOvertime.weekly_overtime_minutes > 0 && `Vecko: ${formatMinutes(weekOvertime.weekly_overtime_minutes)}`}
+                  </p>
+                </div>
+              </div>
+              <p className="text-lg font-bold text-orange-700">{formatMinutes(weekOvertime.total_overtime_minutes)}</p>
+            </div>
+          </div>
+        )}
 
         {/* View Toggle + Week Nav */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
