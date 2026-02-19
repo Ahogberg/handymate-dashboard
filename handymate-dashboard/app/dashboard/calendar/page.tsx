@@ -33,16 +33,16 @@ interface Booking {
 }
 
 interface TimeEntry {
-  entry_id: string
+  time_entry_id: string
   booking_id: string | null
   customer_id: string | null
   work_date: string
   start_time: string | null
   end_time: string | null
-  hours_worked: number
+  duration_minutes: number
   description: string | null
   hourly_rate: number | null
-  materials_cost: number | null
+  is_billable: boolean
   customer?: {
     customer_id: string
     name: string
@@ -94,10 +94,10 @@ export default function CalendarPage() {
     work_date: '',
     start_time: '',
     end_time: '',
-    hours_worked: '',
+    duration_minutes: '',
     description: '',
     hourly_rate: '500',
-    materials_cost: '0'
+    is_billable: true
   })
 
   useEffect(() => {
@@ -254,10 +254,10 @@ export default function CalendarPage() {
       work_date: today,
       start_time: '08:00',
       end_time: '16:00',
-      hours_worked: '8',
+      duration_minutes: '480',
       description: '',
       hourly_rate: '500',
-      materials_cost: '0'
+      is_billable: true
     })
     setTimeModalOpen(true)
   }
@@ -269,16 +269,16 @@ export default function CalendarPage() {
       work_date: entry.work_date,
       start_time: entry.start_time || '',
       end_time: entry.end_time || '',
-      hours_worked: String(entry.hours_worked || 0),
+      duration_minutes: String(entry.duration_minutes || 0),
       description: entry.description || '',
       hourly_rate: String(entry.hourly_rate || 500),
-      materials_cost: String(entry.materials_cost || 0)
+      is_billable: entry.is_billable ?? true
     })
     setTimeModalOpen(true)
   }
 
   const handleTimeSubmit = async () => {
-    if (!timeForm.work_date || !timeForm.hours_worked) {
+    if (!timeForm.work_date || !timeForm.duration_minutes) {
       showToast('Datum och arbetade timmar krävs', 'error')
       return
     }
@@ -288,15 +288,15 @@ export default function CalendarPage() {
       const method = editingTimeEntry ? 'PUT' : 'POST'
       const body = editingTimeEntry
         ? {
-            entry_id: editingTimeEntry.entry_id,
+            entry_id: editingTimeEntry.time_entry_id,
             customer_id: timeForm.customer_id || null,
             work_date: timeForm.work_date,
             start_time: timeForm.start_time || null,
             end_time: timeForm.end_time || null,
-            hours_worked: parseFloat(timeForm.hours_worked),
+            duration_minutes: parseFloat(timeForm.duration_minutes),
             description: timeForm.description || null,
             hourly_rate: parseFloat(timeForm.hourly_rate) || 500,
-            materials_cost: parseFloat(timeForm.materials_cost) || 0
+            is_billable: timeForm.is_billable
           }
         : {
             business_id: business.business_id,
@@ -304,10 +304,10 @@ export default function CalendarPage() {
             work_date: timeForm.work_date,
             start_time: timeForm.start_time || null,
             end_time: timeForm.end_time || null,
-            hours_worked: parseFloat(timeForm.hours_worked),
+            duration_minutes: parseFloat(timeForm.duration_minutes),
             description: timeForm.description || null,
             hourly_rate: parseFloat(timeForm.hourly_rate) || 500,
-            materials_cost: parseFloat(timeForm.materials_cost) || 0
+            is_billable: timeForm.is_billable
           }
 
       const response = await fetch('/api/time-entry', {
@@ -350,9 +350,9 @@ export default function CalendarPage() {
     if (!start || !end) return
     const [sh, sm] = start.split(':').map(Number)
     const [eh, em] = end.split(':').map(Number)
-    const hours = (eh * 60 + em - sh * 60 - sm) / 60
-    if (hours > 0) {
-      setTimeForm(prev => ({ ...prev, hours_worked: hours.toFixed(1) }))
+    const minutes = eh * 60 + em - sh * 60 - sm
+    if (minutes > 0) {
+      setTimeForm(prev => ({ ...prev, duration_minutes: String(minutes) }))
     }
   }
 
@@ -575,8 +575,8 @@ export default function CalendarPage() {
                   <input
                     type="number"
                     step="0.5"
-                    value={timeForm.hours_worked}
-                    onChange={(e) => setTimeForm({ ...timeForm, hours_worked: e.target.value })}
+                    value={timeForm.duration_minutes ? String(Math.round((parseFloat(timeForm.duration_minutes) / 60) * 10) / 10) : ''}
+                    onChange={(e) => setTimeForm({ ...timeForm, duration_minutes: String(Math.round(parseFloat(e.target.value || '0') * 60)) })}
                     className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
@@ -591,13 +591,15 @@ export default function CalendarPage() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Materialkostnad (kr)</label>
-                <input
-                  type="number"
-                  value={timeForm.materials_cost}
-                  onChange={(e) => setTimeForm({ ...timeForm, materials_cost: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
+                <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={timeForm.is_billable}
+                    onChange={(e) => setTimeForm({ ...timeForm, is_billable: e.target.checked })}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500/50"
+                  />
+                  Fakturerbar tid
+                </label>
               </div>
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Beskrivning</label>
@@ -879,10 +881,10 @@ export default function CalendarPage() {
                   {/* Mobile Card View */}
                   <div className="sm:hidden divide-y divide-gray-200">
                     {timeEntries.map((entry) => {
-                      const laborCost = (entry.hours_worked || 0) * (entry.hourly_rate || 0)
-                      const total = laborCost + (entry.materials_cost || 0)
+                      const hours = (entry.duration_minutes || 0) / 60
+                      const total = Math.round(hours * (entry.hourly_rate || 0))
                       return (
-                        <div key={entry.entry_id} className="p-4">
+                        <div key={entry.time_entry_id} className="p-4">
                           <div className="flex items-start justify-between gap-4">
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -890,7 +892,7 @@ export default function CalendarPage() {
                                   {new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
                                 </p>
                                 <span className="text-sm text-gray-400">
-                                  {entry.hours_worked}h @ {entry.hourly_rate} kr
+                                  {hours.toFixed(1)}h @ {entry.hourly_rate} kr
                                 </span>
                               </div>
                               {entry.customer && (
@@ -902,8 +904,8 @@ export default function CalendarPage() {
                             </div>
                             <div className="text-right flex-shrink-0">
                               <p className="font-bold text-gray-900">{total.toLocaleString('sv-SE')} kr</p>
-                              {(entry.materials_cost || 0) > 0 && (
-                                <p className="text-xs text-gray-400">+{entry.materials_cost} material</p>
+                              {!entry.is_billable && (
+                                <p className="text-xs text-gray-400">Ej fakturerbar</p>
                               )}
                             </div>
                           </div>
@@ -912,7 +914,7 @@ export default function CalendarPage() {
                               <Edit className="w-4 h-4" />
                               Redigera
                             </button>
-                            <button onClick={() => handleTimeDelete(entry.entry_id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
+                            <button onClick={() => handleTimeDelete(entry.time_entry_id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
@@ -935,10 +937,10 @@ export default function CalendarPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {timeEntries.map((entry) => {
-                        const laborCost = (entry.hours_worked || 0) * (entry.hourly_rate || 0)
-                        const total = laborCost + (entry.materials_cost || 0)
+                        const hours = (entry.duration_minutes || 0) / 60
+                        const total = Math.round(hours * (entry.hourly_rate || 0))
                         return (
-                          <tr key={entry.entry_id} className="hover:bg-gray-100/30 transition-all">
+                          <tr key={entry.time_entry_id} className="hover:bg-gray-100/30 transition-all">
                             <td className="px-6 py-4">
                               <p className="text-gray-900">{new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
                               {entry.start_time && entry.end_time && (
@@ -961,14 +963,14 @@ export default function CalendarPage() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-2">
                                 <Timer className="w-4 h-4 text-gray-400" />
-                                <span className="text-gray-900">{entry.hours_worked}h</span>
+                                <span className="text-gray-900">{hours.toFixed(1)}h</span>
                                 <span className="text-gray-400 text-sm">@ {entry.hourly_rate} kr</span>
                               </div>
                             </td>
                             <td className="px-6 py-4">
                               <p className="text-gray-900 font-medium">{total.toLocaleString('sv-SE')} kr</p>
-                              {(entry.materials_cost || 0) > 0 && (
-                                <p className="text-xs text-gray-400">inkl. {entry.materials_cost} kr material</p>
+                              {!entry.is_billable && (
+                                <p className="text-xs text-gray-400">Ej fakturerbar</p>
                               )}
                             </td>
                             <td className="px-6 py-4">
@@ -976,7 +978,7 @@ export default function CalendarPage() {
                                 <button onClick={() => openEditTimeModal(entry)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
                                   <Edit className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleTimeDelete(entry.entry_id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
+                                <button onClick={() => handleTimeDelete(entry.time_entry_id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
                                   <Trash2 className="w-4 h-4" />
                                 </button>
                               </div>
