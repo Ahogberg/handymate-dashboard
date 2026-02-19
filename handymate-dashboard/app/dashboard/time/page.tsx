@@ -56,6 +56,8 @@ interface TimeEntry {
   is_billable: boolean
   invoiced: boolean
   invoice_id: string | null
+  approval_status?: 'pending' | 'approved' | 'rejected'
+  rejection_reason?: string | null
   created_at: string
   start_latitude?: number | null
   start_longitude?: number | null
@@ -155,11 +157,13 @@ export default function TimePage() {
   const [filterCustomer, setFilterCustomer] = useState('')
   const [filterWorkType, setFilterWorkType] = useState('')
   const [filterInvoiced, setFilterInvoiced] = useState<'all' | 'yes' | 'no'>('all')
+  const [filterApproval, setFilterApproval] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
   const [showFilters, setShowFilters] = useState(false)
 
   // Bulk selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [approvingIds, setApprovingIds] = useState(false)
 
   // Toast
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
@@ -526,6 +530,36 @@ export default function TimePage() {
     }
   }
 
+  const handleBulkApproval = async (action: 'approve' | 'reject') => {
+    if (selectedIds.size === 0) return
+    let reason = ''
+    if (action === 'reject') {
+      reason = prompt('Ange anledning till avslag:') || ''
+      if (!reason) return
+    }
+    setApprovingIds(true)
+    try {
+      const res = await fetch('/api/time-entry/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entry_ids: Array.from(selectedIds),
+          action,
+          ...(action === 'reject' ? { rejection_reason: reason } : {}),
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      showToast(`${data.count} poster ${action === 'approve' ? 'godkända' : 'avslagna'}`, 'success')
+      setSelectedIds(new Set())
+      fetchEntries()
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setApprovingIds(false)
+    }
+  }
+
   // Quick-add presets (mobile)
   const quickAdd = (minutes: number) => {
     setEditingEntry(null)
@@ -587,9 +621,10 @@ export default function TimePage() {
       if (filterWorkType && e.work_type_id !== filterWorkType) return false
       if (filterInvoiced === 'yes' && !e.invoiced) return false
       if (filterInvoiced === 'no' && e.invoiced) return false
+      if (filterApproval !== 'all' && e.approval_status !== filterApproval) return false
       return true
     })
-  }, [entries, filterCustomer, filterWorkType, filterInvoiced])
+  }, [entries, filterCustomer, filterWorkType, filterInvoiced, filterApproval])
 
   if (loading) {
     return (
@@ -1001,11 +1036,23 @@ export default function TimePage() {
               </h2>
               <div className="flex items-center gap-2">
                 {selectedIds.size > 0 && (
-                  <button onClick={handleBulkMarkInvoiced} disabled={bulkLoading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-xs text-emerald-600 hover:bg-emerald-500/30 disabled:opacity-50">
-                    {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckSquare className="w-3 h-3" />}
-                    Fakturera ({selectedIds.size})
-                  </button>
+                  <>
+                    <button onClick={() => handleBulkApproval('approve')} disabled={approvingIds}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 border border-green-200 rounded-lg text-xs text-green-600 hover:bg-green-500/20 disabled:opacity-50">
+                      {approvingIds ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                      Godkänn ({selectedIds.size})
+                    </button>
+                    <button onClick={() => handleBulkApproval('reject')} disabled={approvingIds}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 hover:bg-red-500/20 disabled:opacity-50">
+                      <X className="w-3 h-3" />
+                      Avslå
+                    </button>
+                    <button onClick={handleBulkMarkInvoiced} disabled={bulkLoading}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-xs text-emerald-600 hover:bg-emerald-500/30 disabled:opacity-50">
+                      {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckSquare className="w-3 h-3" />}
+                      Fakturera ({selectedIds.size})
+                    </button>
+                  </>
                 )}
                 <button onClick={() => setShowFilters(!showFilters)}
                   className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}>
@@ -1015,7 +1062,7 @@ export default function TimePage() {
             </div>
 
             {showFilters && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
                 <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)}
                   className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
                   <option value="">Alla kunder</option>
@@ -1031,6 +1078,13 @@ export default function TimePage() {
                   <option value="all">Alla</option>
                   <option value="no">Ej fakturerade</option>
                   <option value="yes">Fakturerade</option>
+                </select>
+                <select value={filterApproval} onChange={e => setFilterApproval(e.target.value as any)}
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50">
+                  <option value="all">Alla status</option>
+                  <option value="pending">Väntar godkännande</option>
+                  <option value="approved">Godkända</option>
+                  <option value="rejected">Avslagna</option>
                 </select>
               </div>
             )}
@@ -1092,6 +1146,21 @@ export default function TimePage() {
                               Ofakturerad
                             </span>
                           ) : null}
+                          {entry.approval_status === 'pending' && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-50 text-yellow-600 border border-yellow-500/20">
+                              Väntar godkännande
+                            </span>
+                          )}
+                          {entry.approval_status === 'approved' && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-600 border border-green-500/20">
+                              Godkänd
+                            </span>
+                          )}
+                          {entry.approval_status === 'rejected' && (
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-red-50 text-red-600 border border-red-500/20" title={entry.rejection_reason || ''}>
+                              Avslagen
+                            </span>
+                          )}
                         </div>
                         {entry.description && (
                           <p className="text-sm text-gray-500 mt-1 truncate">{entry.description}</p>
