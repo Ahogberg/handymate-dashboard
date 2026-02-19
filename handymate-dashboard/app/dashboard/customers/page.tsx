@@ -20,7 +20,10 @@ import {
   Eye,
   Building2,
   User,
-  Home
+  Home,
+  Tag,
+  AlertTriangle,
+  Merge
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -44,6 +47,25 @@ interface Customer {
   property_designation?: string | null
 }
 
+interface CustomerTag {
+  tag_id: string
+  name: string
+  color: string
+  customer_count: number
+}
+
+interface DuplicateGroup {
+  match_type: 'phone' | 'email' | 'name_address'
+  match_value: string
+  customers: Array<{
+    customer_id: string
+    name: string
+    phone_number: string
+    email: string | null
+    created_at: string
+  }>
+}
+
 interface Campaign {
   campaign_id: string
   name: string
@@ -58,7 +80,7 @@ interface Campaign {
 
 export default function CustomersPage() {
   const business = useBusiness()
-  const [activeTab, setActiveTab] = useState<'customers' | 'campaigns'>('customers')
+  const [activeTab, setActiveTab] = useState<'customers' | 'campaigns' | 'duplicates'>('customers')
 
   // Customers state
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -70,6 +92,18 @@ export default function CustomersPage() {
     customer_type: 'private' as 'private' | 'company' | 'brf',
     org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: ''
   })
+
+  // Tags state (C1)
+  const [tags, setTags] = useState<CustomerTag[]>([])
+  const [customerTags, setCustomerTags] = useState<Map<string, string[]>>(new Map()) // customer_id → tag_ids
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('')
+  const [showTagModal, setShowTagModal] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState('#6366f1')
+
+  // Duplicates state (C3)
+  const [duplicates, setDuplicates] = useState<DuplicateGroup[]>([])
+  const [mergingGroup, setMergingGroup] = useState<DuplicateGroup | null>(null)
 
   // Campaigns state
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -103,7 +137,33 @@ export default function CustomersPage() {
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
+    // Fetch tags (C1)
+    const { data: tagsData } = await supabase
+      .from('customer_tag')
+      .select('tag_id, name, color')
+      .eq('business_id', business.business_id)
+      .order('name')
+
+    // Fetch tag assignments
+    const { data: assignmentsData } = await supabase
+      .from('customer_tag_assignment')
+      .select('customer_id, tag_id')
+
+    const tagMap = new Map<string, string[]>()
+    for (const a of assignmentsData || []) {
+      const existing = tagMap.get(a.customer_id) || []
+      existing.push(a.tag_id)
+      tagMap.set(a.customer_id, existing)
+    }
+
+    const tagsWithCount = (tagsData || []).map((t: any) => ({
+      ...t,
+      customer_count: (assignmentsData || []).filter((a: any) => a.tag_id === t.tag_id).length,
+    }))
+
     setCustomers(customersData || [])
+    setTags(tagsWithCount)
+    setCustomerTags(tagMap)
     setCampaigns(campaignsData || [])
     setLoading(false)
   }
@@ -209,6 +269,98 @@ export default function CustomersPage() {
     fetchData()
   }
 
+  // === TAG FUNCTIONS (C1) ===
+  const handleCreateTag = async () => {
+    if (!newTagName.trim()) return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/customers/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newTagName, color: newTagColor }),
+      })
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Något gick fel')
+      }
+      showToast('Tagg skapad!', 'success')
+      setNewTagName('')
+      setShowTagModal(false)
+      fetchData()
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleToggleTag = async (customerId: string, tagId: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const currentTags = customerTags.get(customerId) || []
+    const hasTag = currentTags.includes(tagId)
+    try {
+      await fetch('/api/customers/tags', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customerId, tag_id: tagId, action: hasTag ? 'remove' : 'assign' }),
+      })
+      // Optimistic update
+      const newMap = new Map(customerTags)
+      if (hasTag) {
+        newMap.set(customerId, currentTags.filter(t => t !== tagId))
+      } else {
+        newMap.set(customerId, [...currentTags, tagId])
+      }
+      setCustomerTags(newMap)
+    } catch {
+      showToast('Kunde inte uppdatera tagg', 'error')
+    }
+  }
+
+  const handleDeleteTag = async (tagId: string) => {
+    if (!confirm('Ta bort taggen? Den tas bort från alla kunder.')) return
+    try {
+      await fetch(`/api/customers/tags?tagId=${tagId}`, { method: 'DELETE' })
+      fetchData()
+    } catch {
+      showToast('Kunde inte ta bort tagg', 'error')
+    }
+  }
+
+  // === DUPLICATE FUNCTIONS (C3) ===
+  const fetchDuplicates = async () => {
+    try {
+      const response = await fetch('/api/customers/duplicates')
+      if (!response.ok) throw new Error()
+      const data = await response.json()
+      setDuplicates(data.duplicates || [])
+    } catch {
+      showToast('Kunde inte hämta dubbletter', 'error')
+    }
+  }
+
+  const handleMergeDuplicates = async (keepId: string, mergeIds: string[]) => {
+    if (!confirm(`Slå ihop ${mergeIds.length} kund(er) till den valda? Bokningar, fakturor m.m. flyttas över.`)) return
+    setActionLoading(true)
+    try {
+      const response = await fetch('/api/customers/duplicates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keep_id: keepId, merge_ids: mergeIds }),
+      })
+      if (!response.ok) throw new Error()
+      showToast('Kunder sammanslagna!', 'success')
+      setMergingGroup(null)
+      fetchData()
+      fetchDuplicates()
+    } catch {
+      showToast('Kunde inte slå ihop kunder', 'error')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'draft':
@@ -234,11 +386,17 @@ export default function CustomersPage() {
   }
 
   // === COMPUTED VALUES ===
-  const filteredCustomers = customers.filter(customer =>
-    customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone_number?.includes(searchTerm) ||
-    customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredCustomers = customers.filter(customer => {
+    const matchesSearch = !searchTerm ||
+      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone_number?.includes(searchTerm) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesTag = !selectedTagFilter ||
+      (customerTags.get(customer.customer_id) || []).includes(selectedTagFilter)
+
+    return matchesSearch && matchesTag
+  })
 
   const filteredCampaigns = campaigns.filter(c => {
     if (campaignFilter === 'draft') return c.status === 'draft'
@@ -505,6 +663,18 @@ export default function CustomersPage() {
                 Kampanjer
                 <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-50 rounded-full">{campaigns.length}</span>
               </button>
+              <button
+                onClick={() => { setActiveTab('duplicates'); fetchDuplicates() }}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
+                  activeTab === 'duplicates'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'text-gray-500 hover:text-white'
+                }`}
+              >
+                <Merge className="w-4 h-4" />
+                <span className="hidden sm:inline">Dubbletter</span>
+                <span className="sm:hidden">Dupl.</span>
+              </button>
             </div>
 
             {/* Primary actions */}
@@ -540,15 +710,53 @@ export default function CustomersPage() {
 
           {/* Search and filters on second row */}
           {activeTab === 'customers' && (
-            <div className="relative w-full sm:max-w-xs">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Sök kund..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[44px]"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-auto sm:max-w-xs flex-1 sm:flex-none">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Sök kund..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[44px]"
+                />
+              </div>
+              {/* Tag filter chips */}
+              {tags.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setSelectedTagFilter('')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      !selectedTagFilter ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    }`}
+                  >
+                    Alla
+                  </button>
+                  {tags.map(tag => (
+                    <button
+                      key={tag.tag_id}
+                      onClick={() => setSelectedTagFilter(selectedTagFilter === tag.tag_id ? '' : tag.tag_id)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1 ${
+                        selectedTagFilter === tag.tag_id
+                          ? 'text-white'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                      style={selectedTagFilter === tag.tag_id ? { backgroundColor: tag.color } : undefined}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
+                      {tag.name}
+                      <span className="opacity-60">({tag.customer_count})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                onClick={() => setShowTagModal(true)}
+                className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+                title="Hantera taggar"
+              >
+                <Tag className="w-4 h-4" />
+              </button>
             </div>
           )}
 
@@ -688,6 +896,24 @@ export default function CustomersPage() {
                       <span className="text-gray-700 truncate">{customer.address_line || '-'}</span>
                     </div>
                   </div>
+                  {/* Tag chips (C1) */}
+                  {(customerTags.get(customer.customer_id) || []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+                      {(customerTags.get(customer.customer_id) || []).map(tagId => {
+                        const tag = tags.find(t => t.tag_id === tagId)
+                        if (!tag) return null
+                        return (
+                          <span
+                            key={tagId}
+                            className="px-2 py-0.5 text-[10px] font-medium rounded-full text-white"
+                            style={{ backgroundColor: tag.color }}
+                          >
+                            {tag.name}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                 </Link>
               ))}
             </div>
@@ -784,7 +1010,127 @@ export default function CustomersPage() {
             )}
           </div>
         )}
+        {/* Duplicates Tab (C3) */}
+        {activeTab === 'duplicates' && (
+          <div className="space-y-4">
+            {duplicates.length === 0 ? (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+                <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+                <p className="text-gray-500">Inga dubbletter hittades!</p>
+                <p className="text-sm text-gray-400 mt-1">Alla kunder verkar vara unika.</p>
+              </div>
+            ) : (
+              <>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-medium text-amber-800">Potentiella dubbletter hittade</p>
+                    <p className="text-sm text-amber-600 mt-1">
+                      {duplicates.length} grupp(er) med möjliga dubbletter. Granska och slå ihop vid behov.
+                    </p>
+                  </div>
+                </div>
+                {duplicates.map((group, gi) => (
+                  <div key={gi} className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
+                        group.match_type === 'phone' ? 'bg-blue-100 text-blue-700' :
+                        group.match_type === 'email' ? 'bg-purple-100 text-purple-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {group.match_type === 'phone' ? 'Samma telefon' : group.match_type === 'email' ? 'Samma e-post' : 'Samma namn + adress'}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {group.customers.map((c, ci) => (
+                        <div key={c.customer_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                          <div>
+                            <p className="font-medium text-gray-900">{c.name}</p>
+                            <p className="text-sm text-gray-500">{c.phone_number} {c.email && `· ${c.email}`}</p>
+                            <p className="text-xs text-gray-400">Skapad {new Date(c.created_at).toLocaleDateString('sv-SE')}</p>
+                          </div>
+                          <button
+                            onClick={() => handleMergeDuplicates(
+                              c.customer_id,
+                              group.customers.filter(o => o.customer_id !== c.customer_id).map(o => o.customer_id)
+                            )}
+                            disabled={actionLoading}
+                            className="px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 disabled:opacity-50"
+                          >
+                            Behåll denna
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Tag Management Modal (C1) */}
+      {showTagModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-gray-900">Hantera taggar</h3>
+              <button onClick={() => setShowTagModal(false)} className="p-2 text-gray-400 hover:text-gray-900">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Create new tag */}
+            <div className="flex items-center gap-2 mb-6">
+              <input
+                type="color"
+                value={newTagColor}
+                onChange={(e) => setNewTagColor(e.target.value)}
+                className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+              />
+              <input
+                type="text"
+                placeholder="Ny tagg..."
+                value={newTagName}
+                onChange={(e) => setNewTagName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
+                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              <button
+                onClick={handleCreateTag}
+                disabled={!newTagName.trim() || actionLoading}
+                className="px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                Skapa
+              </button>
+            </div>
+
+            {/* Existing tags */}
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {tags.length === 0 ? (
+                <p className="text-center text-gray-400 py-4">Inga taggar skapade ännu</p>
+              ) : (
+                tags.map(tag => (
+                  <div key={tag.tag_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full" style={{ backgroundColor: tag.color }} />
+                      <span className="text-sm font-medium text-gray-900">{tag.name}</span>
+                      <span className="text-xs text-gray-400">({tag.customer_count} kunder)</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteTag(tag.tag_id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
