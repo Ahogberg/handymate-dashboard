@@ -22,6 +22,7 @@ import {
   Package,
   Mail,
   Lock,
+  BarChart3,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -104,6 +105,7 @@ const NAV: NavItem[] = [
       { label: 'E-postmallar', href: '/dashboard/settings/email-templates', featureGate: 'email_template_editor' },
     ],
   },
+  { type: 'link', key: 'analytics', label: 'Analys', icon: BarChart3, href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
   { type: 'link', key: 'automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations', paths: ['/dashboard/automations', '/dashboard/communication'] },
   {
     type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
