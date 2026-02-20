@@ -2116,7 +2116,14 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
           <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>
           {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-blue-400'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
         </div>
-        <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(deal.updated_at)}</span>
+        <div className="flex items-center gap-2">
+          {deal.response_time_seconds != null && deal.response_time_seconds > 0 && (
+            <span className={`text-[10px] flex items-center gap-0.5 ${deal.response_time_seconds < 60 ? 'text-green-500' : deal.response_time_seconds < 3600 ? 'text-amber-500' : 'text-red-400'}`} title="Svarstid">
+              <Zap className="w-2.5 h-2.5" />{deal.response_time_seconds < 60 ? `${deal.response_time_seconds}s` : deal.response_time_seconds < 3600 ? `${Math.round(deal.response_time_seconds / 60)}m` : `${Math.round(deal.response_time_seconds / 3600)}h`}
+            </span>
+          )}
+          <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(deal.updated_at)}</span>
+        </div>
       </div>
     </div>
   )

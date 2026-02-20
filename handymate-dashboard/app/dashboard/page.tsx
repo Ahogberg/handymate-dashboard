@@ -18,7 +18,8 @@ import {
   Receipt,
   UserPlus,
   Activity,
-  Phone
+  Phone,
+  Zap
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -88,9 +89,17 @@ export default function DashboardPage() {
     hours_worked: number; budget_hours: number
   }[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [speedData, setSpeedData] = useState<{
+    avg_response_seconds: number
+    industry_avg_seconds: number
+    total_leads: number
+    response_distribution: Record<string, number>
+    win_rate_by_speed: Record<string, number>
+  } | null>(null)
 
   useEffect(() => {
     fetchData()
+    fetchSpeedToLead()
   }, [business.business_id])
 
   async function fetchData() {
@@ -217,6 +226,16 @@ export default function DashboardPage() {
     } catch { /* ignore */ }
 
     setLoading(false)
+  }
+
+  async function fetchSpeedToLead() {
+    try {
+      const res = await fetch(`/api/analytics/speed-to-lead?period=30d&business_id=${business.business_id}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSpeedData(data)
+      }
+    } catch { /* ignore if feature not available */ }
   }
 
   const formatTime = (dateString: string) => {
@@ -454,6 +473,66 @@ export default function DashboardPage() {
             <p className="text-xs text-gray-400">Aktiva projekt</p>
           </Link>
         </div>
+
+        {/* Speed-to-Lead Widget */}
+        {speedData && speedData.total_leads > 0 && (
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-500" />
+                Svarstid
+              </h3>
+              <Link href="/dashboard/analytics" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                Detaljer <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-900">
+                  {speedData.avg_response_seconds < 60
+                    ? `${speedData.avg_response_seconds}s`
+                    : speedData.avg_response_seconds < 3600
+                    ? `${Math.round(speedData.avg_response_seconds / 60)}m`
+                    : `${Math.round(speedData.avg_response_seconds / 3600)}h`
+                  }
+                </p>
+                <p className="text-xs text-gray-400">Din snitt</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-gray-400">4h 00m</p>
+                <p className="text-xs text-gray-400">Branschen</p>
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-bold text-green-600">
+                  {speedData.avg_response_seconds > 0 ? `${Math.round(speedData.industry_avg_seconds / speedData.avg_response_seconds)}x` : '-'}
+                </p>
+                <p className="text-xs text-gray-400">Snabbare</p>
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              {[
+                { label: '< 1 min', key: 'under_1_min' },
+                { label: '1-15 min', key: '1_to_15_min' },
+                { label: '15-60 min', key: '15_to_60_min' },
+                { label: '1-4 tim', key: '1_to_4_hours' },
+                { label: '> 4 tim', key: 'over_4_hours' },
+              ].map(bucket => {
+                const count = speedData.response_distribution[bucket.key] || 0
+                const pct = speedData.total_leads > 0 ? (count / speedData.total_leads) * 100 : 0
+                return (
+                  <div key={bucket.key} className="flex items-center gap-2 text-xs">
+                    <span className="w-14 text-gray-500 text-right">{bucket.label}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
+                    </div>
+                    <span className="w-8 text-gray-400 text-right">{count}</span>
+                    <span className="w-10 text-gray-400 text-right">({Math.round(pct)}%)</span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Main 2-column grid (50/50) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
