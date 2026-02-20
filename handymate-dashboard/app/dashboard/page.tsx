@@ -17,7 +17,8 @@ import {
   BarChart3,
   Receipt,
   UserPlus,
-  Activity
+  Activity,
+  Phone
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -366,6 +367,32 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <ArrowRight className="w-5 h-5 text-blue-600" />
+              </div>
+            </div>
+          </Link>
+        )}
+
+        {/* Phone setup banner — show when phone not configured and onboarding dismissed */}
+        {!showOnboarding && onboardingData && !onboardingData.assigned_phone_number && (
+          <Link href="/dashboard/settings/phone">
+            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl hover:border-blue-300 transition-all cursor-pointer">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500">
+                    <Phone className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      Koppla ditt nummer och missa aldrig ett samtal igen
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Det tar bara 5 minuter.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-blue-600 font-medium text-sm flex items-center gap-1">
+                  Kom igång <ArrowRight className="w-4 h-4" />
+                </span>
               </div>
             </div>
           </Link>

@@ -105,6 +105,7 @@ const NAV: NavItem[] = [
     type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
     children: [
       { label: 'Företagsinställningar', href: '/dashboard/settings', exact: true },
+      { label: 'Telefoni', href: '/dashboard/settings/phone' },
       { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
       { label: 'Billing', href: '/dashboard/settings/billing' },
