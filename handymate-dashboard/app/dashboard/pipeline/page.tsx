@@ -294,6 +294,10 @@ export default function PipelinePage() {
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
 
+  // Link customer to deal
+  const [linkCustomerSearch, setLinkCustomerSearch] = useState('')
+  const [showLinkCustomer, setShowLinkCustomer] = useState(false)
+
   // Customer enrichment
   const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
   const [lastContact, setLastContact] = useState<{ date: string; type: string } | null>(null)
@@ -542,6 +546,32 @@ export default function PipelinePage() {
       if (selectedDeal) fetchDealTasks(selectedDeal.id)
     } catch {
       showToast('Kunde inte ta bort uppgift', 'error')
+    }
+  }
+
+  async function handleLinkCustomer(customerId: string) {
+    if (!selectedDeal) return
+    try {
+      const res = await fetch(`/api/pipeline/deals/${selectedDeal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: business.business_id, customer_id: customerId })
+      })
+      if (!res.ok) throw new Error()
+      setShowLinkCustomer(false)
+      setLinkCustomerSearch('')
+      showToast('Kund kopplad', 'success')
+      // Refresh pipeline to get updated customer data
+      await fetchPipeline()
+      // Re-open the deal with fresh data
+      const updatedDeals = await fetch(`/api/pipeline?business_id=${business.business_id}`).then(r => r.json())
+      const allDeals: Deal[] = Object.values(updatedDeals.deals || {}).flat() as Deal[]
+      const updatedDeal = allDeals.find(d => d.id === selectedDeal.id)
+      if (updatedDeal) {
+        openDealDetail(updatedDeal)
+      }
+    } catch {
+      showToast('Kunde inte koppla kund', 'error')
     }
   }
 
@@ -849,6 +879,8 @@ export default function PipelinePage() {
     setNewTaskDueDate('')
     setCustomerTags([])
     setLastContact(null)
+    setShowLinkCustomer(false)
+    setLinkCustomerSearch('')
     fetchDealActivities(deal.id)
     fetchDealNotes(deal.id)
     fetchDealTasks(deal.id)
@@ -1261,6 +1293,59 @@ export default function PipelinePage() {
                   <span>Skapad {timeAgo(selectedDeal.created_at)}</span>
                   <span>Uppdaterad {timeAgo(selectedDeal.updated_at)}</span>
                 </div>
+
+                {/* Link Customer (when no customer is assigned) */}
+                {!selectedDeal.customer && (
+                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/50 p-4">
+                    {!showLinkCustomer ? (
+                      <button
+                        onClick={() => { setShowLinkCustomer(true); fetchCustomers() }}
+                        className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        Koppla kund till denna deal
+                      </button>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-400 uppercase tracking-wider">Koppla kund</span>
+                          <button onClick={() => { setShowLinkCustomer(false); setLinkCustomerSearch('') }} className="text-gray-400 hover:text-gray-600">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={linkCustomerSearch}
+                          onChange={e => setLinkCustomerSearch(e.target.value)}
+                          placeholder="Sök kund..."
+                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                          autoFocus
+                        />
+                        <div className="max-h-40 overflow-y-auto space-y-1">
+                          {customers
+                            .filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch))
+                            .slice(0, 8)
+                            .map(c => (
+                              <button
+                                key={c.customer_id}
+                                onClick={() => handleLinkCustomer(c.customer_id)}
+                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-blue-50 transition-colors"
+                              >
+                                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-sm text-gray-900 truncate">{c.name}</p>
+                                  <p className="text-xs text-gray-400 truncate">{c.phone_number}{c.email ? ` · ${c.email}` : ''}</p>
+                                </div>
+                              </button>
+                            ))}
+                          {customers.filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch)).length === 0 && (
+                            <p className="text-xs text-gray-400 text-center py-2">Inga kunder hittades</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Customer */}
                 {selectedDeal.customer && (
