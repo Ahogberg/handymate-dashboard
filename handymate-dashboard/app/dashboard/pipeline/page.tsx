@@ -39,7 +39,8 @@ import {
   CheckSquare,
   StickyNote,
   Tag,
-  Calendar
+  Calendar,
+  MessageSquare
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -277,6 +278,7 @@ export default function PipelinePage() {
   const [editingValue, setEditingValue] = useState(false)
   const [editValueInput, setEditValueInput] = useState('')
   const [editingPriority, setEditingPriority] = useState(false)
+  const [dealTab, setDealTab] = useState<'general' | 'tasks' | 'documents' | 'messages'>('general')
 
   // Deal documents
   const [dealDocuments, setDealDocuments] = useState<CustomerDocument[]>([])
@@ -867,6 +869,7 @@ export default function PipelinePage() {
 
   function openDealDetail(deal: Deal) {
     setSelectedDeal(deal)
+    setDealTab('general')
     setEditingTitle(false)
     setEditingValue(false)
     setEditingPriority(false)
@@ -1213,425 +1216,483 @@ export default function PipelinePage() {
         )}
       </div>
 
-      {/* Deal Detail Panel */}
+      {/* Deal Detail Modal */}
       {selectedDeal && (
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={closeDealDetail} />
-          <div className="fixed inset-y-0 right-0 z-50 w-full lg:w-[460px] bg-white border-l border-gray-200 shadow-2xl flex flex-col">
-            <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <div className="flex items-center gap-2 min-w-0">
-                {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0" style={{ backgroundColor: stage.color + '22', color: stage.color, border: `1px solid ${stage.color}44` }}>{stage.name}</span>) : null })()}
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>{getPriorityLabel(selectedDeal.priority)}</span>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              {/* Modal Header */}
+              <div className="flex-shrink-0 px-6 pt-5 pb-0">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0" style={{ backgroundColor: stage.color + '22', color: stage.color, border: `1px solid ${stage.color}44` }}>{stage.name}</span>) : null })()}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>{getPriorityLabel(selectedDeal.priority)}</span>
+                    <div className="flex-1 min-w-0 ml-2">
+                      {editingTitle ? (
+                        <div className="flex items-center gap-2">
+                          <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-blue-400" autoFocus
+                            onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
+                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-4 h-4" /></button>
+                        </div>
+                      ) : (
+                        <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full min-w-0">
+                          <h2 className="text-lg font-bold text-gray-900 truncate">{selectedDeal.title}</h2>
+                          <Edit3 className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={closeDealDetail} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors ml-3 flex-shrink-0"><X className="w-5 h-5" /></button>
+                </div>
+                {selectedDeal.description && <p className="text-sm text-gray-500 mb-4 -mt-1">{selectedDeal.description}</p>}
+
+                {/* Tabs */}
+                <div className="flex gap-0 border-b border-gray-200 -mx-6 px-6">
+                  {([
+                    { key: 'general' as const, label: 'Allmänt', icon: FolderKanban },
+                    { key: 'tasks' as const, label: 'Uppgifter', icon: CheckSquare, count: dealTasks.filter(t => t.status !== 'done').length },
+                    { key: 'documents' as const, label: 'Dokument', icon: FileIcon, count: dealDocuments.length },
+                    { key: 'messages' as const, label: 'Anteckningar', icon: MessageSquare, count: dealNotes.length },
+                  ]).map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setDealTab(tab.key)}
+                      className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        dealTab === tab.key
+                          ? 'border-blue-600 text-blue-600'
+                          : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <tab.icon className="w-4 h-4" />
+                      <span className="hidden sm:inline">{tab.label}</span>
+                      {tab.count !== undefined && tab.count > 0 && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          dealTab === tab.key ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                        }`}>{tab.count}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button onClick={closeDealDetail} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
-            </div>
 
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-5 space-y-5">
-                {/* Title */}
-                <div>
-                  {editingTitle ? (
-                    <div className="flex items-center gap-2">
-                      <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
-                        className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-lg font-bold focus:outline-none focus:border-blue-400" autoFocus
-                        onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
-                      <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-4 h-4" /></button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full">
-                      <h2 className="text-lg font-bold text-gray-900">{selectedDeal.title}</h2>
-                      <Edit3 className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  )}
-                  {selectedDeal.description && <p className="text-sm text-gray-500 mt-1">{selectedDeal.description}</p>}
-                </div>
+              {/* Tab Content */}
+              <div className="flex-1 overflow-y-auto p-6">
 
-                {/* Value */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">Värde</span>
-                  {editingValue ? (
-                    <div className="flex items-center gap-2">
-                      <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
-                        className="w-32 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-blue-400" autoFocus
-                        onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
-                      <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
-                    </div>
-                  ) : (
-                    <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-medium text-sm">
-                      {formatValue(selectedDeal.value)}<Edit3 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Priority */}
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-400">Prioritet</span>
-                  {editingPriority ? (
-                    <select value={selectedDeal.priority} onChange={e => { updateDealField(selectedDeal.id, 'priority', e.target.value); setEditingPriority(false) }} onBlur={() => setEditingPriority(false)} autoFocus
-                      className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-blue-400">
-                      <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
-                    </select>
-                  ) : (
-                    <button onClick={() => setEditingPriority(true)} className={`group flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>
-                      {getPriorityLabel(selectedDeal.priority)}<Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </button>
-                  )}
-                </div>
-
-                {/* Move to stage */}
-                <div>
-                  <span className="text-sm text-gray-400 block mb-2">Flytta till</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {stages.filter(s => s.id !== selectedDeal.stage_id).map(s => (
-                      <button key={s.id} onClick={() => moveDealAction(selectedDeal.id, s.slug)}
-                        className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                        <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: s.color }} />{s.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-xs text-gray-400">
-                  <span>Skapad {timeAgo(selectedDeal.created_at)}</span>
-                  <span>Uppdaterad {timeAgo(selectedDeal.updated_at)}</span>
-                </div>
-
-                {/* Link Customer (when no customer is assigned) */}
-                {!selectedDeal.customer && (
-                  <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/50 p-4">
-                    {!showLinkCustomer ? (
-                      <button
-                        onClick={() => { setShowLinkCustomer(true); fetchCustomers() }}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
-                      >
-                        <User className="w-4 h-4" />
-                        Koppla kund till denna deal
-                      </button>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-400 uppercase tracking-wider">Koppla kund</span>
-                          <button onClick={() => { setShowLinkCustomer(false); setLinkCustomerSearch('') }} className="text-gray-400 hover:text-gray-600">
-                            <X className="w-3.5 h-3.5" />
+                {/* TAB: Allmänt */}
+                {dealTab === 'general' && (
+                  <div className="space-y-5">
+                    {/* Value + Priority row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
+                        <span className="text-sm text-gray-400">Värde</span>
+                        {editingValue ? (
+                          <div className="flex items-center gap-2">
+                            <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
+                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-blue-400" autoFocus
+                              onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
+                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ) : (
+                          <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-semibold text-sm">
+                            {formatValue(selectedDeal.value)}<Edit3 className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
                           </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={linkCustomerSearch}
-                          onChange={e => setLinkCustomerSearch(e.target.value)}
-                          placeholder="Sök kund..."
-                          className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
-                          autoFocus
-                        />
-                        <div className="max-h-40 overflow-y-auto space-y-1">
-                          {customers
-                            .filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch))
-                            .slice(0, 8)
-                            .map(c => (
-                              <button
-                                key={c.customer_id}
-                                onClick={() => handleLinkCustomer(c.customer_id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-blue-50 transition-colors"
-                              >
-                                <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                <div className="min-w-0">
-                                  <p className="text-sm text-gray-900 truncate">{c.name}</p>
-                                  <p className="text-xs text-gray-400 truncate">{c.phone_number}{c.email ? ` · ${c.email}` : ''}</p>
-                                </div>
-                              </button>
-                            ))}
-                          {customers.filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch)).length === 0 && (
-                            <p className="text-xs text-gray-400 text-center py-2">Inga kunder hittades</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Customer */}
-                {selectedDeal.customer && (
-                  <div className="rounded-lg border border-gray-200 bg-gray-50/50 overflow-hidden">
-                    <div className="p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
-                        {selectedDeal.customer.customer_type && (
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                            selectedDeal.customer.customer_type === 'company' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                            selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
-                            'bg-gray-100 text-gray-500 border-gray-200'
-                          }`}>
-                            {selectedDeal.customer.customer_type === 'company' ? 'Företag' : selectedDeal.customer.customer_type === 'brf' ? 'BRF' : 'Privat'}
-                          </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" /><span className="text-sm font-medium text-gray-900">{selectedDeal.customer.name}</span></div>
-                      {selectedDeal.customer.phone_number && <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span></div>}
-                      {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500 truncate">{selectedDeal.customer.email}</span></div>}
-                      {selectedDeal.customer.address_line && <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.address_line}</span></div>}
-                      {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.org_number && (
-                        <div className="text-xs text-gray-400">Org.nr: {selectedDeal.customer.org_number}</div>
-                      )}
-                      {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.contact_person && (
-                        <div className="text-xs text-gray-400">Kontakt: {selectedDeal.customer.contact_person}</div>
-                      )}
-                      {customerTags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {customerTags.map((tag, i) => (
-                            <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border" style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color + '40' }}>
-                              <Tag className="w-2.5 h-2.5" />{tag.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {lastContact && (
-                        <div className="text-xs text-gray-400">Senast kontaktad: {new Date(lastContact.date).toLocaleDateString('sv-SE')} ({lastContact.type})</div>
-                      )}
+                      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
+                        <span className="text-sm text-gray-400">Prioritet</span>
+                        {editingPriority ? (
+                          <select value={selectedDeal.priority} onChange={e => { updateDealField(selectedDeal.id, 'priority', e.target.value); setEditingPriority(false) }} onBlur={() => setEditingPriority(false)} autoFocus
+                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-blue-400">
+                            <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
+                          </select>
+                        ) : (
+                          <button onClick={() => setEditingPriority(true)} className={`group flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>
+                            {getPriorityLabel(selectedDeal.priority)}<Edit3 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <Link
-                      href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
-                      className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                    >
-                      <span className="font-medium">Visa kundkort</span>
-                      <ChevronRight className="w-4 h-4" />
-                    </Link>
+
+                    {/* Move to stage */}
+                    <div>
+                      <span className="text-sm text-gray-400 block mb-2">Flytta till</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {stages.filter(s => s.id !== selectedDeal.stage_id).map(s => (
+                          <button key={s.id} onClick={() => moveDealAction(selectedDeal.id, s.slug)}
+                            className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: s.color }} />{s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-400">
+                      <span>Skapad {timeAgo(selectedDeal.created_at)}</span>
+                      <span>Uppdaterad {timeAgo(selectedDeal.updated_at)}</span>
+                    </div>
+
+                    {/* Link Customer (when no customer is assigned) */}
+                    {!selectedDeal.customer && (
+                      <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/50 p-4">
+                        {!showLinkCustomer ? (
+                          <button
+                            onClick={() => { setShowLinkCustomer(true); fetchCustomers() }}
+                            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                          >
+                            <User className="w-4 h-4" />
+                            Koppla kund till denna deal
+                          </button>
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400 uppercase tracking-wider">Koppla kund</span>
+                              <button onClick={() => { setShowLinkCustomer(false); setLinkCustomerSearch('') }} className="text-gray-400 hover:text-gray-600">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              type="text"
+                              value={linkCustomerSearch}
+                              onChange={e => setLinkCustomerSearch(e.target.value)}
+                              placeholder="Sök kund..."
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                              autoFocus
+                            />
+                            <div className="max-h-40 overflow-y-auto space-y-1">
+                              {customers
+                                .filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch))
+                                .slice(0, 8)
+                                .map(c => (
+                                  <button
+                                    key={c.customer_id}
+                                    onClick={() => handleLinkCustomer(c.customer_id)}
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-blue-50 transition-colors"
+                                  >
+                                    <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-sm text-gray-900 truncate">{c.name}</p>
+                                      <p className="text-xs text-gray-400 truncate">{c.phone_number}{c.email ? ` · ${c.email}` : ''}</p>
+                                    </div>
+                                  </button>
+                                ))}
+                              {customers.filter(c => !linkCustomerSearch || c.name.toLowerCase().includes(linkCustomerSearch.toLowerCase()) || c.phone_number?.includes(linkCustomerSearch)).length === 0 && (
+                                <p className="text-xs text-gray-400 text-center py-2">Inga kunder hittades</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Customer */}
+                    {selectedDeal.customer && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50/50 overflow-hidden">
+                        <div className="p-4 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
+                            {selectedDeal.customer.customer_type && (
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                                selectedDeal.customer.customer_type === 'company' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
+                                'bg-gray-100 text-gray-500 border-gray-200'
+                              }`}>
+                                {selectedDeal.customer.customer_type === 'company' ? 'Företag' : selectedDeal.customer.customer_type === 'brf' ? 'BRF' : 'Privat'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" /><span className="text-sm font-medium text-gray-900">{selectedDeal.customer.name}</span></div>
+                          {selectedDeal.customer.phone_number && <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span></div>}
+                          {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500 truncate">{selectedDeal.customer.email}</span></div>}
+                          {selectedDeal.customer.address_line && <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.address_line}</span></div>}
+                          {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.org_number && (
+                            <div className="text-xs text-gray-400">Org.nr: {selectedDeal.customer.org_number}</div>
+                          )}
+                          {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.contact_person && (
+                            <div className="text-xs text-gray-400">Kontakt: {selectedDeal.customer.contact_person}</div>
+                          )}
+                          {customerTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {customerTags.map((tag, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border" style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color + '40' }}>
+                                  <Tag className="w-2.5 h-2.5" />{tag.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {lastContact && (
+                            <div className="text-xs text-gray-400">Senast kontaktad: {new Date(lastContact.date).toLocaleDateString('sv-SE')} ({lastContact.type})</div>
+                          )}
+                        </div>
+                        <Link
+                          href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
+                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                        >
+                          <span className="font-medium">Visa kundkort</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </div>
+                    )}
+
+                    {/* Quick actions */}
+                    <div className="space-y-2">
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
+                      <div className="flex flex-wrap gap-2">
+                        <Link href={selectedDeal.customer_id ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}` : '/dashboard/quotes/new'}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                          <FileText className="w-4 h-4 text-blue-600" /> Skapa offert
+                        </Link>
+                        {!getStageForDeal(selectedDeal)?.is_lost && (
+                          <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
+                            <XCircle className="w-4 h-4" /> Markera förlorad
+                          </button>
+                        )}
+                        {selectedDeal.quote_id && (
+                          <Link href={`/dashboard/quotes/${selectedDeal.quote_id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                            <FileText className="w-4 h-4 text-emerald-600" /> Visa offert
+                          </Link>
+                        )}
+                  </div>
+                </div>
+
+                    {/* Activity log */}
+                    <div>
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Aktivitetslogg</h4>
+                      {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-blue-600 animate-spin" /></div>
+                        : detailActivities.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
+                        : (
+                          <div className="space-y-2">
+                            {detailActivities.map(act => (
+                              <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-gray-50/50 border-gray-200'}`}>
+                                <div className="mt-0.5">
+                                  {act.triggered_by === 'ai' ? <Bot className="w-4 h-4 text-blue-600" /> : act.triggered_by === 'system' ? <Sparkles className="w-4 h-4 text-gray-400" /> : <User className="w-4 h-4 text-gray-500" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm text-gray-900">{act.description || act.activity_type}</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTriggeredByStyle(act.triggered_by)}`}>{getTriggeredByLabel(act.triggered_by)}</span>
+                                  </div>
+                                  {act.from_stage_name && act.to_stage_name && (
+                                    <div className="flex items-center gap-1 mt-1 text-xs text-gray-400"><span>{act.from_stage_name}</span><ArrowRight className="w-3 h-3" /><span>{act.to_stage_name}</span></div>
+                                  )}
+                                  {act.ai_reason && <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>}
+                                  <span className="text-xs text-gray-400 mt-1 block">{timeAgo(act.created_at)}</span>
+                                </div>
+                                {act.triggered_by === 'ai' && !act.undone_at && (
+                                  <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 p-1.5 rounded-md bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors" title="Ångra"><Undo2 className="w-3.5 h-3.5" /></button>
+                                )}
+                                {act.undone_at && <span className="text-[10px] text-gray-400 italic flex-shrink-0">Ångrad</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                    </div>
                   </div>
                 )}
 
-                {/* Documents */}
-                {selectedDeal.customer_id && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <Upload className="w-3.5 h-3.5" /> Dokument
-                      </h4>
-                      <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="text-xs text-blue-600 hover:text-blue-500">
-                        Visa alla
-                      </Link>
-                    </div>
-
-                    {/* Upload area */}
+                {/* TAB: Uppgifter */}
+                {dealTab === 'tasks' && (
+                  <div className="space-y-4">
+                    {/* Add task form */}
                     <div className="flex items-center gap-2">
-                      <select
-                        value={dealUploadCategory}
-                        onChange={(e) => setDealUploadCategory(e.target.value)}
-                        className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-xs focus:outline-none focus:border-blue-400"
+                      <input
+                        type="text"
+                        value={newTaskTitle}
+                        onChange={e => setNewTaskTitle(e.target.value)}
+                        placeholder="Ny uppgift..."
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                        onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+                      />
+                      <input
+                        type="date"
+                        value={newTaskDueDate}
+                        onChange={e => setNewTaskDueDate(e.target.value)}
+                        className="px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-blue-400 w-32"
+                      />
+                      <button
+                        onClick={handleAddTask}
+                        disabled={!newTaskTitle.trim() || taskSaving}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                       >
-                        <option value="drawing">Ritning</option>
-                        <option value="sketch">Skiss</option>
-                        <option value="description">Beskrivning</option>
-                        <option value="contract">Kontrakt</option>
-                        <option value="photo">Foto</option>
-                        <option value="other">Övrigt</option>
-                      </select>
-                      <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-600 font-medium hover:bg-blue-100 cursor-pointer transition-colors">
-                        {dealUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-                        {dealUploading ? 'Laddar upp...' : 'Ladda upp'}
-                        <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
-                      </label>
+                        {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                        <span className="hidden sm:inline">Lägg till</span>
+                      </button>
                     </div>
 
-                    {/* Document list */}
-                    {dealDocuments.length > 0 && (
-                      <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
-                        {dealDocuments.slice(0, 5).map((doc) => (
-                          <div key={doc.id} className="flex items-center gap-3 px-3 py-2">
-                            <div className="w-7 h-7 bg-gray-100 rounded flex items-center justify-center flex-shrink-0">
-                              {doc.file_type?.startsWith('image/') ? (
-                                <ImageIcon className="w-3.5 h-3.5 text-blue-500" />
-                              ) : doc.file_type?.includes('pdf') ? (
-                                <FileText className="w-3.5 h-3.5 text-red-500" />
-                              ) : (
-                                <FileIcon className="w-3.5 h-3.5 text-gray-400" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-gray-900 truncate">{doc.file_name}</p>
-                              <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
-                                <span className="px-1 py-0.5 bg-gray-100 rounded text-gray-500">
-                                  {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
-                                </span>
-                                {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                    {/* Task list */}
+                    {dealTasks.length > 0 ? (
+                      <div className="space-y-1">
+                        {dealTasks.map(task => (
+                          <div key={task.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 group transition-colors">
+                            <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
+                                {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                               </div>
-                            </div>
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1 text-gray-400 hover:text-blue-600 rounded transition-colors" title="Öppna">
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
+                            </button>
+                            <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{task.title}</span>
+                            {task.due_date && (
+                              <span className={`text-xs flex-shrink-0 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                                {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                              </span>
+                            )}
+                            <button onClick={() => handleDeleteTask(task.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Ta bort">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         ))}
                       </div>
-                    )}
-                    {dealDocuments.length === 0 && (
-                      <p className="text-xs text-gray-400 text-center py-2">Inga dokument ännu</p>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <CheckSquare className="w-8 h-8 mb-2 opacity-40" />
+                        <p className="text-sm">Inga uppgifter ännu</p>
+                        <p className="text-xs mt-1">Lägg till en uppgift ovan</p>
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* Notes */}
-                <div className="space-y-2">
-                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <StickyNote className="w-3.5 h-3.5" /> Anteckningar
-                  </h4>
-                  {dealNotes.length > 0 && (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {dealNotes.map(note => (
-                        <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 group">
-                          {editingNoteId === note.id ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={editNoteContent}
-                                onChange={e => setEditNoteContent(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
-                                rows={3}
-                              />
-                              <div className="flex gap-2">
-                                <button onClick={() => handleUpdateNote(note.id)} className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Spara</button>
-                                <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
+                {/* TAB: Dokument */}
+                {dealTab === 'documents' && (
+                  <div className="space-y-4">
+                    {selectedDeal.customer_id ? (
+                      <>
+                        {/* Upload area */}
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={dealUploadCategory}
+                            onChange={(e) => setDealUploadCategory(e.target.value)}
+                            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-blue-400"
+                          >
+                            <option value="drawing">Ritning</option>
+                            <option value="sketch">Skiss</option>
+                            <option value="description">Beskrivning</option>
+                            <option value="contract">Kontrakt</option>
+                            <option value="photo">Foto</option>
+                            <option value="other">Övrigt</option>
+                          </select>
+                          <label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-600 font-medium hover:bg-blue-100 cursor-pointer transition-colors">
+                            {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
+                            <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
+                          </label>
+                          <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-blue-600 hover:text-blue-500">
+                            Visa alla i kundkort
+                          </Link>
+                        </div>
+
+                        {/* Document list */}
+                        {dealDocuments.length > 0 ? (
+                          <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                            {dealDocuments.map((doc) => (
+                              <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
+                                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  {doc.file_type?.startsWith('image/') ? (
+                                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                                  ) : doc.file_type?.includes('pdf') ? (
+                                    <FileText className="w-4 h-4 text-red-500" />
+                                  ) : (
+                                    <FileIcon className="w-4 h-4 text-gray-400" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-900 truncate">{doc.file_name}</p>
+                                  <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+                                      {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
+                                    </span>
+                                    {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                                    <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
+                                  </div>
+                                </div>
+                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" title="Öppna">
+                                  <Download className="w-4 h-4" />
+                                </a>
                               </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
-                              <div className="flex items-center justify-between mt-2">
-                                <span className="text-[10px] text-gray-400">{timeAgo(note.created_at)}</span>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1 text-gray-400 hover:text-blue-600 rounded" title="Redigera"><Edit3 className="w-3 h-3" /></button>
-                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1 text-gray-400 hover:text-red-600 rounded" title="Ta bort"><Trash2 className="w-3 h-3" /></button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                            <Upload className="w-8 h-8 mb-2 opacity-40" />
+                            <p className="text-sm">Inga dokument ännu</p>
+                            <p className="text-xs mt-1">Ladda upp dokument med knappen ovan</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <User className="w-8 h-8 mb-2 opacity-40" />
+                        <p className="text-sm">Koppla en kund till denna deal</p>
+                        <p className="text-xs mt-1">Dokument kopplas via kundkortet</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB: Anteckningar */}
+                {dealTab === 'messages' && (
+                  <div className="space-y-4">
+                    {/* Add note form */}
+                    <div className="flex gap-2">
+                      <textarea
+                        value={newNoteContent}
+                        onChange={e => setNewNoteContent(e.target.value)}
+                        placeholder="Skriv en anteckning..."
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
+                        rows={3}
+                        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
+                      />
+                      <button
+                        onClick={handleAddNote}
+                        disabled={!newNoteContent.trim() || noteSaving}
+                        className="self-end px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {noteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Spara'}
+                      </button>
+                    </div>
+
+                    {/* Notes list */}
+                    {dealNotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {dealNotes.map(note => (
+                          <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 group">
+                            {editingNoteId === note.id ? (
+                              <div className="space-y-2">
+                                <textarea
+                                  value={editNoteContent}
+                                  onChange={e => setEditNoteContent(e.target.value)}
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
+                                  rows={4}
+                                />
+                                <div className="flex gap-2">
+                                  <button onClick={() => handleUpdateNote(note.id)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Spara</button>
+                                  <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
                                 </div>
                               </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <textarea
-                      value={newNoteContent}
-                      onChange={e => setNewNoteContent(e.target.value)}
-                      placeholder="Skriv en anteckning..."
-                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
-                      rows={2}
-                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
-                    />
-                    <button
-                      onClick={handleAddNote}
-                      disabled={!newNoteContent.trim() || noteSaving}
-                      className="self-end px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {noteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Spara'}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Tasks */}
-                <div className="space-y-2">
-                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckSquare className="w-3.5 h-3.5" /> Uppgifter
-                    {dealTasks.filter(t => t.status !== 'done').length > 0 && (
-                      <span className="ml-auto text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">{dealTasks.filter(t => t.status !== 'done').length}</span>
-                    )}
-                  </h4>
-                  {dealTasks.length > 0 && (
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {dealTasks.map(task => (
-                        <div key={task.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group">
-                          <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
-                              {task.status === 'done' && <CheckCircle2 className="w-3 h-3 text-white" />}
-                            </div>
-                          </button>
-                          <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{task.title}</span>
-                          {task.due_date && (
-                            <span className={`text-[10px] flex-shrink-0 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-gray-400'}`}>
-                              {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
-                            </span>
-                          )}
-                          <button onClick={() => handleDeleteTask(task.id)} className="p-0.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Ta bort">
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newTaskTitle}
-                      onChange={e => setNewTaskTitle(e.target.value)}
-                      placeholder="Ny uppgift..."
-                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
-                      onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
-                    />
-                    <input
-                      type="date"
-                      value={newTaskDueDate}
-                      onChange={e => setNewTaskDueDate(e.target.value)}
-                      className="px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-blue-400 w-28"
-                    />
-                    <button
-                      onClick={handleAddTask}
-                      disabled={!newTaskTitle.trim() || taskSaving}
-                      className="px-2 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                    >
-                      {taskSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Quick actions */}
-                <div className="space-y-2">
-                  <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
-                  <div className="flex flex-wrap gap-2">
-                    <Link href={selectedDeal.customer_id ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}` : '/dashboard/quotes/new'}
-                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                      <FileText className="w-4 h-4 text-blue-600" /> Skapa offert
-                    </Link>
-                    {!getStageForDeal(selectedDeal)?.is_lost && (
-                      <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
-                        <XCircle className="w-4 h-4" /> Markera förlorad
-                      </button>
-                    )}
-                    {selectedDeal.quote_id && (
-                      <Link href={`/dashboard/quotes/${selectedDeal.quote_id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                        <FileText className="w-4 h-4 text-emerald-600" /> Visa offert
-                      </Link>
-                    )}
-                  </div>
-                </div>
-
-                {/* Activity log */}
-                <div>
-                  <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Aktivitetslogg</h4>
-                  {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-blue-600 animate-spin" /></div>
-                    : detailActivities.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
-                    : (
-                      <div className="space-y-2">
-                        {detailActivities.map(act => (
-                          <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-gray-50/50 border-gray-200'}`}>
-                            <div className="mt-0.5">
-                              {act.triggered_by === 'ai' ? <Bot className="w-4 h-4 text-blue-600" /> : act.triggered_by === 'system' ? <Sparkles className="w-4 h-4 text-gray-400" /> : <User className="w-4 h-4 text-gray-500" />}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm text-gray-900">{act.description || act.activity_type}</span>
-                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTriggeredByStyle(act.triggered_by)}`}>{getTriggeredByLabel(act.triggered_by)}</span>
-                              </div>
-                              {act.from_stage_name && act.to_stage_name && (
-                                <div className="flex items-center gap-1 mt-1 text-xs text-gray-400"><span>{act.from_stage_name}</span><ArrowRight className="w-3 h-3" /><span>{act.to_stage_name}</span></div>
-                              )}
-                              {act.ai_reason && <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>}
-                              <span className="text-xs text-gray-400 mt-1 block">{timeAgo(act.created_at)}</span>
-                            </div>
-                            {act.triggered_by === 'ai' && !act.undone_at && (
-                              <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 p-1.5 rounded-md bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors" title="Ångra"><Undo2 className="w-3.5 h-3.5" /></button>
+                            ) : (
+                              <>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                                <div className="flex items-center justify-between mt-3">
+                                  <span className="text-xs text-gray-400">{timeAgo(note.created_at)}</span>
+                                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Ta bort"><Trash2 className="w-3.5 h-3.5" /></button>
+                                  </div>
+                                </div>
+                              </>
                             )}
-                            {act.undone_at && <span className="text-[10px] text-gray-400 italic flex-shrink-0">Ångrad</span>}
                           </div>
                         ))}
                       </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+                        <MessageSquare className="w-8 h-8 mb-2 opacity-40" />
+                        <p className="text-sm">Inga anteckningar ännu</p>
+                        <p className="text-xs mt-1">Skriv en anteckning ovan</p>
+                      </div>
                     )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
