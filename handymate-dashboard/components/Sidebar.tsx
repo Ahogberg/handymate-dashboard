@@ -103,6 +103,7 @@ const NAV: NavItem[] = [
     children: [
       { label: 'Kampanjer', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
       { label: 'E-postmallar', href: '/dashboard/settings/email-templates', featureGate: 'email_template_editor' },
+      { label: 'Hemsida-widget', href: '/dashboard/settings/website-widget', featureGate: 'website_widget' },
     ],
   },
   { type: 'link', key: 'analytics', label: 'Analys', icon: BarChart3, href: '/dashboard/analytics', featureGate: 'lead_intelligence' },

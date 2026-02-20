@@ -121,6 +121,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Lead Intelligence & Analys',
     plans: ['professional', 'business'],
   },
+  website_widget: {
+    key: 'website_widget',
+    name: 'Hemsida-widget',
+    plans: ['professional', 'business'],
+  },
 
   // === BEGR\u00c4NSADE PER PLAN ===
   ai_photo_quote: {
