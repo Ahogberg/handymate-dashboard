@@ -43,12 +43,20 @@ CREATE INDEX IF NOT EXISTS idx_deal_note_business ON deal_note(business_id);
 ALTER TABLE task ENABLE ROW LEVEL SECURITY;
 ALTER TABLE deal_note ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS task_business_policy ON task
-  FOR ALL USING (business_id IN (
-    SELECT business_id FROM business_config WHERE user_id = auth.uid()
-  ));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'task_business_policy' AND tablename = 'task') THEN
+    CREATE POLICY task_business_policy ON task
+      FOR ALL USING (business_id IN (
+        SELECT business_id FROM business_config WHERE user_id = auth.uid()
+      ));
+  END IF;
+END $$;
 
-CREATE POLICY IF NOT EXISTS deal_note_business_policy ON deal_note
-  FOR ALL USING (business_id IN (
-    SELECT business_id FROM business_config WHERE user_id = auth.uid()
-  ));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'deal_note_business_policy' AND tablename = 'deal_note') THEN
+    CREATE POLICY deal_note_business_policy ON deal_note
+      FOR ALL USING (business_id IN (
+        SELECT business_id FROM business_config WHERE user_id = auth.uid()
+      ));
+  END IF;
+END $$;
