@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
     if (customerIds.length > 0) {
       const { data: customers } = await supabase
         .from('customer')
-        .select('customer_id, name, phone_number, email, address_line')
+        .select('customer_id, name, phone_number, email, address_line, customer_type, org_number, contact_person, personal_number')
         .in('customer_id', customerIds)
       for (const c of (customers || [])) {
         customerMap[c.customer_id] = c

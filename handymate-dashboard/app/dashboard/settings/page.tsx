@@ -2018,6 +2018,13 @@ export default function SettingsPage() {
               )}
             </div>
 
+            {/* Email info */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+              <p className="text-sm text-blue-700">
+                <strong>Om e-post:</strong> E-post skickas via Handymate (Resend), inte via Gmail. Google Calendar kan kopplas ovan för att synka bokningar och schema.
+              </p>
+            </div>
+
             {/* Outlook Calendar (placeholder) */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 opacity-60">
               <div className="flex items-center gap-3 mb-4">

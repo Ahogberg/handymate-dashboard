@@ -35,7 +35,11 @@ import {
   MapPin,
   File as FileIcon,
   Image as ImageIcon,
-  Download
+  Download,
+  CheckSquare,
+  StickyNote,
+  Tag,
+  Calendar
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -77,6 +81,10 @@ interface Deal {
     phone_number: string
     email: string
     address_line: string | null
+    customer_type?: string
+    org_number?: string
+    contact_person?: string
+    personal_number?: string
   } | null
 }
 
@@ -88,6 +96,35 @@ interface CustomerDocument {
   file_size: number | null
   category: string
   uploaded_at: string
+}
+
+interface Task {
+  id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'done'
+  priority: 'low' | 'medium' | 'high'
+  due_date: string | null
+  due_time: string | null
+  customer_id: string | null
+  deal_id: string | null
+  project_id: string | null
+  completed_at: string | null
+  created_at: string
+}
+
+interface DealNote {
+  id: string
+  deal_id: string
+  content: string
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface CustomerTag {
+  name: string
+  color: string
 }
 
 interface Activity {
@@ -244,6 +281,23 @@ export default function PipelinePage() {
   const [dealUploading, setDealUploading] = useState(false)
   const [dealUploadCategory, setDealUploadCategory] = useState('other')
 
+  // Deal notes
+  const [dealNotes, setDealNotes] = useState<DealNote[]>([])
+  const [newNoteContent, setNewNoteContent] = useState('')
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editNoteContent, setEditNoteContent] = useState('')
+  const [noteSaving, setNoteSaving] = useState(false)
+
+  // Deal tasks
+  const [dealTasks, setDealTasks] = useState<Task[]>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [taskSaving, setTaskSaving] = useState(false)
+
+  // Customer enrichment
+  const [customerTags, setCustomerTags] = useState<CustomerTag[]>([])
+  const [lastContact, setLastContact] = useState<{ date: string; type: string } | null>(null)
+
   const [showNewDeal, setShowNewDeal] = useState(false)
   const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '' })
   const [newDealSubmitting, setNewDealSubmitting] = useState(false)
@@ -365,6 +419,178 @@ export default function PipelinePage() {
     fetchDealDocuments(selectedDeal.customer_id)
     showToast('Dokument uppladdat', 'success')
   }
+
+  // Deal notes
+  const fetchDealNotes = useCallback(async (dealId: string) => {
+    try {
+      const res = await fetch(`/api/pipeline/notes?dealId=${dealId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setDealNotes(data.notes || [])
+    } catch {
+      setDealNotes([])
+    }
+  }, [])
+
+  async function handleAddNote() {
+    if (!newNoteContent.trim() || !selectedDeal) return
+    setNoteSaving(true)
+    try {
+      const res = await fetch('/api/pipeline/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dealId: selectedDeal.id, content: newNoteContent.trim() })
+      })
+      if (!res.ok) throw new Error()
+      setNewNoteContent('')
+      fetchDealNotes(selectedDeal.id)
+      showToast('Anteckning sparad', 'success')
+    } catch {
+      showToast('Kunde inte spara anteckning', 'error')
+    } finally {
+      setNoteSaving(false)
+    }
+  }
+
+  async function handleUpdateNote(noteId: string) {
+    if (!editNoteContent.trim()) return
+    try {
+      const res = await fetch('/api/pipeline/notes', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId, content: editNoteContent.trim() })
+      })
+      if (!res.ok) throw new Error()
+      setEditingNoteId(null)
+      setEditNoteContent('')
+      if (selectedDeal) fetchDealNotes(selectedDeal.id)
+      showToast('Anteckning uppdaterad', 'success')
+    } catch {
+      showToast('Kunde inte uppdatera', 'error')
+    }
+  }
+
+  async function handleDeleteNote(noteId: string) {
+    if (!confirm('Ta bort anteckning?')) return
+    try {
+      const res = await fetch(`/api/pipeline/notes?noteId=${noteId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      if (selectedDeal) fetchDealNotes(selectedDeal.id)
+      showToast('Anteckning borttagen', 'success')
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
+  // Deal tasks
+  const fetchDealTasks = useCallback(async (dealId: string) => {
+    try {
+      const res = await fetch(`/api/tasks?deal_id=${dealId}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setDealTasks(data.tasks || [])
+    } catch {
+      setDealTasks([])
+    }
+  }, [])
+
+  async function handleAddTask() {
+    if (!newTaskTitle.trim() || !selectedDeal) return
+    setTaskSaving(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          deal_id: selectedDeal.id,
+          customer_id: selectedDeal.customer_id,
+          due_date: newTaskDueDate || null,
+        })
+      })
+      if (!res.ok) throw new Error()
+      setNewTaskTitle('')
+      setNewTaskDueDate('')
+      fetchDealTasks(selectedDeal.id)
+      showToast('Uppgift skapad', 'success')
+    } catch {
+      showToast('Kunde inte skapa uppgift', 'error')
+    } finally {
+      setTaskSaving(false)
+    }
+  }
+
+  async function handleToggleTask(taskId: string, currentStatus: string) {
+    const newStatus = currentStatus === 'done' ? 'pending' : 'done'
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, status: newStatus })
+      })
+      if (!res.ok) throw new Error()
+      if (selectedDeal) fetchDealTasks(selectedDeal.id)
+    } catch {
+      showToast('Kunde inte uppdatera uppgift', 'error')
+    }
+  }
+
+  async function handleDeleteTask(taskId: string) {
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      if (selectedDeal) fetchDealTasks(selectedDeal.id)
+    } catch {
+      showToast('Kunde inte ta bort uppgift', 'error')
+    }
+  }
+
+  // Customer enrichment
+  const fetchCustomerEnrichment = useCallback(async (customerId: string) => {
+    // Fetch tags
+    try {
+      const { data: assignments } = await supabase
+        .from('customer_tag_assignment')
+        .select('tag_id')
+        .eq('customer_id', customerId)
+      if (assignments && assignments.length > 0) {
+        const tagIds = assignments.map((a: any) => a.tag_id)
+        const { data: tags } = await supabase
+          .from('customer_tag')
+          .select('name, color')
+          .in('tag_id', tagIds)
+        setCustomerTags(tags || [])
+      } else {
+        setCustomerTags([])
+      }
+    } catch {
+      setCustomerTags([])
+    }
+
+    // Fetch last contact
+    try {
+      const { data: activity } = await supabase
+        .from('customer_activity')
+        .select('activity_type, created_at')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (activity) {
+        const typeLabel: Record<string, string> = {
+          call: 'samtal', sms: 'SMS', email: 'e-post', quote_sent: 'offert', booking: 'bokning', note: 'anteckning'
+        }
+        setLastContact({
+          date: activity.created_at,
+          type: typeLabel[activity.activity_type] || activity.activity_type
+        })
+      } else {
+        setLastContact(null)
+      }
+    } catch {
+      setLastContact(null)
+    }
+  }, [])
 
   function formatFileSize(bytes: number | null) {
     if (!bytes) return ''
@@ -616,9 +842,19 @@ export default function PipelinePage() {
     setEditValueInput(deal.value?.toString() || '')
     setDealDocuments([])
     setDealUploadCategory('other')
+    setDealNotes([])
+    setDealTasks([])
+    setNewNoteContent('')
+    setNewTaskTitle('')
+    setNewTaskDueDate('')
+    setCustomerTags([])
+    setLastContact(null)
     fetchDealActivities(deal.id)
+    fetchDealNotes(deal.id)
+    fetchDealTasks(deal.id)
     if (deal.customer_id) {
       fetchDealDocuments(deal.customer_id)
+      fetchCustomerEnrichment(deal.customer_id)
     }
   }
 
@@ -626,9 +862,13 @@ export default function PipelinePage() {
     setSelectedDeal(null)
     setDetailActivities([])
     setDealDocuments([])
+    setDealNotes([])
+    setDealTasks([])
     setEditingTitle(false)
     setEditingValue(false)
     setEditingPriority(false)
+    setCustomerTags([])
+    setLastContact(null)
   }
 
   // ------------------------------------------
@@ -1028,11 +1268,38 @@ export default function PipelinePage() {
                     <div className="p-4 space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
+                        {selectedDeal.customer.customer_type && (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
+                            selectedDeal.customer.customer_type === 'company' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                            selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
+                            'bg-gray-100 text-gray-500 border-gray-200'
+                          }`}>
+                            {selectedDeal.customer.customer_type === 'company' ? 'Företag' : selectedDeal.customer.customer_type === 'brf' ? 'BRF' : 'Privat'}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2"><User className="w-4 h-4 text-gray-400" /><span className="text-sm font-medium text-gray-900">{selectedDeal.customer.name}</span></div>
                       {selectedDeal.customer.phone_number && <div className="flex items-center gap-2"><Phone className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.phone_number}</span></div>}
-                      {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.email}</span></div>}
+                      {selectedDeal.customer.email && <div className="flex items-center gap-2"><Mail className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500 truncate">{selectedDeal.customer.email}</span></div>}
                       {selectedDeal.customer.address_line && <div className="flex items-center gap-2"><MapPin className="w-4 h-4 text-gray-400" /><span className="text-sm text-gray-500">{selectedDeal.customer.address_line}</span></div>}
+                      {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.org_number && (
+                        <div className="text-xs text-gray-400">Org.nr: {selectedDeal.customer.org_number}</div>
+                      )}
+                      {selectedDeal.customer.customer_type !== 'private' && selectedDeal.customer.contact_person && (
+                        <div className="text-xs text-gray-400">Kontakt: {selectedDeal.customer.contact_person}</div>
+                      )}
+                      {customerTags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {customerTags.map((tag, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border" style={{ backgroundColor: tag.color + '20', color: tag.color, borderColor: tag.color + '40' }}>
+                              <Tag className="w-2.5 h-2.5" />{tag.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {lastContact && (
+                        <div className="text-xs text-gray-400">Senast kontaktad: {new Date(lastContact.date).toLocaleDateString('sv-SE')} ({lastContact.type})</div>
+                      )}
                     </div>
                     <Link
                       href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
@@ -1043,6 +1310,63 @@ export default function PipelinePage() {
                     </Link>
                   </div>
                 )}
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <StickyNote className="w-3.5 h-3.5" /> Anteckningar
+                  </h4>
+                  {dealNotes.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {dealNotes.map(note => (
+                        <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 group">
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editNoteContent}
+                                onChange={e => setEditNoteContent(e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
+                                rows={3}
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => handleUpdateNote(note.id)} className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Spara</button>
+                                <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-[10px] text-gray-400">{timeAgo(note.created_at)}</span>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1 text-gray-400 hover:text-blue-600 rounded" title="Redigera"><Edit3 className="w-3 h-3" /></button>
+                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1 text-gray-400 hover:text-red-600 rounded" title="Ta bort"><Trash2 className="w-3 h-3" /></button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <textarea
+                      value={newNoteContent}
+                      onChange={e => setNewNoteContent(e.target.value)}
+                      placeholder="Skriv en anteckning..."
+                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
+                      rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
+                    />
+                    <button
+                      onClick={handleAddNote}
+                      disabled={!newNoteContent.trim() || noteSaving}
+                      className="self-end px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {noteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Spara'}
+                    </button>
+                  </div>
+                </div>
 
                 {/* Documents */}
                 {selectedDeal.customer_id && (
@@ -1112,6 +1436,61 @@ export default function PipelinePage() {
                     )}
                   </div>
                 )}
+
+                {/* Tasks */}
+                <div className="space-y-2">
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckSquare className="w-3.5 h-3.5" /> Uppgifter
+                    {dealTasks.filter(t => t.status !== 'done').length > 0 && (
+                      <span className="ml-auto text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full font-medium">{dealTasks.filter(t => t.status !== 'done').length}</span>
+                    )}
+                  </h4>
+                  {dealTasks.length > 0 && (
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {dealTasks.map(task => (
+                        <div key={task.id} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 group">
+                          <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
+                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
+                              {task.status === 'done' && <CheckCircle2 className="w-3 h-3 text-white" />}
+                            </div>
+                          </button>
+                          <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{task.title}</span>
+                          {task.due_date && (
+                            <span className={`text-[10px] flex-shrink-0 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-gray-400'}`}>
+                              {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                            </span>
+                          )}
+                          <button onClick={() => handleDeleteTask(task.id)} className="p-0.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Ta bort">
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newTaskTitle}
+                      onChange={e => setNewTaskTitle(e.target.value)}
+                      placeholder="Ny uppgift..."
+                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                      onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+                    />
+                    <input
+                      type="date"
+                      value={newTaskDueDate}
+                      onChange={e => setNewTaskDueDate(e.target.value)}
+                      className="px-1.5 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-blue-400 w-28"
+                    />
+                    <button
+                      onClick={handleAddTask}
+                      disabled={!newTaskTitle.trim() || taskSaving}
+                      className="px-2 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                    >
+                      {taskSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
 
                 {/* Quick actions */}
                 <div className="space-y-2">

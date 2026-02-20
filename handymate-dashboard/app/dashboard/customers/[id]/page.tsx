@@ -34,7 +34,9 @@ import {
   Home,
   File,
   Image,
-  Download
+  Download,
+  CheckSquare,
+  CheckCircle2
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -94,6 +96,21 @@ interface Booking {
   completed_at?: string
 }
 
+interface Task {
+  id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'done'
+  priority: 'low' | 'medium' | 'high'
+  due_date: string | null
+  due_time: string | null
+  customer_id: string | null
+  deal_id: string | null
+  project_id: string | null
+  completed_at: string | null
+  created_at: string
+}
+
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -101,14 +118,15 @@ export default function CustomerDetailPage() {
   const business = useBusiness()
   const customerId = params.id as string
 
-  const initialTab = searchParams.get('tab') === 'documents' ? 'documents' : searchParams.get('tab') === 'bookings' ? 'bookings' : 'timeline'
+  const tabParam = searchParams.get('tab')
+  const initialTab = tabParam === 'documents' ? 'documents' : tabParam === 'bookings' ? 'bookings' : tabParam === 'tasks' ? 'tasks' : 'timeline'
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [documents, setDocuments] = useState<CustomerDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents'>(initialTab)
+  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents' | 'tasks'>(initialTab)
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -123,6 +141,12 @@ export default function CustomerDetailPage() {
   const [showLogCallModal, setShowLogCallModal] = useState(false)
   const [showAddNoteModal, setShowAddNoteModal] = useState(false)
   const [showSendSMSModal, setShowSendSMSModal] = useState(false)
+
+  // Tasks
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [taskSaving, setTaskSaving] = useState(false)
 
   // Portal
   const [portalToken, setPortalToken] = useState<string | null>(null)
@@ -182,7 +206,71 @@ export default function CustomerDetailPage() {
       // Documents table may not exist yet
     }
 
+    // Fetch tasks
+    try {
+      const taskRes = await fetch(`/api/tasks?customer_id=${customerId}`)
+      if (taskRes.ok) {
+        const taskData = await taskRes.json()
+        setTasks(taskData.tasks || [])
+      }
+    } catch {
+      // Tasks table may not exist yet
+    }
+
     setLoading(false)
+  }
+
+  async function fetchTasks() {
+    try {
+      const res = await fetch(`/api/tasks?customer_id=${customerId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data.tasks || [])
+      }
+    } catch { /* silent */ }
+  }
+
+  async function handleAddTask() {
+    if (!newTaskTitle.trim()) return
+    setTaskSaving(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          customer_id: customerId,
+          due_date: newTaskDueDate || null,
+        })
+      })
+      if (!res.ok) throw new Error()
+      setNewTaskTitle('')
+      setNewTaskDueDate('')
+      fetchTasks()
+    } catch {
+      // error handling
+    } finally {
+      setTaskSaving(false)
+    }
+  }
+
+  async function handleToggleTask(taskId: string, currentStatus: string) {
+    const newStatus = currentStatus === 'done' ? 'pending' : 'done'
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, status: newStatus })
+      })
+      fetchTasks()
+    } catch { /* silent */ }
+  }
+
+  async function handleDeleteTask(taskId: string) {
+    try {
+      await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
+      fetchTasks()
+    } catch { /* silent */ }
   }
 
   // Edit functions
@@ -685,6 +773,16 @@ export default function CustomerDetailPage() {
               >
                 Dokument ({documents.length})
               </button>
+              <button
+                onClick={() => setActiveTab('tasks')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
+                  activeTab === 'tasks'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Uppgifter ({tasks.filter(t => t.status !== 'done').length})
+              </button>
             </div>
 
             {/* Timeline */}
@@ -898,6 +996,68 @@ export default function CustomerDetailPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {/* Tasks */}
+            {activeTab === 'tasks' && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="p-4 border-b border-gray-200">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newTaskTitle}
+                      onChange={e => setNewTaskTitle(e.target.value)}
+                      placeholder="Ny uppgift..."
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 min-h-[44px]"
+                      onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+                    />
+                    <input
+                      type="date"
+                      value={newTaskDueDate}
+                      onChange={e => setNewTaskDueDate(e.target.value)}
+                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-blue-400 min-h-[44px]"
+                    />
+                    <button
+                      onClick={handleAddTask}
+                      disabled={!newTaskTitle.trim() || taskSaving}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] flex items-center gap-1.5"
+                    >
+                      {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                      Lägg till
+                    </button>
+                  </div>
+                </div>
+                {tasks.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-400">Inga uppgifter ännu</p>
+                    <p className="text-xs text-gray-400 mt-1">Skapa en uppgift ovan för att komma igång</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-200">
+                    {tasks.map(task => (
+                      <div key={task.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
+                        <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
+                            {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                          </div>
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{task.title}</p>
+                          {task.due_date && (
+                            <p className={`text-xs ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500' : 'text-gray-400'}`}>
+                              {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                        <button onClick={() => handleDeleteTask(task.id)} className="p-1.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 min-h-[44px] flex items-center" title="Ta bort">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
