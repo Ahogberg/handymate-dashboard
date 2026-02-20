@@ -308,7 +308,7 @@ Files using wrong pattern include: `voice/*`, `sms/incoming`, `suppliers`, `sugg
 - No subscription management
 - No usage tracking against plan limits
 - No payment UI
-- Pricing defined in CLAUDE.md only (1995/4995/12995 kr/mån)
+- Pricing: Starter 2495, Professional 5995, Business 11995 kr/mån
 
 **Required for launch:**
 - Stripe subscription integration

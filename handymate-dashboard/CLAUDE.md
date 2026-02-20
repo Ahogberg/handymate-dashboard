@@ -147,9 +147,9 @@ Tidrapport eller offert → Konvertera till faktura → PDF med bankinfo → Ski
 - Svenska i UI-texter, engelska i kod
 
 ## Prissättning
-- Starter: 1 995 kr/mån (75 samtal, 200 SMS)
-- Professional: 4 995 kr/mån (250 samtal, 600 SMS)
-- Business: 12 995 kr/mån (800 samtal, 2000 SMS)
+- Starter: 2 495 kr/mån (100 samtal, 1 användare)
+- Professional: 5 995 kr/mån (400 samtal, 5 användare)
+- Business: 11 995 kr/mån (Obegränsat samtal, obegränsade användare)
 
 ## Pågående/Planerat
 - Voice agent via Vapi (väntar på 46elks SIP-whitelisting)

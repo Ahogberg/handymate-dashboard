@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
 
 const PLAN_PRICES: Record<string, number> = {
-  starter: 1995,
-  professional: 4995,
-  business: 9995,
+  starter: 2495,
+  professional: 5995,
+  business: 11995,
 }
 
 /**

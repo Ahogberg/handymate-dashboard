@@ -2863,7 +2863,7 @@ export default function SettingsPage() {
                 </div>
                 <div className="sm:text-right">
                   <p className="text-2xl font-bold text-gray-900">
-                    {currentPlan === 'Professional' ? '4 995' : currentPlan === 'Business' ? '9 995' : '1 995'}
+                    {currentPlan === 'Professional' ? '5 995' : currentPlan === 'Business' ? '11 995' : '2 495'}
                   </p>
                   <p className="text-gray-400 text-sm">kr/mån</p>
                 </div>

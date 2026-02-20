@@ -52,16 +52,16 @@ CREATE INDEX IF NOT EXISTS idx_billing_event_business ON billing_event(business_
 -- Seed plans
 INSERT INTO billing_plan (plan_id, name, price_sek, limits, features, sort_order)
 VALUES
-  ('starter', 'Starter', 1995,
-   '{"sms_per_month": 200, "call_minutes_per_month": 75, "ai_requests_per_month": 100, "team_members": 1, "storage_gb": 2}',
-   '["AI-offertgenerering", "SMS & samtal", "Kundregister", "Tidrapportering", "Fakturering"]',
+  ('starter', 'Starter', 2495,
+   '{"sms_per_month": 200, "call_minutes_per_month": 100, "ai_requests_per_month": 500, "team_members": 1, "storage_gb": 5}',
+   '["AI-telefonassistent", "Offerter & fakturor", "Kundhantering", "Pipeline", "Tidrapportering", "Google Calendar-sync"]',
    1),
-  ('professional', 'Professional', 4995,
-   '{"sms_per_month": 600, "call_minutes_per_month": 250, "ai_requests_per_month": 500, "team_members": 5, "storage_gb": 10}',
-   '["Allt i Starter", "Pipeline/CRM", "Automatiseringar", "Google Calendar-sync", "Fortnox-integration", "Kundportal"]',
+  ('professional', 'Professional', 5995,
+   '{"sms_per_month": 600, "call_minutes_per_month": 400, "ai_requests_per_month": 2000, "team_members": 5, "storage_gb": 25}',
+   '["Allt i Starter", "Uppfoljningssekvenser", "Lead-generering", "AI auto-pilot", "Google Reviews", "Fortnox", "CSV-export"]',
    2),
-  ('business', 'Business', 9995,
-   '{"sms_per_month": 2000, "call_minutes_per_month": 800, "ai_requests_per_month": 2000, "team_members": 20, "storage_gb": 50}',
-   '["Allt i Professional", "Obegränsade team-medlemmar", "Prioriterad support", "Anpassade automatiseringar", "API-åtkomst"]',
+  ('business', 'Business', 11995,
+   '{"sms_per_month": 2000, "call_minutes_per_month": 999999, "ai_requests_per_month": 10000, "team_members": 999, "storage_gb": 100}',
+   '["Allt i Professional", "Obegransade samtal", "Obegransade anvandare", "Anpassad AI-rost", "Dedikerad support"]',
    3)
 ON CONFLICT (plan_id) DO NOTHING;
