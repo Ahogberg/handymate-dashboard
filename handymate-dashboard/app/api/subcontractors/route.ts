@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
 
 /**
  * GET /api/subcontractors - Hämta underleverantörer
@@ -10,6 +10,11 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const featureCheck = checkFeatureAccess(business, 'subcontractors')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -42,6 +47,11 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const featureCheck = checkFeatureAccess(business, 'subcontractors')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -88,6 +98,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const featureCheck = checkFeatureAccess(business, 'subcontractors')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const { subcontractor_id, ...updates } = body
@@ -121,6 +136,11 @@ export async function DELETE(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const featureCheck = checkFeatureAccess(business, 'subcontractors')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

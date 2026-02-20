@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
 /**
@@ -10,6 +10,11 @@ export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const featureCheck = checkFeatureAccess(business, 'inventory')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
+    }
 
     const supabase = getServerSupabase()
     const { searchParams } = new URL(request.url)
@@ -44,6 +49,11 @@ export async function POST(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const featureCheck = checkFeatureAccess(business, 'inventory')
+    if (!featureCheck.allowed) {
+      return NextResponse.json({ error: featureCheck.error, feature: featureCheck.feature, required_plan: featureCheck.required_plan }, { status: 403 })
+    }
 
     const supabase = getServerSupabase()
     const body = await request.json()

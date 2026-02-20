@@ -292,3 +292,44 @@ export function checkAiApiRateLimit(businessId: string): {
 
   return { allowed: true }
 }
+
+// ============================================
+// FEATURE GATING (API-level)
+// ============================================
+
+import { hasFeature, PlanType, FEATURE_GATES } from './feature-gates'
+
+/**
+ * Resolves the business plan from a business_config record.
+ */
+export function getBusinessPlanFromConfig(business: any): PlanType {
+  const raw = business.plan || business.billing_plan || business.subscription_plan || 'starter'
+  const normalized = String(raw).toLowerCase()
+  if (normalized === 'professional') return 'professional'
+  if (normalized === 'business') return 'business'
+  return 'starter'
+}
+
+/**
+ * Checks if a business has access to a feature.
+ * Returns 403-ready error info if not allowed.
+ */
+export function checkFeatureAccess(
+  business: any,
+  featureKey: string
+): { allowed: boolean; error?: string; feature?: string; required_plan?: string } {
+  const plan = getBusinessPlanFromConfig(business)
+  if (hasFeature(plan, featureKey)) {
+    return { allowed: true }
+  }
+
+  const gate = FEATURE_GATES[featureKey]
+  const requiredPlan = gate?.plans[0] || 'professional'
+
+  return {
+    allowed: false,
+    error: 'feature_not_available',
+    feature: featureKey,
+    required_plan: requiredPlan,
+  }
+}
