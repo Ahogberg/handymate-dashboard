@@ -72,6 +72,8 @@ interface Deal {
   invoice_id: string | null
   source: string | null
   source_call_id: string | null
+  lead_source_platform: string | null
+  lead_temperature: string | null
   assigned_to: string | null
   created_at: string
   updated_at: string
@@ -1848,6 +1850,17 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
             <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>
             {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" /></span>}
+            {deal.lead_source_platform && <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 ${
+              deal.lead_source_platform === 'offerta' ? 'bg-orange-100 text-orange-700' :
+              deal.lead_source_platform === 'servicefinder' ? 'bg-blue-100 text-blue-700' :
+              deal.lead_source_platform === 'byggahus' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-gray-100 text-gray-600'
+            }`}>{
+              deal.lead_source_platform === 'offerta' ? 'Offerta' :
+              deal.lead_source_platform === 'servicefinder' ? 'SF' :
+              deal.lead_source_platform === 'byggahus' ? 'Byggahus' :
+              deal.lead_source_platform
+            }</span>}
           </div>
           {deal.customer?.name && <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer.name}</p>}
           {deal.description && !deal.customer?.name && <p className="text-xs text-gray-400 mt-0.5 truncate ml-3.5">{deal.description}</p>}
@@ -1855,7 +1868,10 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
         <GripVertical className="w-4 h-4 text-gray-200 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
       </div>
       <div className="flex items-center justify-between mt-2 ml-3.5">
-        <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>
+          {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-blue-400'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
+        </div>
         <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(deal.updated_at)}</span>
       </div>
     </div>

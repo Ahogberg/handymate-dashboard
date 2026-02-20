@@ -31,7 +31,8 @@ import {
   Pencil,
   Package,
   CalendarDays,
-  UsersRound
+  UsersRound,
+  Star
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -78,6 +79,10 @@ interface BusinessConfig {
   auto_invoice_enabled: boolean
   auto_invoice_send: boolean
   auto_invoice_max_amount: number
+  // Google Reviews
+  google_review_url: string | null
+  review_request_enabled: boolean
+  review_request_delay_days: number
 }
 
 interface FortnoxStatus {
@@ -323,6 +328,20 @@ export default function SettingsPage() {
   const [googleSyncing, setGoogleSyncing] = useState(false)
   const [googleSyncResult, setGoogleSyncResult] = useState<any>(null)
 
+  // Google Reviews state
+  const [googleReviewUrl, setGoogleReviewUrl] = useState('')
+  const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
+  const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
+  const [savingReview, setSavingReview] = useState(false)
+
+  // Lead Sources state
+  const [leadSources, setLeadSources] = useState<any[]>([])
+  const [leadSourcesLoading, setLeadSourcesLoading] = useState(false)
+  const [showAddLeadSource, setShowAddLeadSource] = useState(false)
+  const [newLeadSourcePlatform, setNewLeadSourcePlatform] = useState('offerta')
+  const [newLeadSourceName, setNewLeadSourceName] = useState('')
+  const [addingLeadSource, setAddingLeadSource] = useState(false)
+
   // Time tracking state
   const [workTypes, setWorkTypes] = useState<WorkType[]>([])
   const [editingWorkType, setEditingWorkType] = useState<WorkType | null>(null)
@@ -343,6 +362,7 @@ export default function SettingsPage() {
     fetchGoogleStatus()
     fetchWorkTypes()
     fetchGrossistStatus()
+    fetchLeadSources()
   }, [business.business_id])
 
   // Handle Fortnox OAuth callback
@@ -415,7 +435,10 @@ export default function SettingsPage() {
 
     if (data) {
       setConfig(data)
-      
+      setGoogleReviewUrl(data.google_review_url || '')
+      setReviewRequestEnabled(data.review_request_enabled ?? true)
+      setReviewRequestDelayDays(data.review_request_delay_days ?? 3)
+
       if (data.working_hours && typeof data.working_hours === 'object') {
         setWorkingHours(prev => {
           const merged = { ...prev }
@@ -768,6 +791,83 @@ export default function SettingsPage() {
         setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)
       }
     } catch { /* ignore */ }
+  }
+
+  async function handleSaveReviewSettings() {
+    setSavingReview(true)
+    try {
+      const { error } = await supabase
+        .from('business_config')
+        .update({
+          google_review_url: googleReviewUrl || null,
+          review_request_enabled: reviewRequestEnabled,
+          review_request_delay_days: reviewRequestDelayDays,
+        })
+        .eq('business_id', business.business_id)
+      if (error) throw error
+      showToast('Recensionsinställningar sparade', 'success')
+    } catch {
+      showToast('Kunde inte spara', 'error')
+    } finally {
+      setSavingReview(false)
+    }
+  }
+
+  async function fetchLeadSources() {
+    setLeadSourcesLoading(true)
+    try {
+      const res = await fetch('/api/lead-sources')
+      if (res.ok) {
+        const data = await res.json()
+        setLeadSources(data.sources || [])
+      }
+    } catch (e) { console.error(e) }
+    finally { setLeadSourcesLoading(false) }
+  }
+
+  async function handleAddLeadSource() {
+    if (!newLeadSourceName.trim()) return
+    setAddingLeadSource(true)
+    try {
+      const res = await fetch('/api/lead-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: newLeadSourcePlatform,
+          name: newLeadSourceName.trim(),
+        }),
+      })
+      if (res.ok) {
+        showToast('Leadkälla tillagd', 'success')
+        setNewLeadSourceName('')
+        setShowAddLeadSource(false)
+        fetchLeadSources()
+      } else {
+        const data = await res.json()
+        showToast(data.error || 'Kunde inte lägga till', 'error')
+      }
+    } catch { showToast('Fel vid skapande', 'error') }
+    finally { setAddingLeadSource(false) }
+  }
+
+  async function handleToggleLeadSource(id: string, isActive: boolean) {
+    try {
+      await fetch('/api/lead-sources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, is_active: !isActive }),
+      })
+      setLeadSources(prev => prev.map(s => s.id === id ? { ...s, is_active: !isActive } : s))
+    } catch { showToast('Kunde inte uppdatera', 'error') }
+  }
+
+  async function handleDeleteLeadSource(id: string) {
+    if (!confirm('Ta bort denna leadkälla?')) return
+    try {
+      await fetch(`/api/lead-sources?id=${id}`, { method: 'DELETE' })
+      setLeadSources(prev => prev.filter(s => s.id !== id))
+      showToast('Leadkälla borttagen', 'success')
+    } catch { showToast('Kunde inte ta bort', 'error') }
   }
 
   async function fetchGrossistStatus() {
@@ -2025,6 +2125,81 @@ export default function SettingsPage() {
               </p>
             </div>
 
+            {/* Google Reviews */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-amber-100">
+                  <Star className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Google Recensioner</h2>
+                  <p className="text-sm text-gray-400">Automatisk recensionsförfrågan efter slutfört jobb</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Din Google Reviews-länk</label>
+                  <input
+                    type="url"
+                    value={googleReviewUrl}
+                    onChange={e => setGoogleReviewUrl(e.target.value)}
+                    placeholder="https://g.page/r/ditt-foretagsnamn/review"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Sök på ditt företag i Google Maps → Dela → Kopiera länk, eller gå till Google Business Profile → Be om recensioner
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Automatisk förfrågan</p>
+                    <p className="text-xs text-gray-400">Skicka SMS + email till kund efter slutfört jobb</p>
+                  </div>
+                  <button
+                    onClick={() => setReviewRequestEnabled(!reviewRequestEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reviewRequestEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${reviewRequestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {reviewRequestEnabled && (
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Skicka efter</label>
+                    <select
+                      value={reviewRequestDelayDays}
+                      onChange={e => setReviewRequestDelayDays(parseInt(e.target.value))}
+                      className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-400"
+                    >
+                      <option value={1}>1 dag efter slutfört jobb</option>
+                      <option value={3}>3 dagar efter slutfört jobb</option>
+                      <option value={7}>7 dagar efter slutfört jobb</option>
+                    </select>
+                  </div>
+                )}
+
+                {reviewRequestEnabled && googleReviewUrl && (
+                  <div className="p-3 bg-gray-50 rounded-xl">
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Förhandsvisning SMS</p>
+                    <p className="text-sm text-gray-700">
+                      Hej {'{'}<span className="text-blue-600">kundnamn</span>{'}'}! Tack för att du valde {config?.business_name || 'oss'}. Vi hoppas du är nöjd med resultatet! Om du har en minut skulle vi uppskatta en recension: {googleReviewUrl.substring(0, 30)}... /Mvh {config?.business_name || 'oss'}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handleSaveReviewSettings}
+                  disabled={savingReview}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-all"
+                >
+                  {savingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Spara recensionsinställningar
+                </button>
+              </div>
+            </div>
+
             {/* Outlook Calendar (placeholder) */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 opacity-60">
               <div className="flex items-center gap-3 mb-4">
@@ -2361,6 +2536,196 @@ export default function SettingsPage() {
                 </div>
               )
             })()}
+
+            {/* Lead Sources / Lead-generering */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-green-100">
+                    <TrendingUp className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Leadkällor</h2>
+                    <p className="text-sm text-gray-400">Importera leads från externa plattformar</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAddLeadSource(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90"
+                >
+                  <Plus className="w-4 h-4" />
+                  Lägg till
+                </button>
+              </div>
+
+              {/* Add new lead source form */}
+              {showAddLeadSource && (
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 mb-4 space-y-3">
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Plattform</label>
+                    <select
+                      value={newLeadSourcePlatform}
+                      onChange={e => setNewLeadSourcePlatform(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-400"
+                    >
+                      <option value="offerta">Offerta.se</option>
+                      <option value="servicefinder">ServiceFinder</option>
+                      <option value="byggahus">Byggahus.se</option>
+                      <option value="website">Egen hemsida</option>
+                      <option value="email">E-post vidarebefordring</option>
+                      <option value="manual">Manuell</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Namn / Etikett</label>
+                    <input
+                      type="text"
+                      value={newLeadSourceName}
+                      onChange={e => setNewLeadSourceName(e.target.value)}
+                      placeholder="T.ex. Offerta Stockholm"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowAddLeadSource(false); setNewLeadSourceName('') }}
+                      className="flex-1 px-3 py-2 text-sm bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200"
+                    >
+                      Avbryt
+                    </button>
+                    <button
+                      onClick={handleAddLeadSource}
+                      disabled={addingLeadSource || !newLeadSourceName.trim()}
+                      className="flex-1 px-3 py-2 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                    >
+                      {addingLeadSource ? 'Lägger till...' : 'Lägg till källa'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* List of lead sources */}
+              {leadSourcesLoading ? (
+                <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
+              ) : leadSources.length === 0 ? (
+                <div className="text-center py-8">
+                  <TrendingUp className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400">Inga leadkällor konfigurerade</p>
+                  <p className="text-xs text-gray-400 mt-1">Lägg till plattformar som Offerta.se eller ServiceFinder för att importera leads automatiskt</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {leadSources.map((source: any) => {
+                    const platformLabels: Record<string, string> = {
+                      offerta: 'Offerta.se',
+                      servicefinder: 'ServiceFinder',
+                      byggahus: 'Byggahus.se',
+                      website: 'Hemsida',
+                      email: 'E-post',
+                      manual: 'Manuell',
+                    }
+                    const platformColors: Record<string, string> = {
+                      offerta: 'bg-orange-100 text-orange-700',
+                      servicefinder: 'bg-blue-100 text-blue-700',
+                      byggahus: 'bg-yellow-100 text-yellow-700',
+                      website: 'bg-purple-100 text-purple-700',
+                      email: 'bg-gray-100 text-gray-700',
+                      manual: 'bg-gray-100 text-gray-700',
+                    }
+                    return (
+                      <div key={source.id} className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${platformColors[source.platform] || 'bg-gray-100 text-gray-700'}`}>
+                              {platformLabels[source.platform] || source.platform}
+                            </span>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">{source.name}</p>
+                              <p className="text-xs text-gray-400">
+                                {source.leads_imported || 0} leads importerade
+                                {source.last_import_at && ` · Senast ${new Date(source.last_import_at).toLocaleDateString('sv-SE')}`}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleLeadSource(source.id, source.is_active)}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${source.is_active ? 'bg-blue-600' : 'bg-gray-300'}`}
+                            >
+                              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${source.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteLeadSource(source.id)}
+                              className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inbound email for email-based platforms */}
+                        {source.inbound_email && (source.platform === 'offerta' || source.platform === 'servicefinder' || source.platform === 'email') && (
+                          <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                            <p className="text-xs text-gray-500 mb-1">Vidarebefodra leads till denna adress:</p>
+                            <div className="flex items-center gap-2">
+                              <code className="flex-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded font-mono break-all">
+                                {source.inbound_email}
+                              </code>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(source.inbound_email)
+                                  showToast('Kopierad!', 'success')
+                                }}
+                                className="px-2 py-1 text-xs text-blue-600 bg-blue-50 rounded hover:bg-blue-100"
+                              >
+                                Kopiera
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Setup instructions per platform */}
+                        {source.platform === 'offerta' && (
+                          <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                            <p className="text-xs font-medium text-amber-800 mb-1">Så kopplar du Offerta.se:</p>
+                            <ol className="text-xs text-amber-700 space-y-0.5 list-decimal list-inside">
+                              <li>Logga in på Offerta.se → Inställningar</li>
+                              <li>Under &quot;Notifieringar&quot;, lägg till e-postadressen ovan</li>
+                              <li>Nya förfrågningar skickas hit och skapar leads automatiskt</li>
+                            </ol>
+                          </div>
+                        )}
+                        {source.platform === 'servicefinder' && (
+                          <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                            <p className="text-xs font-medium text-blue-800 mb-1">Så kopplar du ServiceFinder:</p>
+                            <ol className="text-xs text-blue-700 space-y-0.5 list-decimal list-inside">
+                              <li>Logga in på ServiceFinder → Mitt konto → Notiser</li>
+                              <li>Ställ in e-postadressen ovan för jobbnotiser</li>
+                              <li>Nya jobb importeras automatiskt som leads</li>
+                            </ol>
+                          </div>
+                        )}
+                        {source.platform === 'website' && (
+                          <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                            <p className="text-xs font-medium text-purple-800 mb-1">Hemsida-integration:</p>
+                            <p className="text-xs text-purple-700">Konfigurera ditt kontaktformulär att skicka till e-postadressen ovan, eller lägg till en webhook mot <code className="bg-purple-100 px-1 rounded">/api/lead-sources/webhook</code></p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* Info about how lead import works */}
+              {leadSources.length > 0 && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-xs text-blue-700">
+                    <strong>Så fungerar det:</strong> När e-post tas emot på den unika adressen parsas innehållet och skapar automatiskt en lead i din pipeline med rätt källa markerad.
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Fler integrationer kommer */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">

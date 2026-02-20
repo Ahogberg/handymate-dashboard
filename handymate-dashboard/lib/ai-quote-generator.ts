@@ -70,17 +70,37 @@ export async function analyzeJobImage(
           },
           {
             type: 'text',
-            text: `Du är en expert på ${branch || 'hantverksjobb'} i Sverige. Analysera denna bild och beskriv:
+            text: `Du är en erfaren svensk kalkylator för ${branch || 'bygg- och hantverksprojekt'}.
+
+Analysera bilden noggrant och identifiera:
 1. Vad du ser som behöver åtgärdas
 2. Vilka specifika arbeten/material som kan behövas
 3. Vilken typ av jobb detta är
+
+Om bilden är en RITNING eller PLANRITNING:
+- Läs av mått från ritningen (meter, millimeter)
+- Beräkna ytor: golv, väggar, tak (m²)
+- Identifiera installationer: el-punkter, VVS, ventilation
+- Notera dörrar, fönster och andra öppningar
+
+Om bilden är ett FOTO:
+- Uppskatta mått baserat på proportioner och kända referenspunkter
+- Identifiera befintligt material och skick
+- Föreslå vad som behöver bytas/renoveras
 
 Svara ENDAST med JSON:
 {
   "description": "Beskrivning av vad du ser och vad som behöver göras",
   "identifiedItems": ["lista", "på", "identifierade", "saker"],
   "suggestedJobType": "typ av jobb",
-  "confidence": 75
+  "confidence": 75,
+  "measurements": {
+    "floor_area_m2": null,
+    "wall_area_m2": null,
+    "ceiling_area_m2": null,
+    "linear_meters": null
+  },
+  "imageType": "photo eller drawing"
 }`
           }
         ]
@@ -193,33 +213,49 @@ export async function generateQuoteFromInput(
     ? `\nHantverkarens prislista:\n${input.priceList.map(p => `- ${p.name}: ${p.unit_price} kr/${p.unit} (${p.category})`).join('\n')}`
     : ''
 
-  const systemPrompt = `Du är en expert på att estimera hantverksjobb för svenska hantverkare.
+  const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
 Hantverkarens timpris: ${input.hourlyRate} kr/h${historicalContext}${priceListContext}
 
-Analysera beskrivningen (och eventuell bildanalys) och ge ett detaljerat offertförslag.
+Analysera beskrivningen (och eventuell bildanalys/ritningsanalys) och ge ett detaljerat offertförslag.
 
-Regler:
-- Arbete: använd hantverkarens timpris (${input.hourlyRate} kr/h)
-- Material: använd realistiska marknadspriser i SEK
-- Inkludera alltid "Småmaterial" (skruv, tejp, etc.) ~100-300 kr
-- Var realistisk med tidsuppskattningar
-- ROT gäller installation/reparation i bostad, RUT gäller hemtjänster/städ
+VIKTIGA REGLER:
+- Arbete: använd ALLTID hantverkarens timpris (${input.hourlyRate} kr/h)
+- Material: ${input.priceList && input.priceList.length > 0 ? 'MATCHA mot hantverkarens prislista ovan när möjligt. Markera priser från prislistan med "fromPriceList": true. Om ingen match finns, använd realistiska marknadspriser.' : 'Använd realistiska marknadspriser i SEK.'}
+- Inkludera alltid "Småmaterial" (skruv, borrspets, tejp, etc.) ~100-300 kr
+- Var realistisk med tidsuppskattningar (hellre lite för mycket tid än för lite)
+- ROT gäller installation/reparation/underhåll i bostad, RUT gäller hemtjänster/städ/trädgård
 - Alla priser exkl moms
+
+OM RITNING/PLANRITNING ANALYSERATS:
+- Använd de identifierade måtten för att beräkna exakta materialkvantiteter
+- Beräkna m² för golv, väggar, tak separat
+- Räkna in spill (~10% extra på material)
+- Identifiera alla installationspunker (el, vatten, avlopp)
+
+OM FOTO ANALYSERATS:
+- Uppskatta mått baserat på proportioner
+- Identifiera materialtyper och skick
+- Föreslå vad som behöver bytas vs kan behållas
 
 Svara ENDAST med JSON:
 {
   "jobTitle": "Kort titel",
-  "jobDescription": "Beskrivning till kund (2-3 meningar)",
+  "jobDescription": "Professionell beskrivning till kund (2-3 meningar)",
   "estimatedHours": 8,
+  "measurements": {
+    "floor_area_m2": null,
+    "wall_area_m2": null,
+    "ceiling_area_m2": null
+  },
   "items": [
-    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90},
-    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 3200, "type": "material", "confidence": 70}
+    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false},
+    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 3200, "type": "material", "confidence": 70, "fromPriceList": false}
   ],
   "suggestedDeductionType": "rot",
   "confidence": 75,
-  "reasoning": "Kort förklaring av bedömningen"
+  "reasoning": "Kort förklaring av bedömningen och använda mått"
 }`
 
   // Build messages with optional image
