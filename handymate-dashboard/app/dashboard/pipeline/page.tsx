@@ -1311,73 +1311,16 @@ export default function PipelinePage() {
                   </div>
                 )}
 
-                {/* Notes */}
-                <div className="space-y-2">
-                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <StickyNote className="w-3.5 h-3.5" /> Anteckningar
-                  </h4>
-                  {dealNotes.length > 0 && (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
-                      {dealNotes.map(note => (
-                        <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 group">
-                          {editingNoteId === note.id ? (
-                            <div className="space-y-2">
-                              <textarea
-                                value={editNoteContent}
-                                onChange={e => setEditNoteContent(e.target.value)}
-                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
-                                rows={3}
-                              />
-                              <div className="flex gap-2">
-                                <button onClick={() => handleUpdateNote(note.id)} className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Spara</button>
-                                <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
-                              <div className="flex items-center justify-between mt-2">
-                                <span className="text-[10px] text-gray-400">{timeAgo(note.created_at)}</span>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1 text-gray-400 hover:text-blue-600 rounded" title="Redigera"><Edit3 className="w-3 h-3" /></button>
-                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1 text-gray-400 hover:text-red-600 rounded" title="Ta bort"><Trash2 className="w-3 h-3" /></button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex gap-2">
-                    <textarea
-                      value={newNoteContent}
-                      onChange={e => setNewNoteContent(e.target.value)}
-                      placeholder="Skriv en anteckning..."
-                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
-                      rows={2}
-                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
-                    />
-                    <button
-                      onClick={handleAddNote}
-                      disabled={!newNoteContent.trim() || noteSaving}
-                      className="self-end px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {noteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Spara'}
-                    </button>
-                  </div>
-                </div>
-
                 {/* Documents */}
                 {selectedDeal.customer_id && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs text-gray-400 uppercase tracking-wider">Dokument</h4>
-                      {selectedDeal.customer_id && (
-                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="text-xs text-blue-600 hover:text-blue-500">
-                          Visa alla
-                        </Link>
-                      )}
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                        <Upload className="w-3.5 h-3.5" /> Dokument
+                      </h4>
+                      <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="text-xs text-blue-600 hover:text-blue-500">
+                        Visa alla
+                      </Link>
                     </div>
 
                     {/* Upload area */}
@@ -1436,6 +1379,63 @@ export default function PipelinePage() {
                     )}
                   </div>
                 )}
+
+                {/* Notes */}
+                <div className="space-y-2">
+                  <h4 className="text-xs text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <StickyNote className="w-3.5 h-3.5" /> Anteckningar
+                  </h4>
+                  {dealNotes.length > 0 && (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {dealNotes.map(note => (
+                        <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-3 group">
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editNoteContent}
+                                onChange={e => setEditNoteContent(e.target.value)}
+                                className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
+                                rows={3}
+                              />
+                              <div className="flex gap-2">
+                                <button onClick={() => handleUpdateNote(note.id)} className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">Spara</button>
+                                <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-2 py-1 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
+                              <div className="flex items-center justify-between mt-2">
+                                <span className="text-[10px] text-gray-400">{timeAgo(note.created_at)}</span>
+                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1 text-gray-400 hover:text-blue-600 rounded" title="Redigera"><Edit3 className="w-3 h-3" /></button>
+                                  <button onClick={() => handleDeleteNote(note.id)} className="p-1 text-gray-400 hover:text-red-600 rounded" title="Ta bort"><Trash2 className="w-3 h-3" /></button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <textarea
+                      value={newNoteContent}
+                      onChange={e => setNewNoteContent(e.target.value)}
+                      placeholder="Skriv en anteckning..."
+                      className="flex-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
+                      rows={2}
+                      onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
+                    />
+                    <button
+                      onClick={handleAddNote}
+                      disabled={!newNoteContent.trim() || noteSaving}
+                      className="self-end px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {noteSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Spara'}
+                    </button>
+                  </div>
+                </div>
 
                 {/* Tasks */}
                 <div className="space-y-2">
