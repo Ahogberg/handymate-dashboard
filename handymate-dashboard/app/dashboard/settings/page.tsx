@@ -36,6 +36,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import dynamic from 'next/dynamic'
 const TeamPageContent = dynamic(() => import('@/app/dashboard/team/page'), {
   loading: () => (
@@ -296,6 +298,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 
 export default function SettingsPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2136,7 +2139,9 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-400">Automatisk recensionsförfrågan efter slutfört jobb</p>
                 </div>
               </div>
-
+              {!canAccess('google_reviews') ? (
+                <UpgradePrompt featureKey="google_reviews" inline />
+              ) : (
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Din Google Reviews-länk</label>
@@ -2198,6 +2203,7 @@ export default function SettingsPage() {
                   Spara recensionsinställningar
                 </button>
               </div>
+              )}
             </div>
 
             {/* Outlook Calendar (placeholder) */}
@@ -2224,11 +2230,13 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Fortnox</h2>
-                  <p className="text-sm text-gray-400">Bokföring och fakturering</p>
+                  <p className="text-sm text-gray-400">Bokf\u00f6ring och fakturering</p>
                 </div>
               </div>
 
-              {fortnoxStatus?.connected ? (
+              {!canAccess('fortnox_integration') ? (
+                <UpgradePrompt featureKey="fortnox_integration" inline />
+              ) : fortnoxStatus?.connected ? (
                 // Kopplad
                 <div className="space-y-4">
                   <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
@@ -2538,6 +2546,20 @@ export default function SettingsPage() {
             })()}
 
             {/* Lead Sources / Lead-generering */}
+            {!canAccess('lead_generation') ? (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-green-100">
+                    <TrendingUp className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">Leadk\u00e4llor</h2>
+                    <p className="text-sm text-gray-400">Importera leads fr\u00e5n externa plattformar</p>
+                  </div>
+                </div>
+                <UpgradePrompt featureKey="lead_generation" inline />
+              </div>
+            ) : (
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -2726,6 +2748,7 @@ export default function SettingsPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Fler integrationer kommer */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">

@@ -1,8 +1,10 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { 
-  Megaphone, 
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
+import {
+  Megaphone,
   Plus, 
   Send, 
   Clock, 
@@ -31,6 +33,7 @@ interface Campaign {
 
 export default function CampaignsPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent'>('all')
@@ -96,6 +99,8 @@ export default function CampaignsPage() {
   // Beräkna SMS-statistik
   const totalSent = campaigns.filter(c => c.status === 'sent').reduce((sum, c) => sum + c.recipient_count, 0)
   const totalDelivered = campaigns.filter(c => c.status === 'sent').reduce((sum, c) => sum + c.delivered_count, 0)
+
+  if (!canAccess('campaign_analytics')) return <UpgradePrompt featureKey="campaign_analytics" />
 
   if (loading) {
     return (

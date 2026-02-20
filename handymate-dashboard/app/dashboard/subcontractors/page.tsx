@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import {
   Wrench,
   Plus,
@@ -33,6 +35,7 @@ interface Subcontractor {
 
 export default function SubcontractorsPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const [subs, setSubs] = useState<Subcontractor[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -155,6 +158,8 @@ export default function SubcontractorsPage() {
     'El', 'VVS', 'Målning', 'Kakel', 'Snickeri', 'Plåt', 'Murning',
     'Golvläggning', 'Takarbete', 'Grävning', 'Betong', 'Isolering', 'Övrigt'
   ]
+
+  if (!canAccess('subcontractors')) return <UpgradePrompt featureKey="subcontractors" />
 
   if (loading) {
     return (

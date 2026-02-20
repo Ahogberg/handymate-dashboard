@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import {
   Shield,
   Plus,
@@ -39,6 +41,7 @@ interface Customer {
 
 export default function WarrantiesPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const [warranties, setWarranties] = useState<Warranty[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
@@ -194,6 +197,8 @@ export default function WarrantiesPage() {
 
   const expiringCount = warranties.filter(w => w.status === 'active' && getDaysLeft(w.end_date) <= 30 && getDaysLeft(w.end_date) > 0).length
   const activeCount = warranties.filter(w => w.status === 'active').length
+
+  if (!canAccess('warranty_tracking')) return <UpgradePrompt featureKey="warranty_tracking" />
 
   if (loading) {
     return (

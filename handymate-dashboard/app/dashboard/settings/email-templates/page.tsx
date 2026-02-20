@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import {
   Mail,
   Plus,
@@ -49,6 +51,7 @@ const AVAILABLE_VARIABLES = [
 
 export default function EmailTemplatesPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const [templates, setTemplates] = useState<EmailTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -171,6 +174,8 @@ export default function EmailTemplatesPage() {
     html = html.replace(/{{warranty_end}}/g, '2028-02-18')
     return html
   }
+
+  if (!canAccess('email_template_editor')) return <UpgradePrompt featureKey="email_template_editor" />
 
   if (loading) {
     return (

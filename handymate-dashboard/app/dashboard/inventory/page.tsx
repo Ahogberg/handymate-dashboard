@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import {
   Package,
   Plus,
@@ -59,6 +61,7 @@ const LOCATIONS = ['Bilen', 'Förrådet', 'Kontoret']
 
 export default function InventoryPage() {
   const business = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -166,6 +169,8 @@ export default function InventoryPage() {
 
   const lowStockCount = items.filter(i => i.quantity <= i.min_quantity && i.min_quantity > 0).length
   const totalValue = items.reduce((sum, i) => sum + i.quantity * i.unit_cost, 0)
+
+  if (!canAccess('inventory')) return <UpgradePrompt featureKey="inventory" />
 
   return (
     <div className="p-4 md:p-6 md:ml-64 max-w-7xl mx-auto">

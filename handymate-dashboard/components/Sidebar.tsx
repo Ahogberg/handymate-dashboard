@@ -21,9 +21,12 @@ import {
   Bell,
   Package,
   Mail,
+  Lock,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { useBusiness } from '@/lib/BusinessContext'
+import { hasFeature, PlanType, getPlanLabel } from '@/lib/feature-gates'
 
 interface SidebarProps {
   businessName: string
@@ -50,11 +53,12 @@ interface NotificationItem {
 interface NavChild {
   label: string
   href: string
-  exact?: boolean // use pathname === href only (no prefix matching)
+  exact?: boolean
+  featureGate?: string
 }
 
 type NavItem =
-  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean }
+  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean; featureGate?: string }
   | { type: 'group'; key: string; label: string; icon: any; children: NavChild[] }
 
 const NAV: NavItem[] = [
@@ -64,7 +68,7 @@ const NAV: NavItem[] = [
     type: 'group', key: 'customers', label: 'Kunder', icon: Users,
     children: [
       { label: 'Kundlista', href: '/dashboard/customers' },
-      { label: 'Garantier', href: '/dashboard/warranties' },
+      { label: 'Garantier', href: '/dashboard/warranties', featureGate: 'warranty_tracking' },
     ],
   },
   { type: 'link', key: 'pipeline', label: 'Pipeline', icon: TrendingUp, href: '/dashboard/pipeline' },
@@ -88,16 +92,16 @@ const NAV: NavItem[] = [
   {
     type: 'group', key: 'inventory', label: 'Lager & Material', icon: Package,
     children: [
-      { label: 'Lagersaldo', href: '/dashboard/inventory' },
+      { label: 'Lagersaldo', href: '/dashboard/inventory', featureGate: 'inventory' },
       { label: 'Beställningar', href: '/dashboard/orders' },
-      { label: 'Underentreprenörer', href: '/dashboard/subcontractors' },
+      { label: 'Underentreprenörer', href: '/dashboard/subcontractors', featureGate: 'subcontractors' },
     ],
   },
   {
     type: 'group', key: 'marketing', label: 'Marknadsföring', icon: Mail,
     children: [
-      { label: 'Kampanjer', href: '/dashboard/campaigns' },
-      { label: 'E-postmallar', href: '/dashboard/settings/email-templates' },
+      { label: 'Kampanjer', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
+      { label: 'E-postmallar', href: '/dashboard/settings/email-templates', featureGate: 'email_template_editor' },
     ],
   },
   { type: 'link', key: 'automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations', paths: ['/dashboard/automations', '/dashboard/communication'] },
@@ -118,6 +122,8 @@ const NAV: NavItem[] = [
 // ── Component ─────────────────────────────────────────────────────────
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
+  const business = useBusiness()
+  const plan: PlanType = business.plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
@@ -436,17 +442,20 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           if (item.type === 'link') {
             const active = isLinkActive(item)
             const Icon = item.icon
+            const locked = item.featureGate ? !hasFeature(plan, item.featureGate) : false
             return (
-              <Link key={item.key} href={item.href} className={navClass(active)}>
+              <Link key={item.key} href={item.href} className={`${navClass(active)} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
                 <div className="flex items-center gap-3">
                   <Icon className={`w-5 h-5 ${active ? 'text-cyan-300' : ''}`} />
                   <span className="text-sm">{item.label}</span>
                 </div>
-                {item.hasBadge && pendingCount > 0 && (
+                {locked ? (
+                  <Lock className="w-3.5 h-3.5 text-blue-300/40" />
+                ) : item.hasBadge && pendingCount > 0 ? (
                   <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full animate-pulse">
                     {pendingCount > 99 ? '99+' : pendingCount}
                   </span>
-                )}
+                ) : null}
               </Link>
             )
           }
@@ -472,9 +481,13 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                 <div className="ml-8 mt-0.5 mb-1 space-y-0.5">
                   {item.children.map(child => {
                     const childActive = isPathActive(child.href, child.exact)
+                    const childLocked = child.featureGate ? !hasFeature(plan, child.featureGate) : false
                     return (
-                      <Link key={child.href} href={child.href} className={subNavClass(childActive)}>
-                        {child.label}
+                      <Link key={child.href} href={child.href} className={`${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`} title={childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+                        <span className="flex items-center gap-2">
+                          {child.label}
+                          {childLocked && <Lock className="w-3 h-3 text-blue-300/40" />}
+                        </span>
                       </Link>
                     )
                   })}

@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useBusinessPlan } from '@/lib/useBusinessPlan'
+import UpgradePrompt from '@/components/UpgradePrompt'
 import {
   Zap,
   Phone,
@@ -238,6 +240,7 @@ const categories: AutomationCategory[] = [
 
 export default function AutomationsPage() {
   const { business_id: businessId } = useBusiness()
+  const { hasFeature: canAccess } = useBusinessPlan()
 
   const [settings, setSettings] = useState<AutomationSettings | null>(null)
   const [integrations, setIntegrations] = useState<Integrations | null>(null)
@@ -498,6 +501,8 @@ export default function AutomationsPage() {
     job_completed: 'bg-violet-50 text-violet-700',
     invoice_overdue: 'bg-red-50 text-red-700',
   }
+
+  if (!canAccess('nurture_sequences')) return <UpgradePrompt featureKey="nurture_sequences" />
 
   if (loading) {
     return (
