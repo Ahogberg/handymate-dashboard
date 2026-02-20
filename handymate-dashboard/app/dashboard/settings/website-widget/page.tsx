@@ -18,6 +18,10 @@ import {
   X,
   ExternalLink,
   Sparkles,
+  BarChart3,
+  Users,
+  TrendingUp,
+  Target,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -48,6 +52,26 @@ const COLOR_PRESETS = [
   { name: 'Svart', value: '#18181b' },
 ]
 
+interface WidgetAnalytics {
+  total_conversations: number
+  total_messages: number
+  leads_created: number
+  conversion_rate: number
+  avg_messages_per_conversation: number
+  contact_collection_rate: number
+  common_questions: { question: string; count: number }[]
+  recent_conversations: {
+    id: string
+    visitor_name: string | null
+    visitor_phone: string | null
+    visitor_email: string | null
+    message_count: number
+    lead_created: boolean
+    created_at: string
+    first_message: string
+  }[]
+}
+
 const DEFAULT_CONFIG: WidgetConfig = {
   widget_enabled: false,
   widget_color: '#0891b2',
@@ -69,9 +93,11 @@ export default function WebsiteWidgetPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [config, setConfig] = useState<WidgetConfig>(DEFAULT_CONFIG)
-  const [activeTab, setActiveTab] = useState<'appearance' | 'behavior' | 'install' | 'preview'>('appearance')
+  const [activeTab, setActiveTab] = useState<'analytics' | 'appearance' | 'behavior' | 'install' | 'preview'>('appearance')
   const [copied, setCopied] = useState(false)
   const [newQuestion, setNewQuestion] = useState('')
+  const [analytics, setAnalytics] = useState<WidgetAnalytics | null>(null)
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
 
   useEffect(() => {
     if (business.business_id) fetchConfig()
@@ -106,6 +132,28 @@ export default function WebsiteWidgetPage() {
     }
     setLoading(false)
   }
+
+  async function fetchAnalytics() {
+    setAnalyticsLoading(true)
+    try {
+      const res = await fetch('/api/widget/analytics?period=30d', {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      })
+      if (res.ok) {
+        setAnalytics(await res.json())
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err)
+    }
+    setAnalyticsLoading(false)
+  }
+
+  useEffect(() => {
+    if (activeTab === 'analytics' && !analytics && !analyticsLoading) {
+      fetchAnalytics()
+    }
+  }, [activeTab])
 
   async function handleSave() {
     setSaving(true)
@@ -189,6 +237,7 @@ export default function WebsiteWidgetPage() {
   const botName = config.widget_bot_name || `${business.business_name}s assistent`
 
   const tabs = [
+    { key: 'analytics' as const, label: 'Statistik', icon: BarChart3 },
     { key: 'appearance' as const, label: 'Utseende', icon: Palette },
     { key: 'behavior' as const, label: 'Beteende', icon: Settings },
     { key: 'install' as const, label: 'Installation', icon: Code },
@@ -262,6 +311,99 @@ export default function WebsiteWidgetPage() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'analytics' && (
+        <div className="space-y-6">
+          {analyticsLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+            </div>
+          ) : analytics ? (
+            <>
+              {/* KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Konversationer', value: analytics.total_conversations, icon: MessageSquare, color: 'text-blue-600 bg-blue-50' },
+                  { label: 'Leads skapade', value: analytics.leads_created, icon: Users, color: 'text-green-600 bg-green-50' },
+                  { label: 'Konverteringsgrad', value: `${analytics.conversion_rate}%`, icon: Target, color: 'text-violet-600 bg-violet-50' },
+                  { label: 'Snitt meddelanden', value: analytics.avg_messages_per_conversation, icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
+                ].map((kpi, i) => (
+                  <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${kpi.color}`}>
+                        <kpi.icon className="w-4 h-4" />
+                      </div>
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900">{kpi.value}</p>
+                    <p className="text-xs text-gray-500">{kpi.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Two columns */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Common questions */}
+                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Vanligaste frågorna</h3>
+                  {analytics.common_questions.length > 0 ? (
+                    <div className="space-y-2">
+                      {analytics.common_questions.slice(0, 8).map((q, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <p className="text-sm text-gray-700 truncate flex-1 mr-2">{q.question}</p>
+                          <span className="text-xs text-gray-400 flex-shrink-0">{q.count}x</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">Inga konversationer ännu</p>
+                  )}
+                </div>
+
+                {/* Recent conversations */}
+                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Senaste konversationer</h3>
+                  {analytics.recent_conversations.length > 0 ? (
+                    <div className="space-y-3">
+                      {analytics.recent_conversations.slice(0, 6).map((c, i) => (
+                        <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-50 last:border-0 last:pb-0">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <Users className="w-4 h-4 text-gray-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {c.visitor_name || 'Anonym besökare'}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">{c.first_message}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-xs text-gray-400">
+                                {new Date(c.created_at).toLocaleDateString('sv-SE')}
+                              </span>
+                              {c.lead_created && (
+                                <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-700 rounded-full">Lead</span>
+                              )}
+                              <span className="text-xs text-gray-400">{c.message_count} meddelanden</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">Inga konversationer ännu</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-16">
+              <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-sm text-gray-500">Kunde inte ladda statistik</p>
+              <button onClick={fetchAnalytics} className="mt-2 text-sm text-blue-600 hover:underline">
+                Försök igen
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'appearance' && (
         <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
           {/* Bot Name */}
