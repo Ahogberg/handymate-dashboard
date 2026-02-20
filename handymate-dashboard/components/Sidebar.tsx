@@ -4,26 +4,23 @@ import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  LayoutGrid,
+  LayoutDashboard,
   Phone,
   Calendar,
   Users,
   Briefcase,
-  Clock,
   Settings,
   Zap,
   LogOut,
   HelpCircle,
-  FileText,
-  Receipt,
   ChevronDown,
-  FolderKanban,
   Menu,
   X,
   User,
   TrendingUp,
   Bell,
   Package,
+  Mail,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -49,10 +46,79 @@ interface NotificationItem {
   created_at: string
 }
 
+// ── Navigation structure ──────────────────────────────────────────────
+interface NavChild {
+  label: string
+  href: string
+  exact?: boolean // use pathname === href only (no prefix matching)
+}
+
+type NavItem =
+  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean }
+  | { type: 'group'; key: string; label: string; icon: any; children: NavChild[] }
+
+const NAV: NavItem[] = [
+  { type: 'link', key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', exact: true },
+  { type: 'link', key: 'calls', label: 'Samtal', icon: Phone, href: '/dashboard/calls', paths: ['/dashboard/calls', '/dashboard/inbox', '/dashboard/assistant', '/dashboard/recordings'], hasBadge: true },
+  {
+    type: 'group', key: 'customers', label: 'Kunder', icon: Users,
+    children: [
+      { label: 'Kundlista', href: '/dashboard/customers' },
+      { label: 'Garantier', href: '/dashboard/warranties' },
+    ],
+  },
+  { type: 'link', key: 'pipeline', label: 'Pipeline', icon: TrendingUp, href: '/dashboard/pipeline' },
+  {
+    type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
+    children: [
+      { label: 'Projekt', href: '/dashboard/projects' },
+      { label: 'Offerter', href: '/dashboard/quotes' },
+      { label: 'Fakturor', href: '/dashboard/invoices' },
+      { label: 'Dokument', href: '/dashboard/documents' },
+    ],
+  },
+  {
+    type: 'group', key: 'planning', label: 'Planering', icon: Calendar,
+    children: [
+      { label: 'Schema', href: '/dashboard/schedule' },
+      { label: 'Kalender', href: '/dashboard/calendar' },
+      { label: 'Tidrapportering', href: '/dashboard/time' },
+    ],
+  },
+  {
+    type: 'group', key: 'inventory', label: 'Lager & Material', icon: Package,
+    children: [
+      { label: 'Lagersaldo', href: '/dashboard/inventory' },
+      { label: 'Beställningar', href: '/dashboard/orders' },
+      { label: 'Underentreprenörer', href: '/dashboard/subcontractors' },
+    ],
+  },
+  {
+    type: 'group', key: 'marketing', label: 'Marknadsföring', icon: Mail,
+    children: [
+      { label: 'Kampanjer', href: '/dashboard/campaigns' },
+      { label: 'E-postmallar', href: '/dashboard/settings/email-templates' },
+    ],
+  },
+  { type: 'link', key: 'automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations', paths: ['/dashboard/automations', '/dashboard/communication'] },
+  {
+    type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
+    children: [
+      { label: 'Företagsinställningar', href: '/dashboard/settings', exact: true },
+      { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
+      { label: 'Prislista', href: '/dashboard/settings/pricelist' },
+      { label: 'Billing', href: '/dashboard/settings/billing' },
+      { label: 'Team', href: '/dashboard/team' },
+    ],
+  },
+  { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
+]
+
+// ── Component ─────────────────────────────────────────────────────────
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const [pendingCount, setPendingCount] = useState(0)
-  const [jobbOpen, setJobbOpen] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
@@ -63,13 +129,52 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const notifRef = useRef<HTMLDivElement>(null)
   const { user: currentUser } = useCurrentUser()
 
-  // Close mobile menu and user menu on route change
+  // ── Route helpers ──────────────────────────────────────────────────
+  function isPathActive(href: string, exact?: boolean): boolean {
+    if (exact) return pathname === href
+    return pathname === href || pathname?.startsWith(href + '/') === true
+  }
+
+  function isLinkActive(item: Extract<NavItem, { type: 'link' }>): boolean {
+    if (item.exact) return pathname === item.href
+    if (item.paths) return item.paths.some(p => isPathActive(p))
+    return isPathActive(item.href)
+  }
+
+  function isGroupActive(item: Extract<NavItem, { type: 'group' }>): boolean {
+    return item.children.some(c => isPathActive(c.href))
+  }
+
+  // ── Auto-expand groups when a child route is active ────────────────
   useEffect(() => {
     setIsMobileOpen(false)
     setUserMenuOpen(false)
+
+    const toOpen = new Set<string>()
+    for (const item of NAV) {
+      if (item.type === 'group' && isGroupActive(item)) {
+        toOpen.add(item.key)
+      }
+    }
+    if (toOpen.size > 0) {
+      setOpenGroups(prev => {
+        const next = new Set(prev)
+        toOpen.forEach(k => next.add(k))
+        return next
+      })
+    }
   }, [pathname])
 
-  // Close user menu on click outside
+  function toggleGroup(key: string) {
+    setOpenGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // ── Close menus on click outside ───────────────────────────────────
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
@@ -82,7 +187,6 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     }
   }, [userMenuOpen])
 
-  // Close notification panel on click outside
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -95,7 +199,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     }
   }, [notifOpen])
 
-  // Fetch notification count
+  // ── Notifications ──────────────────────────────────────────────────
   useEffect(() => {
     if (!businessId) return
     fetchNotifCount()
@@ -167,7 +271,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     return `${days} dag${days > 1 ? 'ar' : ''}`
   }
 
-  // Prevent body scroll when mobile menu is open
+  // ── Prevent body scroll on mobile ──────────────────────────────────
   useEffect(() => {
     if (isMobileOpen) {
       document.body.style.overflow = 'hidden'
@@ -177,7 +281,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     return () => { document.body.style.overflow = '' }
   }, [isMobileOpen])
 
-  // Fetch pending count for badge
+  // ── Pending AI suggestion count + badge ────────────────────────────
   useEffect(() => {
     if (!businessId) return
 
@@ -223,20 +327,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     setPendingCount((aiCount || 0) + (recordingCount || 0))
   }
 
-  // Auto-expand Jobb dropdown if a child route is active
-  const jobbPaths = ['/dashboard/projects', '/dashboard/quotes', '/dashboard/invoices', '/dashboard/documents']
-  const isJobbActive = jobbPaths.some(p => pathname === p || pathname?.startsWith(p + '/'))
-
-  useEffect(() => {
-    if (isJobbActive) setJobbOpen(true)
-  }, [isJobbActive])
-
-  function isActive(href: string) {
-    return pathname === href || pathname?.startsWith(href + '/')
-  }
-
+  // ── Style helpers ──────────────────────────────────────────────────
   function navClass(active: boolean) {
-    return `flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
+    return `flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${
       active
         ? 'bg-white/10 text-white border border-white/20'
         : 'text-blue-200/70 hover:text-white hover:bg-white/5'
@@ -244,13 +337,14 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   }
 
   function subNavClass(active: boolean) {
-    return `flex items-center gap-3 px-4 py-2 rounded-lg transition-all ${
+    return `block px-4 py-2 rounded-lg text-sm transition-all ${
       active
         ? 'text-cyan-300 bg-white/10'
         : 'text-blue-300/50 hover:text-white hover:bg-white/5'
     }`
   }
 
+  // ── Sidebar content (shared by mobile + desktop) ───────────────────
   const sidebarContent = (
     <>
       {/* Logo + Notification bell */}
@@ -336,125 +430,58 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {/* Dashboard */}
-        <Link href="/dashboard" className={navClass(pathname === '/dashboard')}>
-          <div className="flex items-center gap-3">
-            <LayoutGrid className={`w-5 h-5 ${pathname === '/dashboard' ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Dashboard</span>
-          </div>
-        </Link>
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+        {NAV.map(item => {
+          if (item.type === 'link') {
+            const active = isLinkActive(item)
+            const Icon = item.icon
+            return (
+              <Link key={item.key} href={item.href} className={navClass(active)}>
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-5 h-5 ${active ? 'text-cyan-300' : ''}`} />
+                  <span className="text-sm">{item.label}</span>
+                </div>
+                {item.hasBadge && pendingCount > 0 && (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full animate-pulse">
+                    {pendingCount > 99 ? '99+' : pendingCount}
+                  </span>
+                )}
+              </Link>
+            )
+          }
 
-        {/* Samtal */}
-        <Link href="/dashboard/calls" className={navClass(isActive('/dashboard/calls') || isActive('/dashboard/inbox') || isActive('/dashboard/assistant') || isActive('/dashboard/recordings'))}>
-          <div className="flex items-center gap-3">
-            <Phone className={`w-5 h-5 ${isActive('/dashboard/calls') || isActive('/dashboard/inbox') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Samtal</span>
-          </div>
-          {pendingCount > 0 && (
-            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-full animate-pulse">
-              {pendingCount > 99 ? '99+' : pendingCount}
-            </span>
-          )}
-        </Link>
+          // Group item
+          const groupActive = isGroupActive(item)
+          const isOpen = openGroups.has(item.key)
+          const Icon = item.icon
 
-        {/* Schema */}
-        <Link href="/dashboard/schedule" className={navClass(isActive('/dashboard/schedule') || isActive('/dashboard/calendar'))}>
-          <div className="flex items-center gap-3">
-            <Calendar className={`w-5 h-5 ${isActive('/dashboard/schedule') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Schema</span>
-          </div>
-        </Link>
-
-        {/* Kunder */}
-        <Link href="/dashboard/customers" className={navClass(isActive('/dashboard/customers'))}>
-          <div className="flex items-center gap-3">
-            <Users className={`w-5 h-5 ${isActive('/dashboard/customers') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Kunder</span>
-          </div>
-        </Link>
-
-        {/* Pipeline */}
-        <Link href="/dashboard/pipeline" className={navClass(isActive('/dashboard/pipeline'))}>
-          <div className="flex items-center gap-3">
-            <TrendingUp className={`w-5 h-5 ${isActive('/dashboard/pipeline') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Pipeline</span>
-          </div>
-        </Link>
-
-        {/* Jobb (dropdown) */}
-        <div>
-          <button
-            onClick={() => setJobbOpen(!jobbOpen)}
-            className={`w-full ${navClass(isJobbActive)}`}
-          >
-            <div className="flex items-center gap-3">
-              <Briefcase className={`w-5 h-5 ${isJobbActive ? 'text-cyan-300' : ''}`} />
-              <span className="text-sm sm:text-base">Jobb</span>
+          return (
+            <div key={item.key}>
+              <button
+                onClick={() => toggleGroup(item.key)}
+                className={`w-full ${navClass(groupActive)}`}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-5 h-5 ${groupActive ? 'text-cyan-300' : ''}`} />
+                  <span className="text-sm">{item.label}</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isOpen && (
+                <div className="ml-8 mt-0.5 mb-1 space-y-0.5">
+                  {item.children.map(child => {
+                    const childActive = isPathActive(child.href, child.exact)
+                    return (
+                      <Link key={child.href} href={child.href} className={subNavClass(childActive)}>
+                        {child.label}
+                      </Link>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-            <ChevronDown className={`w-4 h-4 transition-transform ${jobbOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {jobbOpen && (
-            <div className="ml-4 mt-1 space-y-1">
-              <Link href="/dashboard/projects" className={subNavClass(isActive('/dashboard/projects'))}>
-                <FolderKanban className="w-4 h-4" />
-                <span className="text-sm">Projekt</span>
-              </Link>
-              <Link href="/dashboard/quotes" className={subNavClass(isActive('/dashboard/quotes'))}>
-                <FileText className="w-4 h-4" />
-                <span className="text-sm">Offerter</span>
-              </Link>
-              <Link href="/dashboard/invoices" className={subNavClass(isActive('/dashboard/invoices'))}>
-                <Receipt className="w-4 h-4" />
-                <span className="text-sm">Fakturor</span>
-              </Link>
-              <Link href="/dashboard/documents" className={subNavClass(isActive('/dashboard/documents'))}>
-                <FileText className="w-4 h-4" />
-                <span className="text-sm">Dokument</span>
-              </Link>
-            </div>
-          )}
-        </div>
-
-        {/* Tid */}
-        <Link href="/dashboard/time" className={navClass(isActive('/dashboard/time'))}>
-          <div className="flex items-center gap-3">
-            <Clock className={`w-5 h-5 ${isActive('/dashboard/time') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Tid</span>
-          </div>
-        </Link>
-
-        {/* Lager */}
-        <Link href="/dashboard/inventory" className={navClass(isActive('/dashboard/inventory'))}>
-          <div className="flex items-center gap-3">
-            <Package className={`w-5 h-5 ${isActive('/dashboard/inventory') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Lager</span>
-          </div>
-        </Link>
-
-        {/* Automationer */}
-        <Link href="/dashboard/automations" className={navClass(isActive('/dashboard/automations') || isActive('/dashboard/communication'))}>
-          <div className="flex items-center gap-3">
-            <Zap className={`w-5 h-5 ${isActive('/dashboard/automations') || isActive('/dashboard/communication') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Automationer</span>
-          </div>
-        </Link>
-
-        {/* Inställningar */}
-        <Link href="/dashboard/settings" className={navClass(isActive('/dashboard/settings') || isActive('/dashboard/team'))}>
-          <div className="flex items-center gap-3">
-            <Settings className={`w-5 h-5 ${isActive('/dashboard/settings') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Inställningar</span>
-          </div>
-        </Link>
-
-        {/* Hjälp */}
-        <Link href="/dashboard/help" className={navClass(isActive('/dashboard/help'))}>
-          <div className="flex items-center gap-3">
-            <HelpCircle className={`w-5 h-5 ${isActive('/dashboard/help') ? 'text-cyan-300' : ''}`} />
-            <span className="text-sm sm:text-base">Hjälp</span>
-          </div>
-        </Link>
+          )
+        })}
       </nav>
 
       {/* User Menu */}
