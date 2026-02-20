@@ -7,6 +7,7 @@ interface Business {
   business_name: string
   contact_name: string
   contact_email: string
+  plan: 'starter' | 'professional' | 'business'
 }
 
 export const BusinessContext = createContext<Business | null>(null)

@@ -153,7 +153,7 @@ if (action === 'login') {
       // Hämta business_config
       const { data: business } = await getServerSupabase()
         .from('business_config')
-        .select('business_id, business_name, contact_name, contact_email')
+        .select('business_id, business_name, contact_name, contact_email, plan, billing_plan, subscription_plan')
         .eq('user_id', session.user.id)
         .single()
 
@@ -161,9 +161,20 @@ if (action === 'login') {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
-      return NextResponse.json({ 
+      // Resolve plan from available fields
+      const resolvedPlan = (business as any).plan || (business as any).billing_plan || (business as any).subscription_plan || 'starter'
+      const normalizedPlan = resolvedPlan.toLowerCase()
+      const plan = normalizedPlan === 'professional' ? 'professional' : normalizedPlan === 'business' ? 'business' : 'starter'
+
+      return NextResponse.json({
         authenticated: true,
-        business
+        business: {
+          business_id: (business as any).business_id,
+          business_name: (business as any).business_name,
+          contact_name: (business as any).contact_name,
+          contact_email: (business as any).contact_email,
+          plan,
+        }
       })
     }
 
