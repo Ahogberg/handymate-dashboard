@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/nurture",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/check-overdue",
@@ -10,11 +10,11 @@
     },
     {
       "path": "/api/cron/communication-check",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/sync-calendars",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/send-reminders",
