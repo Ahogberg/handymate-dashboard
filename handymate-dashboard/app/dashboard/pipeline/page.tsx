@@ -684,7 +684,7 @@ export default function PipelinePage() {
         body: JSON.stringify({
           business_id: business.business_id,
           title: newDealForm.title.trim(),
-          customer_id: newDealForm.customer_id || null,
+          customerId: newDealForm.customer_id || null,
           value: newDealForm.value ? parseFloat(newDealForm.value) : null,
           priority: newDealForm.priority,
           description: newDealForm.description.trim() || null
