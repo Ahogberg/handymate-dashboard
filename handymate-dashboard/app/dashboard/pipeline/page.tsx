@@ -40,11 +40,16 @@ import {
   StickyNote,
   Tag,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  Target,
+  Lightbulb,
+  Zap,
+  BarChart3
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -75,6 +80,15 @@ interface Deal {
   source_call_id: string | null
   lead_source_platform: string | null
   lead_temperature: string | null
+  lead_score: number | null
+  lead_score_factors: Record<string, number> | null
+  lead_reasoning: string | null
+  suggested_action: string | null
+  estimated_value: number | null
+  first_response_at: string | null
+  response_time_seconds: number | null
+  loss_reason: string | null
+  loss_reason_detail: string | null
   assigned_to: string | null
   created_at: string
   updated_at: string
@@ -279,6 +293,12 @@ export default function PipelinePage() {
   const [editValueInput, setEditValueInput] = useState('')
   const [editingPriority, setEditingPriority] = useState(false)
   const [dealTab, setDealTab] = useState<'general' | 'tasks' | 'documents' | 'messages'>('general')
+
+  // Loss reason modal
+  const [showLossModal, setShowLossModal] = useState(false)
+  const [lossDealId, setLossDealId] = useState<string | null>(null)
+  const [lossReason, setLossReason] = useState('')
+  const [lossReasonDetail, setLossReasonDetail] = useState('')
 
   // Deal documents
   const [dealDocuments, setDealDocuments] = useState<CustomerDocument[]>([])
@@ -655,7 +675,18 @@ export default function PipelinePage() {
   // Deal actions
   // ------------------------------------------
 
-  async function moveDealAction(dealId: string, toStageSlug: string) {
+  async function moveDealAction(dealId: string, toStageSlug: string, extraData?: Record<string, any>) {
+    const targetStage = stages.find(s => s.slug === toStageSlug)
+
+    // Intercept: if moving to lost stage, show loss reason modal
+    if (targetStage?.is_lost && !extraData?.loss_reason) {
+      setLossDealId(dealId)
+      setLossReason('')
+      setLossReasonDetail('')
+      setShowLossModal(true)
+      return
+    }
+
     try {
       const res = await fetch(`/api/pipeline/deals/${dealId}/move`, {
         method: 'POST',
@@ -663,19 +694,55 @@ export default function PipelinePage() {
         body: JSON.stringify({ toStageSlug, business_id: business.business_id })
       })
       if (!res.ok) throw new Error()
-      const targetStage = stages.find(s => s.slug === toStageSlug)
+
       if (targetStage) {
         setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: targetStage.id, updated_at: new Date().toISOString() } : d))
         if (selectedDeal?.id === dealId) {
           setSelectedDeal(prev => prev ? { ...prev, stage_id: targetStage.id, updated_at: new Date().toISOString() } : prev)
         }
       }
+
+      // Save extra data (loss_reason, won_value)
+      if (extraData && Object.keys(extraData).length > 0) {
+        await fetch(`/api/pipeline/deals/${dealId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: business.business_id, ...extraData })
+        })
+      }
+
+      // Auto-save won_value when moving to won stage
+      if (targetStage?.is_won) {
+        const deal = deals.find(d => d.id === dealId)
+        if (deal?.value) {
+          await fetch(`/api/pipeline/deals/${dealId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ business_id: business.business_id, won_value: deal.value })
+          })
+        }
+      }
+
       showToast('Deal flyttad', 'success')
       fetchAiActivities()
     } catch {
       showToast('Kunde inte flytta deal', 'error')
       fetchPipeline()
     }
+  }
+
+  async function confirmLossReason() {
+    if (!lossDealId || !lossReason) return
+    const lostStage = stages.find(s => s.is_lost)
+    if (!lostStage) return
+    setShowLossModal(false)
+    const deal = deals.find(d => d.id === lossDealId)
+    await moveDealAction(lossDealId, lostStage.slug, {
+      loss_reason: LOSS_REASONS.find(r => r.value === lossReason)?.label || lossReason,
+      loss_reason_detail: lossReasonDetail || null,
+      lost_value: deal?.value || null,
+    })
+    setLossDealId(null)
   }
 
   async function createDeal() {
@@ -727,6 +794,7 @@ export default function PipelinePage() {
   async function markDealLost(dealId: string) {
     const lost = stages.find(s => s.is_lost)
     if (!lost) return
+    // This will trigger the loss reason modal via moveDealAction intercept
     await moveDealAction(dealId, lost.slug)
   }
 
@@ -1315,6 +1383,79 @@ export default function PipelinePage() {
                       </div>
                     </div>
 
+                    {/* Lead Score Card */}
+                    {selectedDeal.lead_score != null && selectedDeal.lead_score > 0 && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Target className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm font-medium text-gray-900">Lead-kvalificering</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg font-bold text-gray-900">{selectedDeal.lead_score}/100</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                              backgroundColor: getTemperatureColor(selectedDeal.lead_temperature || 'cold') + '20',
+                              color: getTemperatureColor(selectedDeal.lead_temperature || 'cold'),
+                            }}>
+                              {getTemperatureLabel(selectedDeal.lead_temperature || 'cold')}
+                            </span>
+                          </div>
+                        </div>
+                        {/* Score bar */}
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="h-2 rounded-full transition-all" style={{
+                            width: `${selectedDeal.lead_score}%`,
+                            backgroundColor: getTemperatureColor(selectedDeal.lead_temperature || 'cold'),
+                          }} />
+                        </div>
+                        {/* Factor bars */}
+                        {selectedDeal.lead_score_factors && (
+                          <div className="space-y-1.5">
+                            {(Object.entries(selectedDeal.lead_score_factors) as [string, number][]).map(([key, val]) => {
+                              const meta = SCORE_FACTOR_LABELS[key as keyof typeof SCORE_FACTOR_LABELS]
+                              if (!meta) return null
+                              return (
+                                <div key={key} className="flex items-center gap-2 text-xs">
+                                  <span className="w-16 text-gray-400 truncate">{meta.label}</span>
+                                  <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                    <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${(val / meta.max) * 100}%` }} />
+                                  </div>
+                                  <span className="text-gray-500 w-10 text-right">{val}/{meta.max}</span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {selectedDeal.suggested_action && (
+                          <div className="flex items-start gap-2 pt-1">
+                            <Lightbulb className="w-3.5 h-3.5 text-amber-500 mt-0.5 flex-shrink-0" />
+                            <p className="text-xs text-gray-600">{selectedDeal.suggested_action}</p>
+                          </div>
+                        )}
+                        {selectedDeal.estimated_value != null && selectedDeal.estimated_value > 0 && (
+                          <div className="text-xs text-gray-400">
+                            Uppskattat värde: <span className="font-medium text-gray-600">{formatValue(selectedDeal.estimated_value)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Response time badge */}
+                    {selectedDeal.response_time_seconds != null && selectedDeal.response_time_seconds > 0 && (
+                      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5">
+                        <Zap className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm text-gray-400">Svarstid:</span>
+                        <span className={`text-sm font-medium ${selectedDeal.response_time_seconds < 60 ? 'text-green-600' : selectedDeal.response_time_seconds < 900 ? 'text-amber-600' : 'text-red-600'}`}>
+                          {selectedDeal.response_time_seconds < 60
+                            ? `${selectedDeal.response_time_seconds}s`
+                            : selectedDeal.response_time_seconds < 3600
+                            ? `${Math.round(selectedDeal.response_time_seconds / 60)} min`
+                            : `${Math.round(selectedDeal.response_time_seconds / 3600)}h ${Math.round((selectedDeal.response_time_seconds % 3600) / 60)}m`
+                          }
+                        </span>
+                      </div>
+                    )}
+
                     {/* Move to stage */}
                     <div>
                       <span className="text-sm text-gray-400 block mb-2">Flytta till</span>
@@ -1873,6 +2014,48 @@ export default function PipelinePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Loss Reason Modal */}
+      {showLossModal && (
+        <>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={() => setShowLossModal(false)} />
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-md">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-bold text-gray-900">Varför förlorades denna deal?</h2>
+                <button onClick={() => setShowLossModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="p-6 space-y-3">
+                {LOSS_REASONS.map(r => (
+                  <label key={r.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${lossReason === r.value ? 'border-red-300 bg-red-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                    <input type="radio" name="loss_reason" value={r.value} checked={lossReason === r.value} onChange={() => setLossReason(r.value)} className="text-red-600 focus:ring-red-500" />
+                    <span className="text-sm text-gray-700">{r.label}</span>
+                  </label>
+                ))}
+                {lossReason === 'other' && (
+                  <textarea
+                    value={lossReasonDetail}
+                    onChange={e => setLossReasonDetail(e.target.value)}
+                    placeholder="Beskriv orsaken..."
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-red-400 resize-none"
+                    rows={2}
+                  />
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
+                <button onClick={() => setShowLossModal(false)} className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
+                <button
+                  onClick={confirmLossReason}
+                  disabled={!lossReason}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  Markera förlorad
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Toast */}

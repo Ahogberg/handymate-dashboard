@@ -116,6 +116,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Lagerhantering',
     plans: ['professional', 'business'],
   },
+  lead_intelligence: {
+    key: 'lead_intelligence',
+    name: 'Lead Intelligence & Analys',
+    plans: ['professional', 'business'],
+  },
 
   // === BEGR\u00c4NSADE PER PLAN ===
   ai_photo_quote: {
