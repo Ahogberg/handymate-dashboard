@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       business_id: auth.business_id,
       deal_id: body.dealId,
       content: body.content.trim(),
-      created_by: auth.user_id,
+      created_by: (await getCurrentUser(request))?.name || auth.user_id,
     })
     .select()
     .single()

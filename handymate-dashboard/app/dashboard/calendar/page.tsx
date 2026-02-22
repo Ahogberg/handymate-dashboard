@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 
 interface Booking {
   booking_id: string
@@ -36,6 +37,7 @@ interface TimeEntry {
   time_entry_id: string
   booking_id: string | null
   customer_id: string | null
+  business_user_id: string | null
   work_date: string
   start_time: string | null
   end_time: string | null
@@ -48,6 +50,18 @@ interface TimeEntry {
     name: string
     phone_number: string
   }
+  business_user?: {
+    id: string
+    name: string
+    color: string
+  } | null
+}
+
+interface TeamMember {
+  id: string
+  name: string
+  color: string
+  role: string
 }
 
 interface Customer {
@@ -58,6 +72,7 @@ interface Customer {
 
 export default function CalendarPage() {
   const business = useBusiness()
+  const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
   const [activeTab, setActiveTab] = useState<'bookings' | 'time'>('bookings')
 
   // Bookings state
@@ -72,6 +87,10 @@ export default function CalendarPage() {
   const [selectedWeek, setSelectedWeek] = useState(getWeekDates(new Date()))
   const [timeModalOpen, setTimeModalOpen] = useState(false)
   const [editingTimeEntry, setEditingTimeEntry] = useState<TimeEntry | null>(null)
+
+  // Team state
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [filterUserId, setFilterUserId] = useState<string>('all')
 
   // Shared state
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -91,6 +110,7 @@ export default function CalendarPage() {
 
   const [timeForm, setTimeForm] = useState({
     customer_id: '',
+    business_user_id: '',
     work_date: '',
     start_time: '',
     end_time: '',
@@ -104,7 +124,7 @@ export default function CalendarPage() {
     if (business.business_id) {
       fetchData()
     }
-  }, [business.business_id, selectedWeek])
+  }, [business.business_id, selectedWeek, filterUserId])
 
   function getWeekDates(date: Date) {
     const day = date.getDay()
@@ -138,9 +158,11 @@ export default function CalendarPage() {
       .order('scheduled_start', { ascending: true })
 
     // Fetch time entries for selected week
-    const timeResponse = await fetch(
-      `/api/time-entry?businessId=${business.business_id}&startDate=${selectedWeek.start}&endDate=${selectedWeek.end}`
-    )
+    let timeUrl = `/api/time-entry?businessId=${business.business_id}&startDate=${selectedWeek.start}&endDate=${selectedWeek.end}`
+    if (filterUserId !== 'all') {
+      timeUrl += `&businessUserId=${filterUserId}`
+    }
+    const timeResponse = await fetch(timeUrl)
     const timeData = await timeResponse.json()
 
     // Fetch customers
@@ -149,10 +171,19 @@ export default function CalendarPage() {
       .select('customer_id, name, phone_number')
       .eq('business_id', business.business_id)
 
+    // Fetch team members
+    const { data: teamData } = await supabase
+      .from('business_users')
+      .select('id, name, color, role')
+      .eq('business_id', business.business_id)
+      .eq('is_active', true)
+      .order('role', { ascending: true })
+
     setBookings(bookingsData || [])
     setTimeEntries(timeData.entries || [])
     setTimeTotals(timeData.totals || { hours: 0, revenue: 0, count: 0 })
     setCustomers(customersData || [])
+    setTeamMembers(teamData || [])
     setLoading(false)
   }
 
@@ -251,6 +282,7 @@ export default function CalendarPage() {
     const today = new Date().toISOString().split('T')[0]
     setTimeForm({
       customer_id: '',
+      business_user_id: currentUser?.id || '',
       work_date: today,
       start_time: '08:00',
       end_time: '16:00',
@@ -266,6 +298,7 @@ export default function CalendarPage() {
     setEditingTimeEntry(entry)
     setTimeForm({
       customer_id: entry.customer_id || '',
+      business_user_id: entry.business_user_id || '',
       work_date: entry.work_date,
       start_time: entry.start_time || '',
       end_time: entry.end_time || '',
@@ -290,6 +323,7 @@ export default function CalendarPage() {
         ? {
             entry_id: editingTimeEntry.time_entry_id,
             customer_id: timeForm.customer_id || null,
+            business_user_id: timeForm.business_user_id || null,
             work_date: timeForm.work_date,
             start_time: timeForm.start_time || null,
             end_time: timeForm.end_time || null,
@@ -301,6 +335,7 @@ export default function CalendarPage() {
         : {
             business_id: business.business_id,
             customer_id: timeForm.customer_id || null,
+            business_user_id: timeForm.business_user_id || null,
             work_date: timeForm.work_date,
             start_time: timeForm.start_time || null,
             end_time: timeForm.end_time || null,
@@ -534,6 +569,21 @@ export default function CalendarPage() {
                   ))}
                 </select>
               </div>
+              {teamMembers.length > 1 && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Medarbetare</label>
+                  <select
+                    value={timeForm.business_user_id}
+                    onChange={(e) => setTimeForm({ ...timeForm, business_user_id: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  >
+                    <option value="">Ingen vald</option>
+                    {teamMembers.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Datum *</label>
                 <input
@@ -699,14 +749,28 @@ export default function CalendarPage() {
           )}
 
           {activeTab === 'time' && (
-            <div className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
-              <button onClick={() => changeWeek(-1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              <span className="px-3 text-sm text-gray-900 min-w-[160px] sm:min-w-[180px] text-center">{formatWeekRange()}</span>
-              <button onClick={() => changeWeek(1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                <ChevronRight className="w-5 h-5" />
-              </button>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+              <div className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
+                <button onClick={() => changeWeek(-1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="px-3 text-sm text-gray-900 min-w-[160px] sm:min-w-[180px] text-center">{formatWeekRange()}</span>
+                <button onClick={() => changeWeek(1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+              {teamMembers.length > 1 && isOwnerOrAdmin && (
+                <select
+                  value={filterUserId}
+                  onChange={(e) => setFilterUserId(e.target.value)}
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                >
+                  <option value="all">Alla medarbetare</option>
+                  {teamMembers.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
         </div>
@@ -898,6 +962,12 @@ export default function CalendarPage() {
                               {entry.customer && (
                                 <p className="text-sm text-gray-500 mt-1">{entry.customer.name}</p>
                               )}
+                              {entry.business_user && (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.business_user.color }} />
+                                  {entry.business_user.name}
+                                </span>
+                              )}
                               {entry.description && (
                                 <p className="text-sm text-gray-400 mt-1 line-clamp-2">{entry.description}</p>
                               )}
@@ -955,6 +1025,12 @@ export default function CalendarPage() {
                                 </div>
                               ) : (
                                 <span className="text-gray-400">-</span>
+                              )}
+                              {entry.business_user && (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.business_user.color }} />
+                                  {entry.business_user.name}
+                                </span>
                               )}
                             </td>
                             <td className="px-6 py-4">

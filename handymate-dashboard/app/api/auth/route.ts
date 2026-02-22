@@ -87,6 +87,24 @@ if (action === 'register') {
     return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
   }
 
+  // 3. Skapa owner-rad i business_users (för team-funktioner)
+  await supabaseAdmin
+    .from('business_users')
+    .insert({
+      business_id: businessId,
+      user_id: authData.user.id,
+      role: 'owner',
+      name: contactName,
+      email: email,
+      phone: phone || null,
+      accepted_at: new Date().toISOString(),
+      can_see_all_projects: true,
+      can_see_financials: true,
+      can_manage_users: true,
+      can_approve_time: true,
+      can_create_invoices: true,
+    })
+
   // Kontrollera om email confirmation behövs
   const emailConfirmationPending = !authData.session
 
@@ -117,19 +135,41 @@ if (action === 'login') {
     return NextResponse.json({ error: 'Fel e-post eller lösenord' }, { status: 401 })
   }
 
-  // Hämta business_config
-  const { data: business, error: businessError } = await getServerSupabase()
+  // Hämta business_config (owner) eller via business_users (teammedlem)
+  let business: { business_id: string; business_name: string; contact_name?: string } | null = null
+
+  const { data: directBusiness } = await getServerSupabase()
     .from('business_config')
     .select('business_id, business_name, contact_name')
     .eq('user_id', authData.user.id)
     .single()
 
-  if (businessError || !business) {
-    console.error('Business lookup error:', businessError)
+  if (directBusiness) {
+    business = directBusiness
+  } else {
+    // Fallback: teammedlem → sök business_users → hämta business_config
+    const { data: bu } = await getServerSupabase()
+      .from('business_users')
+      .select('business_id, name')
+      .eq('user_id', authData.user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (bu) {
+      const { data: bc } = await getServerSupabase()
+        .from('business_config')
+        .select('business_id, business_name, contact_name')
+        .eq('business_id', bu.business_id)
+        .single()
+      if (bc) business = bc
+    }
+  }
+
+  if (!business) {
     return NextResponse.json({ error: 'Inget företag kopplat till kontot' }, { status: 401 })
   }
 
-  return NextResponse.json({ 
+  return NextResponse.json({
     success: true,
     businessId: business.business_id,
     businessName: business.business_name
@@ -150,31 +190,52 @@ if (action === 'login') {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
-      // Hämta business_config - use select('*') to avoid column-not-found errors
-      // (plan column may not exist if migration hasn't been run)
-      const { data: business } = await getServerSupabase()
+      // Hämta business_config (owner) eller via business_users (teammedlem)
+      let business: any = null
+
+      const { data: directBusiness } = await getServerSupabase()
         .from('business_config')
         .select('*')
         .eq('user_id', session.user.id)
         .single()
+
+      if (directBusiness) {
+        business = directBusiness
+      } else {
+        // Fallback: teammedlem → sök business_users → hämta business_config
+        const { data: bu } = await getServerSupabase()
+          .from('business_users')
+          .select('business_id, name')
+          .eq('user_id', session.user.id)
+          .eq('is_active', true)
+          .single()
+
+        if (bu) {
+          const { data: bc } = await getServerSupabase()
+            .from('business_config')
+            .select('*')
+            .eq('business_id', bu.business_id)
+            .single()
+          if (bc) business = bc
+        }
+      }
 
       if (!business) {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
       // Resolve plan from whichever column exists
-      const biz = business as any
-      const resolvedPlan = biz.plan || biz.billing_plan || biz.subscription_plan || 'starter'
+      const resolvedPlan = business.plan || business.billing_plan || business.subscription_plan || 'starter'
       const normalizedPlan = String(resolvedPlan).toLowerCase()
       const plan = normalizedPlan === 'professional' ? 'professional' : normalizedPlan === 'business' ? 'business' : 'starter'
 
       return NextResponse.json({
         authenticated: true,
         business: {
-          business_id: (business as any).business_id,
-          business_name: (business as any).business_name,
-          contact_name: (business as any).contact_name,
-          contact_email: (business as any).contact_email,
+          business_id: business.business_id,
+          business_name: business.business_name,
+          contact_name: business.contact_name,
+          contact_email: business.contact_email,
           plan,
         }
       })

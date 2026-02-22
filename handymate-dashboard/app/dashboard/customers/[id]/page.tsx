@@ -40,6 +40,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 
@@ -116,6 +117,7 @@ export default function CustomerDetailPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
+  const { user: currentUser } = useCurrentUser()
   const customerId = params.id as string
 
   const tabParam = searchParams.get('tab')
@@ -806,6 +808,9 @@ export default function CustomerDetailPage() {
                             <div className="flex items-start justify-between gap-2">
                               <p className="font-medium text-gray-900 text-sm">{activity.title}</p>
                               <span className="text-xs text-gray-400 whitespace-nowrap">
+                                {activity.created_by && activity.created_by !== 'user' && activity.created_by !== 'system' && (
+                                  <span className="mr-1">{activity.created_by} &middot;</span>
+                                )}
                                 {formatDate(activity.created_at)}
                               </span>
                             </div>
@@ -1252,6 +1257,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const { user: currentUser } = useCurrentUser()
   const [direction, setDirection] = useState<'inbound' | 'outbound'>('outbound')
   const [duration, setDuration] = useState('')
   const [notes, setNotes] = useState('')
@@ -1271,7 +1277,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
       title: direction === 'inbound' ? 'Inkommande samtal' : 'Utgående samtal',
       description: notes || null,
       duration_seconds: durationSeconds,
-      created_by: 'user'
+      created_by: currentUser?.name || 'Okänd'
     })
 
     onSaved()
@@ -1361,6 +1367,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const { user: currentUser } = useCurrentUser()
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -1377,7 +1384,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
       activity_type: 'note_added',
       title: 'Anteckning',
       description: note,
-      created_by: 'user'
+      created_by: currentUser?.name || 'Okänd'
     })
 
     onSaved()
@@ -1425,6 +1432,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
   onClose: () => void
   onSaved: () => void
 }) {
+  const { user: currentUser } = useCurrentUser()
   const toast = useToast()
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
@@ -1456,7 +1464,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           activity_type: 'sms_sent',
           title: 'SMS skickat',
           description: message,
-          created_by: 'user'
+          created_by: currentUser?.name || 'Okänd'
         })
 
         onSaved()

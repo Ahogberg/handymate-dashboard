@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     const workTypeId = request.nextUrl.searchParams.get('workTypeId')
     const projectId = request.nextUrl.searchParams.get('projectId')
 
+    const businessUserId = request.nextUrl.searchParams.get('businessUserId')
+
     let query = supabase
       .from('time_entry')
       .select(`
@@ -40,6 +42,11 @@ export async function GET(request: NextRequest) {
           work_type_id,
           name,
           multiplier
+        ),
+        business_user:business_user_id (
+          id,
+          name,
+          color
         )
       `)
       .eq('business_id', businessId)
@@ -53,6 +60,7 @@ export async function GET(request: NextRequest) {
     if (invoiced === 'true') query = query.eq('invoiced', true)
     if (invoiced === 'false') query = query.eq('invoiced', false)
     if (projectId) query = query.eq('project_id', projectId)
+    if (businessUserId) query = query.eq('business_user_id', businessUserId)
 
     const { data: entries, error } = await query
 
@@ -102,6 +110,7 @@ export async function POST(request: NextRequest) {
       work_type_id,
       project_id,
       milestone_id,
+      business_user_id,
       work_date,
       start_time,
       end_time,
@@ -149,6 +158,7 @@ export async function POST(request: NextRequest) {
         work_type_id: work_type_id || null,
         project_id: project_id || null,
         milestone_id: milestone_id || null,
+        business_user_id: business_user_id || null,
         work_date,
         start_time: start_time || null,
         end_time: end_time || null,
@@ -160,7 +170,8 @@ export async function POST(request: NextRequest) {
       .select(`
         *,
         customer:customer_id (customer_id, name, phone_number),
-        work_type:work_type_id (work_type_id, name, multiplier)
+        work_type:work_type_id (work_type_id, name, multiplier),
+        business_user:business_user_id (id, name, color)
       `)
       .single()
 
@@ -213,7 +224,8 @@ export async function PUT(request: NextRequest) {
       .select(`
         *,
         customer:customer_id (customer_id, name, phone_number),
-        work_type:work_type_id (work_type_id, name, multiplier)
+        work_type:work_type_id (work_type_id, name, multiplier),
+        business_user:business_user_id (id, name, color)
       `)
       .single()
 

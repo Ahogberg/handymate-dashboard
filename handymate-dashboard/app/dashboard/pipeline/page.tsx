@@ -1814,7 +1814,10 @@ export default function PipelinePage() {
                               <>
                                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.content}</p>
                                 <div className="flex items-center justify-between mt-3">
-                                  <span className="text-xs text-gray-400">{timeAgo(note.created_at)}</span>
+                                  <span className="text-xs text-gray-400">
+                                    {note.created_by && <span className="mr-1">{note.created_by} &middot;</span>}
+                                    {timeAgo(note.created_at)}
+                                  </span>
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Ta bort"><Trash2 className="w-3.5 h-3.5" /></button>

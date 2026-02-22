@@ -16,7 +16,7 @@ interface InviteData {
 }
 
 const roleLabels: Record<string, string> = {
-  owner: '\u00c4gare',
+  owner: 'Ägare',
   admin: 'Admin',
   technician: 'Tekniker',
   office: 'Kontor',
@@ -69,12 +69,12 @@ export default function InviteAcceptPage() {
     e.preventDefault()
 
     if (form.password.length < 6) {
-      setError('L\u00f6senord m\u00e5ste vara minst 6 tecken')
+      setError('Lösenord måste vara minst 6 tecken')
       return
     }
 
     if (form.password !== form.confirmPassword) {
-      setError('L\u00f6senorden matchar inte')
+      setError('Lösenorden matchar inte')
       return
     }
 
@@ -91,7 +91,7 @@ export default function InviteAcceptPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'N\u00e5got gick fel')
+        setError(data.error || 'Något gick fel')
         setSubmitting(false)
         return
       }
@@ -106,7 +106,7 @@ export default function InviteAcceptPage() {
       setSuccess(true)
       setTimeout(() => router.push('/dashboard'), 1500)
     } catch {
-      setError('N\u00e5got gick fel. F\u00f6rs\u00f6k igen.')
+      setError('Något gick fel. Försök igen.')
       setSubmitting(false)
     }
   }
@@ -143,10 +143,10 @@ export default function InviteAcceptPage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Ogiltig inbjudan</h2>
             <p className="text-gray-500 mb-1">
-              {invite?.error || 'Inbjudan har g\u00e5tt ut eller \u00e4r ogiltig.'}
+              {invite?.error || 'Inbjudan har gått ut eller är ogiltig.'}
             </p>
             <p className="text-gray-400 text-sm mb-6">
-              Kontakta din arbetsgivare f\u00f6r en ny inbjudan.
+              Kontakta din arbetsgivare för en ny inbjudan.
             </p>
             <a
               href="/login"
@@ -174,7 +174,7 @@ export default function InviteAcceptPage() {
             <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-7 h-7 text-emerald-600" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">V\u00e4lkommen!</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Välkommen!</h2>
             <p className="text-gray-500 mb-4">Ditt konto har skapats. Omdirigerar...</p>
             <Loader2 className="w-5 h-5 text-blue-600 animate-spin mx-auto" />
           </div>
@@ -211,7 +211,7 @@ export default function InviteAcceptPage() {
             </h2>
             <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-500/20">
               {roleLabels[invite.role] || invite.role}
-              {invite.title ? ` \u2013 ${invite.title}` : ''}
+              {invite.title ? ` – ${invite.title}` : ''}
             </span>
           </div>
 
@@ -244,7 +244,7 @@ export default function InviteAcceptPage() {
             <div>
               <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <Lock className="w-4 h-4" />
-                L\u00f6senord
+                Lösenord
               </label>
               <div className="relative">
                 <input
@@ -270,13 +270,13 @@ export default function InviteAcceptPage() {
             <div>
               <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
                 <Lock className="w-4 h-4" />
-                Bekr\u00e4fta l\u00f6senord
+                Bekräfta lösenord
               </label>
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                placeholder="Upprepa l\u00f6senord"
+                placeholder="Upprepa lösenord"
                 required
                 minLength={6}
                 className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
@@ -299,7 +299,7 @@ export default function InviteAcceptPage() {
               {submitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                'Skapa konto och g\u00e5 med'
+                'Skapa konto och gå med'
               )}
             </button>
           </form>
