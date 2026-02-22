@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { Suspense, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 interface WidgetConfig {
@@ -24,7 +24,7 @@ function generateSessionId() {
   return 'ws_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9)
 }
 
-export default function WidgetChatPage() {
+function WidgetChatContent() {
   const searchParams = useSearchParams()
   const businessId = searchParams.get('bid')
 
@@ -59,7 +59,6 @@ export default function WidgetChatPage() {
           return
         }
         setConfig(data)
-        // Add welcome message
         setMessages([{ role: 'assistant', content: data.welcome_message }])
       })
       .catch(() => setError('Kunde inte ladda widget'))
@@ -79,7 +78,6 @@ export default function WidgetChatPage() {
     const userMessage: Message = { role: 'user', content: msg }
     setMessages(prev => [...prev, userMessage])
 
-    // Extract visitor info from message
     const info = { ...visitorInfo }
     const phoneMatch = msg.match(/(?:0\d{1,3}[\s-]?\d{5,8}|\+46\s?\d{1,3}[\s-]?\d{5,8})/)
     if (phoneMatch) info.phone = phoneMatch[0].replace(/[\s-]/g, '')
@@ -208,7 +206,7 @@ export default function WidgetChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick questions (only show if first message and config has them) */}
+      {/* Quick questions */}
       {messages.length === 1 && config.quick_questions.length > 0 && (
         <div className="px-4 pb-2 flex flex-wrap gap-1.5 bg-gray-50 border-t border-gray-100">
           {config.quick_questions.map((q, i) => (
@@ -258,5 +256,19 @@ export default function WidgetChatPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function WidgetChatPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center bg-gray-50">
+          <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <WidgetChatContent />
+    </Suspense>
   )
 }
