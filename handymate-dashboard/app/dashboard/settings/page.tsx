@@ -326,7 +326,7 @@ export default function SettingsPage() {
   const [invoiceSyncResult, setInvoiceSyncResult] = useState<{ synced?: number; failed?: number; updated?: number; unchanged?: number } | null>(null)
 
   // Google Calendar integration state
-  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null; calendarId: string | null; syncDirection: string; lastSyncAt: string | null; syncError: string | null } | null>(null)
+  const [googleStatus, setGoogleStatus] = useState<{ connected: boolean; email: string | null; calendarId: string | null; syncDirection: string; lastSyncAt: string | null; syncError: string | null; gmailScopeGranted?: boolean; gmailSyncEnabled?: boolean; gmailLastSyncAt?: string | null } | null>(null)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [googleSyncing, setGoogleSyncing] = useState(false)
   const [googleSyncResult, setGoogleSyncResult] = useState<any>(null)
@@ -794,6 +794,22 @@ export default function SettingsPage() {
         setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)
       }
     } catch { /* ignore */ }
+  }
+
+  const handleToggleGmailSync = async (enabled: boolean) => {
+    try {
+      const res = await fetch('/api/google/gmail-toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      if (res.ok) {
+        setGoogleStatus(prev => prev ? { ...prev, gmailSyncEnabled: enabled } : null)
+        showToast(enabled ? 'Gmail-visning aktiverad' : 'Gmail-visning inaktiverad', 'success')
+      }
+    } catch {
+      showToast('Kunde inte ändra Gmail-inställning', 'error')
+    }
   }
 
   async function handleSaveReviewSettings() {
@@ -2076,6 +2092,42 @@ export default function SettingsPage() {
                     </ul>
                   </div>
 
+                  {/* Gmail integration toggle */}
+                  <div className="p-4 bg-gray-50 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Mail className="w-5 h-5 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">Visa kundmail</p>
+                          <p className="text-xs text-gray-400">
+                            {googleStatus?.gmailScopeGranted
+                              ? 'Visa Gmail-konversationer i kundkort'
+                              : 'Koppla om Google för att aktivera e-post'}
+                          </p>
+                        </div>
+                      </div>
+                      {googleStatus?.gmailScopeGranted ? (
+                        <button
+                          onClick={() => handleToggleGmailSync(!googleStatus?.gmailSyncEnabled)}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${
+                            googleStatus?.gmailSyncEnabled ? 'bg-blue-500' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                            googleStatus?.gmailSyncEnabled ? 'translate-x-5' : ''
+                          }`} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleConnectGoogle}
+                          className="px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          Koppla om
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Disconnect */}
                   <button
                     onClick={handleDisconnectGoogle}
@@ -2124,7 +2176,7 @@ export default function SettingsPage() {
             {/* Email info */}
             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
               <p className="text-sm text-blue-700">
-                <strong>Om e-post:</strong> E-post skickas via Handymate (Resend), inte via Gmail. Google Calendar kan kopplas ovan för att synka bokningar och schema.
+                <strong>Om e-post:</strong> Utgående e-post skickas via Handymate (Resend). Med Gmail-koppling kan du se inkommande kundmail direkt i kundkortet.
               </p>
             </div>
 

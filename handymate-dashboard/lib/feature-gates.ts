@@ -41,7 +41,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   },
   sms_basic: {
     key: 'sms_basic',
-    name: 'SMS-bekr\u00e4ftelser',
+    name: 'SMS-bekräftelser',
     plans: ['starter', 'professional', 'business'],
   },
   documents: {
@@ -53,7 +53,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   // === PROFESSIONAL + BUSINESS ===
   nurture_sequences: {
     key: 'nurture_sequences',
-    name: 'Uppf\u00f6ljningssekvenser',
+    name: 'Uppföljningssekvenser',
     plans: ['professional', 'business'],
   },
   lead_generation: {
@@ -78,7 +78,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   },
   profitability_full: {
     key: 'profitability_full',
-    name: 'L\u00f6nsamhetsuppf\u00f6ljning (full)',
+    name: 'Lönsamhetsuppföljning (full)',
     plans: ['professional', 'business'],
   },
   csv_export: {
@@ -108,7 +108,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   },
   subcontractors: {
     key: 'subcontractors',
-    name: 'Underentrepren\u00f6rer',
+    name: 'Underentreprenörer',
     plans: ['professional', 'business'],
   },
   inventory: {
@@ -126,11 +126,16 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Hemsida-widget',
     plans: ['professional', 'business'],
   },
+  gmail_integration: {
+    key: 'gmail_integration',
+    name: 'Gmail-integration',
+    plans: ['professional', 'business'],
+  },
 
-  // === BEGR\u00c4NSADE PER PLAN ===
+  // === BEGRÄNSADE PER PLAN ===
   ai_photo_quote: {
     key: 'ai_photo_quote',
-    name: 'AI prisber\u00e4kning foto/ritning',
+    name: 'AI prisberäkning foto/ritning',
     plans: ['starter', 'professional', 'business'],
     limit: { starter: 3, professional: 30, business: null },
   },
@@ -142,7 +147,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   },
   call_volume: {
     key: 'call_volume',
-    name: 'Samtal per m\u00e5nad',
+    name: 'Samtal per månad',
     plans: ['starter', 'professional', 'business'],
     limit: { starter: 100, professional: 400, business: null },
   },
@@ -150,7 +155,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   // === BUSINESS ONLY ===
   custom_ai_voice: {
     key: 'custom_ai_voice',
-    name: 'Anpassad AI-r\u00f6st',
+    name: 'Anpassad AI-röst',
     plans: ['business'],
   },
   dedicated_support: {
@@ -160,7 +165,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   },
   unlimited_users: {
     key: 'unlimited_users',
-    name: 'Obegr\u00e4nsade anv\u00e4ndare',
+    name: 'Obegränsade användare',
     plans: ['business'],
   },
 }

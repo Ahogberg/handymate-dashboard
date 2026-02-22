@@ -85,6 +85,31 @@ interface Activity {
   created_by: string
 }
 
+interface GmailThread {
+  threadId: string
+  subject: string
+  snippet: string
+  from: string
+  to: string
+  date: string
+  messageCount: number
+  isUnread: boolean
+}
+
+interface GmailMessage {
+  messageId: string
+  threadId: string
+  subject: string
+  from: string
+  to: string
+  date: string
+  snippet: string
+  bodyText: string | null
+  bodyHtml: string | null
+}
+
+type TimelineFilter = 'all' | 'calls' | 'sms' | 'email' | 'notes'
+
 interface Booking {
   booking_id: string
   scheduled_start: string
@@ -149,6 +174,14 @@ export default function CustomerDetailPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
+
+  // Gmail / Timeline
+  const [emailThreads, setEmailThreads] = useState<GmailThread[]>([])
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>('all')
+  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null)
+  const [threadMessages, setThreadMessages] = useState<Record<string, GmailMessage[]>>({})
+  const [threadLoading, setThreadLoading] = useState(false)
 
   // Portal
   const [portalToken, setPortalToken] = useState<string | null>(null)
@@ -219,7 +252,48 @@ export default function CustomerDetailPage() {
       // Tasks table may not exist yet
     }
 
+    // Fetch Gmail threads if customer has email
+    if (customerData?.email) {
+      fetchEmailThreads(customerData.email)
+    }
+
     setLoading(false)
+  }
+
+  async function fetchEmailThreads(email: string) {
+    setEmailLoading(true)
+    try {
+      const res = await fetch(`/api/gmail/customer-emails?email=${encodeURIComponent(email)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setEmailThreads(data.threads || [])
+      }
+    } catch {
+      // Gmail not configured or not enabled — silent
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  async function fetchThreadMessages(threadId: string) {
+    if (threadMessages[threadId]) {
+      // Already loaded
+      setExpandedThreadId(expandedThreadId === threadId ? null : threadId)
+      return
+    }
+    setExpandedThreadId(threadId)
+    setThreadLoading(true)
+    try {
+      const res = await fetch(`/api/gmail/thread-messages?threadId=${encodeURIComponent(threadId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setThreadMessages(prev => ({ ...prev, [threadId]: data.messages || [] }))
+      }
+    } catch {
+      // silent
+    } finally {
+      setThreadLoading(false)
+    }
   }
 
   async function fetchTasks() {
@@ -433,6 +507,7 @@ export default function CustomerDetailPage() {
       case 'job_completed': return <CheckCircle className="w-4 h-4 text-emerald-600" />
       case 'note_added': return <FileText className="w-4 h-4 text-gray-500" />
       case 'rating_received': return <Star className="w-4 h-4 text-yellow-400" />
+      case 'email_thread': return <Mail className="w-4 h-4 text-purple-500" />
       default: return <Clock className="w-4 h-4 text-gray-500" />
     }
   }
@@ -451,6 +526,52 @@ export default function CustomerDetailPage() {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
     return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const parseEmailDate = (dateStr: string): Date => {
+    const d = new Date(dateStr)
+    return isNaN(d.getTime()) ? new Date() : d
+  }
+
+  const extractEmailName = (from: string): string => {
+    const match = from.match(/^"?([^"<]+)"?\s*</)
+    return match ? match[1].trim() : from.split('@')[0]
+  }
+
+  // Build unified timeline
+  const getFilteredTimeline = () => {
+    // Build activity items
+    let filteredActivities = activities
+    if (timelineFilter === 'calls') {
+      filteredActivities = activities.filter(a => a.activity_type.startsWith('call_'))
+    } else if (timelineFilter === 'sms') {
+      filteredActivities = activities.filter(a => a.activity_type.startsWith('sms_'))
+    } else if (timelineFilter === 'notes') {
+      filteredActivities = activities.filter(a => a.activity_type === 'note_added')
+    } else if (timelineFilter === 'email') {
+      filteredActivities = []
+    }
+
+    const activityItems = filteredActivities.map(a => ({
+      type: 'activity' as const,
+      id: a.activity_id,
+      date: new Date(a.created_at),
+      data: a,
+    }))
+
+    // Build email items
+    const showEmails = timelineFilter === 'all' || timelineFilter === 'email'
+    const emailItems = showEmails ? emailThreads.map(t => ({
+      type: 'email' as const,
+      id: t.threadId,
+      date: parseEmailDate(t.date),
+      data: t,
+    })) : []
+
+    // Merge and sort by date descending
+    const allItems = [...activityItems, ...emailItems]
+    allItems.sort((a, b) => b.date.getTime() - a.date.getTime())
+    return allItems
   }
 
   const getJobStatusBadge = (status: string) => {
@@ -789,61 +910,178 @@ export default function CustomerDetailPage() {
 
             {/* Timeline */}
             {activeTab === 'timeline' && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-                {activities.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-400">Ingen aktivitet ännu</p>
-                    <p className="text-xs text-gray-400 mt-1">Logga ett samtal eller skicka ett SMS för att komma igång</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-200">
-                    {activities.map((activity) => (
-                      <div key={activity.activity_id} className="p-4 hover:bg-gray-100/30 transition-all">
-                        <div className="flex gap-4">
-                          <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                            {getActivityIcon(activity.activity_type)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <p className="font-medium text-gray-900 text-sm">{activity.title}</p>
-                              <span className="text-xs text-gray-400 whitespace-nowrap">
-                                {activity.created_by && activity.created_by !== 'user' && activity.created_by !== 'system' && (
-                                  <span className="mr-1">{activity.created_by} &middot;</span>
-                                )}
-                                {formatDate(activity.created_at)}
-                              </span>
-                            </div>
-                            {activity.description && (
-                              <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
-                            )}
-                            {activity.duration_seconds && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                Längd: {formatDuration(activity.duration_seconds)}
-                              </p>
-                            )}
-                            {activity.transcript && (
-                              <details className="mt-2">
-                                <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-500">
-                                  Visa transkription
-                                </summary>
-                                <p className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 whitespace-pre-wrap">
-                                  {activity.transcript}
-                                </p>
-                              </details>
-                            )}
-                            {activity.recording_url && (
-                              <button className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500">
-                                <Play className="w-3 h-3" />
-                                Spela upp inspelning
-                              </button>
-                            )}
-                          </div>
+              <div className="space-y-3">
+                {/* Timeline filter */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {([
+                    { key: 'all', label: 'Alla' },
+                    { key: 'calls', label: 'Samtal' },
+                    { key: 'sms', label: 'SMS' },
+                    { key: 'email', label: 'E-post' },
+                    { key: 'notes', label: 'Anteckningar' },
+                  ] as { key: TimelineFilter; label: string }[]).map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => setTimelineFilter(f.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                        timelineFilter === f.key
+                          ? 'bg-blue-100 text-blue-600 border border-blue-200'
+                          : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      {f.label}
+                      {f.key === 'email' && emailThreads.length > 0 && (
+                        <span className="ml-1 text-[10px] opacity-70">({emailThreads.length})</span>
+                      )}
+                    </button>
+                  ))}
+                  {emailLoading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin self-center ml-1" />}
+                </div>
+
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  {(() => {
+                    const timeline = getFilteredTimeline()
+                    if (timeline.length === 0) {
+                      return (
+                        <div className="p-8 text-center">
+                          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                          <p className="text-gray-400">
+                            {timelineFilter === 'email' ? 'Inga e-postmeddelanden hittade' : 'Ingen aktivitet ännu'}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-1">
+                            {timelineFilter === 'email'
+                              ? 'Gmail-koppling krävs i Inställningar → Integrationer'
+                              : 'Logga ett samtal eller skicka ett SMS för att komma igång'}
+                          </p>
                         </div>
+                      )
+                    }
+                    return (
+                      <div className="divide-y divide-gray-200">
+                        {timeline.map((item) => {
+                          if (item.type === 'activity') {
+                            const activity = item.data
+                            return (
+                              <div key={activity.activity_id} className="p-4 hover:bg-gray-100/30 transition-all">
+                                <div className="flex gap-4">
+                                  <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                                    {getActivityIcon(activity.activity_type)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="font-medium text-gray-900 text-sm">{activity.title}</p>
+                                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                                        {activity.created_by && activity.created_by !== 'user' && activity.created_by !== 'system' && (
+                                          <span className="mr-1">{activity.created_by} &middot;</span>
+                                        )}
+                                        {formatDate(activity.created_at)}
+                                      </span>
+                                    </div>
+                                    {activity.description && (
+                                      <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
+                                    )}
+                                    {activity.duration_seconds && (
+                                      <p className="text-xs text-gray-400 mt-1">
+                                        Längd: {formatDuration(activity.duration_seconds)}
+                                      </p>
+                                    )}
+                                    {activity.transcript && (
+                                      <details className="mt-2">
+                                        <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-500">
+                                          Visa transkription
+                                        </summary>
+                                        <p className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 whitespace-pre-wrap">
+                                          {activity.transcript}
+                                        </p>
+                                      </details>
+                                    )}
+                                    {activity.recording_url && (
+                                      <button className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500">
+                                        <Play className="w-3 h-3" />
+                                        Spela upp inspelning
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          }
+
+                          // Email thread item
+                          const thread = item.data
+                          const isExpanded = expandedThreadId === thread.threadId
+                          const messages = threadMessages[thread.threadId]
+                          return (
+                            <div key={thread.threadId} className="p-4 hover:bg-gray-100/30 transition-all">
+                              <div className="flex gap-4">
+                                <div className="flex-shrink-0 w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
+                                  <Mail className="w-4 h-4 text-purple-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-gray-900 text-sm truncate">
+                                        {thread.subject}
+                                      </p>
+                                      <p className="text-xs text-gray-400 mt-0.5">
+                                        {extractEmailName(thread.from)}
+                                        {thread.messageCount > 1 && (
+                                          <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
+                                            {thread.messageCount} meddelanden
+                                          </span>
+                                        )}
+                                        {thread.isUnread && (
+                                          <span className="ml-1.5 w-2 h-2 bg-blue-500 rounded-full inline-block" />
+                                        )}
+                                      </p>
+                                    </div>
+                                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                                      {formatDate(parseEmailDate(thread.date).toISOString())}
+                                    </span>
+                                  </div>
+                                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{thread.snippet}</p>
+
+                                  <button
+                                    onClick={() => fetchThreadMessages(thread.threadId)}
+                                    className="mt-2 text-xs text-purple-600 hover:text-purple-500 flex items-center gap-1"
+                                  >
+                                    {threadLoading && expandedThreadId === thread.threadId ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Mail className="w-3 h-3" />
+                                    )}
+                                    {isExpanded && messages ? 'Dölj konversation' : 'Visa konversation'}
+                                  </button>
+
+                                  {/* Expanded thread messages */}
+                                  {isExpanded && messages && (
+                                    <div className="mt-3 space-y-2">
+                                      {messages.map((msg) => (
+                                        <div key={msg.messageId} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                          <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs font-medium text-gray-700">
+                                              {extractEmailName(msg.from)}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400">
+                                              {formatDate(parseEmailDate(msg.date).toISOString())}
+                                            </span>
+                                          </div>
+                                          <div className="text-xs text-gray-600 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                                            {msg.bodyText || msg.snippet}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    )
+                  })()}
+                </div>
               </div>
             )}
 

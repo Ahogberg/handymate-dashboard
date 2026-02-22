@@ -312,6 +312,13 @@ export default function PipelinePage() {
   const [editNoteContent, setEditNoteContent] = useState('')
   const [noteSaving, setNoteSaving] = useState(false)
 
+  // Deal emails (Gmail)
+  const [dealEmailThreads, setDealEmailThreads] = useState<{ threadId: string; subject: string; snippet: string; from: string; to: string; date: string; messageCount: number; isUnread: boolean }[]>([])
+  const [dealEmailLoading, setDealEmailLoading] = useState(false)
+  const [dealExpandedThread, setDealExpandedThread] = useState<string | null>(null)
+  const [dealThreadMessages, setDealThreadMessages] = useState<Record<string, { messageId: string; from: string; date: string; bodyText: string | null; snippet: string }[]>>({})
+  const [dealThreadLoading, setDealThreadLoading] = useState(false)
+
   // Deal tasks
   const [dealTasks, setDealTasks] = useState<Task[]>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
@@ -449,6 +456,49 @@ export default function PipelinePage() {
   }
 
   // Deal notes
+  async function fetchDealEmails(email: string) {
+    setDealEmailLoading(true)
+    setDealEmailThreads([])
+    setDealExpandedThread(null)
+    setDealThreadMessages({})
+    try {
+      const res = await fetch(`/api/gmail/customer-emails?email=${encodeURIComponent(email)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDealEmailThreads(data.threads || [])
+      }
+    } catch {
+      // Gmail not configured — silent
+    } finally {
+      setDealEmailLoading(false)
+    }
+  }
+
+  async function fetchDealThreadMessages(threadId: string) {
+    if (dealThreadMessages[threadId]) {
+      setDealExpandedThread(dealExpandedThread === threadId ? null : threadId)
+      return
+    }
+    setDealExpandedThread(threadId)
+    setDealThreadLoading(true)
+    try {
+      const res = await fetch(`/api/gmail/thread-messages?threadId=${encodeURIComponent(threadId)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setDealThreadMessages(prev => ({ ...prev, [threadId]: data.messages || [] }))
+      }
+    } catch {
+      // silent
+    } finally {
+      setDealThreadLoading(false)
+    }
+  }
+
+  const extractEmailName = (from: string): string => {
+    const match = from.match(/^"?([^"<]+)"?\s*</)
+    return match ? match[1].trim() : from.split('@')[0]
+  }
+
   const fetchDealNotes = useCallback(async (dealId: string) => {
     try {
       const res = await fetch(`/api/pipeline/notes?dealId=${dealId}`)
@@ -961,6 +1011,12 @@ export default function PipelinePage() {
       fetchDealDocuments(deal.customer_id)
       fetchCustomerEnrichment(deal.customer_id)
     }
+    // Fetch emails if customer has email
+    if (deal.customer?.email) {
+      fetchDealEmails(deal.customer.email)
+    } else {
+      setDealEmailThreads([])
+    }
   }
 
   function closeDealDetail() {
@@ -969,6 +1025,9 @@ export default function PipelinePage() {
     setDealDocuments([])
     setDealNotes([])
     setDealTasks([])
+    setDealEmailThreads([])
+    setDealExpandedThread(null)
+    setDealThreadMessages({})
     setEditingTitle(false)
     setEditingValue(false)
     setEditingPriority(false)
@@ -1322,7 +1381,7 @@ export default function PipelinePage() {
                     { key: 'general' as const, label: 'Allmänt', icon: FolderKanban },
                     { key: 'tasks' as const, label: 'Uppgifter', icon: CheckSquare, count: dealTasks.filter(t => t.status !== 'done').length },
                     { key: 'documents' as const, label: 'Dokument', icon: FileIcon, count: dealDocuments.length },
-                    { key: 'messages' as const, label: 'Anteckningar', icon: MessageSquare, count: dealNotes.length },
+                    { key: 'messages' as const, label: 'Anteckningar', icon: MessageSquare, count: dealNotes.length + dealEmailThreads.length },
                   ]).map(tab => (
                     <button
                       key={tab.key}
@@ -1793,7 +1852,7 @@ export default function PipelinePage() {
                     </div>
 
                     {/* Notes list */}
-                    {dealNotes.length > 0 ? (
+                    {dealNotes.length > 0 && (
                       <div className="space-y-3">
                         {dealNotes.map(note => (
                           <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 group">
@@ -1828,7 +1887,68 @@ export default function PipelinePage() {
                           </div>
                         ))}
                       </div>
-                    ) : (
+                    )}
+
+                    {/* Gmail threads */}
+                    {(dealEmailThreads.length > 0 || dealEmailLoading) && (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-purple-500" />
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">E-post</span>
+                          {dealEmailLoading && <Loader2 className="w-3 h-3 animate-spin text-gray-400" />}
+                        </div>
+                        {dealEmailThreads.map(thread => (
+                          <div key={thread.threadId} className="rounded-lg border border-purple-100 bg-purple-50/30 p-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">{thread.subject}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  {extractEmailName(thread.from)}
+                                  {thread.messageCount > 1 && (
+                                    <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
+                                      {thread.messageCount} meddelanden
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                                {timeAgo(thread.date)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{thread.snippet}</p>
+                            <button
+                              onClick={() => fetchDealThreadMessages(thread.threadId)}
+                              className="mt-2 text-xs text-purple-600 hover:text-purple-500 flex items-center gap-1"
+                            >
+                              {dealThreadLoading && dealExpandedThread === thread.threadId ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <Mail className="w-3 h-3" />
+                              )}
+                              {dealExpandedThread === thread.threadId && dealThreadMessages[thread.threadId] ? 'Dölj' : 'Visa konversation'}
+                            </button>
+                            {dealExpandedThread === thread.threadId && dealThreadMessages[thread.threadId] && (
+                              <div className="mt-3 space-y-2">
+                                {dealThreadMessages[thread.threadId].map((msg, idx) => (
+                                  <div key={msg.messageId || idx} className="p-3 bg-white rounded-lg border border-gray-100">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs font-medium text-gray-700">{extractEmailName(msg.from)}</span>
+                                      <span className="text-[10px] text-gray-400">{timeAgo(msg.date)}</span>
+                                    </div>
+                                    <div className="text-xs text-gray-600 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
+                                      {msg.bodyText || msg.snippet}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Empty state - only when no notes AND no emails */}
+                    {dealNotes.length === 0 && dealEmailThreads.length === 0 && !dealEmailLoading && (
                       <div className="flex flex-col items-center justify-center py-12 text-gray-400">
                         <MessageSquare className="w-8 h-8 mb-2 opacity-40" />
                         <p className="text-sm">Inga anteckningar ännu</p>

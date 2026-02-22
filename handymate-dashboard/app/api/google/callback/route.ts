@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
           access_token: tokens.access_token,
           refresh_token: tokens.refresh_token,
           token_expires_at: new Date(tokens.expiry_date).toISOString(),
+          gmail_scope_granted: true,
         },
         { onConflict: 'business_user_id,provider' }
       )
