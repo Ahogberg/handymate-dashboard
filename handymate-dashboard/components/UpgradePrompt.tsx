@@ -37,8 +37,8 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
       <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 rounded-xl">
         <Lock className="w-5 h-5 text-violet-500 flex-shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900">{gate.name} ing\u00e5r i {targetLabel}</p>
-          <p className="text-xs text-gray-500 mt-0.5">Uppgradera f\u00f6r att l\u00e5sa upp denna funktion</p>
+          <p className="text-sm font-medium text-gray-900">{gate.name} ingår i {targetLabel}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Uppgradera för att låsa upp denna funktion</p>
         </div>
         <Link
           href="/dashboard/settings/billing"
@@ -64,12 +64,12 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
         {/* Content */}
         <div className="p-6 space-y-5">
           <p className="text-sm text-gray-600">
-            <strong className="text-gray-900">{gate.name}</strong> ing\u00e5r i {targetLabel}-planen.
+            <strong className="text-gray-900">{gate.name}</strong> ingår i {targetLabel}-planen.
           </p>
 
           {upgradeHighlights.length > 0 && (
             <div>
-              <p className="text-sm font-medium text-gray-900 mb-3">Du f\u00e5r \u00e4ven:</p>
+              <p className="text-sm font-medium text-gray-900 mb-3">Du får även:</p>
               <ul className="space-y-2">
                 {upgradeHighlights.map(h => (
                   <li key={h.key} className="flex items-center gap-2 text-sm text-gray-700">
@@ -90,12 +90,12 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
             href="/dashboard/settings/billing"
             className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
           >
-            Uppgradera nu \u2013 {(targetPrice / 100).toLocaleString('sv-SE')} kr/m\u00e5n
+            Uppgradera nu – {targetPrice.toLocaleString('sv-SE')} kr/mån
             <ArrowRight className="w-4 h-4" />
           </Link>
 
           <p className="text-xs text-gray-400 text-center">
-            Du kan n\u00e4rsom helst byta plan eller avsluta i inst\u00e4llningarna
+            Du kan närsomhelst byta plan eller avsluta i inställningarna
           </p>
         </div>
       </div>
