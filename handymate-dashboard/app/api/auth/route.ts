@@ -150,10 +150,11 @@ if (action === 'login') {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
-      // Hämta business_config
+      // Hämta business_config - use select('*') to avoid column-not-found errors
+      // (plan column may not exist if migration hasn't been run)
       const { data: business } = await getServerSupabase()
         .from('business_config')
-        .select('business_id, business_name, contact_name, contact_email, plan, billing_plan, subscription_plan')
+        .select('*')
         .eq('user_id', session.user.id)
         .single()
 
@@ -161,9 +162,10 @@ if (action === 'login') {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
-      // Resolve plan from available fields
-      const resolvedPlan = (business as any).plan || (business as any).billing_plan || (business as any).subscription_plan || 'starter'
-      const normalizedPlan = resolvedPlan.toLowerCase()
+      // Resolve plan from whichever column exists
+      const biz = business as any
+      const resolvedPlan = biz.plan || biz.billing_plan || biz.subscription_plan || 'starter'
+      const normalizedPlan = String(resolvedPlan).toLowerCase()
       const plan = normalizedPlan === 'professional' ? 'professional' : normalizedPlan === 'business' ? 'business' : 'starter'
 
       return NextResponse.json({
