@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Handymate API
+  description: API för Handymate - AI-plattform för svenska hantverkare
+  version: 1.0.0
+  contact:
+    name: Handymate Support
+
+servers:
+  - url: https://{project-ref}.supabase.co/functions/v1
+    description: Supabase Edge Functions
+
+paths:
+  /api-health:
+    get:
+      summary: API Health Check
+      description: |
+        Returnerar hälsostatus för API:et och dess beroenden.
+        Kräver ingen autentisering.
+      operationId: getApiHealth
+      tags:
+        - Health
+      security: []
+      responses:
+        "200":
+          description: API är friskt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: healthy
+                version: "1.0.0"
+                timestamp: "2024-01-15T10:30:00.000Z"
+                services:
+                  database: healthy
+        "503":
+          description: API är degraderat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: degraded
+                version: "1.0.0"
+                timestamp: "2024-01-15T10:30:00.000Z"
+                services:
+                  database: "Connection timeout"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - version
+        - timestamp
+        - services
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+          description: Övergripande hälsostatus för API:et
+        version:
+          type: string
+          description: API-version
+          example: "1.0.0"
+        timestamp:
+          type: string
+          format: date-time
+          description: Tidpunkt för hälsokontrollen (ISO 8601)
+        services:
+          type: object
+          required:
+            - database
+          properties:
+            database:
+              type: string
+              description: |
+                Databasstatus. "healthy" om databasen svarar,
+                annars ett felmeddelande.
+              example: healthy
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Supabase JWT token
+
+tags:
+  - name: Health
+    description: Hälsokontroller för API:et
