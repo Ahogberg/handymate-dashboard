@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
   LayoutDashboard,
   Phone,
@@ -111,12 +111,12 @@ const NAV: NavItem[] = [
   {
     type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
     children: [
-      { label: 'Företagsinställningar', href: '/dashboard/settings', exact: true },
-      { label: 'Telefoni', href: '/dashboard/settings/phone' },
+      { label: 'Företag', href: '/dashboard/settings', exact: true },
+      { label: 'Telefoni', href: '/dashboard/settings?tab=phone' },
+      { label: 'Integrationer', href: '/dashboard/settings?tab=integrations' },
+      { label: 'Team', href: '/dashboard/settings?tab=team' },
       { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
-      { label: 'Billing', href: '/dashboard/settings/billing' },
-      { label: 'Team', href: '/dashboard/team' },
     ],
   },
   { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
@@ -125,6 +125,7 @@ const NAV: NavItem[] = [
 // ── Component ─────────────────────────────────────────────────────────
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const business = useBusiness()
   const plan: PlanType = business.plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
@@ -141,7 +142,18 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Route helpers ──────────────────────────────────────────────────
   function isPathActive(href: string, exact?: boolean): boolean {
-    if (exact) return pathname === href
+    // Handle query-param links like /dashboard/settings?tab=phone
+    if (href.includes('?')) {
+      const [path, query] = href.split('?')
+      if (pathname !== path) return false
+      const params = new URLSearchParams(query)
+      let match = true
+      params.forEach((v, k) => {
+        if (searchParams?.get(k) !== v) match = false
+      })
+      return match
+    }
+    if (exact) return pathname === href && !searchParams?.get('tab')
     return pathname === href || pathname?.startsWith(href + '/') === true
   }
 

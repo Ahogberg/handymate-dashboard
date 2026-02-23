@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import {
   Building2,
@@ -1060,18 +1060,39 @@ export default function SettingsPage() {
     )
   }
 
-  const tabs = [
-    { id: 'company', label: 'Företag', icon: Building2 },
-    { id: 'hours', label: 'Öppettider', icon: Clock },
-    { id: 'phone', label: 'Telefoni', icon: PhoneCall },
-    { id: 'invoice', label: 'Faktura', icon: Receipt },
-    { id: 'time', label: 'Tidrapport', icon: Clock },
-    { id: 'team', label: 'Team', icon: UsersRound },
-    { id: 'integrations', label: 'Integrationer', icon: Link2 },
-    { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
-    { id: 'ai', label: 'AI-assistent', icon: Bot },
-    { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
+  const tabGroups = [
+    {
+      label: 'Företag',
+      tabs: [
+        { id: 'company', label: 'Företag', icon: Building2 },
+        { id: 'hours', label: 'Öppettider', icon: Clock },
+        { id: 'invoice', label: 'Faktura', icon: Receipt },
+      ],
+    },
+    {
+      label: 'Kommunikation',
+      tabs: [
+        { id: 'phone', label: 'Telefoni', icon: PhoneCall },
+        { id: 'ai', label: 'AI-assistent', icon: Bot },
+      ],
+    },
+    {
+      label: 'Drift',
+      tabs: [
+        { id: 'time', label: 'Tidrapport', icon: Clock },
+        { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
+        { id: 'team', label: 'Team', icon: UsersRound },
+      ],
+    },
+    {
+      label: 'System',
+      tabs: [
+        { id: 'integrations', label: 'Integrationer', icon: Link2 },
+        { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
+      ],
+    },
   ]
+  const tabs = tabGroups.flatMap(g => g.tabs)
 
   const currentPlan = config.subscription_plan || 'Starter'
 
@@ -1106,21 +1127,28 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex space-x-2 mb-8 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
-                  : 'bg-white text-gray-500 hover:text-white border border-gray-200'
-              }`}
-            >
-              <tab.icon className="w-4 h-4 mr-2" />
-              {tab.label}
-            </button>
+        {/* Tabs – grouped with wrap */}
+        <div className="flex flex-wrap gap-x-1 gap-y-2 mb-8 items-center">
+          {tabGroups.map((group, gi) => (
+            <Fragment key={group.label}>
+              {gi > 0 && (
+                <div className="hidden sm:block w-px h-6 bg-gray-200 mx-2" />
+              )}
+              {group.tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
+                    activeTab === tab.id
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                      : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-200'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4 mr-1.5" />
+                  {tab.label}
+                </button>
+              ))}
+            </Fragment>
           ))}
         </div>
 
