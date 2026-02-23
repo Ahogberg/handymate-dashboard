@@ -386,8 +386,8 @@ export default function SettingsPage() {
 
     // Handle tab param
     const tabParam = searchParams.get('tab')
-    if (tabParam === 'team') {
-      setActiveTab('team')
+    if (tabParam && ['company','hours','phone','invoice','time','team','integrations','pipeline','ai','subscription'].includes(tabParam)) {
+      setActiveTab(tabParam)
     }
 
     // Handle Google Calendar OAuth callback
