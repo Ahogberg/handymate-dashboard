@@ -14,7 +14,8 @@ import {
   Loader2,
   X,
   Trash2,
-  TrendingUp
+  TrendingUp,
+  Activity
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -40,6 +41,9 @@ interface Project {
   actual_amount: number
   uninvoiced_hours: number
   next_deadline: string | null
+  ai_health_score: number | null
+  ai_health_summary: string | null
+  ai_auto_created: boolean
 }
 
 interface Customer {
@@ -360,6 +364,21 @@ export default function ProjectsPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
                           {getStatusText(project.status)}
                         </span>
+                        {project.ai_health_score != null && project.status !== 'completed' && project.status !== 'cancelled' && (
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border ${
+                              project.ai_health_score >= 80
+                                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                : project.ai_health_score >= 50
+                                ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                : 'bg-red-50 text-red-600 border-red-200'
+                            }`}
+                            title={project.ai_health_summary || ''}
+                          >
+                            <Activity className="w-3 h-3" />
+                            {project.ai_health_score}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-gray-400">
                         {/* Avatar stack */}
@@ -397,6 +416,9 @@ export default function ProjectsPage() {
                         {project.project_type === 'hourly' && <span>Löpande</span>}
                         {project.project_type === 'fixed_price' && <span>Fast pris</span>}
                         {project.project_type === 'mixed' && <span>Blandat</span>}
+                        {project.ai_auto_created && (
+                          <span className="text-violet-500">Auto</span>
+                        )}
                       </div>
                     </div>
 

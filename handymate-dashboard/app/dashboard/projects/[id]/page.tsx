@@ -39,7 +39,10 @@ import {
   BookOpen,
   ClipboardCheck,
   ClipboardList,
-  PenTool
+  PenTool,
+  Activity,
+  RefreshCw,
+  Zap
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -67,6 +70,10 @@ interface Project {
   completed_at: string | null
   created_at: string
   updated_at: string
+  ai_health_score: number | null
+  ai_health_summary: string | null
+  ai_auto_created: boolean
+  ai_last_analyzed_at: string | null
   customer?: {
     customer_id: string
     name: string
@@ -156,7 +163,7 @@ interface ExtraCost {
   date: string
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log'
 
 interface ScheduleEntry {
   id: string
@@ -312,6 +319,11 @@ export default function ProjectDetailPage() {
   const [showChecklistCreate, setShowChecklistCreate] = useState(false)
   const [activeChecklist, setActiveChecklist] = useState<any>(null)
 
+  // AI log state
+  const [aiLogs, setAiLogs] = useState<{ id: string; event_type: string; action: string; details: Record<string, unknown>; created_at: string }[]>([])
+  const [aiLogLoading, setAiLogLoading] = useState(false)
+  const [analyzingHealth, setAnalyzingHealth] = useState(false)
+
   // UI state
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
@@ -436,7 +448,42 @@ export default function ProjectDetailPage() {
       fetchChecklists()
       fetchChecklistTemplates()
     }
+    if (activeTab === 'ai_log') {
+      fetchAiLogs()
+    }
   }, [activeTab, fetchProjectTeam])
+
+  async function fetchAiLogs() {
+    setAiLogLoading(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/ai-log`)
+      if (res.ok) {
+        const data = await res.json()
+        setAiLogs(data.logs || [])
+      }
+    } catch { /* ignore */ }
+    setAiLogLoading(false)
+  }
+
+  async function triggerHealthAnalysis() {
+    setAnalyzingHealth(true)
+    try {
+      const res = await fetch('/api/projects/ai-analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_id: projectId }),
+      })
+      if (res.ok) {
+        showToast('Hälsoanalys körd', 'success')
+        // Re-fetch project data to get updated health score
+        fetchProjectData()
+        if (activeTab === 'ai_log') fetchAiLogs()
+      }
+    } catch {
+      showToast('Kunde inte köra analys', 'error')
+    }
+    setAnalyzingHealth(false)
+  }
 
   const fetchProjectSchedule = useCallback(async () => {
     try {
@@ -902,7 +949,8 @@ export default function ProjectDetailPage() {
     { key: 'documents', label: 'Dokument' },
     { key: 'log', label: 'Dagbok' },
     { key: 'checklists', label: 'Checklistor' },
-    { key: 'economy', label: 'Ekonomi' }
+    { key: 'economy', label: 'Ekonomi' },
+    { key: 'ai_log', label: 'Projektanalys' }
   ]
 
   // --- Render ---
@@ -1060,6 +1108,49 @@ export default function ProjectDetailPage() {
                 />
               </div>
             </div>
+
+            {/* AI Health Card */}
+            {project.ai_health_score != null && project.status !== 'completed' && project.status !== 'cancelled' && (
+              <div className={`shadow-sm rounded-xl border p-4 sm:p-6 ${
+                project.ai_health_score >= 80
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : project.ai_health_score >= 50
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <Activity className={`w-5 h-5 ${
+                      project.ai_health_score >= 80 ? 'text-emerald-600' : project.ai_health_score >= 50 ? 'text-amber-600' : 'text-red-600'
+                    }`} />
+                    Projekthälsa
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <span className={`text-2xl font-bold ${
+                      project.ai_health_score >= 80 ? 'text-emerald-600' : project.ai_health_score >= 50 ? 'text-amber-600' : 'text-red-600'
+                    }`}>
+                      {project.ai_health_score}/100
+                    </span>
+                    <button
+                      onClick={triggerHealthAnalysis}
+                      disabled={analyzingHealth}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white/50 transition-all"
+                      title="Kör hälsoanalys"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${analyzingHealth ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                </div>
+                {project.ai_health_summary && (
+                  <p className="text-sm text-gray-600">{project.ai_health_summary}</p>
+                )}
+                {project.ai_last_analyzed_at && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Senast analyserat: {new Date(project.ai_last_analyzed_at).toLocaleString('sv-SE')}
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Budget vs Actual */}
             {(project.budget_hours || project.budget_amount) && summary && (
@@ -2372,6 +2463,103 @@ export default function ProjectDetailPage() {
                 <p className="text-gray-400">Kunde inte ladda ekonomidata</p>
               </div>
             )}
+          </div>
+        )}
+        {/* === TAB: AI-logg (Projektanalys) === */}
+        {activeTab === 'ai_log' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-violet-600" />
+                Projektanalys
+              </h2>
+              <button
+                onClick={triggerHealthAnalysis}
+                disabled={analyzingHealth}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-violet-600 bg-violet-50 rounded-xl hover:bg-violet-100 transition-colors disabled:opacity-50"
+              >
+                {analyzingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                Kör analys
+              </button>
+            </div>
+
+            {/* Health summary card */}
+            {project.ai_health_score != null && (
+              <div className={`rounded-xl border p-5 ${
+                project.ai_health_score >= 80
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : project.ai_health_score >= 50
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <div className="flex items-center gap-4">
+                  <div className={`text-4xl font-bold ${
+                    project.ai_health_score >= 80 ? 'text-emerald-600' : project.ai_health_score >= 50 ? 'text-amber-600' : 'text-red-600'
+                  }`}>
+                    {project.ai_health_score}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Hälsopoäng</p>
+                    <p className="text-sm text-gray-600">{project.ai_health_summary || 'Ingen analys körd ännu'}</p>
+                    {project.ai_last_analyzed_at && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Uppdaterad: {new Date(project.ai_last_analyzed_at).toLocaleString('sv-SE')}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Log entries */}
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h3 className="font-medium text-gray-900">Händelselogg</h3>
+              </div>
+              {aiLogLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 text-violet-600 animate-spin" />
+                </div>
+              ) : aiLogs.length === 0 ? (
+                <div className="text-center py-12">
+                  <Zap className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-400">Inga händelser loggade ännu</p>
+                  <p className="text-sm text-gray-300 mt-1">Händelser loggas automatiskt vid tidsrapportering, offertacceptans m.m.</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {aiLogs.map(log => (
+                    <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                            log.event_type === 'daily_health_check' ? 'bg-blue-400'
+                              : log.event_type === 'quote_accepted' ? 'bg-emerald-400'
+                              : log.event_type === 'time_logged' ? 'bg-cyan-400'
+                              : log.event_type === 'milestone_completed' ? 'bg-violet-400'
+                              : log.event_type === 'invoice_paid' ? 'bg-amber-400'
+                              : 'bg-gray-400'
+                          }`} />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900">{log.action}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {log.event_type === 'daily_health_check' && 'Daglig kontroll'}
+                              {log.event_type === 'quote_accepted' && 'Offert accepterad'}
+                              {log.event_type === 'time_logged' && 'Tid rapporterad'}
+                              {log.event_type === 'milestone_completed' && 'Delmoment klart'}
+                              {log.event_type === 'invoice_paid' && 'Faktura betald'}
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">
+                          {new Date(log.created_at).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

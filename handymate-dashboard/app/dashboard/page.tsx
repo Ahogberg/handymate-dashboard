@@ -97,6 +97,7 @@ export default function DashboardPage() {
   }[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
+  const [projectsAtRisk, setProjectsAtRisk] = useState<{ project_id: string; name: string; ai_health_score: number | null; ai_health_summary: string | null; status: string }[]>([])
   const [speedData, setSpeedData] = useState<{
     avg_response_seconds: number
     industry_avg_seconds: number
@@ -184,14 +185,21 @@ export default function DashboardPage() {
 
     setCallCount(calls || 0)
 
-    // Hämta aktiva projekt
-    const { count: projectCount } = await supabase
+    // Hämta aktiva projekt + hälsodata
+    const { data: activeProjectsData } = await supabase
       .from('project')
-      .select('*', { count: 'exact', head: true })
+      .select('project_id, name, ai_health_score, ai_health_summary, status')
       .eq('business_id', business.business_id)
       .in('status', ['planning', 'active', 'paused'])
+      .order('ai_health_score', { ascending: true, nullsFirst: false })
 
-    setActiveProjects(projectCount || 0)
+    setActiveProjects(activeProjectsData?.length || 0)
+
+    // Store projects needing attention (low health score)
+    const atRisk = (activeProjectsData || []).filter(
+      (p: { ai_health_score: number | null }) => p.ai_health_score != null && p.ai_health_score < 70
+    )
+    setProjectsAtRisk(atRisk)
 
     // Hämta dagens schema
     try {
@@ -890,6 +898,40 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+
+          {/* Projekthälsa - Kräver uppmärksamhet */}
+          {projectsAtRisk.length > 0 && (
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-amber-500" />
+                  Kräver uppmärksamhet
+                </h2>
+                <Link href="/dashboard/projects" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                  Alla projekt <ArrowRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {projectsAtRisk.slice(0, 4).map(p => (
+                  <Link
+                    key={p.project_id}
+                    href={`/dashboard/projects/${p.project_id}`}
+                    className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{p.ai_health_summary}</p>
+                    </div>
+                    <span className={`ml-3 text-sm font-bold ${
+                      (p.ai_health_score ?? 0) < 50 ? 'text-red-600' : 'text-amber-600'
+                    }`}>
+                      {p.ai_health_score}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ═══ Row 3: Dagens schema + Snabbåtgärder ═══ */}
 
