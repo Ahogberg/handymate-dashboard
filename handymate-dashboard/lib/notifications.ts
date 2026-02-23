@@ -90,6 +90,8 @@ function getIconForType(type: string): string {
     nurture_complete: 'flag',
     nurture_response: 'message-square',
     escalation: 'alert-circle',
+    project_update: 'folder-kanban',
+    project_warning: 'alert-triangle',
     system: 'bell',
   }
   return iconMap[type] || 'bell'

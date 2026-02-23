@@ -136,6 +136,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Gmail-integration',
     plans: ['professional', 'business'],
   },
+  ai_project_manager: {
+    key: 'ai_project_manager',
+    name: 'AI Projektledare',
+    plans: ['professional', 'business'],
+  },
 
   // === BEGRÄNSADE PER PLAN ===
   ai_photo_quote: {
