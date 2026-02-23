@@ -6,6 +6,12 @@ export const dynamic = 'force-dynamic'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
 
+function errorRedirect(message: string) {
+  return NextResponse.redirect(
+    `${APP_URL}/dashboard/settings?tab=integrations&google=error&message=${encodeURIComponent(message)}`
+  )
+}
+
 /**
  * GET /api/google/callback
  * Handle Google OAuth callback
@@ -20,15 +26,11 @@ export async function GET(request: NextRequest) {
     // Handle OAuth errors
     if (error) {
       console.error('Google OAuth error:', error)
-      return NextResponse.redirect(
-        `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-      )
+      return errorRedirect('Google nekade åtkomst: ' + error)
     }
 
     if (!code || !stateParam) {
-      return NextResponse.redirect(
-        `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-      )
+      return errorRedirect('Saknar authorization code eller state')
     }
 
     // Decode and validate state
@@ -37,62 +39,80 @@ export async function GET(request: NextRequest) {
       state = JSON.parse(Buffer.from(stateParam, 'base64').toString('utf-8'))
     } catch {
       console.error('Invalid state parameter')
-      return NextResponse.redirect(
-        `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-      )
+      return errorRedirect('Ogiltig state-parameter')
     }
 
     // Validate timestamp (must be within 10 minutes)
     if (Date.now() - state.timestamp > 10 * 60 * 1000) {
       console.error('State token expired')
-      return NextResponse.redirect(
-        `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-      )
+      return errorRedirect('Sessionen har gått ut, försök igen')
     }
 
     // Exchange code for tokens
-    const tokens = await getGoogleTokens(code)
+    let tokens
+    try {
+      tokens = await getGoogleTokens(code)
+    } catch (tokenError: unknown) {
+      const msg = tokenError instanceof Error ? tokenError.message : 'Token exchange failed'
+      console.error('Google token exchange error:', msg)
+      return errorRedirect('Kunde inte hämta Google-token: ' + msg)
+    }
 
-    // Get primary calendar
-    const calendars = await getCalendarList(tokens.access_token)
-    const primaryCalendar = calendars.find((cal) => cal.primary)
+    // Get primary calendar (non-fatal if it fails)
+    let primaryCalendarId = 'primary'
+    try {
+      const calendars = await getCalendarList(tokens.access_token)
+      const primaryCalendar = calendars.find((cal) => cal.primary)
+      if (primaryCalendar?.id) primaryCalendarId = primaryCalendar.id
+    } catch (calError) {
+      console.error('Calendar list error (non-fatal):', calError)
+    }
 
     // Save to calendar_connection table
     const supabase = getServerSupabase()
     const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    const { error: upsertError } = await supabase
+    const connectionData: Record<string, unknown> = {
+      id,
+      business_id: state.business_id,
+      business_user_id: state.user_id,
+      provider: 'google',
+      account_email: tokens.email,
+      calendar_id: primaryCalendarId,
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: new Date(tokens.expiry_date).toISOString(),
+    }
+
+    // Try with gmail_scope_granted, fallback without if column doesn't exist yet
+    const { error: err1 } = await supabase
       .from('calendar_connection')
       .upsert(
-        {
-          id,
-          business_id: state.business_id,
-          business_user_id: state.user_id,
-          provider: 'google',
-          account_email: tokens.email,
-          calendar_id: primaryCalendar?.id || 'primary',
-          access_token: tokens.access_token,
-          refresh_token: tokens.refresh_token,
-          token_expires_at: new Date(tokens.expiry_date).toISOString(),
-          gmail_scope_granted: true,
-        },
+        { ...connectionData, gmail_scope_granted: true },
         { onConflict: 'business_user_id,provider' }
       )
 
-    if (upsertError) {
-      console.error('Error saving calendar connection:', upsertError)
-      return NextResponse.redirect(
-        `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-      )
+    if (err1) {
+      console.error('Upsert with gmail_scope failed, retrying without:', err1.message)
+      const { error: err2 } = await supabase
+        .from('calendar_connection')
+        .upsert(
+          connectionData,
+          { onConflict: 'business_user_id,provider' }
+        )
+
+      if (err2) {
+        console.error('Error saving calendar connection:', err2)
+        return errorRedirect('Kunde inte spara anslutningen: ' + err2.message)
+      }
     }
 
     return NextResponse.redirect(
       `${APP_URL}/dashboard/settings?tab=integrations&google=connected`
     )
   } catch (error: unknown) {
-    console.error('Google callback error:', error)
-    return NextResponse.redirect(
-      `${APP_URL}/dashboard/settings?tab=integrations&google=error`
-    )
+    const msg = error instanceof Error ? error.message : 'Okänt fel'
+    console.error('Google callback error:', msg)
+    return errorRedirect(msg)
   }
 }
