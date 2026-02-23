@@ -2282,7 +2282,7 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Fortnox</h2>
-                  <p className="text-sm text-gray-400">Bokf\u00f6ring och fakturering</p>
+                  <p className="text-sm text-gray-400">Bokföring och fakturering</p>
                 </div>
               </div>
 
@@ -2605,8 +2605,8 @@ export default function SettingsPage() {
                     <TrendingUp className="w-6 h-6 text-green-600" />
                   </div>
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">Leadk\u00e4llor</h2>
-                    <p className="text-sm text-gray-400">Importera leads fr\u00e5n externa plattformar</p>
+                    <h2 className="text-lg font-semibold text-gray-900">Leadkällor</h2>
+                    <p className="text-sm text-gray-400">Importera leads från externa plattformar</p>
                   </div>
                 </div>
                 <UpgradePrompt featureKey="lead_generation" inline />

@@ -25,7 +25,7 @@ function formatDate(dateStr: string | null | undefined): string {
 function getRoleBadge(role: string) {
   if (role === 'owner')
     return {
-      label: '\u00c4gare',
+      label: 'Ägare',
       className:
         'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-500 border-blue-300',
     }
@@ -35,7 +35,7 @@ function getRoleBadge(role: string) {
       className: 'bg-blue-100 text-blue-400 border-blue-500/30',
     }
   return {
-    label: 'Anst\u00e4lld',
+    label: 'Anställd',
     className: 'bg-gray-100 text-gray-500 border-gray-300',
   }
 }
@@ -106,7 +106,7 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <p className="text-gray-500">Kunde inte ladda anv\u00e4ndare.</p>
+        <p className="text-gray-500">Kunde inte ladda användare.</p>
       </div>
     )
   }
@@ -216,7 +216,7 @@ export default function ProfilePage() {
           {/* Email (read-only) */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1.5">
-              E-post (kan inte \u00e4ndras)
+              E-post (kan inte ändras)
             </label>
             <p className="px-4 py-2.5 text-gray-400 text-sm">{user.email}</p>
           </div>
@@ -234,7 +234,7 @@ export default function ProfilePage() {
             ) : (
               <Save className="w-4 h-4" />
             )}
-            Spara \u00e4ndringar
+            Spara ändringar
           </button>
         </div>
       </div>
