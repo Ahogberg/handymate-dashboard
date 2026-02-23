@@ -35,6 +35,7 @@ interface BusinessData {
   rut_enabled: boolean
   google_review_url: string | null
   widget_enabled: boolean
+  plan: string | null
 }
 
 interface PriceItem {
@@ -74,7 +75,18 @@ export default function StorefrontClient({
   priceItems: PriceItem[]
   reviews: Review[]
 }) {
-  const c = COLORS[storefront.color_scheme] || COLORS.blue
+  const plan = (business.plan || 'starter') as string
+  const isStarter = plan === 'starter'
+
+  // Feature gating per plan
+  const showContactForm = !isStarter   // Professional+
+  const showReviews = !isStarter       // Professional+
+  const showGallery = !isStarter       // Professional+
+  const showAbout = !isStarter         // Professional+
+  const showCustomColors = !isStarter  // Professional+
+  const showChatbot = !isStarter       // Professional+
+
+  const c = showCustomColors ? (COLORS[storefront.color_scheme] || COLORS.blue) : COLORS.blue
   const sections = storefront.sections || ['hero', 'services', 'about', 'gallery', 'reviews', 'contact']
   const phone = business.assigned_phone_number || business.phone_number || ''
 
@@ -200,7 +212,7 @@ export default function StorefrontClient({
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     {business.services_offered.map((service) => {
-                      const desc = storefront.service_descriptions?.[service]
+                      const desc = !isStarter ? storefront.service_descriptions?.[service] : null
                       const price = priceItems.find(p => p.name.toLowerCase() === service.toLowerCase())
                       return (
                         <div key={service} className="border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
@@ -236,7 +248,7 @@ export default function StorefrontClient({
 
           // ═══════════ ABOUT ═══════════
           case 'about':
-            if (!storefront.about_text) return null
+            if (!showAbout || !storefront.about_text) return null
             return (
               <section key="about" id="about" className={`py-16 sm:py-20 ${c.primaryBg}`}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -252,6 +264,7 @@ export default function StorefrontClient({
 
           // ═══════════ GALLERY ═══════════
           case 'gallery': {
+            if (!showGallery) return null
             const images = storefront.gallery_images || []
             if (images.length === 0) return null
             return (
@@ -272,7 +285,7 @@ export default function StorefrontClient({
 
           // ═══════════ REVIEWS ═══════════
           case 'reviews':
-            if (reviews.length === 0) return null
+            if (!showReviews || reviews.length === 0) return null
             return (
               <section key="reviews" id="reviews" className={`py-16 sm:py-20 ${c.primaryBg}`}>
                 <div className="max-w-6xl mx-auto px-4 sm:px-6">
@@ -316,7 +329,7 @@ export default function StorefrontClient({
               <section key="contact" id="contact" className="py-16 sm:py-20">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6">
                   <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Kontakta oss</h2>
-                  <div className="grid md:grid-cols-2 gap-10">
+                  <div className={showContactForm ? 'grid md:grid-cols-2 gap-10' : 'max-w-xl'}>
                     {/* Contact info */}
                     <div className="space-y-4">
                       {phone && (
@@ -343,67 +356,77 @@ export default function StorefrontClient({
                           <span>Serviceområde: {business.service_area}</span>
                         </div>
                       )}
-                    </div>
-
-                    {/* Contact form */}
-                    <div className="bg-gray-50 rounded-2xl p-6">
-                      {formSent ? (
-                        <div className="text-center py-8">
-                          <div className="text-4xl mb-3">✅</div>
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">Tack för din förfrågan!</h3>
-                          <p className="text-gray-500">Vi återkommer till dig så snart som möjligt.</p>
-                        </div>
-                      ) : (
-                        <form onSubmit={handleSubmitContact} className="space-y-4">
-                          <h3 className="font-semibold text-gray-900 mb-1">Skicka en förfrågan</h3>
-                          {/* Honeypot */}
-                          <div className="hidden" aria-hidden="true">
-                            <input type="text" name="_hp" tabIndex={-1} autoComplete="off" />
-                          </div>
-                          <div>
-                            <input
-                              type="text"
-                              value={formName}
-                              onChange={e => setFormName(e.target.value)}
-                              required
-                              placeholder="Ditt namn *"
-                              className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
-                            />
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <input
-                              type="tel"
-                              value={formPhone}
-                              onChange={e => setFormPhone(e.target.value)}
-                              placeholder="Telefon"
-                              className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
-                            />
-                            <input
-                              type="email"
-                              value={formEmail}
-                              onChange={e => setFormEmail(e.target.value)}
-                              placeholder="E-post"
-                              className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
-                            />
-                          </div>
-                          <textarea
-                            value={formMessage}
-                            onChange={e => setFormMessage(e.target.value)}
-                            placeholder="Beskriv vad du behöver hjälp med..."
-                            rows={4}
-                            className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white resize-none`}
-                          />
-                          {formError && <p className="text-sm text-red-600">{formError}</p>}
-                          <button
-                            type="submit"
-                            disabled={formSending}
-                            className={`w-full py-3.5 rounded-xl text-white font-semibold ${c.primary} ${c.primaryHover} transition-colors disabled:opacity-50`}
-                          >
-                            {formSending ? 'Skickar...' : 'Skicka förfrågan'}
-                          </button>
-                        </form>
+                      {!showContactForm && phone && (
+                        <a
+                          href={`tel:${phone.replace(/\s/g, '')}`}
+                          className={`inline-flex items-center justify-center px-6 py-3.5 rounded-xl text-base font-semibold text-white ${c.primary} ${c.primaryHover} transition-colors shadow-sm mt-4`}
+                        >
+                          Ring oss
+                        </a>
                       )}
                     </div>
+
+                    {/* Contact form (Professional+) */}
+                    {showContactForm && (
+                      <div className="bg-gray-50 rounded-2xl p-6">
+                        {formSent ? (
+                          <div className="text-center py-8">
+                            <div className="text-4xl mb-3">✅</div>
+                            <h3 className="text-xl font-semibold text-gray-900 mb-2">Tack för din förfrågan!</h3>
+                            <p className="text-gray-500">Vi återkommer till dig så snart som möjligt.</p>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleSubmitContact} className="space-y-4">
+                            <h3 className="font-semibold text-gray-900 mb-1">Skicka en förfrågan</h3>
+                            {/* Honeypot */}
+                            <div className="hidden" aria-hidden="true">
+                              <input type="text" name="_hp" tabIndex={-1} autoComplete="off" />
+                            </div>
+                            <div>
+                              <input
+                                type="text"
+                                value={formName}
+                                onChange={e => setFormName(e.target.value)}
+                                required
+                                placeholder="Ditt namn *"
+                                className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <input
+                                type="tel"
+                                value={formPhone}
+                                onChange={e => setFormPhone(e.target.value)}
+                                placeholder="Telefon"
+                                className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
+                              />
+                              <input
+                                type="email"
+                                value={formEmail}
+                                onChange={e => setFormEmail(e.target.value)}
+                                placeholder="E-post"
+                                className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white`}
+                              />
+                            </div>
+                            <textarea
+                              value={formMessage}
+                              onChange={e => setFormMessage(e.target.value)}
+                              placeholder="Beskriv vad du behöver hjälp med..."
+                              rows={4}
+                              className={`w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:ring-2 ${c.ring} focus:border-transparent bg-white resize-none`}
+                            />
+                            {formError && <p className="text-sm text-red-600">{formError}</p>}
+                            <button
+                              type="submit"
+                              disabled={formSending}
+                              className={`w-full py-3.5 rounded-xl text-white font-semibold ${c.primary} ${c.primaryHover} transition-colors disabled:opacity-50`}
+                            >
+                              {formSending ? 'Skickar...' : 'Skicka förfrågan'}
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </section>
@@ -424,8 +447,8 @@ export default function StorefrontClient({
         </div>
       </footer>
 
-      {/* ─── WIDGET EMBED ─── */}
-      {storefront.show_chat_widget && business.widget_enabled && (
+      {/* ─── WIDGET EMBED (Professional+) ─── */}
+      {showChatbot && storefront.show_chat_widget && business.widget_enabled && (
         <script
           dangerouslySetInnerHTML={{
             __html: `

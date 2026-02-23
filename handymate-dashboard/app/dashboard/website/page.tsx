@@ -16,6 +16,12 @@ import {
   BarChart3,
   CheckCircle2,
   Rocket,
+  Lock,
+  MessageCircle,
+  FileText,
+  Star,
+  Image,
+  Palette,
 } from 'lucide-react'
 
 interface Storefront {
@@ -189,13 +195,23 @@ export default function WebsitePage() {
     : ''
 
   // Feature gate check
-  if (!hasFeature('website_widget')) {
+  if (!hasFeature('storefront_basic')) {
     return (
       <div className="p-8">
-        <UpgradePrompt featureKey="website_widget" />
+        <UpgradePrompt featureKey="storefront_basic" />
       </div>
     )
   }
+
+  // Plan-based locked sections for Starter
+  const isStarterPlan = (business.plan || 'starter') === 'starter'
+  const lockedSections = isStarterPlan ? [
+    { icon: MessageCircle, label: 'AI-chatbot', description: 'Fånga leads dygnet runt', featureKey: 'storefront_chatbot' },
+    { icon: FileText, label: 'Kontaktformulär', description: 'Leads direkt i din pipeline', featureKey: 'storefront_contact_form' },
+    { icon: Star, label: 'Recensioner', description: 'Visa dina recensioner och bygg förtroende', featureKey: 'storefront_reviews' },
+    { icon: Image, label: 'Bildgalleri', description: 'Visa upp dina bästa projekt', featureKey: 'storefront_customization' },
+    { icon: Palette, label: 'Färgschema', description: 'Matcha din profil', featureKey: 'storefront_customization' },
+  ] : []
 
   if (loading) {
     return (
@@ -529,6 +545,32 @@ export default function WebsitePage() {
 
             <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-500">
               Detaljerad daglig statistik och Google Analytics-koppling kommer i en framtida uppdatering.
+            </div>
+          </div>
+        )}
+
+        {/* ═══ Locked sections for Starter ═══ */}
+        {lockedSections.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Uppgradera din hemsida</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {lockedSections.map((section) => (
+                <div key={section.label} className="bg-white rounded-2xl border border-gray-200 p-5 opacity-75">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                      <section.icon className="w-5 h-5 text-gray-400" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-gray-900 text-sm">{section.label}</h3>
+                        <Lock className="w-3.5 h-3.5 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-3">{section.description}</p>
+                  <UpgradePrompt featureKey={section.featureKey} inline />
+                </div>
+              ))}
             </div>
           </div>
         )}

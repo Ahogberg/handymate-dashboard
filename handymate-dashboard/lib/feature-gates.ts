@@ -126,10 +126,35 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Hemsida-widget',
     plans: ['professional', 'business'],
   },
-  storefront: {
-    key: 'storefront',
-    name: 'Digitalt skyltfönster',
+  storefront_basic: {
+    key: 'storefront_basic',
+    name: 'Hemsida (grundversion)',
+    plans: ['starter', 'professional', 'business'],
+  },
+  storefront_chatbot: {
+    key: 'storefront_chatbot',
+    name: 'AI-chatbot på hemsidan',
     plans: ['professional', 'business'],
+  },
+  storefront_contact_form: {
+    key: 'storefront_contact_form',
+    name: 'Kontaktformulär till pipeline',
+    plans: ['professional', 'business'],
+  },
+  storefront_reviews: {
+    key: 'storefront_reviews',
+    name: 'Google Reviews på hemsidan',
+    plans: ['professional', 'business'],
+  },
+  storefront_customization: {
+    key: 'storefront_customization',
+    name: 'Anpassning (färg, galleri)',
+    plans: ['professional', 'business'],
+  },
+  storefront_custom_domain: {
+    key: 'storefront_custom_domain',
+    name: 'Egen domän',
+    plans: ['business'],
   },
   gmail_integration: {
     key: 'gmail_integration',
