@@ -9,6 +9,7 @@ interface Business {
   contact_name: string
   contact_email: string
   plan: 'starter' | 'professional' | 'business'
+  onboarding_step: number
 }
 
 export function useAuth(requireAuth = true) {

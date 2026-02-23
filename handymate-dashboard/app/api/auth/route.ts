@@ -237,6 +237,7 @@ if (action === 'login') {
           contact_name: business.contact_name,
           contact_email: business.contact_email,
           plan,
+          onboarding_step: business.onboarding_step ?? 1,
         }
       })
     }

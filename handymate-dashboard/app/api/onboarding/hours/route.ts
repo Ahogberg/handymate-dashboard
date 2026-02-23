@@ -36,12 +36,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Onboarding session expired' }, { status: 403 })
     }
 
-    // Uppdatera working_hours
+    // Uppdatera working_hours + markera onboarding som klar
     const { error: updateError } = await supabase
       .from('business_config')
       .update({
         working_hours: working_hours,
         onboarding_completed_at: new Date().toISOString(),
+        onboarding_step: 7,
       })
       .eq('business_id', businessId)
 
