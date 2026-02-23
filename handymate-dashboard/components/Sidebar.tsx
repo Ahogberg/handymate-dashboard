@@ -19,10 +19,7 @@ import {
   User,
   TrendingUp,
   Bell,
-  Package,
-  Mail,
   Lock,
-  BarChart3,
   Globe,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -64,13 +61,20 @@ type NavItem =
   | { type: 'group'; key: string; label: string; icon: any; children: NavChild[] }
 
 const NAV: NavItem[] = [
-  { type: 'link', key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard', exact: true },
+  {
+    type: 'group', key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard,
+    children: [
+      { label: 'Översikt', href: '/dashboard', exact: true },
+      { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
+    ],
+  },
   { type: 'link', key: 'calls', label: 'Samtal', icon: Phone, href: '/dashboard/calls', paths: ['/dashboard/calls', '/dashboard/inbox', '/dashboard/assistant', '/dashboard/recordings'], hasBadge: true },
   {
     type: 'group', key: 'customers', label: 'Kunder', icon: Users,
     children: [
       { label: 'Kundlista', href: '/dashboard/customers' },
       { label: 'Garantier', href: '/dashboard/warranties', featureGate: 'warranty_tracking' },
+      { label: 'Kundportal', href: '/dashboard/customer-portal' },
     ],
   },
   { type: 'link', key: 'pipeline', label: 'Pipeline', icon: TrendingUp, href: '/dashboard/pipeline' },
@@ -91,34 +95,18 @@ const NAV: NavItem[] = [
       { label: 'Tidrapportering', href: '/dashboard/time' },
     ],
   },
-  {
-    type: 'group', key: 'inventory', label: 'Lager & Material', icon: Package,
-    children: [
-      { label: 'Lagersaldo', href: '/dashboard/inventory', featureGate: 'inventory' },
-      { label: 'Beställningar', href: '/dashboard/orders' },
-      { label: 'Underentreprenörer', href: '/dashboard/subcontractors', featureGate: 'subcontractors' },
-    ],
-  },
-  {
-    type: 'group', key: 'marketing', label: 'Marknadsföring', icon: Mail,
-    children: [
-      { label: 'Kampanjer', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
-      { label: 'E-postmallar', href: '/dashboard/settings/email-templates', featureGate: 'email_template_editor' },
-      { label: 'Hemsida-widget', href: '/dashboard/settings/website-widget', featureGate: 'website_widget' },
-    ],
-  },
   { type: 'link', key: 'website', label: 'Hemsida', icon: Globe, href: '/dashboard/website', featureGate: 'storefront_basic' },
-  { type: 'link', key: 'analytics', label: 'Analys', icon: BarChart3, href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
-  { type: 'link', key: 'automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations', paths: ['/dashboard/automations', '/dashboard/communication'] },
   {
     type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
     children: [
-      { label: 'Företag', href: '/dashboard/settings', exact: true },
-      { label: 'Telefoni', href: '/dashboard/settings?tab=phone' },
-      { label: 'Integrationer', href: '/dashboard/settings?tab=integrations' },
-      { label: 'Team', href: '/dashboard/settings?tab=team' },
+      { label: 'Företag', href: '/dashboard/settings' },
       { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
+      { label: 'Billing', href: '/dashboard/billing' },
+      { label: 'Team', href: '/dashboard/settings?tab=team' },
+      { label: 'Automationer', href: '/dashboard/automations' },
+      { label: 'Lager & Material', href: '/dashboard/orders' },
+      { label: 'Marknadsföring', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
     ],
   },
   { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
@@ -166,36 +154,21 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   }
 
   function isGroupActive(item: Extract<NavItem, { type: 'group' }>): boolean {
-    return item.children.some(c => isPathActive(c.href))
+    return item.children.some(c => isPathActive(c.href, c.exact))
   }
 
-  // ── Auto-expand groups when a child route is active ────────────────
+  // ── Auto-expand only the active group (collapsed by default) ──────
   useEffect(() => {
     setIsMobileOpen(false)
     setUserMenuOpen(false)
 
-    const toOpen = new Set<string>()
-    for (const item of NAV) {
-      if (item.type === 'group' && isGroupActive(item)) {
-        toOpen.add(item.key)
-      }
-    }
-    if (toOpen.size > 0) {
-      setOpenGroups(prev => {
-        const next = new Set(prev)
-        toOpen.forEach(k => next.add(k))
-        return next
-      })
-    }
+    const activeKey = NAV.find(item => item.type === 'group' && isGroupActive(item))?.key
+    setOpenGroups(activeKey ? new Set([activeKey]) : new Set())
   }, [pathname])
 
+  // ── Accordion: only one group open at a time ──────────────────────
   function toggleGroup(key: string) {
-    setOpenGroups(prev => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    setOpenGroups(prev => prev.has(key) ? new Set<string>() : new Set<string>([key]))
   }
 
   // ── Close menus on click outside ───────────────────────────────────
