@@ -177,6 +177,19 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // AI Projektledare: uppdatera framsteg och budget
+    if (data?.project_id) {
+      try {
+        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+        await handleProjectEvent({
+          type: 'time_logged',
+          businessId: business.business_id,
+          projectId: data.project_id,
+          entryId: data.time_entry_id,
+        })
+      } catch { /* non-blocking */ }
+    }
+
     return NextResponse.json({ entry: data })
 
   } catch (error: unknown) {

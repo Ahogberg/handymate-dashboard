@@ -208,6 +208,16 @@ export async function POST(
             total: signedQuote.total || 0,
           })
         } catch { /* non-blocking */ }
+
+        // AI Projektledare: auto-skapa projekt
+        try {
+          const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+          await handleProjectEvent({
+            type: 'quote_accepted',
+            businessId: signedQuote.business_id,
+            quoteId: signedQuote.quote_id,
+          })
+        } catch { /* non-blocking */ }
       }
     } catch (commErr) {
       console.error('Communication trigger error (non-blocking):', commErr)

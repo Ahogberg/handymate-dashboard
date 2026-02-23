@@ -104,6 +104,16 @@ export async function PATCH(
       } catch (commErr) {
         console.error('Communication trigger error (non-blocking):', commErr)
       }
+
+      // AI Projektledare: kontrollera projektavslut
+      try {
+        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+        await handleProjectEvent({
+          type: 'invoice_paid',
+          businessId: business.business_id,
+          invoiceId,
+        })
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({

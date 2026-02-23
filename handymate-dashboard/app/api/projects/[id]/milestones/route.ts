@@ -153,6 +153,19 @@ export async function PUT(
         .eq('project_id', params.id)
     }
 
+    // AI Projektledare: hantera milestone-avslut
+    if (body.status === 'completed' && milestone) {
+      try {
+        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+        await handleProjectEvent({
+          type: 'milestone_completed',
+          businessId: business.business_id,
+          projectId: params.id,
+          milestoneId: body.milestone_id,
+        })
+      } catch { /* non-blocking */ }
+    }
+
     return NextResponse.json({ milestone })
 
   } catch (error: any) {
