@@ -19,7 +19,10 @@ import {
   UserPlus,
   Activity,
   Phone,
-  Zap
+  Zap,
+  Mail,
+  Globe,
+  X
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -58,6 +61,10 @@ interface OnboardingData {
   working_hours?: any
   logo_url?: string | null
   onboarding_dismissed?: boolean
+  onboarding_data?: Record<string, unknown>
+  lead_sources?: string[]
+  google_calendar_connected?: boolean
+  gmail_enabled?: boolean
 }
 
 interface RecentActivity {
@@ -89,6 +96,7 @@ export default function DashboardPage() {
     hours_worked: number; budget_hours: number
   }[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
+  const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
   const [speedData, setSpeedData] = useState<{
     avg_response_seconds: number
     industry_avg_seconds: number
@@ -138,14 +146,34 @@ export default function DashboardPage() {
         forwarding_confirmed,
         working_hours,
         logo_url,
-        onboarding_dismissed
+        onboarding_dismissed,
+        onboarding_data,
+        lead_sources
       `)
       .eq('business_id', business.business_id)
       .single()
 
     if (configData) {
-      setOnboardingData(configData)
+      // Check Google Calendar connection
+      const { data: calConn } = await supabase
+        .from('calendar_connection')
+        .select('id, gmail_sync_enabled')
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+
+      const enriched = {
+        ...configData,
+        google_calendar_connected: !!calConn,
+        gmail_enabled: calConn?.gmail_sync_enabled || false,
+      }
+      setOnboardingData(enriched)
       setShowOnboarding(!configData.onboarding_dismissed)
+      // Load dismissed reminders
+      const obData = (configData.onboarding_data || {}) as Record<string, unknown>
+      const dismissed = (obData.dismissed_reminders as string[]) || []
+      if (dismissed.length > 0) {
+        setDismissedReminders(new Set(dismissed))
+      }
     }
 
     // Hämta antal samtal
@@ -415,6 +443,59 @@ export default function DashboardPage() {
               </div>
             </div>
           </Link>
+        )}
+
+        {/* Setup reminder banners — show one at a time after onboarding */}
+        {!showOnboarding && onboardingData && (
+          (() => {
+            const reminders = []
+            if (!onboardingData.google_calendar_connected && !dismissedReminders.has('google')) {
+              reminders.push({ id: 'google', icon: Calendar, gradient: 'from-red-50 to-orange-50', border: 'border-red-200', iconBg: 'from-red-500 to-orange-500', title: 'Koppla Google Calendar för att synka bokningar', desc: 'Dina bokningar visas i Google Calendar automatiskt.', href: '/dashboard/settings?tab=integrations', cta: 'Koppla nu' })
+            }
+            if (!onboardingData.gmail_enabled && !dismissedReminders.has('gmail')) {
+              reminders.push({ id: 'gmail', icon: Mail, gradient: 'from-blue-50 to-cyan-50', border: 'border-blue-200', iconBg: 'from-blue-500 to-cyan-500', title: 'Koppla Gmail för att se all kundkommunikation', desc: 'Se email-historik direkt i kundkortet.', href: '/dashboard/settings?tab=integrations', cta: 'Aktivera' })
+            }
+            if ((!onboardingData.lead_sources || onboardingData.lead_sources.length === 0) && !dismissedReminders.has('leads')) {
+              reminders.push({ id: 'leads', icon: Globe, gradient: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', iconBg: 'from-emerald-500 to-teal-500', title: 'Konfigurera lead-källor för att få in kunder automatiskt', desc: 'Ta emot förfrågningar från Offerta, ServiceFinder m.fl.', href: '/dashboard/settings?tab=integrations', cta: 'Kom igång' })
+            }
+            const r = reminders[0]
+            if (!r) return null
+            return (
+              <div className={`mb-6 p-4 bg-gradient-to-r ${r.gradient} border ${r.border} rounded-xl`}>
+                <div className="flex items-center justify-between">
+                  <Link href={r.href} className="flex items-center gap-3 flex-1">
+                    <div className={`p-2 rounded-lg bg-gradient-to-br ${r.iconBg}`}>
+                      <r.icon className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{r.title}</p>
+                      <p className="text-sm text-gray-500">{r.desc}</p>
+                    </div>
+                  </Link>
+                  <div className="flex items-center gap-2 ml-3">
+                    <Link href={r.href} className="text-blue-600 font-medium text-sm flex items-center gap-1 whitespace-nowrap">
+                      {r.cta} <ArrowRight className="w-4 h-4" />
+                    </Link>
+                    <button
+                      onClick={async () => {
+                        setDismissedReminders(prev => new Set(prev).add(r.id))
+                        // Persist dismiss
+                        const existing = (onboardingData.onboarding_data || {}) as Record<string, unknown>
+                        const dismissed = ((existing.dismissed_reminders as string[]) || [])
+                        await supabase
+                          .from('business_config')
+                          .update({ onboarding_data: { ...existing, dismissed_reminders: [...dismissed, r.id] } })
+                          .eq('business_id', business.business_id)
+                      }}
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })()
         )}
 
         {/* KPI cards — 2 per row on mobile, 5 on desktop */}

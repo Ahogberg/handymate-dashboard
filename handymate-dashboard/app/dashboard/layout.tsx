@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import AICopilot from '@/components/AICopilot'
 import WelcomeModal from '@/components/WelcomeModal'
@@ -16,6 +18,14 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { business, loading, logout } = useAuth(true)
+  const router = useRouter()
+
+  // Redirect to onboarding if not completed
+  useEffect(() => {
+    if (!loading && business && business.onboarding_step < 7) {
+      router.push('/onboarding')
+    }
+  }, [loading, business, router])
 
   if (loading) {
     return (
@@ -27,6 +37,15 @@ export default function DashboardLayout({
 
   if (!business) {
     return null
+  }
+
+  // Don't render dashboard while redirecting to onboarding
+  if (business.onboarding_step < 7) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-gray-500">Laddar...</div>
+      </div>
+    )
   }
 
   return (
