@@ -23,6 +23,7 @@ import {
   Mail,
   Lock,
   BarChart3,
+  Globe,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -106,6 +107,7 @@ const NAV: NavItem[] = [
       { label: 'Hemsida-widget', href: '/dashboard/settings/website-widget', featureGate: 'website_widget' },
     ],
   },
+  { type: 'link', key: 'website', label: 'Hemsida', icon: Globe, href: '/dashboard/website', featureGate: 'website_widget' },
   { type: 'link', key: 'analytics', label: 'Analys', icon: BarChart3, href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
   { type: 'link', key: 'automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations', paths: ['/dashboard/automations', '/dashboard/communication'] },
   {

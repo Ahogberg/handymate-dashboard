@@ -126,6 +126,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Hemsida-widget',
     plans: ['professional', 'business'],
   },
+  storefront: {
+    key: 'storefront',
+    name: 'Digitalt skyltfönster',
+    plans: ['professional', 'business'],
+  },
   gmail_integration: {
     key: 'gmail_integration',
     name: 'Gmail-integration',
