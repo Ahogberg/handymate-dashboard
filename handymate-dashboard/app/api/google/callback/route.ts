@@ -70,13 +70,16 @@ export async function GET(request: NextRequest) {
 
     // Save to calendar_connection table
     const supabase = getServerSupabase()
-    const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    const connectionData: Record<string, unknown> = {
-      id,
-      business_id: state.business_id,
-      business_user_id: state.user_id,
-      provider: 'google',
+    // Check if connection already exists for this user
+    const { data: existing } = await supabase
+      .from('calendar_connection')
+      .select('id')
+      .eq('business_user_id', state.user_id)
+      .eq('provider', 'google')
+      .maybeSingle()
+
+    const coreFields = {
       account_email: tokens.email,
       calendar_id: primaryCalendarId,
       access_token: tokens.access_token,
@@ -84,26 +87,46 @@ export async function GET(request: NextRequest) {
       token_expires_at: new Date(tokens.expiry_date).toISOString(),
     }
 
-    // Try with gmail_scope_granted, fallback without if column doesn't exist yet
-    const { error: err1 } = await supabase
-      .from('calendar_connection')
-      .upsert(
-        { ...connectionData, gmail_scope_granted: true },
-        { onConflict: 'business_user_id,provider' }
-      )
-
-    if (err1) {
-      console.error('Upsert with gmail_scope failed, retrying without:', err1.message)
-      const { error: err2 } = await supabase
+    if (existing) {
+      // Update existing connection
+      const { error: err1 } = await supabase
         .from('calendar_connection')
-        .upsert(
-          connectionData,
-          { onConflict: 'business_user_id,provider' }
-        )
+        .update({ ...coreFields, gmail_scope_granted: true })
+        .eq('id', existing.id)
 
-      if (err2) {
-        console.error('Error saving calendar connection:', err2)
-        return errorRedirect('Kunde inte spara anslutningen: ' + err2.message)
+      if (err1) {
+        // Retry without gmail_scope_granted if column doesn't exist
+        console.error('Update with gmail_scope failed:', err1.message)
+        const { error: err2 } = await supabase
+          .from('calendar_connection')
+          .update(coreFields)
+          .eq('id', existing.id)
+
+        if (err2) return errorRedirect('Kunde inte uppdatera anslutningen: ' + err2.message)
+      }
+    } else {
+      // Insert new connection
+      const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      const insertData = {
+        id,
+        business_id: state.business_id,
+        business_user_id: state.user_id,
+        provider: 'google',
+        ...coreFields,
+      }
+
+      const { error: err1 } = await supabase
+        .from('calendar_connection')
+        .insert({ ...insertData, gmail_scope_granted: true })
+
+      if (err1) {
+        // Retry without gmail_scope_granted if column doesn't exist
+        console.error('Insert with gmail_scope failed:', err1.message)
+        const { error: err2 } = await supabase
+          .from('calendar_connection')
+          .insert(insertData)
+
+        if (err2) return errorRedirect('Kunde inte spara anslutningen: ' + err2.message)
       }
     }
 
