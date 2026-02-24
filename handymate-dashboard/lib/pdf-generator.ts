@@ -9,6 +9,10 @@ interface InvoiceItem {
   unit_price: number
   total: number
   type?: string
+  item_type?: string
+  is_rot_eligible?: boolean
+  is_rut_eligible?: boolean
+  group_name?: string
 }
 
 interface InvoiceData {
@@ -29,6 +33,10 @@ interface InvoiceData {
   original_invoice_id?: string | null
   personnummer?: string | null
   fastighetsbeteckning?: string | null
+  ocr_number?: string | null
+  our_reference?: string | null
+  your_reference?: string | null
+  invoice_type?: string
   customer?: {
     name: string
     phone_number?: string
@@ -44,7 +52,13 @@ interface BusinessData {
   contact_phone?: string
   address?: string
   bankgiro?: string
+  plusgiro?: string
+  swish_number?: string
+  bank_account_number?: string
   f_skatt_registered?: boolean
+  accent_color?: string
+  invoice_footer_text?: string
+  penalty_interest?: number
 }
 
 function formatSEK(amount: number | null | undefined): string {
@@ -59,12 +73,24 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   const contentWidth = pageWidth - margin * 2
   let y = margin
 
-  const purple = [124, 58, 237] as const
+  // Parse accent color
+  const accentHex = business.accent_color || '#7c3aed'
+  const r = parseInt(accentHex.slice(1, 3), 16)
+  const g = parseInt(accentHex.slice(3, 5), 16)
+  const b = parseInt(accentHex.slice(5, 7), 16)
+  const purple = [r, g, b] as const
   const darkText = [26, 26, 26] as const
   const grayText = [102, 102, 102] as const
   const lightGray = [153, 153, 153] as const
 
-  // Header: company name + FAKTURA
+  // Determine title
+  const invoiceType = invoice.invoice_type || 'standard'
+  let title = 'FAKTURA'
+  if (invoice.is_credit_note || invoiceType === 'credit') title = 'KREDITFAKTURA'
+  else if (invoiceType === 'reminder') title = 'PÅMINNELSE'
+  else if (invoiceType === 'partial') title = 'DELFAKTURA'
+
+  // Header: company name + title
   doc.setFontSize(22)
   doc.setTextColor(...purple)
   doc.text(business.business_name || 'Företag', margin, y + 8)
@@ -83,7 +109,6 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   // Invoice title
   doc.setFontSize(28)
   doc.setTextColor(...darkText)
-  const title = invoice.is_credit_note ? 'KREDITFAKTURA' : 'FAKTURA'
   doc.text(title, pageWidth - margin, y + 8, { align: 'right' })
 
   doc.setFontSize(12)
@@ -103,60 +128,63 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   doc.line(margin, y, pageWidth - margin, y)
   y += 10
 
-  // Customer info
+  // Parties: sender + receiver
   doc.setFontSize(8)
   doc.setTextColor(...lightGray)
-  doc.text('FAKTURERAS TILL', margin, y)
+  doc.text('AVSÄNDARE', margin, y)
+  doc.text('MOTTAGARE', margin + contentWidth / 2 + 10, y)
   y += 5
 
-  doc.setFontSize(11)
+  // Sender
+  doc.setFontSize(10)
   doc.setTextColor(...darkText)
-  doc.text(invoice.customer?.name || 'Kund', margin, y)
-  y += 5
-
+  doc.text(business.business_name || '', margin, y)
   doc.setFontSize(9)
   doc.setTextColor(...grayText)
-  if (invoice.customer?.address_line) {
-    doc.text(invoice.customer.address_line, margin, y)
-    y += 4.5
-  }
-  if (invoice.customer?.email) {
-    doc.text(invoice.customer.email, margin, y)
-    y += 4.5
-  }
-  if (invoice.customer?.phone_number) {
-    doc.text(invoice.customer.phone_number, margin, y)
-    y += 4.5
-  }
-  if (invoice.personnummer) {
-    doc.text(`Personnummer: ${invoice.personnummer}`, margin, y)
-    y += 4.5
-  }
+  if (business.address) { y += 4; doc.text(business.address, margin, y) }
+  if (business.contact_email) { y += 4; doc.text(business.contact_email, margin, y) }
 
-  y += 6
+  // Receiver
+  let ry = y - (business.address ? 8 : 4)
+  const rx = margin + contentWidth / 2 + 10
+  doc.setFontSize(10)
+  doc.setTextColor(...darkText)
+  doc.text(invoice.customer?.name || 'Kund', rx, ry)
+  doc.setFontSize(9)
+  doc.setTextColor(...grayText)
+  if (invoice.customer?.address_line) { ry += 4; doc.text(invoice.customer.address_line, rx, ry) }
+  if (invoice.customer?.email) { ry += 4; doc.text(invoice.customer.email, rx, ry) }
+  if (invoice.customer?.phone_number) { ry += 4; doc.text(invoice.customer.phone_number, rx, ry) }
+  if (invoice.personnummer) { ry += 4; doc.text(`Personnr: ${invoice.personnummer}`, rx, ry) }
+  if (invoice.fastighetsbeteckning) { ry += 4; doc.text(`Fastighet: ${invoice.fastighetsbeteckning}`, rx, ry) }
 
-  // Dates box
-  const ocrNumber = generateOCR(invoice.invoice_number || '')
+  y = Math.max(y, ry) + 8
+
+  // Meta box
+  const ocrNumber = invoice.ocr_number || generateOCR(invoice.invoice_number || '')
   const boxY = y
   doc.setFillColor(248, 245, 255)
   doc.roundedRect(margin, boxY, contentWidth, 22, 3, 3, 'F')
 
-  const colWidth = contentWidth / 3
-  const labels = ['FAKTURADATUM', 'FÖRFALLODATUM', 'OCR-NUMMER']
-  const values = [
+  const metaLabels = ['FAKTURADATUM', 'FÖRFALLODATUM', 'OCR-NUMMER']
+  const metaValues = [
     new Date(invoice.invoice_date).toLocaleDateString('sv-SE'),
     new Date(invoice.due_date).toLocaleDateString('sv-SE'),
     ocrNumber,
   ]
 
-  labels.forEach((label, i) => {
+  if (invoice.our_reference) { metaLabels.push('VÅR REF'); metaValues.push(invoice.our_reference) }
+  if (invoice.your_reference) { metaLabels.push('ER REF'); metaValues.push(invoice.your_reference) }
+
+  const colWidth = contentWidth / metaLabels.length
+  metaLabels.forEach((label, i) => {
     const x = margin + 6 + i * colWidth
     doc.setFontSize(7)
     doc.setTextColor(...lightGray)
     doc.text(label, x, boxY + 8)
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setTextColor(...darkText)
-    doc.text(values[i], x, boxY + 16)
+    doc.text(metaValues[i], x, boxY + 16)
   })
 
   y = boxY + 28
@@ -178,15 +206,41 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
     y += 22
   }
 
-  // Items table
-  const items = invoice.items || []
-  const tableBody = items.map((item) => [
-    item.description,
-    String(item.quantity),
-    item.unit,
-    formatSEK(item.unit_price),
-    formatSEK(item.total),
-  ])
+  // Items table – filter to displayable rows
+  const displayItems = invoice.items || []
+  const tableBody: any[][] = []
+
+  for (const item of displayItems) {
+    const itemType = item.item_type || 'item'
+
+    if (itemType === 'heading') {
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }])
+    } else if (itemType === 'text') {
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'italic', textColor: [102, 102, 102] } }])
+    } else if (itemType === 'subtotal') {
+      tableBody.push([
+        { content: '', colSpan: 3 },
+        { content: item.description, styles: { fontStyle: 'bold', fillColor: [254, 243, 199] } },
+        { content: formatSEK(item.total), styles: { fontStyle: 'bold', halign: 'right', fillColor: [254, 243, 199] } }
+      ])
+    } else if (itemType === 'discount') {
+      tableBody.push([
+        item.description,
+        String(item.quantity),
+        item.unit,
+        formatSEK(Math.abs(item.unit_price)),
+        `-${formatSEK(Math.abs(item.total))}`,
+      ])
+    } else {
+      tableBody.push([
+        item.description + (item.is_rot_eligible ? ' [ROT]' : item.is_rut_eligible ? ' [RUT]' : ''),
+        String(item.quantity),
+        item.unit,
+        formatSEK(item.unit_price),
+        formatSEK(item.total),
+      ])
+    }
+  }
 
   autoTable(doc, {
     startY: y,
@@ -195,7 +249,7 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
     theme: 'plain',
     margin: { left: margin, right: margin },
     headStyles: {
-      fillColor: [124, 58, 237],
+      fillColor: [r, g, b],
       textColor: [255, 255, 255],
       fontSize: 8,
       fontStyle: 'bold',
@@ -220,12 +274,12 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
 
   y = (doc as any).lastAutoTable.finalY + 10
 
-  // Totals box — right-aligned
+  // Totals box
   const totalsX = pageWidth - margin - 80
   const totalsWidth = 80
+  const totalsHeight = invoice.rot_rut_type ? 58 : 38
 
   doc.setFillColor(248, 245, 255)
-  const totalsHeight = invoice.rot_rut_type ? 58 : 38
   doc.roundedRect(totalsX, y, totalsWidth, totalsHeight, 3, 3, 'F')
 
   let ty = y + 8
@@ -265,31 +319,33 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
 
   // Payment info box
   doc.setFillColor(26, 26, 26)
-  doc.roundedRect(margin, y, contentWidth, 28, 3, 3, 'F')
+
+  const payItems: { label: string; value: string }[] = []
+  if (business.bankgiro) payItems.push({ label: 'Bankgiro', value: business.bankgiro })
+  if (business.plusgiro) payItems.push({ label: 'Plusgiro', value: business.plusgiro })
+  if (business.swish_number) payItems.push({ label: 'Swish', value: business.swish_number })
+  payItems.push({ label: 'Att betala', value: formatSEK(invoice.rot_rut_type ? invoice.customer_pays : invoice.total) })
+  payItems.push({ label: 'OCR-nummer', value: ocrNumber })
+
+  const payBoxH = 28
+  doc.roundedRect(margin, y, contentWidth, payBoxH, 3, 3, 'F')
 
   doc.setFontSize(7)
   doc.setTextColor(...lightGray)
   doc.text('BETALNINGSINFORMATION', margin + 8, y + 7)
 
-  const payColWidth = contentWidth / 3
-  const payLabels = ['Bankgiro', 'Att betala', 'OCR-nummer']
-  const payValues = [
-    business.bankgiro || 'Ej angivet',
-    formatSEK(invoice.rot_rut_type ? invoice.customer_pays : invoice.total),
-    ocrNumber,
-  ]
-
-  payLabels.forEach((label, i) => {
+  const payColWidth = contentWidth / payItems.length
+  payItems.forEach((item, i) => {
     const px = margin + 8 + i * payColWidth
     doc.setFontSize(7)
     doc.setTextColor(...lightGray)
-    doc.text(label, px, y + 14)
+    doc.text(item.label, px, y + 14)
     doc.setFontSize(12)
     doc.setTextColor(...purple)
-    doc.text(payValues[i], px, y + 22)
+    doc.text(item.value, px, y + 22)
   })
 
-  y += 36
+  y += payBoxH + 8
 
   // Footer
   doc.setDrawColor(230, 230, 230)
@@ -305,8 +361,14 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
     business.f_skatt_registered ? 'Godkänd för F-skatt' : '',
   ].filter(Boolean)
   doc.text(footerParts.join(' | '), pageWidth / 2, y, { align: 'center' })
-  y += 5
-  doc.text('Tack för att du anlitar oss!', pageWidth / 2, y, { align: 'center' })
+
+  if (business.penalty_interest) {
+    y += 4
+    doc.text(`Dröjsmålsränta: ${business.penalty_interest}%`, pageWidth / 2, y, { align: 'center' })
+  }
+
+  y += 4
+  doc.text(business.invoice_footer_text || 'Tack för att du anlitar oss!', pageWidth / 2, y, { align: 'center' })
 
   // Return as Buffer
   const arrayBuffer = doc.output('arraybuffer')

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
@@ -24,11 +24,36 @@ import {
   Link2,
   PenTool,
   Bookmark,
-  Copy
+  Copy,
+  ClipboardList,
+  MapPin,
+  CreditCard,
+  AlertTriangle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+
+interface QuoteItem {
+  id: string
+  item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+  group_name?: string
+  description: string
+  quantity: number
+  unit: string
+  unit_price: number
+  total: number
+  is_rot_eligible: boolean
+  is_rut_eligible: boolean
+  sort_order: number
+}
+
+interface PaymentPlanEntry {
+  label: string
+  percent: number
+  amount: number
+  due_description: string
+}
 
 interface Quote {
   quote_id: string
@@ -65,6 +90,29 @@ interface Quote {
     email: string
     address_line: string
   }
+  quote_items?: QuoteItem[]
+  introduction_text?: string
+  conclusion_text?: string
+  not_included?: string
+  ata_terms?: string
+  payment_terms_text?: string
+  payment_plan?: PaymentPlanEntry[]
+  reference_person?: string
+  customer_reference?: string
+  project_address?: string
+  detail_level?: string
+  show_unit_prices?: boolean
+  show_quantities?: boolean
+  rot_work_cost?: number
+  rot_deduction?: number
+  rot_customer_pays?: number
+  rut_work_cost?: number
+  rut_deduction?: number
+  rut_customer_pays?: number
+  quote_number?: string
+  signature_data?: string
+  signed_at?: string
+  signed_by_name?: string
 }
 
 export default function QuoteDetailPage() {
@@ -92,20 +140,24 @@ export default function QuoteDetailPage() {
     if (!quote || !templateName.trim()) return
     setSavingTemplate(true)
     try {
-      const laborItems = (quote.items || []).filter((i: any) => i.type === 'labor')
-      const materialItems = (quote.items || []).filter((i: any) => i.type === 'material')
-      const totalHours = laborItems.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
-
-      await fetch('/api/quotes/templates', {
+      await fetch('/api/quote-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: templateName,
           description: quote.description,
-          estimatedHours: totalHours,
-          laborCost: quote.labor_total,
-          materials: materialItems.map((i: any) => ({ name: i.name, quantity: i.quantity, unit: i.unit, unitPrice: i.unit_price })),
-          totalEstimate: quote.subtotal
+          default_items: quote.quote_items || [],
+          default_payment_plan: quote.payment_plan || [],
+          introduction_text: quote.introduction_text,
+          conclusion_text: quote.conclusion_text,
+          not_included: quote.not_included,
+          ata_terms: quote.ata_terms,
+          payment_terms_text: quote.payment_terms_text,
+          detail_level: quote.detail_level,
+          show_unit_prices: quote.show_unit_prices,
+          show_quantities: quote.show_quantities,
+          rot_enabled: (quote.quote_items || []).some((i: any) => i.is_rot_eligible),
+          rut_enabled: (quote.quote_items || []).some((i: any) => i.is_rut_eligible),
         })
       })
       showToast('Mall sparad!', 'success')
@@ -261,23 +313,11 @@ export default function QuoteDetailPage() {
     setCreatingInvoice(true)
 
     try {
-      const response = await fetch('/api/invoices', {
+      const response = await fetch('/api/invoices/from-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          business_id: quote.business_id,
-          customer_id: quote.customer_id,
           quote_id: quote.quote_id,
-          items: quote.items.map((item: any) => ({
-            description: item.name,
-            quantity: item.quantity || 1,
-            unit: item.unit === 'hour' ? 'timmar' : 'st',
-            unit_price: item.unit_price || 0,
-            total: item.total || 0,
-            type: item.type === 'labor' ? 'labor' : 'material'
-          })),
-          vat_rate: quote.vat_rate,
-          rot_rut_type: quote.rot_rut_type
         })
       })
 
@@ -350,7 +390,7 @@ export default function QuoteDetailPage() {
     switch (unit) {
       case 'hour': return 'tim'
       case 'piece': return 'st'
-      case 'm2': return 'm²'
+      case 'm2': return 'm\u00B2'
       case 'm': return 'm'
       case 'lm': return 'lm'
       case 'pauschal': return 'pauschal'
@@ -380,6 +420,142 @@ export default function QuoteDetailPage() {
       case 'expired': return 'Utgången'
       default: return status
     }
+  }
+
+  const hasStructuredItems = quote?.quote_items && quote.quote_items.length > 0
+  const hasNewRotRut = (quote?.rot_work_cost && quote.rot_work_cost > 0) || (quote?.rut_work_cost && quote.rut_work_cost > 0)
+
+  const renderStructuredItems = (items: QuoteItem[]) => {
+    const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order)
+
+    return (
+      <div className="space-y-1">
+        {sorted.map((item) => {
+          switch (item.item_type) {
+            case 'heading':
+              return (
+                <div key={item.id} className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
+                  <p className="font-semibold text-blue-800 text-sm">{item.description}</p>
+                </div>
+              )
+
+            case 'item':
+              return (
+                <div key={item.id} className="flex justify-between items-center py-2.5 px-2 border-b border-gray-100">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-gray-900">{item.description}</p>
+                      {item.is_rot_eligible && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 rounded">
+                          ROT
+                        </span>
+                      )}
+                      {item.is_rut_eligible && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700 rounded">
+                          RUT
+                        </span>
+                      )}
+                    </div>
+                    {(quote?.show_quantities !== false || quote?.show_unit_prices !== false) && (
+                      <p className="text-sm text-gray-400">
+                        {quote?.show_quantities !== false && <>{item.quantity} {getUnitLabel(item.unit)}</>}
+                        {quote?.show_quantities !== false && quote?.show_unit_prices !== false && ' \u00D7 '}
+                        {quote?.show_unit_prices !== false && formatCurrency(item.unit_price)}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-gray-900 font-medium ml-4 whitespace-nowrap">{formatCurrency(item.total)}</p>
+                </div>
+              )
+
+            case 'text':
+              return (
+                <div key={item.id} className="py-2 px-2">
+                  <p className="text-gray-500 italic text-sm">{item.description}</p>
+                </div>
+              )
+
+            case 'subtotal':
+              return (
+                <div key={item.id} className="flex justify-between items-center py-2.5 px-2 border-t border-gray-300 bg-gray-50 rounded">
+                  <p className="font-semibold text-gray-900">{item.description || 'Delsumma'}</p>
+                  <p className="font-semibold text-gray-900">{formatCurrency(item.total)}</p>
+                </div>
+              )
+
+            case 'discount':
+              return (
+                <div key={item.id} className="flex justify-between items-center py-2.5 px-2 border-b border-gray-100">
+                  <p className="text-emerald-600">{item.description}</p>
+                  <p className="text-emerald-600 font-medium">-{formatCurrency(Math.abs(item.total))}</p>
+                </div>
+              )
+
+            default:
+              return null
+          }
+        })}
+      </div>
+    )
+  }
+
+  const renderLegacyItems = (items: any[]) => {
+    return (
+      <>
+        {/* Labor */}
+        {items.filter((i: any) => i.type === 'labor').length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-blue-400 mb-2">Arbete</h3>
+            <div className="space-y-2">
+              {items.filter((i: any) => i.type === 'labor').map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
+                  <div>
+                    <p className="text-gray-900">{item.name}</p>
+                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} \u00D7 {formatCurrency(item.unit_price)}</p>
+                  </div>
+                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Materials */}
+        {items.filter((i: any) => i.type === 'material').length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium text-emerald-600 mb-2">Material</h3>
+            <div className="space-y-2">
+              {items.filter((i: any) => i.type === 'material').map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
+                  <div>
+                    <p className="text-gray-900">{item.name}</p>
+                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} \u00D7 {formatCurrency(item.unit_price)}</p>
+                  </div>
+                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Services */}
+        {items.filter((i: any) => i.type === 'service').length > 0 && (
+          <div>
+            <h3 className="text-sm font-medium text-amber-400 mb-2">Tjänster</h3>
+            <div className="space-y-2">
+              {items.filter((i: any) => i.type === 'service').map((item: any, idx: number) => (
+                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
+                  <div>
+                    <p className="text-gray-900">{item.name}</p>
+                  </div>
+                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    )
   }
 
   if (loading) {
@@ -421,8 +597,8 @@ export default function QuoteDetailPage() {
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {quote.title || 'Offert'}
-                {(quote as any).quote_number && (
-                  <span className="ml-2 text-sm font-normal text-gray-400">{(quote as any).quote_number}</span>
+                {quote.quote_number && (
+                  <span className="ml-2 text-sm font-normal text-gray-400">{quote.quote_number}</span>
                 )}
               </h1>
               <p className="text-sm text-gray-500">Skapad {formatDate(quote.created_at)}</p>
@@ -571,6 +747,39 @@ export default function QuoteDetailPage() {
               )}
             </div>
 
+            {/* Reference fields */}
+            {(quote.reference_person || quote.customer_reference || quote.project_address) && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-blue-400" />
+                  Referenser
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {quote.reference_person && (
+                    <div>
+                      <p className="text-sm text-gray-400">Referensperson</p>
+                      <p className="text-gray-900">{quote.reference_person}</p>
+                    </div>
+                  )}
+                  {quote.customer_reference && (
+                    <div>
+                      <p className="text-sm text-gray-400">Kundreferens</p>
+                      <p className="text-gray-900">{quote.customer_reference}</p>
+                    </div>
+                  )}
+                  {quote.project_address && (
+                    <div className="sm:col-span-2">
+                      <p className="text-sm text-gray-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        Projektadress
+                      </p>
+                      <p className="text-gray-900">{quote.project_address}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             {quote.description && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
@@ -582,63 +791,94 @@ export default function QuoteDetailPage() {
               </div>
             )}
 
+            {/* Introduction text */}
+            {quote.introduction_text && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-blue-400" />
+                  Inledning
+                </h2>
+                <p className="text-gray-700 whitespace-pre-wrap">{quote.introduction_text}</p>
+              </div>
+            )}
+
             {/* Items */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4">Specifikation</h2>
-              
-              {/* Labor */}
-              {quote.items.filter((i: any) => i.type === 'labor').length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-blue-400 mb-2">Arbete</h3>
-                  <div className="space-y-2">
-                    {quote.items.filter((i: any) => i.type === 'labor').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                        <div>
-                          <p className="text-gray-900">{item.name}</p>
-                          <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
-                        </div>
-                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
-              {/* Materials */}
-              {quote.items.filter((i: any) => i.type === 'material').length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-emerald-600 mb-2">Material</h3>
-                  <div className="space-y-2">
-                    {quote.items.filter((i: any) => i.type === 'material').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                        <div>
-                          <p className="text-gray-900">{item.name}</p>
-                          <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
-                        </div>
-                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Services */}
-              {quote.items.filter((i: any) => i.type === 'service').length > 0 && (
-                <div>
-                  <h3 className="text-sm font-medium text-amber-400 mb-2">Tjänster</h3>
-                  <div className="space-y-2">
-                    {quote.items.filter((i: any) => i.type === 'service').map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                        <div>
-                          <p className="text-gray-900">{item.name}</p>
-                        </div>
-                        <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {hasStructuredItems
+                ? renderStructuredItems(quote.quote_items!)
+                : renderLegacyItems(quote.items || [])
+              }
             </div>
+
+            {/* Ej inkluderat */}
+            {quote.not_included && (
+              <div className="bg-red-50 shadow-sm rounded-xl border border-red-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-red-800 mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Ej inkluderat
+                </h2>
+                <p className="text-red-700 whitespace-pre-wrap text-sm">{quote.not_included}</p>
+              </div>
+            )}
+
+            {/* ATA-villkor */}
+            {quote.ata_terms && (
+              <div className="bg-amber-50 shadow-sm rounded-xl border border-amber-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
+                  <ClipboardList className="w-5 h-5 text-amber-500" />
+                  ÄTA-villkor
+                </h2>
+                <p className="text-amber-700 whitespace-pre-wrap text-sm">{quote.ata_terms}</p>
+              </div>
+            )}
+
+            {/* Payment plan */}
+            {quote.payment_plan && quote.payment_plan.length > 0 && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-violet-500" />
+                  Betalningsplan
+                </h2>
+                {quote.payment_terms_text && (
+                  <p className="text-gray-500 text-sm mb-4">{quote.payment_terms_text}</p>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="text-left py-2 pr-4 text-gray-500 font-medium">Delbetaling</th>
+                        <th className="text-right py-2 px-4 text-gray-500 font-medium">Andel</th>
+                        <th className="text-right py-2 px-4 text-gray-500 font-medium">Belopp</th>
+                        <th className="text-left py-2 pl-4 text-gray-500 font-medium">Förfaller</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quote.payment_plan.map((entry, idx) => (
+                        <tr key={idx} className="border-b border-gray-100 last:border-0">
+                          <td className="py-2.5 pr-4 text-gray-900">{entry.label}</td>
+                          <td className="py-2.5 px-4 text-right text-gray-600">{entry.percent}%</td>
+                          <td className="py-2.5 px-4 text-right text-gray-900 font-medium">{formatCurrency(entry.amount)}</td>
+                          <td className="py-2.5 pl-4 text-gray-500">{entry.due_description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Conclusion text */}
+            {quote.conclusion_text && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-gray-400" />
+                  Avslutning
+                </h2>
+                <p className="text-gray-700 whitespace-pre-wrap">{quote.conclusion_text}</p>
+              </div>
+            )}
           </div>
 
           {/* Sidebar - Summary */}
@@ -674,25 +914,74 @@ export default function QuoteDetailPage() {
                   <span className="text-gray-900">{formatCurrency(quote.total)}</span>
                 </div>
 
-                {quote.rot_rut_type && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-emerald-600">{quote.rot_rut_type.toUpperCase()}-avdrag</span>
-                      <span className="text-emerald-600">-{formatCurrency(quote.rot_rut_deduction)}</span>
-                    </div>
-                    <div className="border-t border-emerald-500/30 pt-2 mt-2">
-                      <div className="flex justify-between font-semibold">
-                        <span className="text-gray-900">Kund betalar</span>
-                        <span className="text-emerald-600">{formatCurrency(quote.customer_pays)}</span>
+                {/* New ROT/RUT display with structured fields */}
+                {hasNewRotRut ? (
+                  <>
+                    {quote.rot_work_cost && quote.rot_work_cost > 0 && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
+                        <p className="text-xs font-semibold text-emerald-700 mb-2">ROT-avdrag</p>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Arbetskostnad (ROT)</span>
+                            <span className="text-gray-900">{formatCurrency(quote.rot_work_cost)}</span>
+                          </div>
+                          <div className="flex justify-between text-emerald-600">
+                            <span>ROT-avdrag (30%)</span>
+                            <span>-{formatCurrency(quote.rot_deduction || 0)}</span>
+                          </div>
+                          <div className="border-t border-emerald-500/30 pt-2 mt-1">
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-900">Kund betalar</span>
+                              <span className="text-emerald-600">{formatCurrency(quote.rot_customer_pays || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {quote.rut_work_cost && quote.rut_work_cost > 0 && (
+                      <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mt-4">
+                        <p className="text-xs font-semibold text-purple-700 mb-2">RUT-avdrag</p>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-gray-500">Arbetskostnad (RUT)</span>
+                            <span className="text-gray-900">{formatCurrency(quote.rut_work_cost)}</span>
+                          </div>
+                          <div className="flex justify-between text-purple-600">
+                            <span>RUT-avdrag (50%)</span>
+                            <span>-{formatCurrency(quote.rut_deduction || 0)}</span>
+                          </div>
+                          <div className="border-t border-purple-500/30 pt-2 mt-1">
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-900">Kund betalar</span>
+                              <span className="text-purple-600">{formatCurrency(quote.rut_customer_pays || 0)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Legacy ROT/RUT display */
+                  quote.rot_rut_type && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 mt-4">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-emerald-600">{quote.rot_rut_type.toUpperCase()}-avdrag</span>
+                        <span className="text-emerald-600">-{formatCurrency(quote.rot_rut_deduction)}</span>
+                      </div>
+                      <div className="border-t border-emerald-500/30 pt-2 mt-2">
+                        <div className="flex justify-between font-semibold">
+                          <span className="text-gray-900">Kund betalar</span>
+                          <span className="text-emerald-600">{formatCurrency(quote.customer_pays)}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )
                 )}
               </div>
             </div>
 
             {/* Signature Info */}
-            {(quote as any).signature_data && (
+            {quote.signature_data && (
               <div className="bg-white shadow-sm rounded-xl border border-emerald-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <PenTool className="w-5 h-5 text-emerald-600" />
@@ -703,13 +992,13 @@ export default function QuoteDetailPage() {
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-900">{(quote as any).signed_by_name}</p>
-                    <p className="text-xs text-gray-500">{(quote as any).signed_at && formatDate((quote as any).signed_at)}</p>
+                    <p className="text-sm font-medium text-gray-900">{quote.signed_by_name}</p>
+                    <p className="text-xs text-gray-500">{quote.signed_at && formatDate(quote.signed_at)}</p>
                   </div>
                 </div>
-                {(quote as any).signature_data && (
+                {quote.signature_data && (
                   <div className="bg-gray-50 rounded-lg p-2">
-                    <img src={(quote as any).signature_data} alt="Signatur" className="max-h-16 mx-auto" />
+                    <img src={quote.signature_data} alt="Signatur" className="max-h-16 mx-auto" />
                   </div>
                 )}
               </div>
@@ -744,10 +1033,10 @@ export default function QuoteDetailPage() {
                     <span className="text-gray-500">Accepterad {formatDate(quote.accepted_at)}</span>
                   </div>
                 )}
-                {(quote as any).signed_at && (
+                {quote.signed_at && (
                   <div className="flex items-center gap-3">
                     <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-gray-500">Signerad av {(quote as any).signed_by_name} {formatDate((quote as any).signed_at)}</span>
+                    <span className="text-gray-500">Signerad av {quote.signed_by_name} {formatDate(quote.signed_at)}</span>
                   </div>
                 )}
                 {quote.declined_at && (

@@ -20,7 +20,8 @@ import {
   Building,
   Bell,
   RotateCcw,
-  Eye
+  Eye,
+  Pencil
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
@@ -33,6 +34,18 @@ interface InvoiceItem {
   unit_price: number
   total: number
   type?: string
+  item_type?: string
+}
+
+interface InvoiceReminder {
+  id: string
+  reminder_number: number
+  sent_at: string
+  sent_method: string
+  fee_amount: number
+  penalty_interest_amount: number
+  total_with_fees: number
+  message: string
 }
 
 interface Invoice {
@@ -55,10 +68,14 @@ interface Invoice {
   payment_method: string | null
   reminder_sent_at: string | null
   reminder_count: number
+  reminder_fee: number | null
+  penalty_interest: number | null
+  last_reminder_at: string | null
   created_at: string
   is_credit_note?: boolean
   original_invoice_id?: string | null
   credit_reason?: string | null
+  ocr_number?: string | null
   customer?: {
     customer_id: string
     name: string
@@ -95,10 +112,15 @@ export default function InvoiceDetailPage() {
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditReason, setCreditReason] = useState('')
+  const [creditType, setCreditType] = useState<'full' | 'partial'>('full')
+  const [creditItemChecked, setCreditItemChecked] = useState<Record<number, boolean>>({})
+  const [creditItemQuantity, setCreditItemQuantity] = useState<Record<number, number>>({})
   const [creatingCredit, setCreatingCredit] = useState(false)
+  const [reminders, setReminders] = useState<InvoiceReminder[]>([])
 
   useEffect(() => {
     fetchInvoice()
+    fetchReminders()
   }, [invoiceId])
 
   useEffect(() => {
@@ -130,6 +152,18 @@ export default function InvoiceDetailPage() {
       setInvoice(data)
     }
     setLoading(false)
+  }
+
+  async function fetchReminders() {
+    const { data } = await supabase
+      .from('invoice_reminders')
+      .select('*')
+      .eq('invoice_id', invoiceId)
+      .order('reminder_number', { ascending: true })
+
+    if (data) {
+      setReminders(data)
+    }
   }
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -207,6 +241,7 @@ export default function InvoiceDetailPage() {
 
       showToast(`Påminnelse skickad! (${result.reminderCount} totalt)`, 'success')
       fetchInvoice()
+      fetchReminders()
     } catch (err: any) {
       showToast(err.message || 'Något gick fel', 'error')
     } finally {
@@ -218,12 +253,36 @@ export default function InvoiceDetailPage() {
     if (!creditReason.trim()) return
     setCreatingCredit(true)
     try {
-      const response = await fetch('/api/invoices', {
+      // Build partial items if partial credit
+      let partialItems = undefined
+      if (creditType === 'partial') {
+        const selectedItems = items
+          .map((item, index) => {
+            if (!creditItemChecked[index]) return null
+            const qty = creditItemQuantity[index] ?? item.quantity
+            return {
+              ...item,
+              quantity: qty,
+              total: qty * item.unit_price,
+            }
+          })
+          .filter(Boolean)
+
+        if (selectedItems.length === 0) {
+          showToast('Välj minst en rad för delkredit', 'error')
+          setCreatingCredit(false)
+          return
+        }
+        partialItems = selectedItems
+      }
+
+      const response = await fetch('/api/invoices/credit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          is_credit_note: true,
           original_invoice_id: invoiceId,
+          credit_type: creditType,
+          items: partialItems,
           credit_reason: creditReason,
         })
       })
@@ -237,7 +296,9 @@ export default function InvoiceDetailPage() {
       showToast('Kreditfaktura skapad!', 'success')
       setShowCreditModal(false)
       setCreditReason('')
-      // Navigera till den nya kreditfakturan
+      setCreditType('full')
+      setCreditItemChecked({})
+      setCreditItemQuantity({})
       router.push(`/dashboard/invoices/${result.invoice.invoice_id}`)
     } catch (err: any) {
       showToast(err.message || 'Något gick fel', 'error')
@@ -300,7 +361,7 @@ export default function InvoiceDetailPage() {
   }
 
   const items = invoice.items || []
-  const ocrNumber = generateOCR(invoice.invoice_number || '')
+  const ocrNumber = invoice.ocr_number || generateOCR(invoice.invoice_number || '')
 
   // Build timeline events
   const timelineEvents = [
@@ -444,7 +505,7 @@ export default function InvoiceDetailPage() {
       {/* Credit Note Modal */}
       {showCreditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Skapa kreditfaktura</h3>
               <button
@@ -455,10 +516,86 @@ export default function InvoiceDetailPage() {
               </button>
             </div>
 
+            {/* Credit type tabs */}
+            <div className="flex bg-gray-100 rounded-xl p-1 mb-4">
+              <button
+                onClick={() => setCreditType('full')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  creditType === 'full' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                Hel kreditering
+              </button>
+              <button
+                onClick={() => setCreditType('partial')}
+                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
+                  creditType === 'partial' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                }`}
+              >
+                Delkreditering
+              </button>
+            </div>
+
             <p className="text-sm text-gray-500 mb-4">
-              En kreditfaktura skapas som motbokar faktura #{invoice.invoice_number}
-              ({invoice.total?.toLocaleString('sv-SE')} kr). Originalfakturan markeras som krediterad.
+              {creditType === 'full'
+                ? `Hela faktura #${invoice.invoice_number} (${invoice.total?.toLocaleString('sv-SE')} kr) krediteras. Originalfakturan markeras som krediterad.`
+                : 'Välj vilka rader och antal som ska krediteras.'
+              }
             </p>
+
+            {/* Partial credit item selection */}
+            {creditType === 'partial' && (
+              <div className="space-y-2 mb-4 max-h-60 overflow-y-auto">
+                {items.map((item, index) => {
+                  const itemType = (item as any).item_type || 'item'
+                  if (itemType !== 'item') return null
+
+                  return (
+                    <label
+                      key={index}
+                      className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                        creditItemChecked[index] ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={creditItemChecked[index] || false}
+                        onChange={(e) => {
+                          setCreditItemChecked({ ...creditItemChecked, [index]: e.target.checked })
+                          if (e.target.checked && !creditItemQuantity[index]) {
+                            setCreditItemQuantity({ ...creditItemQuantity, [index]: item.quantity })
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 truncate">{item.description}</p>
+                        <p className="text-xs text-gray-400">
+                          {item.quantity} {item.unit} x {item.unit_price?.toLocaleString('sv-SE')} kr
+                        </p>
+                      </div>
+                      {creditItemChecked[index] && (
+                        <input
+                          type="number"
+                          min={0.5}
+                          max={item.quantity}
+                          step={0.5}
+                          value={creditItemQuantity[index] ?? item.quantity}
+                          onChange={(e) => setCreditItemQuantity({
+                            ...creditItemQuantity,
+                            [index]: Math.min(Number(e.target.value), item.quantity)
+                          })}
+                          className="w-16 px-2 py-1 bg-white border border-gray-200 rounded-lg text-sm text-center"
+                        />
+                      )}
+                      <span className="text-sm font-medium text-gray-700 w-20 text-right">
+                        {item.total?.toLocaleString('sv-SE')} kr
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
@@ -496,7 +633,7 @@ export default function InvoiceDetailPage() {
                 ) : (
                   <>
                     <RotateCcw className="w-4 h-4" />
-                    Skapa kreditfaktura
+                    {creditType === 'full' ? 'Helkreditera' : 'Delkreditera'}
                   </>
                 )}
               </button>
@@ -546,6 +683,16 @@ export default function InvoiceDetailPage() {
               <Eye className="w-4 h-4" />
               Förhandsgranska
             </a>
+
+            {invoice.status === 'draft' && (
+              <Link
+                href={`/dashboard/invoices/${invoiceId}/edit`}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-200"
+              >
+                <Pencil className="w-4 h-4" />
+                Redigera
+              </Link>
+            )}
 
             {invoice.status === 'draft' && (
               <div className="relative group">
@@ -806,6 +953,88 @@ export default function InvoiceDetailPage() {
             </div>
           </div>
         </div>
+
+        {/* Reminder History */}
+        {reminders.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mt-6">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-amber-500" />
+                  Påminnelsehistorik ({reminders.length})
+                </h3>
+                <a
+                  href={`/api/invoices/${invoiceId}/reminder-pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                >
+                  <Eye className="w-3 h-3" />
+                  Visa påminnelse-PDF
+                </a>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">#</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Datum</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase">Metod</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Avgift</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Ränta</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-400 uppercase">Totalt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {reminders.map((reminder) => (
+                    <tr key={reminder.id} className="hover:bg-gray-100/30">
+                      <td className="px-6 py-3 text-sm text-gray-900">Påminnelse {reminder.reminder_number}</td>
+                      <td className="px-6 py-3 text-sm text-gray-500">
+                        {new Date(reminder.sent_at).toLocaleDateString('sv-SE')}
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
+                          reminder.sent_method === 'sms' ? 'bg-green-100 text-green-700' :
+                          reminder.sent_method === 'email' ? 'bg-blue-100 text-blue-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {reminder.sent_method === 'sms' ? 'SMS' :
+                           reminder.sent_method === 'email' ? 'E-post' :
+                           'Misslyckad'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-sm text-right text-gray-500">
+                        {reminder.fee_amount > 0 ? `${reminder.fee_amount?.toLocaleString('sv-SE')} kr` : '–'}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-right text-gray-500">
+                        {reminder.penalty_interest_amount > 0 ? `${reminder.penalty_interest_amount?.toLocaleString('sv-SE')} kr` : '–'}
+                      </td>
+                      <td className="px-6 py-3 text-sm text-right font-medium text-gray-900">
+                        {reminder.total_with_fees?.toLocaleString('sv-SE')} kr
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Max Reminders Warning */}
+        {invoice.reminder_count >= 3 && (invoice.status === 'overdue' || invoice.status === 'sent') && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-6">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+              <div>
+                <p className="text-amber-700 font-medium">Max antal påminnelser nått</p>
+                <p className="text-sm text-amber-600">
+                  {invoice.reminder_count} påminnelser har skickats. Inkassohantering eller annan åtgärd rekommenderas.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

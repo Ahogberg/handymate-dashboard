@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { calculateQuoteTotals } from '@/lib/quote-calculations'
+import type { QuoteItem } from '@/lib/types/quote'
 
 /**
  * GET - Lista offerter för ett företag
@@ -32,6 +34,13 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
       }
 
+      // Fetch structured items from quote_items table
+      const { data: quoteItems } = await supabase
+        .from('quote_items')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .order('sort_order', { ascending: true })
+
       // Fetch customer separately
       let customer = null
       if (quote.customer_id) {
@@ -43,7 +52,13 @@ export async function GET(request: NextRequest) {
         customer = data
       }
 
-      return NextResponse.json({ quote: { ...quote, customer } })
+      return NextResponse.json({
+        quote: {
+          ...quote,
+          quote_items: quoteItems || [],
+          customer,
+        }
+      })
     }
 
     // List quotes
@@ -149,9 +164,27 @@ export async function POST(request: NextRequest) {
         valid_until: validUntil.toISOString().split('T')[0],
         duplicated_from: body.duplicate_from,
         ai_generated: source.ai_generated,
+        // New fields
+        introduction_text: source.introduction_text,
+        conclusion_text: source.conclusion_text,
+        not_included: source.not_included,
+        ata_terms: source.ata_terms,
+        payment_terms_text: source.payment_terms_text,
+        payment_plan: source.payment_plan,
+        reference_person: source.reference_person,
+        customer_reference: source.customer_reference,
+        project_address: source.project_address,
+        detail_level: source.detail_level,
+        show_unit_prices: source.show_unit_prices,
+        show_quantities: source.show_quantities,
+        rot_work_cost: source.rot_work_cost,
+        rot_deduction: source.rot_deduction,
+        rot_customer_pays: source.rot_customer_pays,
+        rut_work_cost: source.rut_work_cost,
+        rut_deduction: source.rut_deduction,
+        rut_customer_pays: source.rut_customer_pays,
       }
 
-      // Only include ROT/RUT personal fields when they have values
       if (source.personnummer) dupData.personnummer = source.personnummer
       if (source.fastighetsbeteckning) dupData.fastighetsbeteckning = source.fastighetsbeteckning
 
@@ -162,44 +195,86 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (dupErr) throw dupErr
+
+      // Duplicate quote_items
+      const { data: sourceItems } = await supabase
+        .from('quote_items')
+        .select('*')
+        .eq('quote_id', body.duplicate_from)
+        .order('sort_order')
+
+      if (sourceItems && sourceItems.length > 0) {
+        const dupItems = sourceItems.map((item: any) => ({
+          ...item,
+          id: 'qi_' + Math.random().toString(36).substr(2, 12),
+          quote_id: newId,
+        }))
+        await supabase.from('quote_items').insert(dupItems)
+      }
+
       return NextResponse.json({ quote: newQuote })
     }
 
-    // Normal creation
-    const items = body.items || []
-    const vatRate = body.vat_rate ?? 25
-    const discountPercent = body.discount_percent ?? 0
-
-    // Server-side calculations
-    const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-    const materialTotal = items.filter((i: any) => i.type === 'material').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-    const serviceTotal = items.filter((i: any) => i.type === 'service').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-    const subtotal = laborTotal + materialTotal + serviceTotal
-    const discountAmount = subtotal * (discountPercent / 100)
-    const afterDiscount = subtotal - discountAmount
-    const vatAmount = afterDiscount * (vatRate / 100)
-    const total = afterDiscount + vatAmount
-
-    // ROT/RUT
-    let rotRutEligible = 0
-    let rotRutDeduction = 0
-    let customerPays = total
-    if (body.rot_rut_type) {
-      rotRutEligible = laborTotal
-      const rate = body.rot_rut_type === 'rot' ? 0.30 : 0.50
-      const maxDeduction = body.rot_rut_type === 'rot' ? 50000 : 75000
-      rotRutDeduction = Math.min(rotRutEligible * rate, maxDeduction)
-      customerPays = total - rotRutDeduction
-    }
-
+    // New quote creation - support both legacy items and structured quote_items
     const quoteId = 'quote_' + Math.random().toString(36).substr(2, 9)
     const quoteNumber = await generateQuoteNumber(supabase, businessId)
     const validDays = body.valid_days ?? 30
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + validDays)
 
-    // Ensure items have calculated totals
-    const processedItems = items.map((i: any) => ({
+    const structuredItems: QuoteItem[] = body.quote_items || []
+    const legacyItems = body.items || []
+    const vatRate = body.vat_rate ?? 25
+    const discountPercent = body.discount_percent ?? 0
+
+    let laborTotal = 0, materialTotal = 0, subtotal = 0, discountAmount = 0
+    let vatAmount = 0, total = 0
+    let rotWorkCost = 0, rotDeduction = 0, rotCustomerPays = 0
+    let rutWorkCost = 0, rutDeduction = 0, rutCustomerPays = 0
+    let rotRutEligible = 0, rotRutDeduction = 0, customerPays = 0
+
+    if (structuredItems.length > 0) {
+      // Use new calculation engine
+      const totals = calculateQuoteTotals(structuredItems, discountPercent, vatRate)
+      laborTotal = totals.laborTotal
+      materialTotal = totals.materialTotal
+      subtotal = totals.subtotal
+      discountAmount = totals.discountAmount
+      vatAmount = totals.vat
+      total = totals.total
+      rotWorkCost = totals.rotWorkCost
+      rotDeduction = totals.rotDeduction
+      rotCustomerPays = totals.rotCustomerPays
+      rutWorkCost = totals.rutWorkCost
+      rutDeduction = totals.rutDeduction
+      rutCustomerPays = totals.rutCustomerPays
+      // Legacy compat
+      rotRutEligible = rotWorkCost + rutWorkCost
+      rotRutDeduction = rotDeduction + rutDeduction
+      customerPays = (rotDeduction > 0 || rutDeduction > 0) ? total - rotRutDeduction : total
+    } else if (legacyItems.length > 0) {
+      // Legacy calculation
+      laborTotal = legacyItems.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
+      materialTotal = legacyItems.filter((i: any) => i.type === 'material').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
+      const serviceTotal = legacyItems.filter((i: any) => i.type === 'service').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
+      subtotal = laborTotal + materialTotal + serviceTotal
+      discountAmount = subtotal * (discountPercent / 100)
+      const afterDiscount = subtotal - discountAmount
+      vatAmount = afterDiscount * (vatRate / 100)
+      total = afterDiscount + vatAmount
+
+      if (body.rot_rut_type) {
+        rotRutEligible = laborTotal
+        const rate = body.rot_rut_type === 'rot' ? 0.30 : 0.50
+        const maxDed = body.rot_rut_type === 'rot' ? 50000 : 75000
+        rotRutDeduction = Math.min(rotRutEligible * rate, maxDed)
+        customerPays = total - rotRutDeduction
+      } else {
+        customerPays = total
+      }
+    }
+
+    const processedLegacyItems = legacyItems.map((i: any) => ({
       ...i,
       total: (i.quantity || 0) * (i.unit_price || 0)
     }))
@@ -212,7 +287,7 @@ export async function POST(request: NextRequest) {
       status: body.status || 'draft',
       title: body.title || '',
       description: body.description || null,
-      items: processedItems,
+      items: structuredItems.length > 0 ? [] : processedLegacyItems,
       labor_total: laborTotal,
       material_total: materialTotal,
       subtotal,
@@ -233,10 +308,27 @@ export async function POST(request: NextRequest) {
       ai_confidence: body.ai_confidence || null,
       source_transcript: body.source_transcript || null,
       template_id: body.template_id || null,
+      // New fields
+      introduction_text: body.introduction_text || null,
+      conclusion_text: body.conclusion_text || null,
+      not_included: body.not_included || null,
+      ata_terms: body.ata_terms || null,
+      payment_terms_text: body.payment_terms_text || null,
+      payment_plan: body.payment_plan || [],
+      reference_person: body.reference_person || null,
+      customer_reference: body.customer_reference || null,
+      project_address: body.project_address || null,
+      detail_level: body.detail_level || 'detailed',
+      show_unit_prices: body.show_unit_prices ?? true,
+      show_quantities: body.show_quantities ?? true,
+      rot_work_cost: rotWorkCost || null,
+      rot_deduction: rotDeduction || null,
+      rot_customer_pays: rotCustomerPays || null,
+      rut_work_cost: rutWorkCost || null,
+      rut_deduction: rutDeduction || null,
+      rut_customer_pays: rutCustomerPays || null,
     }
 
-    // Only include ROT/RUT personal fields when they have values
-    // (columns may not exist if migration hasn't been run yet)
     if (body.personnummer) insertData.personnummer = body.personnummer
     if (body.fastighetsbeteckning) insertData.fastighetsbeteckning = body.fastighetsbeteckning
 
@@ -249,6 +341,30 @@ export async function POST(request: NextRequest) {
     if (insertError) {
       console.error('Quote insert error:', insertError)
       return NextResponse.json({ error: insertError.message }, { status: 500 })
+    }
+
+    // Save structured items to quote_items table
+    if (structuredItems.length > 0) {
+      const itemInserts = structuredItems.map((item, idx) => ({
+        id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
+        quote_id: quoteId,
+        business_id: businessId,
+        item_type: item.item_type,
+        group_name: item.group_name || null,
+        description: item.description || '',
+        quantity: item.quantity || 0,
+        unit: item.unit || 'st',
+        unit_price: item.unit_price || 0,
+        total: item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0),
+        cost_price: item.cost_price || null,
+        article_number: item.article_number || null,
+        is_rot_eligible: item.is_rot_eligible || false,
+        is_rut_eligible: item.is_rut_eligible || false,
+        sort_order: idx,
+      }))
+
+      const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
+      if (itemsError) console.error('Insert quote_items error:', itemsError)
     }
 
     return NextResponse.json({ quote })
@@ -276,7 +392,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing quote_id' }, { status: 400 })
     }
 
-    // Verify ownership
     const { data: existing } = await supabase
       .from('quotes')
       .select('quote_id, business_id, status')
@@ -292,15 +407,29 @@ export async function PUT(request: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // Update provided fields
+    // Update simple fields
     if (body.customer_id !== undefined) updates.customer_id = body.customer_id
     if (body.title !== undefined) updates.title = body.title
     if (body.description !== undefined) updates.description = body.description
-    // Only include ROT/RUT personal fields when explicitly provided with values
     if (body.personnummer !== undefined && body.personnummer !== null) updates.personnummer = body.personnummer
     if (body.fastighetsbeteckning !== undefined && body.fastighetsbeteckning !== null) updates.fastighetsbeteckning = body.fastighetsbeteckning
     if (body.terms !== undefined) updates.terms = body.terms
     if (body.images !== undefined) updates.images = body.images
+
+    // New text fields
+    if (body.introduction_text !== undefined) updates.introduction_text = body.introduction_text
+    if (body.conclusion_text !== undefined) updates.conclusion_text = body.conclusion_text
+    if (body.not_included !== undefined) updates.not_included = body.not_included
+    if (body.ata_terms !== undefined) updates.ata_terms = body.ata_terms
+    if (body.payment_terms_text !== undefined) updates.payment_terms_text = body.payment_terms_text
+    if (body.payment_plan !== undefined) updates.payment_plan = body.payment_plan
+    if (body.reference_person !== undefined) updates.reference_person = body.reference_person
+    if (body.customer_reference !== undefined) updates.customer_reference = body.customer_reference
+    if (body.project_address !== undefined) updates.project_address = body.project_address
+    if (body.detail_level !== undefined) updates.detail_level = body.detail_level
+    if (body.show_unit_prices !== undefined) updates.show_unit_prices = body.show_unit_prices
+    if (body.show_quantities !== undefined) updates.show_quantities = body.show_quantities
+
     if (body.status !== undefined) {
       updates.status = body.status
       if (body.status === 'sent' && !existing.status?.includes('sent')) {
@@ -308,44 +437,100 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Recalculate totals if items provided
-    if (body.items !== undefined) {
-      const items = body.items || []
-      const vatRate = body.vat_rate ?? 25
-      const discountPercent = body.discount_percent ?? 0
+    const structuredItems: QuoteItem[] = body.quote_items || []
+    const vatRate = body.vat_rate ?? 25
+    const discountPercent = body.discount_percent ?? 0
 
+    // Recalculate from structured items
+    if (structuredItems.length > 0) {
+      const totals = calculateQuoteTotals(structuredItems, discountPercent, vatRate)
+
+      updates.labor_total = totals.laborTotal
+      updates.material_total = totals.materialTotal
+      updates.subtotal = totals.subtotal
+      updates.discount_percent = discountPercent
+      updates.discount_amount = totals.discountAmount
+      updates.vat_rate = vatRate
+      updates.vat_amount = totals.vat
+      updates.total = totals.total
+      updates.items = [] // Clear legacy JSONB
+
+      // ROT/RUT new split
+      updates.rot_work_cost = totals.rotWorkCost
+      updates.rot_deduction = totals.rotDeduction
+      updates.rot_customer_pays = totals.rotCustomerPays
+      updates.rut_work_cost = totals.rutWorkCost
+      updates.rut_deduction = totals.rutDeduction
+      updates.rut_customer_pays = totals.rutCustomerPays
+
+      // Legacy compat
+      const totalDeduction = totals.rotDeduction + totals.rutDeduction
+      if (totals.rotWorkCost > 0 && totals.rutWorkCost > 0) {
+        updates.rot_rut_type = 'rot' // both active, prefer rot
+      } else if (totals.rotWorkCost > 0) {
+        updates.rot_rut_type = 'rot'
+      } else if (totals.rutWorkCost > 0) {
+        updates.rot_rut_type = 'rut'
+      } else if (body.rot_rut_type !== undefined) {
+        updates.rot_rut_type = body.rot_rut_type || null
+      }
+      updates.rot_rut_eligible = totals.rotWorkCost + totals.rutWorkCost
+      updates.rot_rut_deduction = totalDeduction
+      updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
+
+      // Replace quote_items rows
+      await supabase.from('quote_items').delete().eq('quote_id', quote_id)
+      const itemInserts = structuredItems.map((item, idx) => ({
+        id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
+        quote_id: quote_id,
+        business_id: business.business_id,
+        item_type: item.item_type,
+        group_name: item.group_name || null,
+        description: item.description || '',
+        quantity: item.quantity || 0,
+        unit: item.unit || 'st',
+        unit_price: item.unit_price || 0,
+        total: item.item_type === 'item' ? (item.quantity || 0) * (item.unit_price || 0) : (item.total || 0),
+        cost_price: item.cost_price || null,
+        article_number: item.article_number || null,
+        is_rot_eligible: item.is_rot_eligible || false,
+        is_rut_eligible: item.is_rut_eligible || false,
+        sort_order: idx,
+      }))
+      if (itemInserts.length > 0) {
+        const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
+        if (itemsErr) console.error('Update quote_items error:', itemsErr)
+      }
+    } else if (body.items !== undefined) {
+      // Legacy JSONB items recalculation
+      const items = body.items || []
       const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
       const materialTotal = items.filter((i: any) => i.type === 'material').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
       const serviceTotal = items.filter((i: any) => i.type === 'service').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
       const subtotal = laborTotal + materialTotal + serviceTotal
-      const discountAmount = subtotal * (discountPercent / 100)
-      const afterDiscount = subtotal - discountAmount
+      const discountAmt = subtotal * (discountPercent / 100)
+      const afterDiscount = subtotal - discountAmt
       const vatAmount = afterDiscount * (vatRate / 100)
       const total = afterDiscount + vatAmount
 
-      const processedItems = items.map((i: any) => ({
-        ...i,
-        total: (i.quantity || 0) * (i.unit_price || 0)
-      }))
+      const processedItems = items.map((i: any) => ({ ...i, total: (i.quantity || 0) * (i.unit_price || 0) }))
 
       updates.items = processedItems
       updates.labor_total = laborTotal
       updates.material_total = materialTotal
       updates.subtotal = subtotal
       updates.discount_percent = discountPercent
-      updates.discount_amount = discountAmount
+      updates.discount_amount = discountAmt
       updates.vat_rate = vatRate
       updates.vat_amount = vatAmount
       updates.total = total
 
-      // ROT/RUT
-      const rotRutType = body.rot_rut_type !== undefined ? body.rot_rut_type : existing.status // fetch from existing if not provided
       if (body.rot_rut_type !== undefined) updates.rot_rut_type = body.rot_rut_type
       if (body.rot_rut_type) {
         const rotRutEligible = laborTotal
         const rate = body.rot_rut_type === 'rot' ? 0.30 : 0.50
-        const maxDeduction = body.rot_rut_type === 'rot' ? 50000 : 75000
-        const rotRutDeduction = Math.min(rotRutEligible * rate, maxDeduction)
+        const maxDed = body.rot_rut_type === 'rot' ? 50000 : 75000
+        const rotRutDeduction = Math.min(rotRutEligible * rate, maxDed)
         updates.rot_rut_eligible = rotRutEligible
         updates.rot_rut_deduction = rotRutDeduction
         updates.customer_pays = total - rotRutDeduction
@@ -356,7 +541,6 @@ export async function PUT(request: NextRequest) {
         updates.customer_pays = total
       }
     } else {
-      // Only update discount/vat/rot without items change
       if (body.discount_percent !== undefined) updates.discount_percent = body.discount_percent
       if (body.vat_rate !== undefined) updates.vat_rate = body.vat_rate
       if (body.rot_rut_type !== undefined) updates.rot_rut_type = body.rot_rut_type || null
@@ -385,7 +569,7 @@ export async function PUT(request: NextRequest) {
 }
 
 /**
- * DELETE - Ta bort offert (bara drafts)
+ * DELETE - Ta bort offert
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -401,7 +585,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing quoteId' }, { status: 400 })
     }
 
-    // Check status
     const { data: quote } = await supabase
       .from('quotes')
       .select('status')
@@ -413,6 +596,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
+    // quote_items are CASCADE deleted via FK
     const { error } = await supabase
       .from('quotes')
       .delete()

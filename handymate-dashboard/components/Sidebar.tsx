@@ -105,6 +105,8 @@ const NAV: NavItem[] = [
       { label: 'Billing', href: '/dashboard/billing' },
       { label: 'Team', href: '/dashboard/settings?tab=team' },
       { label: 'Automationer', href: '/dashboard/automations' },
+      { label: 'Offertmallar', href: '/dashboard/settings/quote-templates', featureGate: 'quote_templates' },
+      { label: 'Standardtexter', href: '/dashboard/settings/quote-texts', featureGate: 'quote_templates' },
       { label: 'Lager & Material', href: '/dashboard/orders' },
       { label: 'Marknadsföring', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
     ],

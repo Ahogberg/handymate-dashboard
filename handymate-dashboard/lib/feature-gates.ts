@@ -166,6 +166,16 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'AI Projektledare',
     plans: ['professional', 'business'],
   },
+  quote_templates: {
+    key: 'quote_templates',
+    name: 'Offertmallar',
+    plans: ['professional', 'business'],
+  },
+  ai_quote_generator: {
+    key: 'ai_quote_generator',
+    name: 'AI-offertgenerering',
+    plans: ['professional', 'business'],
+  },
 
   // === BEGRÄNSADE PER PLAN ===
   ai_photo_quote: {
