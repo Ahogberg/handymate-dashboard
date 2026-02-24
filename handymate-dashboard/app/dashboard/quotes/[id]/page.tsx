@@ -390,7 +390,7 @@ export default function QuoteDetailPage() {
     switch (unit) {
       case 'hour': return 'tim'
       case 'piece': return 'st'
-      case 'm2': return 'm\u00B2'
+      case 'm2': return 'm²'
       case 'm': return 'm'
       case 'lm': return 'lm'
       case 'pauschal': return 'pauschal'
@@ -459,7 +459,7 @@ export default function QuoteDetailPage() {
                     {(quote?.show_quantities !== false || quote?.show_unit_prices !== false) && (
                       <p className="text-sm text-gray-400">
                         {quote?.show_quantities !== false && <>{item.quantity} {getUnitLabel(item.unit)}</>}
-                        {quote?.show_quantities !== false && quote?.show_unit_prices !== false && ' \u00D7 '}
+                        {quote?.show_quantities !== false && quote?.show_unit_prices !== false && ' × '}
                         {quote?.show_unit_prices !== false && formatCurrency(item.unit_price)}
                       </p>
                     )}
@@ -511,7 +511,7 @@ export default function QuoteDetailPage() {
                 <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                   <div>
                     <p className="text-gray-900">{item.name}</p>
-                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} \u00D7 {formatCurrency(item.unit_price)}</p>
+                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
                   </div>
                   <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                 </div>
@@ -529,7 +529,7 @@ export default function QuoteDetailPage() {
                 <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
                   <div>
                     <p className="text-gray-900">{item.name}</p>
-                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} \u00D7 {formatCurrency(item.unit_price)}</p>
+                    <p className="text-sm text-gray-400">{item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}</p>
                   </div>
                   <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
                 </div>

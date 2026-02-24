@@ -138,7 +138,7 @@ function getUnitLabel(unit: string): string {
     case 'tim': return 'tim'
     case 'st': return 'st'
     case 'h': return 'tim'
-    case 'm2': return 'm\u00B2'
+    case 'm2': return 'm²'
     case 'm': return 'm'
     case 'lm': return 'lm'
     case 'pauschal': return 'pauschal'
@@ -211,7 +211,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       headerCols.push('<th class="text-center" style="width: 10%">Enhet</th>')
     }
     if (showUnitPrices) {
-      headerCols.push('<th class="text-right" style="width: 18%">\u00C0-pris</th>')
+      headerCols.push('<th class="text-right" style="width: 18%">À-pris</th>')
     }
     headerCols.push('<th class="text-right" style="width: 22%">Summa</th>')
 
@@ -291,7 +291,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
           <th style="width: 35%">Post</th>
           <th class="text-center" style="width: 10%">Antal</th>
           <th class="text-center" style="width: 10%">Enhet</th>
-          <th class="text-right" style="width: 18%">\u00C0-pris</th>
+          <th class="text-right" style="width: 18%">À-pris</th>
           <th class="text-right" style="width: 22%">Summa</th>
         </tr>
       </thead>

@@ -99,7 +99,7 @@ const UNIT_OPTIONS = [
   { value: 'st', label: 'st' },
   { value: 'tim', label: 'tim' },
   { value: 'm', label: 'm' },
-  { value: 'm2', label: 'm\u00B2' },
+  { value: 'm2', label: 'm²' },
   { value: 'lm', label: 'lm' },
   { value: 'kg', label: 'kg' },
   { value: 'pauschal', label: 'pauschal' },
@@ -194,7 +194,7 @@ function StandardTextPicker({
         onClick={() => setOpen(!open)}
         className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
       >
-        V\u00E4lj standardtext
+        Välj standardtext
       </button>
       {open && (
         <>
@@ -467,7 +467,7 @@ export default function NewQuotePage() {
       }
     } catch (err) {
       console.error('AI generation failed:', err)
-      toast.error('N\u00E4tverksfel vid AI-generering')
+      toast.error('Nätverksfel vid AI-generering')
       setWizardStep('select')
     }
     setGenerating(false)
@@ -508,7 +508,7 @@ export default function NewQuotePage() {
       }
     } catch (err) {
       console.error('AI generation failed:', err)
-      toast.error('N\u00E4tverksfel vid AI-generering')
+      toast.error('Nätverksfel vid AI-generering')
       setWizardStep('text')
     }
     setGenerating(false)
@@ -787,12 +787,12 @@ export default function NewQuotePage() {
 
   const saveQuote = async (send: boolean = false) => {
     if (send && !selectedCustomer) {
-      toast.warning('V\u00E4lj en kund f\u00F6rst f\u00F6r att skicka offerten')
+      toast.warning('Välj en kund först för att skicka offerten')
       return
     }
 
     if (paymentPlan.length > 0 && !paymentPlanValid) {
-      toast.warning('Betalningsplanens procentsatser m\u00E5ste summera till 100%')
+      toast.warning('Betalningsplanens procentsatser måste summera till 100%')
       return
     }
 
@@ -933,7 +933,7 @@ export default function NewQuotePage() {
               onClick={() => setWizardStep('form')}
               className="text-sm text-gray-400 hover:text-gray-900 transition-all"
             >
-              Hoppa till formul\u00E4r
+              Hoppa till formulär
             </button>
           </div>
 
@@ -968,7 +968,7 @@ export default function NewQuotePage() {
                 <textarea
                   value={aiTextInput}
                   onChange={(e) => setAiTextInput(e.target.value)}
-                  placeholder="Beskriv jobbet... t.ex. 'Byta 3 eluttag i k\u00F6k, dra ny kabel fr\u00E5n elcentral, installera dimmer i vardagsrum'"
+                  placeholder="Beskriv jobbet... t.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
                   rows={5}
                   autoFocus
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none mb-4"
@@ -990,7 +990,7 @@ export default function NewQuotePage() {
                     ) : (
                       <Sparkles className="w-4 h-4" />
                     )}
-                    {generating ? 'Genererar...' : 'Generera offertf\u00F6rslag'}
+                    {generating ? 'Genererar...' : 'Generera offertförslag'}
                   </button>
                 </div>
               </div>
@@ -1006,11 +1006,11 @@ export default function NewQuotePage() {
             {wizardStep === 'ai-preview' && generating && (
               <div className="text-center py-12">
                 <Loader2 className="w-10 h-10 text-blue-600 animate-spin mx-auto mb-4" />
-                <p className="text-gray-900 font-medium">Genererar offertf\u00F6rslag...</p>
+                <p className="text-gray-900 font-medium">Genererar offertförslag...</p>
                 <div className="space-y-1 mt-3 text-sm text-gray-400">
                   <p>Analyserar beskrivning...</p>
-                  <p>H\u00E4mtar din prishistorik...</p>
-                  <p>Ber\u00E4knar material och arbete...</p>
+                  <p>Hämtar din prishistorik...</p>
+                  <p>Beräknar material och arbete...</p>
                 </div>
               </div>
             )}
@@ -1114,7 +1114,7 @@ export default function NewQuotePage() {
                     onChange={(e) => setSelectedCustomer(e.target.value)}
                     className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   >
-                    <option value="">V\u00E4lj kund...</option>
+                    <option value="">Välj kund...</option>
                     {customers.map((c) => (
                       <option key={c.customer_id} value={c.customer_id}>
                         {c.name} - {c.phone_number}
@@ -1141,7 +1141,7 @@ export default function NewQuotePage() {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder="T.ex. Elinstallation k\u00F6k"
+                    placeholder="T.ex. Elinstallation kök"
                     className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
@@ -1150,7 +1150,7 @@ export default function NewQuotePage() {
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Beskriv arbetet som ska utf\u00F6ras..."
+                    placeholder="Beskriv arbetet som ska utföras..."
                     rows={2}
                     className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                   />
@@ -1229,7 +1229,7 @@ export default function NewQuotePage() {
                     <textarea
                       value={introductionText}
                       onChange={(e) => setIntroductionText(e.target.value)}
-                      placeholder="H\u00E4lsningsfras och inledning..."
+                      placeholder="Hälsningsfras och inledning..."
                       rows={3}
                       className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                     />
@@ -1263,15 +1263,15 @@ export default function NewQuotePage() {
                     <textarea
                       value={notIncluded}
                       onChange={(e) => setNotIncluded(e.target.value)}
-                      placeholder="Vad ing\u00E5r inte..."
+                      placeholder="Vad ingår inte..."
                       rows={3}
                       className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                     />
                   </div>
-                  {/* \u00C4TA terms */}
+                  {/* ÄTA terms */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">\u00C4TA-villkor</label>
+                      <label className="block text-sm text-gray-500">ÄTA-villkor</label>
                       <StandardTextPicker
                         texts={textsByType.ata_terms}
                         onSelect={setAtaTerms}
@@ -1280,7 +1280,7 @@ export default function NewQuotePage() {
                     <textarea
                       value={ataTerms}
                       onChange={(e) => setAtaTerms(e.target.value)}
-                      placeholder="\u00C4ndrings- och till\u00E4ggsarbeten..."
+                      placeholder="Ändrings- och tilläggsarbeten..."
                       rows={3}
                       className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
                     />
@@ -1351,14 +1351,14 @@ export default function NewQuotePage() {
                   onClick={() => setShowGrossistSearch(true)}
                   className="px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-700 text-sm hover:bg-emerald-200 flex items-center gap-1"
                 >
-                  <Search className="w-3.5 h-3.5" /> S\u00F6k grossist
+                  <Search className="w-3.5 h-3.5" /> Sök grossist
                 </button>
               </div>
 
               {items.length === 0 ? (
                 <div className="text-center py-8 text-gray-400">
                   <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p>Inga rader \u00E4nnu. L\u00E4gg till poster ovan.</p>
+                  <p>Inga rader ännu. Lägg till poster ovan.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1393,7 +1393,7 @@ export default function NewQuotePage() {
               {/* Quick add from price list */}
               {priceList.length > 0 && (
                 <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-400 mb-2">Snabbval fr\u00E5n prislista:</p>
+                  <p className="text-sm text-gray-400 mb-2">Snabbval från prislista:</p>
                   <div className="flex flex-wrap gap-2">
                     {priceList.slice(0, 8).map((item) => (
                       <button
@@ -1435,7 +1435,7 @@ export default function NewQuotePage() {
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 pt-4">
                   {paymentPlan.length === 0 ? (
                     <p className="text-sm text-gray-400 mb-3">
-                      Ingen betalningsplan. L\u00E4gg till delbetalningar nedan.
+                      Ingen betalningsplan. Lägg till delbetalningar nedan.
                     </p>
                   ) : (
                     <div className="space-y-3 mb-4">
@@ -1477,7 +1477,7 @@ export default function NewQuotePage() {
                             onChange={(e) =>
                               updatePaymentPlanEntry(idx, 'due_description', e.target.value)
                             }
-                            placeholder="F\u00F6rfallodatum/villkor"
+                            placeholder="Förfallodatum/villkor"
                             className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                           />
                           <button
@@ -1501,7 +1501,7 @@ export default function NewQuotePage() {
                     onClick={addPaymentPlanEntry}
                     className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm hover:bg-gray-200"
                   >
-                    <Plus className="w-4 h-4" /> L\u00E4gg till delbetalning
+                    <Plus className="w-4 h-4" /> Lägg till delbetalning
                   </button>
                 </div>
               )}
@@ -1516,7 +1516,7 @@ export default function NewQuotePage() {
               >
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Settings2 className="w-5 h-5 text-gray-500" />
-                  Visningsinst\u00E4llningar
+                  Visningsinställningar
                 </h2>
                 {showDisplaySettings ? (
                   <ChevronUp className="w-5 h-5 text-gray-400" />
@@ -1527,7 +1527,7 @@ export default function NewQuotePage() {
               {showDisplaySettings && (
                 <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 pt-4 space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Detaljniv\u00E5</label>
+                    <label className="block text-sm text-gray-500 mb-1">Detaljnivå</label>
                     <select
                       value={detailLevel}
                       onChange={(e) => setDetailLevel(e.target.value as DetailLevel)}
@@ -1552,7 +1552,7 @@ export default function NewQuotePage() {
                         ) : (
                           <EyeOff className="w-4 h-4 text-gray-400" />
                         )}
-                        Visa \u00E0-priser
+                        Visa à-priser
                       </span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1598,7 +1598,7 @@ export default function NewQuotePage() {
                 </div>
                 {totals.serviceTotal > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Tj\u00E4nster</span>
+                    <span className="text-gray-500">Tjänster</span>
                     <span className="text-gray-900">{formatCurrency(totals.serviceTotal)}</span>
                   </div>
                 )}
@@ -1650,7 +1650,7 @@ export default function NewQuotePage() {
                     {hasRotItems && totals.rotWorkCost > 0 && (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-emerald-700">ROT-ber\u00E4ttigat arbete</span>
+                          <span className="text-emerald-700">ROT-berättigat arbete</span>
                           <span className="text-gray-900">
                             {formatCurrency(totals.rotWorkCost)}
                           </span>
@@ -1675,7 +1675,7 @@ export default function NewQuotePage() {
                     {hasRutItems && totals.rutWorkCost > 0 && (
                       <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
                         <div className="flex justify-between text-sm mb-1">
-                          <span className="text-emerald-700">RUT-ber\u00E4ttigat arbete</span>
+                          <span className="text-emerald-700">RUT-berättigat arbete</span>
                           <span className="text-gray-900">
                             {formatCurrency(totals.rutWorkCost)}
                           </span>
@@ -1720,14 +1720,14 @@ export default function NewQuotePage() {
                             type="text"
                             value={fastighetsbeteckning}
                             onChange={(e) => setFastighetsbeteckning(e.target.value)}
-                            placeholder="T.ex. Stockholm S\u00F6der 1:23"
+                            placeholder="T.ex. Stockholm Söder 1:23"
                             className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                           />
                         </div>
                       )}
                       {!personnummer && (
                         <p className="text-xs text-amber-600">
-                          Personnummer kr\u00E4vs f\u00F6r{' '}
+                          Personnummer krävs för{' '}
                           {hasRotItems && hasRutItems
                             ? 'ROT/RUT'
                             : hasRotItems
@@ -2045,7 +2045,7 @@ function ItemRow({
           <div className="flex items-center gap-1 justify-center">
             <label
               className="cursor-pointer"
-              title="ROT-ber\u00E4ttigat"
+              title="ROT-berättigat"
             >
               <input
                 type="checkbox"
@@ -2057,7 +2057,7 @@ function ItemRow({
             </label>
             <label
               className="cursor-pointer"
-              title="RUT-ber\u00E4ttigat"
+              title="RUT-berättigat"
             >
               <input
                 type="checkbox"
