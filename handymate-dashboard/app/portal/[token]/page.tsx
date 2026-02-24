@@ -56,12 +56,42 @@ interface Quote {
 interface Invoice {
   invoice_id: string
   invoice_number: string
+  invoice_type?: string
   status: string
+  items?: any[]
+  subtotal?: number
+  vat_rate?: number
+  vat_amount?: number
   total: number
+  rot_rut_type: string | null
+  rot_rut_deduction?: number | null
+  customer_pays?: number | null
+  invoice_date?: string
   due_date: string
   paid_at: string | null
   created_at: string
-  rot_rut_type: string | null
+  ocr_number?: string
+  our_reference?: string | null
+  your_reference?: string | null
+  is_credit_note?: boolean
+  reminder_count?: number
+  introduction_text?: string | null
+  conclusion_text?: string | null
+}
+
+interface PaymentInfo {
+  bankgiro: string | null
+  plusgiro: string | null
+  swish: string | null
+  bank_account: string | null
+  penalty_interest: number
+  reminder_fee: number
+}
+
+interface BusinessInfo {
+  name: string
+  org_number: string
+  f_skatt: boolean
 }
 
 interface Message {
@@ -89,7 +119,9 @@ export default function CustomerPortalPage() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [paymentInfo, setPaymentInfo] = useState<{ bankgiro: string | null; swish: string | null }>({ bankgiro: null, swish: null })
+  const [selectedInvoice, setSelectedInvoice] = useState<string | null>(null)
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo>({ bankgiro: null, plusgiro: null, swish: null, bank_account: null, penalty_interest: 8, reminder_fee: 60 })
+  const [businessInfo, setBusinessInfo] = useState<BusinessInfo>({ name: '', org_number: '', f_skatt: false })
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
@@ -141,7 +173,8 @@ export default function CustomerPortalPage() {
         const res = await fetch(`/api/portal/${token}/invoices`)
         const data = await res.json()
         setInvoices(data.invoices || [])
-        setPaymentInfo(data.paymentInfo || { bankgiro: null, swish: null })
+        setPaymentInfo(data.paymentInfo || { bankgiro: null, plusgiro: null, swish: null, bank_account: null, penalty_interest: 8, reminder_fee: 60 })
+        if (data.business) setBusinessInfo(data.business)
       } else if (tab === 'messages') {
         const res = await fetch(`/api/portal/${token}/messages`)
         const data = await res.json()
@@ -277,7 +310,7 @@ export default function CustomerPortalPage() {
             ]).map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => { setActiveTab(tab.id); setSelectedInvoice(null) }}
                 className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all ${
                   activeTab === tab.id
                     ? 'border-blue-500 text-blue-700'
@@ -488,43 +521,311 @@ export default function CustomerPortalPage() {
             )}
 
             {/* Invoices Tab */}
-            {activeTab === 'invoices' && (
+            {activeTab === 'invoices' && !selectedInvoice && (
               <div className="space-y-4">
                 {invoices.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Receipt className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                     <p>Inga fakturor just nu.</p>
                   </div>
-                ) : invoices.map(inv => (
-                  <div key={inv.invoice_id} className="bg-white rounded-xl border border-gray-200 p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-gray-900">Faktura #{inv.invoice_number}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full border ${getInvoiceStatusColor(inv.status)}`}>
-                        {getInvoiceStatusText(inv.status)}
-                      </span>
-                    </div>
-                    <div className="text-sm text-gray-500 mb-3">
-                      {inv.status === 'paid' && inv.paid_at
-                        ? `Betald: ${formatDate(inv.paid_at)}`
-                        : `Forfaller: ${formatDate(inv.due_date)}`}
-                    </div>
-                    <p className="text-lg font-semibold text-gray-900 mb-3">{formatCurrency(inv.total)}</p>
-
-                    {inv.status !== 'paid' && (paymentInfo.bankgiro || paymentInfo.swish) && (
-                      <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
-                        {paymentInfo.bankgiro && (
-                          <p className="text-gray-600">Bankgiro: <span className="font-medium text-gray-900">{paymentInfo.bankgiro}</span></p>
-                        )}
-                        {paymentInfo.swish && (
-                          <p className="text-gray-600">Swish: <span className="font-medium text-gray-900">{paymentInfo.swish}</span></p>
-                        )}
-                        <p className="text-gray-600">OCR: <span className="font-medium text-gray-900">{inv.invoice_number}</span></p>
+                ) : invoices.map(inv => {
+                  const amountToPay = inv.customer_pays || inv.total
+                  const daysUntilDue = Math.ceil((new Date(inv.due_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  return (
+                    <button
+                      key={inv.invoice_id}
+                      onClick={() => setSelectedInvoice(inv.invoice_id)}
+                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Faktura #{inv.invoice_number}</h3>
+                          {inv.is_credit_note && (
+                            <span className="text-xs text-red-600 font-medium">Kreditfaktura</span>
+                          )}
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full border ${getInvoiceStatusColor(inv.status)}`}>
+                          {getInvoiceStatusText(inv.status)}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <div className="text-sm text-gray-500 mb-2">
+                        {inv.status === 'paid' && inv.paid_at
+                          ? `Betald: ${formatDate(inv.paid_at)}`
+                          : inv.status === 'overdue'
+                            ? `${Math.abs(daysUntilDue)} dagar forsenad`
+                            : `Forfaller: ${formatDate(inv.due_date)}`
+                        }
+                        {inv.reminder_count ? ` | ${inv.reminder_count} paminnelse${inv.reminder_count > 1 ? 'r' : ''}` : ''}
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">{formatCurrency(amountToPay)}</p>
+                          {inv.rot_rut_type && inv.rot_rut_deduction && (
+                            <p className="text-xs text-emerald-600">efter {inv.rot_rut_type.toUpperCase()}-avdrag ({formatCurrency(inv.rot_rut_deduction)})</p>
+                          )}
+                        </div>
+                        <span className="text-sm text-blue-600 flex items-center gap-1">
+                          Detaljer <ChevronRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
             )}
+
+            {/* Invoice Detail View */}
+            {activeTab === 'invoices' && selectedInvoice && (() => {
+              const inv = invoices.find(i => i.invoice_id === selectedInvoice)
+              if (!inv) return null
+              const amountToPay = inv.customer_pays || inv.total
+              const ocrNumber = inv.ocr_number || inv.invoice_number
+              const dueDate = new Date(inv.due_date)
+              const now = new Date()
+              const daysOverdue = inv.status === 'overdue' ? Math.max(0, Math.ceil((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))) : 0
+              const penaltyAmount = daysOverdue > 0 ? Math.round(amountToPay * (paymentInfo.penalty_interest / 100) * (daysOverdue / 365) * 100) / 100 : 0
+              const reminderFeeAmount = inv.reminder_count && inv.reminder_count > 0 ? paymentInfo.reminder_fee : 0
+              const totalWithFees = amountToPay + penaltyAmount + reminderFeeAmount
+              const swishUrl = paymentInfo.swish ? `swish://payment?payee=${paymentInfo.swish.replace(/\s/g, '')}&amount=${Math.round(inv.status === 'overdue' ? totalWithFees : amountToPay)}&message=Faktura ${inv.invoice_number}` : null
+
+              return (
+                <div className="space-y-4">
+                  {/* Back button */}
+                  <button
+                    onClick={() => setSelectedInvoice(null)}
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 mb-2"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Tillbaka till fakturor
+                  </button>
+
+                  {/* Status header */}
+                  <div className={`rounded-xl p-4 ${
+                    inv.status === 'paid' ? 'bg-emerald-50 border border-emerald-200' :
+                    inv.status === 'overdue' ? 'bg-red-50 border border-red-200' :
+                    'bg-blue-50 border border-blue-200'
+                  }`}>
+                    <div className="flex items-center gap-3">
+                      {inv.status === 'paid' ? (
+                        <CheckCircle className="w-6 h-6 text-emerald-600" />
+                      ) : inv.status === 'overdue' ? (
+                        <AlertCircle className="w-6 h-6 text-red-600" />
+                      ) : (
+                        <Clock className="w-6 h-6 text-blue-600" />
+                      )}
+                      <div>
+                        <h3 className={`font-semibold ${
+                          inv.status === 'paid' ? 'text-emerald-700' :
+                          inv.status === 'overdue' ? 'text-red-700' :
+                          'text-blue-700'
+                        }`}>
+                          {inv.status === 'paid' ? 'Betald' :
+                           inv.status === 'overdue' ? `Forsenad - ${daysOverdue} dagar` :
+                           'Vantar pa betalning'}
+                        </h3>
+                        <p className={`text-sm ${
+                          inv.status === 'paid' ? 'text-emerald-600' :
+                          inv.status === 'overdue' ? 'text-red-600' :
+                          'text-blue-600'
+                        }`}>
+                          {inv.status === 'paid' && inv.paid_at
+                            ? `Betalades ${formatDate(inv.paid_at)}`
+                            : `Forfallodag: ${formatDate(inv.due_date)}`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Invoice details card */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <h3 className="font-semibold text-gray-900 mb-3">Faktura #{inv.invoice_number}</h3>
+
+                    {inv.introduction_text && (
+                      <p className="text-sm text-gray-600 mb-3">{inv.introduction_text}</p>
+                    )}
+
+                    {/* Meta info */}
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-400 mb-0.5">Fakturadatum</p>
+                        <p className="text-sm font-medium text-gray-900">{formatDate(inv.invoice_date || inv.created_at)}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-400 mb-0.5">Forfallodag</p>
+                        <p className={`text-sm font-medium ${inv.status === 'overdue' ? 'text-red-600' : 'text-gray-900'}`}>
+                          {formatDate(inv.due_date)}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-xs text-gray-400 mb-0.5">OCR-nummer</p>
+                        <p className="text-sm font-mono font-semibold text-gray-900">{ocrNumber}</p>
+                      </div>
+                      {inv.our_reference && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs text-gray-400 mb-0.5">Er referens</p>
+                          <p className="text-sm font-medium text-gray-900">{inv.our_reference}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Items */}
+                    {inv.items && inv.items.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Rader</h4>
+                        <div className="space-y-1.5">
+                          {inv.items.filter((item: any) => item.item_type !== 'heading' && item.item_type !== 'text').map((item: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-gray-900 truncate">{item.description}</p>
+                                <p className="text-xs text-gray-400">{item.quantity} {item.unit} x {formatCurrency(item.unit_price)}</p>
+                              </div>
+                              <p className="text-sm font-medium text-gray-900 ml-4">{formatCurrency(item.total)}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Totals */}
+                    <div className="border-t border-gray-200 pt-3 space-y-1.5">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Delsumma</span>
+                        <span className="text-gray-900">{formatCurrency(inv.subtotal || 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Moms ({inv.vat_rate || 25}%)</span>
+                        <span className="text-gray-900">{formatCurrency(inv.vat_amount || 0)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold border-t border-gray-100 pt-1.5">
+                        <span className="text-gray-900">Totalt</span>
+                        <span className="text-gray-900">{formatCurrency(inv.total)}</span>
+                      </div>
+                      {inv.rot_rut_type && inv.rot_rut_deduction && (
+                        <>
+                          <div className="flex justify-between text-sm text-emerald-600">
+                            <span>{inv.rot_rut_type.toUpperCase()}-avdrag</span>
+                            <span>-{formatCurrency(inv.rot_rut_deduction)}</span>
+                          </div>
+                          <div className="flex justify-between text-base font-bold bg-emerald-50 rounded-lg px-3 py-2 -mx-1">
+                            <span className="text-gray-900">Att betala</span>
+                            <span className="text-gray-900">{formatCurrency(amountToPay)}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {inv.conclusion_text && (
+                      <p className="text-sm text-gray-500 mt-3 pt-3 border-t border-gray-100">{inv.conclusion_text}</p>
+                    )}
+                  </div>
+
+                  {/* Overdue fees */}
+                  {inv.status === 'overdue' && (penaltyAmount > 0 || reminderFeeAmount > 0) && (
+                    <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+                      <h4 className="font-medium text-red-700 mb-2">Forsent betalad</h4>
+                      <div className="space-y-1.5 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-red-600">Fakturabelopp</span>
+                          <span className="text-red-700">{formatCurrency(amountToPay)}</span>
+                        </div>
+                        {reminderFeeAmount > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-red-600">Paminnelseavgift</span>
+                            <span className="text-red-700">{formatCurrency(reminderFeeAmount)}</span>
+                          </div>
+                        )}
+                        {penaltyAmount > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-red-600">Drojsmalsranta ({paymentInfo.penalty_interest}%, {daysOverdue} dgr)</span>
+                            <span className="text-red-700">{formatCurrency(penaltyAmount)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-bold border-t border-red-200 pt-1.5">
+                          <span className="text-red-700">Att betala nu</span>
+                          <span className="text-red-700">{formatCurrency(totalWithFees)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payment info */}
+                  {inv.status !== 'paid' && (
+                    <div className="bg-gray-900 rounded-xl p-4 text-white">
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Betalningsinformation</h4>
+                      <div className="grid grid-cols-2 gap-3">
+                        {paymentInfo.bankgiro && (
+                          <div>
+                            <p className="text-xs text-gray-400">Bankgiro</p>
+                            <p className="text-base font-semibold text-blue-400">{paymentInfo.bankgiro}</p>
+                          </div>
+                        )}
+                        {paymentInfo.plusgiro && (
+                          <div>
+                            <p className="text-xs text-gray-400">Plusgiro</p>
+                            <p className="text-base font-semibold text-blue-400">{paymentInfo.plusgiro}</p>
+                          </div>
+                        )}
+                        {paymentInfo.swish && (
+                          <div>
+                            <p className="text-xs text-gray-400">Swish</p>
+                            <p className="text-base font-semibold text-blue-400">{paymentInfo.swish}</p>
+                          </div>
+                        )}
+                        {paymentInfo.bank_account && (
+                          <div>
+                            <p className="text-xs text-gray-400">Bankkonto</p>
+                            <p className="text-base font-semibold text-blue-400">{paymentInfo.bank_account}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs text-gray-400">OCR-nummer</p>
+                          <p className="text-base font-mono font-semibold text-blue-400">{ocrNumber}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Att betala</p>
+                          <p className="text-base font-semibold text-blue-400">
+                            {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Swish button */}
+                  {inv.status !== 'paid' && paymentInfo.swish && (
+                    <a
+                      href={swishUrl || '#'}
+                      className="flex items-center justify-center gap-3 w-full py-4 bg-[#00C281] hover:bg-[#00A86E] text-white rounded-xl font-semibold text-lg transition-colors shadow-md"
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/>
+                      </svg>
+                      Betala {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)} med Swish
+                    </a>
+                  )}
+
+                  {/* Paid confirmation */}
+                  {inv.status === 'paid' && (
+                    <div className="bg-emerald-50 rounded-xl border border-emerald-200 p-4 text-center">
+                      <CheckCircle className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                      <p className="font-semibold text-emerald-700">Fakturan ar betald</p>
+                      {inv.paid_at && (
+                        <p className="text-sm text-emerald-600">Betalning mottagen {formatDate(inv.paid_at)}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Business footer */}
+                  {businessInfo.name && (
+                    <div className="text-center text-xs text-gray-400 pt-2">
+                      <p>{businessInfo.name}{businessInfo.org_number ? ` | Org.nr: ${businessInfo.org_number}` : ''}</p>
+                      {businessInfo.f_skatt && <p>Godkand for F-skatt</p>}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Messages Tab */}
             {activeTab === 'messages' && (
