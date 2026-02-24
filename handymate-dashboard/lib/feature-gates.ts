@@ -34,6 +34,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Tidrapportering',
     plans: ['starter', 'professional', 'business'],
   },
+  time_tracking_advanced: {
+    key: 'time_tracking_advanced',
+    name: 'GPS, reseersättning, löneexport',
+    plans: ['professional', 'business'],
+  },
   calendar_sync: {
     key: 'calendar_sync',
     name: 'Google Calendar-sync',
