@@ -86,6 +86,19 @@ interface BusinessConfig {
   default_hourly_rate: number
   time_rounding_minutes: number
   time_require_description: boolean
+  standard_work_hours: number
+  overtime_after: number
+  break_after_hours: number
+  default_break_minutes: number
+  require_gps_checkin: boolean
+  require_project: boolean
+  mileage_rate: number
+  allowance_full_day: number
+  allowance_half_day: number
+  ob1_rate: number
+  ob2_rate: number
+  overtime_50_rate: number
+  overtime_100_rate: number
   // Auto-faktura
   auto_invoice_enabled: boolean
   auto_invoice_send: boolean
@@ -512,6 +525,19 @@ export default function SettingsPage() {
           default_hourly_rate: config.default_hourly_rate || 500,
           time_rounding_minutes: config.time_rounding_minutes || 15,
           time_require_description: config.time_require_description || false,
+          standard_work_hours: config.standard_work_hours || 8,
+          overtime_after: config.overtime_after || 8,
+          break_after_hours: config.break_after_hours || 5,
+          default_break_minutes: config.default_break_minutes || 30,
+          require_gps_checkin: config.require_gps_checkin || false,
+          require_project: config.require_project || false,
+          mileage_rate: config.mileage_rate || 25,
+          allowance_full_day: config.allowance_full_day || 290,
+          allowance_half_day: config.allowance_half_day || 145,
+          ob1_rate: config.ob1_rate || 1.3,
+          ob2_rate: config.ob2_rate || 1.7,
+          overtime_50_rate: config.overtime_50_rate || 1.5,
+          overtime_100_rate: config.overtime_100_rate || 2.0,
           // Auto-faktura
           auto_invoice_enabled: config.auto_invoice_enabled || false,
           auto_invoice_send: config.auto_invoice_send || false,
@@ -1808,7 +1834,7 @@ export default function SettingsPage() {
           <div className="space-y-6">
             {/* Grundinställningar */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tidrapportering</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Grundinställningar</h2>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -1840,29 +1866,219 @@ export default function SettingsPage() {
                   </select>
                   <p className="text-xs text-gray-400 mt-1">Tid avrundas uppåt till närmaste intervall</p>
                 </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Standardarbetstid</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={config.standard_work_hours || 8}
+                      onChange={(e) => setConfig({ ...config, standard_work_hours: parseFloat(e.target.value) || 8 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-20"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">tim/dag</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Övertid efter</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={config.overtime_after || 8}
+                      onChange={(e) => setConfig({ ...config, overtime_after: parseFloat(e.target.value) || 8 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-16"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">timmar</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Tid utöver detta räknas som övertid</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Obligatorisk rast efter</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={config.break_after_hours || 5}
+                      onChange={(e) => setConfig({ ...config, break_after_hours: parseFloat(e.target.value) || 5 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-16"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">timmar</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Standard rasttid</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={config.default_break_minutes || 30}
+                      onChange={(e) => setConfig({ ...config, default_break_minutes: parseInt(e.target.value) || 30 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-16"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">minuter</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Kräv beskrivning toggle */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl mt-6">
-                <div>
-                  <p className="font-medium text-gray-900">Kräv beskrivning</p>
-                  <p className="text-sm text-gray-400">Tidrapporter måste ha en beskrivning</p>
+              {/* Toggles */}
+              <div className="space-y-3 mt-6">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="font-medium text-gray-900">Kräv beskrivning</p>
+                    <p className="text-sm text-gray-400">Tidrapporter måste ha en beskrivning</p>
+                  </div>
+                  <button
+                    onClick={() => setConfig({ ...config, time_require_description: !config.time_require_description })}
+                    className={`w-12 h-6 rounded-full transition-all ${config.time_require_description ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gray-200'}`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.time_require_description ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setConfig({
-                    ...config,
-                    time_require_description: !config.time_require_description
-                  })}
-                  className={`w-12 h-6 rounded-full transition-all ${
-                    config.time_require_description
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
-                      : 'bg-gray-200'
-                  }`}
-                >
-                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                    config.time_require_description ? 'translate-x-6' : 'translate-x-0.5'
-                  }`} />
-                </button>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="font-medium text-gray-900">Kräv GPS vid instämpling</p>
+                    <p className="text-sm text-gray-400">Medarbetare måste ha GPS aktiverat vid check-in</p>
+                  </div>
+                  <button
+                    onClick={() => setConfig({ ...config, require_gps_checkin: !config.require_gps_checkin })}
+                    className={`w-12 h-6 rounded-full transition-all ${config.require_gps_checkin ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gray-200'}`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.require_gps_checkin ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="font-medium text-gray-900">Kräv projekt vid tidrapportering</p>
+                    <p className="text-sm text-gray-400">Alla tidrapporter måste kopplas till ett projekt</p>
+                  </div>
+                  <button
+                    onClick={() => setConfig({ ...config, require_project: !config.require_project })}
+                    className={`w-12 h-6 rounded-full transition-all ${config.require_project ? 'bg-gradient-to-r from-blue-500 to-cyan-500' : 'bg-gray-200'}`}
+                  >
+                    <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.require_project ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Resa & Traktamente */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Resa &amp; traktamente</h2>
+              <p className="text-sm text-gray-400 mb-4">Skatteverkets schabloner som standard, konfigurerbart per företag</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Milersättning</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={config.mileage_rate || 25}
+                      onChange={(e) => setConfig({ ...config, mileage_rate: parseFloat(e.target.value) || 25 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-14"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr/km</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Skatteverket: 25 kr/km (2024)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Traktamente heldag</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={config.allowance_full_day || 290}
+                      onChange={(e) => setConfig({ ...config, allowance_full_day: parseInt(e.target.value) || 290 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-10"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Skatteverket: 290 kr (2024)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Traktamente halvdag</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      value={config.allowance_half_day || 145}
+                      onChange={(e) => setConfig({ ...config, allowance_half_day: parseInt(e.target.value) || 145 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-10"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Skatteverket: 145 kr (2024)</p>
+                </div>
+              </div>
+            </div>
+
+            {/* OB & Övertid */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">OB-tillägg &amp; övertid</h2>
+              <p className="text-sm text-gray-400 mb-4">Multiplikatorer för löneunderlag</p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">OB1 (kväll/helg)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={Math.round((config.ob1_rate || 1.3) * 100)}
+                      onChange={(e) => setConfig({ ...config, ob1_rate: (parseInt(e.target.value) || 130) / 100 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">OB2 (natt/storhelg)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={Math.round((config.ob2_rate || 1.7) * 100)}
+                      onChange={(e) => setConfig({ ...config, ob2_rate: (parseInt(e.target.value) || 170) / 100 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Övertid 50%</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={Math.round((config.overtime_50_rate || 1.5) * 100)}
+                      onChange={(e) => setConfig({ ...config, overtime_50_rate: (parseInt(e.target.value) || 150) / 100 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Övertid 100%</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={Math.round((config.overtime_100_rate || 2.0) * 100)}
+                      onChange={(e) => setConfig({ ...config, overtime_100_rate: (parseInt(e.target.value) || 200) / 100 })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-8"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                  </div>
+                </div>
               </div>
             </div>
 
