@@ -18,7 +18,7 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/send-reminders",
+      "path": "/api/invoices/remind-cron",
       "schedule": "0 9 * * *"
     },
     {

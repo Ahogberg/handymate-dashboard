@@ -2,22 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
-
-interface InvoiceItem {
-  description: string
-  quantity: number
-  unit: string
-  unit_price: number
-  total: number
-  type?: 'labor' | 'material'
-}
+import { generateOCR } from '@/lib/ocr'
+import { InvoiceItem } from '@/lib/types/invoice'
 
 /**
  * GET - Lista fakturor för ett företag
  */
 export async function GET(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -27,6 +19,12 @@ export async function GET(request: NextRequest) {
     const businessId = business.business_id
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
+    const invoiceType = request.nextUrl.searchParams.get('invoiceType')
+    const dateFrom = request.nextUrl.searchParams.get('dateFrom')
+    const dateTo = request.nextUrl.searchParams.get('dateTo')
+    const search = request.nextUrl.searchParams.get('search')
+    const sortBy = request.nextUrl.searchParams.get('sortBy') || 'created_at'
+    const sortOrder = request.nextUrl.searchParams.get('sortOrder') === 'asc'
 
     let query = supabase
       .from('invoice')
@@ -41,21 +39,39 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('business_id', businessId)
-      .order('created_at', { ascending: false })
+      .order(sortBy, { ascending: sortOrder })
 
     if (status) {
       query = query.eq('status', status)
     }
-
     if (customerId) {
       query = query.eq('customer_id', customerId)
+    }
+    if (invoiceType) {
+      query = query.eq('invoice_type', invoiceType)
+    }
+    if (dateFrom) {
+      query = query.gte('invoice_date', dateFrom)
+    }
+    if (dateTo) {
+      query = query.lte('invoice_date', dateTo)
     }
 
     const { data: invoices, error } = await query
 
     if (error) throw error
 
-    return NextResponse.json({ invoices })
+    // Client-side search filter (invoice_number + customer name)
+    let filtered = invoices || []
+    if (search) {
+      const term = search.toLowerCase()
+      filtered = filtered.filter((inv: any) =>
+        inv.invoice_number?.toLowerCase().includes(term) ||
+        inv.customer?.name?.toLowerCase().includes(term)
+      )
+    }
+
+    return NextResponse.json({ invoices: filtered })
 
   } catch (error: any) {
     console.error('Get invoices error:', error)
@@ -65,11 +81,9 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST - Skapa ny faktura
- * Kan skapas från tidrapporter eller konverteras från offert
  */
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -86,6 +100,14 @@ export async function POST(request: NextRequest) {
       vat_rate = 25,
       rot_rut_type,
       due_days = 30,
+      invoice_date: providedInvoiceDate,
+      our_reference,
+      your_reference,
+      personnummer,
+      fastighetsbeteckning,
+      introduction_text,
+      conclusion_text,
+      invoice_type = 'standard',
       is_credit_note = false,
       original_invoice_id,
       credit_reason,
@@ -93,32 +115,33 @@ export async function POST(request: NextRequest) {
 
     const business_id = business.business_id
 
-    let items: InvoiceItem[] = providedItems || []
+    let items: any[] = providedItems || []
     let subtotal = 0
 
     // Om vi skapar från tidrapporter
     if (time_entry_ids && time_entry_ids.length > 0) {
       const { data: timeEntries, error: timeError } = await supabase
         .from('time_entry')
-        .select(`
-          *,
-          customer:customer_id (name)
-        `)
+        .select(`*, customer:customer_id (name)`)
         .in('time_entry_id', time_entry_ids)
 
       if (timeError) throw timeError
 
-      // Gruppera tidrapporter per dag/beskrivning
       for (const entry of timeEntries || []) {
         const hours = (entry.duration_minutes || 0) / 60
         const laborCost = hours * (entry.hourly_rate || 0)
         items.push({
+          id: 'ii_' + Math.random().toString(36).substr(2, 12),
+          item_type: 'item',
           description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
           quantity: Math.round(hours * 100) / 100,
           unit: 'timmar',
           unit_price: entry.hourly_rate || 0,
           total: laborCost,
-          type: 'labor'
+          type: 'labor',
+          is_rot_eligible: rot_rut_type === 'rot',
+          is_rut_eligible: rot_rut_type === 'rut',
+          sort_order: items.length,
         })
       }
     }
@@ -128,7 +151,7 @@ export async function POST(request: NextRequest) {
       const { data: matRows, error: matError } = await supabase
         .from('project_material')
         .select('*')
-        .in('material_id', project_material_ids)
+        .in('id', project_material_ids)
         .eq('business_id', business_id)
         .eq('invoiced', false)
 
@@ -136,18 +159,23 @@ export async function POST(request: NextRequest) {
 
       for (const mat of matRows || []) {
         items.push({
+          id: 'ii_' + Math.random().toString(36).substr(2, 12),
+          item_type: 'item',
           description: mat.name + (mat.sku ? ` (${mat.sku})` : ''),
           quantity: mat.quantity,
           unit: mat.unit || 'st',
           unit_price: mat.sell_price || 0,
           total: mat.total_sell || 0,
-          type: 'material' as const
+          type: 'material',
+          is_rot_eligible: false,
+          is_rut_eligible: false,
+          sort_order: items.length,
         })
       }
     }
 
     // Om vi konverterar från offert
-    if (quote_id) {
+    if (quote_id && items.length === 0) {
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
         .select('*')
@@ -157,19 +185,31 @@ export async function POST(request: NextRequest) {
       if (quoteError) throw quoteError
 
       if (quote.items && Array.isArray(quote.items)) {
-        items = quote.items.map((item: any) => ({
+        items = quote.items.map((item: any, i: number) => ({
+          id: item.id || 'ii_' + Math.random().toString(36).substr(2, 12),
+          item_type: item.item_type || 'item',
+          group_name: item.group_name,
           description: item.description || item.name,
           quantity: item.quantity || 1,
           unit: item.unit || 'st',
           unit_price: item.unit_price || item.price || 0,
           total: (item.quantity || 1) * (item.unit_price || item.price || 0),
-          type: item.type
+          type: item.type,
+          is_rot_eligible: item.is_rot_eligible || false,
+          is_rut_eligible: item.is_rut_eligible || false,
+          sort_order: item.sort_order ?? i,
+          cost_price: item.cost_price,
+          article_number: item.article_number,
         }))
       }
     }
 
     // Beräkna totaler
-    subtotal = items.reduce((sum: number, item: InvoiceItem) => sum + item.total, 0)
+    const regularItems = items.filter((i: any) => (i.item_type || 'item') === 'item')
+    const discountItems = items.filter((i: any) => i.item_type === 'discount')
+    subtotal = regularItems.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0)
+    const discountFromRows = discountItems.reduce((sum: number, item: any) => sum + Math.abs(item.total || 0), 0)
+    subtotal -= discountFromRows
     const vatAmount = subtotal * (vat_rate / 100)
     let total = subtotal + vatAmount
 
@@ -180,8 +220,8 @@ export async function POST(request: NextRequest) {
 
     if (rot_rut_type && customer_id) {
       const laborCost = items
-        .filter((i: InvoiceItem) => i.type === 'labor')
-        .reduce((sum: number, i: InvoiceItem) => sum + i.total, 0)
+        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
+        .reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
 
       const cappedResult = await calculateCappedDeduction(
         customer_id,
@@ -194,117 +234,40 @@ export async function POST(request: NextRequest) {
       customerPays = total - rotRutDeduction
       rotRutWarning = cappedResult.warning
     } else if (rot_rut_type && !customer_id) {
-      // Fallback utan kundkoppling
       const laborCost = items
-        .filter((i: InvoiceItem) => i.type === 'labor')
-        .reduce((sum: number, i: InvoiceItem) => sum + i.total, 0)
+        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
+        .reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
       const deductionRate = rot_rut_type === 'rot' ? 0.30 : 0.50
       rotRutDeduction = Math.round(laborCost * deductionRate * 100) / 100
       customerPays = total - rotRutDeduction
     }
 
-    // Kreditfaktura: hämta original och negera belopp
+    // Kreditfaktura: använd /api/invoices/credit istället
     if (is_credit_note && original_invoice_id) {
-      const { data: originalInvoice, error: origError } = await supabase
-        .from('invoice')
-        .select('*')
-        .eq('invoice_id', original_invoice_id)
-        .eq('business_id', business_id)
-        .single()
-
-      if (origError || !originalInvoice) {
-        return NextResponse.json({ error: 'Originalfaktura hittades inte' }, { status: 404 })
-      }
-
-      // Använd originalfakturans poster om inga explicita items
-      if (items.length === 0 && originalInvoice.items) {
-        items = (originalInvoice.items as InvoiceItem[]).map((item: InvoiceItem) => ({
-          ...item,
-          total: -Math.abs(item.total),
-          unit_price: -Math.abs(item.unit_price),
-        }))
-      } else {
-        items = items.map((item: InvoiceItem) => ({
-          ...item,
-          total: -Math.abs(item.total),
-          unit_price: -Math.abs(item.unit_price),
-        }))
-      }
-
-      subtotal = items.reduce((sum: number, item: InvoiceItem) => sum + item.total, 0)
-      const creditVatRate = originalInvoice.vat_rate || vat_rate
-      const creditVatAmount = subtotal * (creditVatRate / 100)
-      const creditTotal = subtotal + creditVatAmount
-
-      // Generera kreditfakturanummer
-      const year = new Date().getFullYear()
-      const { count } = await supabase
-        .from('invoice')
-        .select('*', { count: 'exact', head: true })
-        .eq('business_id', business_id)
-        .gte('created_at', `${year}-01-01`)
-
-      const creditNumber = `KF-${year}-${String((count || 0) + 1).padStart(3, '0')}`
-      const invoiceDate = new Date()
-
-      const { data: creditNote, error: creditError } = await supabase
-        .from('invoice')
-        .insert({
-          business_id,
-          customer_id: originalInvoice.customer_id,
-          invoice_number: creditNumber,
-          status: 'sent',
-          items,
-          subtotal,
-          vat_rate: creditVatRate,
-          vat_amount: creditVatAmount,
-          total: creditTotal,
-          rot_rut_type: originalInvoice.rot_rut_type,
-          rot_rut_deduction: originalInvoice.rot_rut_deduction ? -Math.abs(originalInvoice.rot_rut_deduction) : 0,
-          customer_pays: originalInvoice.customer_pays ? -Math.abs(originalInvoice.customer_pays) : creditTotal,
-          invoice_date: invoiceDate.toISOString().split('T')[0],
-          due_date: invoiceDate.toISOString().split('T')[0],
-          is_credit_note: true,
-          original_invoice_id,
-          credit_reason: credit_reason || null,
-        })
-        .select(`
-          *,
-          customer:customer_id (
-            customer_id,
-            name,
-            phone_number,
-            email,
-            address_line
-          )
-        `)
-        .single()
-
-      if (creditError) throw creditError
-
-      // Markera originalfaktura som krediterad
-      await supabase
-        .from('invoice')
-        .update({ status: 'credited' })
-        .eq('invoice_id', original_invoice_id)
-        .eq('business_id', business_id)
-
-      return NextResponse.json({ invoice: creditNote })
+      return NextResponse.json(
+        { error: 'Använd /api/invoices/credit för att skapa kreditfakturor' },
+        { status: 400 }
+      )
     }
 
-    // Generera fakturanummer
-    const year = new Date().getFullYear()
-    const { count } = await supabase
-      .from('invoice')
-      .select('*', { count: 'exact', head: true })
+    // Hämta business_config för prefix + next_number
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('invoice_prefix, next_invoice_number')
       .eq('business_id', business_id)
-      .gte('created_at', `${year}-01-01`)
+      .single()
 
-    const invoiceNumber = `${year}-${String((count || 0) + 1).padStart(3, '0')}`
+    const prefix = config?.invoice_prefix || 'FV'
+    const nextNum = config?.next_invoice_number || 1
+    const year = new Date().getFullYear()
+    const invoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
+
+    // Generate OCR
+    const ocrNumber = generateOCR(String(nextNum))
 
     // Beräkna förfallodatum
-    const invoiceDate = new Date()
-    const dueDate = new Date(invoiceDate)
+    const invoiceDateVal = providedInvoiceDate ? new Date(providedInvoiceDate) : new Date()
+    const dueDate = new Date(invoiceDateVal)
     dueDate.setDate(dueDate.getDate() + due_days)
 
     const { data: invoice, error: insertError } = await supabase
@@ -314,6 +277,7 @@ export async function POST(request: NextRequest) {
         customer_id,
         quote_id,
         invoice_number: invoiceNumber,
+        invoice_type: invoice_type || 'standard',
         status: 'draft',
         items,
         subtotal,
@@ -323,8 +287,15 @@ export async function POST(request: NextRequest) {
         rot_rut_type,
         rot_rut_deduction: rotRutDeduction,
         customer_pays: customerPays,
-        invoice_date: invoiceDate.toISOString().split('T')[0],
-        due_date: dueDate.toISOString().split('T')[0]
+        invoice_date: invoiceDateVal.toISOString().split('T')[0],
+        due_date: dueDate.toISOString().split('T')[0],
+        ocr_number: ocrNumber,
+        our_reference: our_reference || null,
+        your_reference: your_reference || null,
+        personnummer: personnummer || null,
+        fastighetsbeteckning: fastighetsbeteckning || null,
+        introduction_text: introduction_text || null,
+        conclusion_text: conclusion_text || null,
       })
       .select(`
         *,
@@ -340,6 +311,12 @@ export async function POST(request: NextRequest) {
 
     if (insertError) throw insertError
 
+    // Increment next_invoice_number
+    await supabase
+      .from('business_config')
+      .update({ next_invoice_number: nextNum + 1 })
+      .eq('business_id', business_id)
+
     // Markera tidrapporter som fakturerade
     if (time_entry_ids && time_entry_ids.length > 0) {
       await supabase
@@ -353,7 +330,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('project_material')
         .update({ invoice_id: invoice.invoice_id, invoiced: true })
-        .in('material_id', project_material_ids)
+        .in('id', project_material_ids)
     }
 
     return NextResponse.json({
@@ -372,7 +349,6 @@ export async function POST(request: NextRequest) {
  */
 export async function PUT(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -380,31 +356,42 @@ export async function PUT(request: NextRequest) {
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { invoice_id, items, status, due_date, vat_rate, rot_rut_type } = body
+    const { invoice_id, ...fields } = body
 
     if (!invoice_id) {
       return NextResponse.json({ error: 'Missing invoice_id' }, { status: 400 })
     }
 
+    // Build updates from provided fields
     const updates: Record<string, any> = {}
+    const allowedFields = [
+      'items', 'status', 'due_date', 'invoice_date', 'vat_rate', 'rot_rut_type',
+      'our_reference', 'your_reference', 'introduction_text', 'conclusion_text',
+      'personnummer', 'fastighetsbeteckning', 'internal_notes',
+      'subtotal', 'vat_amount', 'total', 'rot_rut_deduction', 'customer_pays',
+      'discount_percent', 'discount_amount',
+    ]
 
-    if (items) {
-      updates.items = items
-      updates.subtotal = items.reduce((sum: number, item: InvoiceItem) => sum + item.total, 0)
-      updates.vat_amount = updates.subtotal * ((vat_rate || 25) / 100)
-      updates.total = updates.subtotal + updates.vat_amount
-    }
-
-    if (status) {
-      updates.status = status
-      if (status === 'paid') {
-        updates.paid_at = new Date().toISOString()
+    for (const field of allowedFields) {
+      if (fields[field] !== undefined) {
+        updates[field] = fields[field]
       }
     }
 
-    if (due_date) updates.due_date = due_date
-    if (vat_rate !== undefined) updates.vat_rate = vat_rate
-    if (rot_rut_type !== undefined) updates.rot_rut_type = rot_rut_type
+    // If items provided, recalculate totals
+    if (fields.items && !fields.subtotal) {
+      const regularItems = fields.items.filter((i: any) => (i.item_type || 'item') === 'item')
+      const discountItems = fields.items.filter((i: any) => i.item_type === 'discount')
+      const sub = regularItems.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0)
+      const discFromRows = discountItems.reduce((sum: number, item: any) => sum + Math.abs(item.total || 0), 0)
+      updates.subtotal = sub - discFromRows
+      updates.vat_amount = updates.subtotal * ((fields.vat_rate || 25) / 100)
+      updates.total = updates.subtotal + updates.vat_amount
+    }
+
+    if (fields.status === 'paid' && !fields.paid_at) {
+      updates.paid_at = new Date().toISOString()
+    }
 
     const { data: invoice, error } = await supabase
       .from('invoice')
@@ -438,7 +425,6 @@ export async function PUT(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    // Auth check
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -451,7 +437,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
     }
 
-    // Verifiera att fakturan är ett utkast och ägs av användaren
     const { data: existing } = await supabase
       .from('invoice')
       .select('status')
