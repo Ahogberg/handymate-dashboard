@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import TimerWidget from '@/components/time/TimerWidget'
+import TravelSection from '@/components/time/TravelSection'
 import {
   format,
   startOfWeek,
@@ -1362,6 +1363,11 @@ export default function TimePage() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Reseersättning & traktamente */}
+        <div className="mt-6">
+          <TravelSection currentWeek={currentWeek} />
         </div>
       </div>
 
