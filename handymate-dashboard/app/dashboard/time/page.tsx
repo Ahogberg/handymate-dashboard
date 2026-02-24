@@ -139,8 +139,11 @@ export default function TimePage() {
     booking_id: '',
     work_type_id: '',
     project_id: '',
+    work_category: 'work' as string,
     description: '',
     work_date: format(new Date(), 'yyyy-MM-dd'),
+    start_time: '',
+    end_time: '',
     duration_hours: 0,
     duration_minutes: 0,
     break_minutes: 0,
@@ -327,8 +330,11 @@ export default function TimePage() {
       booking_id: '',
       work_type_id: '',
       project_id: '',
+      work_category: 'work',
       description: '',
       work_date: prefillDate || format(new Date(), 'yyyy-MM-dd'),
+      start_time: '',
+      end_time: '',
       duration_hours: 0,
       duration_minutes: 0,
       break_minutes: 0,
@@ -349,8 +355,11 @@ export default function TimePage() {
       booking_id: entry.booking_id || '',
       work_type_id: entry.work_type_id || '',
       project_id: (entry as any).project_id || '',
+      work_category: (entry as any).work_category || 'work',
       description: entry.description || '',
       work_date: entry.work_date,
+      start_time: entry.start_time || '',
+      end_time: entry.end_time || '',
       duration_hours: Math.floor(grossMins / 60),
       duration_minutes: grossMins % 60,
       break_minutes: breakMins,
@@ -377,9 +386,12 @@ export default function TimePage() {
         customer_id: formData.customer_id || null,
         booking_id: formData.booking_id || null,
         work_type_id: formData.work_type_id || null,
+        work_category: formData.work_category || 'work',
         business_user_id: assignToUser,
         description: formData.description || null,
         work_date: formData.work_date,
+        start_time: formData.start_time || null,
+        end_time: formData.end_time || null,
         duration_minutes: totalMins,
         break_minutes: breakMins,
         hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
@@ -514,8 +526,11 @@ export default function TimePage() {
       booking_id: '',
       work_type_id: '',
       project_id: '',
+      work_category: 'work',
       description: '',
       work_date: format(new Date(), 'yyyy-MM-dd'),
+      start_time: '',
+      end_time: '',
       duration_hours: Math.floor(minutes / 60),
       duration_minutes: minutes % 60,
       break_minutes: 0,
@@ -642,20 +657,95 @@ export default function TimePage() {
                 </div>
               )}
 
-              {/* Datum */}
+              {/* Arbetstyp (kategori) */}
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Datum</label>
-                <input
-                  type="date"
-                  value={formData.work_date}
-                  onChange={e => setFormData({ ...formData, work_date: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                />
+                <label className="block text-sm text-gray-500 mb-2">Arbetstyp</label>
+                <div className="flex gap-1.5">
+                  {[
+                    { value: 'work', label: 'Arbete', icon: '🔨' },
+                    { value: 'travel', label: 'Restid', icon: '🚗' },
+                    { value: 'material_pickup', label: 'Material', icon: '📦' },
+                    { value: 'meeting', label: 'Möte', icon: '👥' },
+                    { value: 'admin', label: 'Admin', icon: '📋' },
+                  ].map(cat => (
+                    <button key={cat.value}
+                      onClick={() => setFormData({ ...formData, work_category: cat.value, is_billable: cat.value === 'work' })}
+                      className={`flex-1 py-2.5 text-xs rounded-xl border text-center transition-colors ${
+                        formData.work_category === cat.value
+                          ? 'bg-blue-50 border-blue-300 text-blue-700 font-medium'
+                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}>
+                      <span className="text-lg block">{cat.icon}</span>
+                      <span className="block mt-0.5">{cat.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Datum + Start/Slut */}
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Datum</label>
+                  <input
+                    type="date"
+                    value={formData.work_date}
+                    onChange={e => setFormData({ ...formData, work_date: e.target.value })}
+                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Start</label>
+                  <input
+                    type="time"
+                    value={formData.start_time}
+                    onChange={e => {
+                      const st = e.target.value
+                      setFormData(prev => {
+                        const updated = { ...prev, start_time: st }
+                        if (st && prev.end_time) {
+                          const [sh, sm] = st.split(':').map(Number)
+                          const [eh, em] = prev.end_time.split(':').map(Number)
+                          const diff = (eh * 60 + em) - (sh * 60 + sm)
+                          if (diff > 0) {
+                            updated.duration_hours = Math.floor(diff / 60)
+                            updated.duration_minutes = diff % 60
+                          }
+                        }
+                        return updated
+                      })
+                    }}
+                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Slut</label>
+                  <input
+                    type="time"
+                    value={formData.end_time}
+                    onChange={e => {
+                      const et = e.target.value
+                      setFormData(prev => {
+                        const updated = { ...prev, end_time: et }
+                        if (prev.start_time && et) {
+                          const [sh, sm] = prev.start_time.split(':').map(Number)
+                          const [eh, em] = et.split(':').map(Number)
+                          const diff = (eh * 60 + em) - (sh * 60 + sm)
+                          if (diff > 0) {
+                            updated.duration_hours = Math.floor(diff / 60)
+                            updated.duration_minutes = diff % 60
+                          }
+                        }
+                        return updated
+                      })
+                    }}
+                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-sm"
+                  />
+                </div>
               </div>
 
               {/* Duration */}
               <div>
-                <label className="block text-sm text-gray-500 mb-2">Tid</label>
+                <label className="block text-sm text-gray-500 mb-2">Tid (eller ange manuellt)</label>
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <input type="number" min="0" value={formData.duration_hours}
@@ -704,12 +794,37 @@ export default function TimePage() {
                     ))}
                   </div>
                 </div>
-                {formData.break_minutes > 0 && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    Effektiv tid: {Math.floor(Math.max(0, (formData.duration_hours * 60 + formData.duration_minutes - formData.break_minutes)) / 60)}h {Math.max(0, (formData.duration_hours * 60 + formData.duration_minutes - formData.break_minutes)) % 60}m
-                  </p>
-                )}
               </div>
+
+              {/* Beräkningssammanfattning */}
+              {(() => {
+                const gross = formData.duration_hours * 60 + formData.duration_minutes
+                const net = Math.max(0, gross - formData.break_minutes)
+                const overtime = Math.max(0, net - 8 * 60)
+                const rate = formData.hourly_rate ? parseFloat(formData.hourly_rate) : 0
+                const amount = (net / 60) * rate
+                if (gross <= 0) return null
+                return (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-xs text-gray-500">Total tid</p>
+                        <p className="text-sm font-bold text-gray-900">{Math.floor(gross / 60)}h {gross % 60}m</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">Debiterad</p>
+                        <p className="text-sm font-bold text-gray-900">{Math.floor(net / 60)}h {net % 60}m</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500">{rate > 0 ? 'Summa' : 'Övertid'}</p>
+                        <p className={`text-sm font-bold ${overtime > 0 ? 'text-orange-600' : 'text-gray-900'}`}>
+                          {rate > 0 ? `${Math.round(amount).toLocaleString('sv-SE')} kr` : overtime > 0 ? `${Math.floor(overtime / 60)}h ${overtime % 60}m` : '–'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Kund */}
               <div>
@@ -1142,7 +1257,9 @@ export default function TimePage() {
                         : entry.is_billable ? 'bg-gradient-to-br from-blue-500/20 to-cyan-500/20 border-blue-300'
                         : 'bg-gray-50 border-gray-300'
                       }`}>
-                        <Clock className={`w-5 h-5 ${entry.invoiced ? 'text-emerald-600' : entry.is_billable ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <span className="text-lg">
+                          {({ work: '🔨', travel: '🚗', material_pickup: '📦', meeting: '👥', admin: '📋' } as Record<string, string>)[(entry as any).work_category] || '🔨'}
+                        </span>
                       </div>
 
                       <div className="min-w-0 flex-1">
