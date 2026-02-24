@@ -68,11 +68,20 @@ interface BusinessConfig {
   // Faktura
   default_payment_days: number
   bankgiro: string | null
+  plusgiro: string | null
+  bank_account_number: string | null
   swish_number: string | null
+  invoice_prefix: string | null
+  next_invoice_number: number
+  invoice_footer_text: string | null
   reminder_sms_template: string | null
   auto_reminder_enabled: boolean
   auto_reminder_days: number
   late_fee_percent: number
+  penalty_interest: number
+  reminder_fee: number
+  max_auto_reminders: number
+  f_skatt_registered: boolean
   // Tidrapport
   default_hourly_rate: number
   time_rounding_minutes: number
@@ -486,8 +495,15 @@ export default function SettingsPage() {
           default_payment_days: config.default_payment_days || 30,
           bankgiro: config.bankgiro || null,
           plusgiro: (config as any).plusgiro || null,
+          bank_account_number: config.bank_account_number || null,
           f_skatt_registered: (config as any).f_skatt_registered || false,
           swish_number: config.swish_number || null,
+          invoice_prefix: config.invoice_prefix || 'FV',
+          next_invoice_number: config.next_invoice_number || 1,
+          invoice_footer_text: config.invoice_footer_text || null,
+          penalty_interest: config.penalty_interest || config.late_fee_percent || 8,
+          reminder_fee: config.reminder_fee || 60,
+          max_auto_reminders: config.max_auto_reminders || 3,
           reminder_sms_template: config.reminder_sms_template || null,
           auto_reminder_enabled: config.auto_reminder_enabled || false,
           auto_reminder_days: config.auto_reminder_days || 7,
@@ -1576,16 +1592,16 @@ export default function SettingsPage() {
                 <button
                   onClick={() => setConfig({
                     ...config!,
-                    ...(({ f_skatt_registered: !(config as any).f_skatt_registered }) as any)
-                  } as any)}
+                    f_skatt_registered: !config.f_skatt_registered
+                  })}
                   className={`w-12 h-6 rounded-full transition-all ${
-                    (config as any).f_skatt_registered
+                    config.f_skatt_registered
                       ? 'bg-gradient-to-r from-blue-500 to-cyan-500'
                       : 'bg-gray-200'
                   }`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${
-                    (config as any).f_skatt_registered ? 'translate-x-6' : 'translate-x-0.5'
+                    config.f_skatt_registered ? 'translate-x-6' : 'translate-x-0.5'
                   }`} />
                 </button>
               </div>
@@ -1612,8 +1628,8 @@ export default function SettingsPage() {
                   <label className="block text-sm text-gray-500 mb-2">Plusgiro</label>
                   <input
                     type="text"
-                    value={(config as any).plusgiro || ''}
-                    onChange={(e) => setConfig({ ...config, ...(({ plusgiro: e.target.value }) as any) } as any)}
+                    value={config.plusgiro || ''}
+                    onChange={(e) => setConfig({ ...config, plusgiro: e.target.value })}
                     placeholder="12 34 56-7"
                     className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
@@ -1629,6 +1645,60 @@ export default function SettingsPage() {
                     className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Bankkontonummer</label>
+                  <input
+                    type="text"
+                    value={config.bank_account_number || ''}
+                    onChange={(e) => setConfig({ ...config, bank_account_number: e.target.value })}
+                    placeholder="1234-12 345 67"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Fakturainställningar */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Fakturainställningar</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Fakturaprefix</label>
+                  <input
+                    type="text"
+                    value={config.invoice_prefix || 'FV'}
+                    onChange={(e) => setConfig({ ...config, invoice_prefix: e.target.value })}
+                    placeholder="FV"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Prefix för fakturanummer, t.ex. FV-2026-001</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Nästa fakturanummer</label>
+                  <input
+                    type="number"
+                    value={config.next_invoice_number || 1}
+                    onChange={(e) => setConfig({ ...config, next_invoice_number: parseInt(e.target.value) || 1 })}
+                    min={1}
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Numret som nästa faktura får</p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <label className="block text-sm text-gray-500 mb-2">Fakturafotstext</label>
+                <textarea
+                  value={config.invoice_footer_text || ''}
+                  onChange={(e) => setConfig({ ...config, invoice_footer_text: e.target.value })}
+                  placeholder="Tack för att du anlitar oss! Vid frågor kontakta oss på..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Visas längst ner på varje faktura</p>
               </div>
             </div>
 
@@ -1665,18 +1735,49 @@ export default function SettingsPage() {
               </div>
 
               {config.auto_reminder_enabled && (
-                <div className="mb-4">
-                  <label className="block text-sm text-gray-500 mb-2">Skicka påminnelse efter</label>
-                  <select
-                    value={config.auto_reminder_days || 7}
-                    onChange={(e) => setConfig({ ...config, auto_reminder_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                  >
-                    <option value={3}>3 dagar efter förfall</option>
-                    <option value={5}>5 dagar efter förfall</option>
-                    <option value={7}>7 dagar efter förfall</option>
-                    <option value={14}>14 dagar efter förfall</option>
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">Skicka påminnelse efter</label>
+                    <select
+                      value={config.auto_reminder_days || 7}
+                      onChange={(e) => setConfig({ ...config, auto_reminder_days: parseInt(e.target.value) })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    >
+                      <option value={3}>3 dagar efter förfall</option>
+                      <option value={5}>5 dagar efter förfall</option>
+                      <option value={7}>7 dagar efter förfall</option>
+                      <option value={14}>14 dagar efter förfall</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">Påminnelseavgift</label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={config.reminder_fee || 60}
+                        onChange={(e) => setConfig({ ...config, reminder_fee: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 pr-12"
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-2">Max automatiska</label>
+                    <select
+                      value={config.max_auto_reminders || 3}
+                      onChange={(e) => setConfig({ ...config, max_auto_reminders: parseInt(e.target.value) })}
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    >
+                      <option value={1}>1 påminnelse</option>
+                      <option value={2}>2 påminnelser</option>
+                      <option value={3}>3 påminnelser</option>
+                      <option value={4}>4 påminnelser</option>
+                      <option value={5}>5 påminnelser</option>
+                    </select>
+                    <p className="text-xs text-gray-400 mt-1">Sedan krävs manuell hantering</p>
+                  </div>
                 </div>
               )}
 
