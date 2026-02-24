@@ -20,11 +20,13 @@ import {
   Filter,
   CheckSquare,
   MapPin,
-  Download
+  Download,
+  Users
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import Link from 'next/link'
 import TimerWidget from '@/components/time/TimerWidget'
 import TravelSection from '@/components/time/TravelSection'
 import {
@@ -953,6 +955,12 @@ export default function TimePage() {
                 ))}
               </select>
             )}
+
+            <Link href="/dashboard/time/weekly"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-blue-300 text-sm">
+              <Users className="w-4 h-4" />
+              <span className="hidden sm:inline">Veckorapport</span>
+            </Link>
 
             <button onClick={() => openAddModal()}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90">
