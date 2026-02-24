@@ -6,8 +6,6 @@ import {
   Plus,
   Calendar,
   User,
-  Play,
-  Square,
   Trash2,
   Edit2,
   X,
@@ -27,6 +25,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import TimerWidget from '@/components/time/TimerWidget'
 import {
   format,
   startOfWeek,
@@ -130,14 +129,7 @@ export default function TimePage() {
   const [viewMode, setViewMode] = useState<'week' | 'list'>('week')
   const [currentWeek, setCurrentWeek] = useState(new Date())
 
-  // Timer
-  const [activeTimer, setActiveTimer] = useState(false)
-  const [timerStart, setTimerStart] = useState<Date | null>(null)
-  const [timerElapsed, setTimerElapsed] = useState(0)
-
-  // Geo
-  const [startGeo, setStartGeo] = useState<{ lat: number; lng: number } | null>(null)
-  const [endGeo, setEndGeo] = useState<{ lat: number; lng: number } | null>(null)
+  // Timer handled by TimerWidget component
 
   // Modal
   const [showModal, setShowModal] = useState(false)
@@ -192,16 +184,7 @@ export default function TimePage() {
     }
   }, [currentWeek, business.business_id, filterPerson])
 
-  // Timer tick
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (activeTimer && timerStart) {
-      interval = setInterval(() => {
-        setTimerElapsed(Math.floor((Date.now() - timerStart.getTime()) / 1000))
-      }, 1000)
-    }
-    return () => clearInterval(interval)
-  }, [activeTimer, timerStart])
+  // Timer tick handled by TimerWidget
 
   async function fetchAll() {
     await Promise.all([fetchEntries(), fetchWorkTypes(), fetchCustomersAndBookings(), fetchStats(), fetchTeamMembers()])
@@ -330,44 +313,10 @@ export default function TimePage() {
     return `${h}h ${m}m`
   }
 
-  const fmtTimer = (s: number) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
-  }
-
-  // GPS helper
-  const getGeoLocation = (): Promise<{ lat: number; lng: number } | null> => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return Promise.resolve(null)
-    return new Promise((resolve) => {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => resolve(null),
-        { timeout: 5000, enableHighAccuracy: true }
-      )
-    })
-  }
-
-  // Timer
-  const startTimer = async () => {
-    setActiveTimer(true)
-    setTimerStart(new Date())
-    setTimerElapsed(0)
-    const geo = await getGeoLocation()
-    setStartGeo(geo)
-    setEndGeo(null)
-  }
-  const stopTimer = async () => {
-    const geo = await getGeoLocation()
-    setEndGeo(geo)
-    if (timerStart) {
-      const mins = Math.floor((Date.now() - timerStart.getTime()) / 60000)
-      setFormData(prev => ({ ...prev, duration_hours: Math.floor(mins / 60), duration_minutes: mins % 60, work_date: format(new Date(), 'yyyy-MM-dd') }))
-      setEditingEntry(null)
-      setShowModal(true)
-    }
-    setActiveTimer(false); setTimerStart(null); setTimerElapsed(0)
+  // Timer functions moved to TimerWidget
+  const handleTimerCheckInOut = () => {
+    fetchEntries()
+    fetchStats()
   }
 
   // Modal
@@ -437,16 +386,6 @@ export default function TimePage() {
         is_billable: formData.is_billable
       }
 
-      // Add GPS data if captured from timer
-      if (startGeo) {
-        entryData.start_latitude = startGeo.lat
-        entryData.start_longitude = startGeo.lng
-      }
-      if (endGeo) {
-        entryData.end_latitude = endGeo.lat
-        entryData.end_longitude = endGeo.lng
-      }
-
       if (editingEntry) {
         const { error } = await supabase.from('time_entry').update(entryData).eq('time_entry_id', editingEntry.time_entry_id)
         if (error) throw error
@@ -456,10 +395,6 @@ export default function TimePage() {
         if (error) throw error
         showToast('Tid registrerad!', 'success')
       }
-      // Clear geo state after save
-      setStartGeo(null)
-      setEndGeo(null)
-
       setShowModal(false)
       fetchEntries()
       fetchStats()
@@ -903,22 +838,6 @@ export default function TimePage() {
               </select>
             )}
 
-            {activeTimer ? (
-              <div className="flex items-center gap-3 px-4 py-2 bg-emerald-100 border border-emerald-200 rounded-xl">
-                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-emerald-600 font-mono text-lg">{fmtTimer(timerElapsed)}</span>
-                <button onClick={stopTimer} className="p-2 bg-red-100 hover:bg-red-500/30 rounded-lg">
-                  <Square className="w-4 h-4 text-red-600" />
-                </button>
-              </div>
-            ) : (
-              <button onClick={startTimer}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200">
-                <Play className="w-4 h-4" />
-                <span className="hidden sm:inline">Timer</span>
-              </button>
-            )}
-
             <button onClick={() => openAddModal()}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90">
               <Plus className="w-4 h-4" />
@@ -1328,6 +1247,9 @@ export default function TimePage() {
           </div>
         </div>
       </div>
+
+      {/* Floating timer widget – mobilanpassad, en hand */}
+      <TimerWidget onCheckInOut={handleTimerCheckInOut} />
     </div>
   )
 }
