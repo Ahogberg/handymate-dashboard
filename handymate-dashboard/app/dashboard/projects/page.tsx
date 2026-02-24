@@ -15,7 +15,10 @@ import {
   X,
   Trash2,
   TrendingUp,
-  Activity
+  Activity,
+  Paperclip,
+  FileText,
+  Upload,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -73,6 +76,7 @@ export default function ProjectsPage() {
     start_date: '',
     end_date: ''
   })
+  const [pendingFiles, setPendingFiles] = useState<File[]>([])
 
   useEffect(() => {
     if (business.business_id) {
@@ -153,9 +157,33 @@ export default function ProjectsPage() {
         throw new Error(errData.error || 'Kunde inte skapa projekt')
       }
 
-      showToast('Projekt skapat!', 'success')
+      const { project } = await response.json()
+      const newProjectId = project?.project_id
+
+      // Upload pending files if any
+      if (newProjectId && pendingFiles.length > 0) {
+        let uploadedCount = 0
+        for (const file of pendingFiles) {
+          try {
+            const formData = new FormData()
+            formData.append('file', file)
+            formData.append('category', 'other')
+            const uploadRes = await fetch(`/api/projects/${newProjectId}/documents`, { method: 'POST', body: formData })
+            if (uploadRes.ok) uploadedCount++
+          } catch { /* continue with next file */ }
+        }
+        if (uploadedCount > 0) {
+          showToast(`Projekt skapat med ${uploadedCount} dokument!`, 'success')
+        } else {
+          showToast('Projekt skapat, men dokumenten kunde inte laddas upp', 'error')
+        }
+      } else {
+        showToast('Projekt skapat!', 'success')
+      }
+
       setShowCreateModal(false)
       setNewProject({ name: '', customer_id: '', project_type: 'hourly', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
+      setPendingFiles([])
       fetchProjects()
     } catch (err: any) {
       showToast(err.message || 'Något gick fel', 'error')
@@ -490,10 +518,10 @@ export default function ProjectsPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg">
+          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Nytt projekt</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-900">
+              <button onClick={() => { setShowCreateModal(false); setPendingFiles([]) }} className="text-gray-400 hover:text-gray-900">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -579,6 +607,44 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
+              {/* Dokument */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">Dokument</label>
+                <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer hover:border-blue-400 hover:text-blue-500 transition">
+                  <Upload className="w-4 h-4" />
+                  <span className="text-sm">Välj filer att bifoga...</span>
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setPendingFiles(prev => [...prev, ...Array.from(e.target.files!)])
+                      }
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+                {pendingFiles.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {pendingFiles.map((file, idx) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
+                        <span className="text-xs text-gray-400 flex-shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
+                        <button
+                          type="button"
+                          onClick={() => setPendingFiles(prev => prev.filter((_, i) => i !== idx))}
+                          className="p-0.5 text-gray-400 hover:text-red-500 transition"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={handleCreateProject}
@@ -586,10 +652,10 @@ export default function ProjectsPage() {
                   className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                  Skapa projekt
+                  {creating && pendingFiles.length > 0 ? 'Skapar & laddar upp...' : 'Skapa projekt'}
                 </button>
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => { setShowCreateModal(false); setPendingFiles([]) }}
                   className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-gray-900"
                 >
                   Avbryt

@@ -453,6 +453,13 @@ export default function ProjectDetailPage() {
     }
   }, [activeTab, fetchProjectTeam])
 
+  // Re-fetch documents when category filter changes
+  useEffect(() => {
+    if (activeTab === 'documents') {
+      fetchDocuments()
+    }
+  }, [docCategory])
+
   async function fetchAiLogs() {
     setAiLogLoading(true)
     try {
@@ -1918,7 +1925,7 @@ export default function ProjectDetailPage() {
                 {['all', 'photo', 'drawing', 'contract', 'other'].map((cat) => (
                   <button
                     key={cat}
-                    onClick={() => { setDocCategory(cat); setTimeout(fetchDocuments, 50) }}
+                    onClick={() => setDocCategory(cat)}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition ${
                       docCategory === cat
                         ? 'bg-blue-100 text-blue-500 border-blue-300'
