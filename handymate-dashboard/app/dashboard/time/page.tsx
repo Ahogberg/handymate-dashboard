@@ -962,6 +962,12 @@ export default function TimePage() {
               <span className="hidden sm:inline">Veckorapport</span>
             </Link>
 
+            <Link href="/dashboard/time/projects"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-blue-300 text-sm">
+              <LayoutGrid className="w-4 h-4" />
+              <span className="hidden sm:inline">Projekt</span>
+            </Link>
+
             <button onClick={() => openAddModal()}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90">
               <Plus className="w-4 h-4" />
