@@ -31,6 +31,10 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Upload,
+  Image,
+  FileSpreadsheet,
+  ExternalLink,
 } from 'lucide-react'
 
 // ============================================
@@ -105,6 +109,21 @@ interface GeneratedDocument {
   }
 }
 
+interface UploadedFile {
+  id: string
+  source: 'customer' | 'project'
+  file_name: string
+  file_url: string | null
+  file_type: string | null
+  file_size: number | null
+  category: string | null
+  customer_id: string | null
+  customer_name: string | null
+  project_id: string | null
+  project_name: string | null
+  created_at: string
+}
+
 interface CustomerOption {
   customer_id: string
   name: string
@@ -132,6 +151,21 @@ function getCategoryIcon(iconName: string, className = 'w-5 h-5') {
   }
   const Icon = icons[iconName] || FileText
   return <Icon className={className} />
+}
+
+function getFileIcon(mimeType: string | null, className = 'w-5 h-5') {
+  if (!mimeType) return <File className={className} />
+  if (mimeType.startsWith('image/')) return <Image className={className} />
+  if (mimeType.includes('pdf')) return <FileText className={className} />
+  if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType.includes('csv')) return <FileSpreadsheet className={className} />
+  return <File className={className} />
+}
+
+function formatFileSize(bytes: number | null) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function getStatusBadge(status: string) {
@@ -168,12 +202,13 @@ export default function DocumentsPage() {
   const [categories, setCategories] = useState<TemplateCategory[]>([])
   const [templates, setTemplates] = useState<DocumentTemplate[]>([])
   const [documents, setDocuments] = useState<GeneratedDocument[]>([])
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
   const [loading, setLoading] = useState(true)
 
   // UI state
-  const [view, setView] = useState<'documents' | 'templates'>('documents')
+  const [view, setView] = useState<'documents' | 'uploads' | 'templates'>('documents')
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -250,6 +285,7 @@ export default function DocumentsPage() {
       setCategories(catData.categories || [])
       setTemplates(tplData.templates || [])
       setDocuments(docData.documents || [])
+      setUploadedFiles(docData.uploaded_files || [])
       setCustomers(custData.customers || [])
       setProjects(projData.projects || [])
     } catch (err) {
@@ -415,6 +451,33 @@ export default function DocumentsPage() {
   }
 
   // ============================================
+  // Delete uploaded file
+  // ============================================
+
+  async function deleteUploadedFile(file: UploadedFile) {
+    try {
+      const headers = await getAuthHeaders()
+      if (file.source === 'customer' && file.customer_id) {
+        const res = await fetch(`/api/customers/${file.customer_id}/documents?docId=${file.id}`, {
+          method: 'DELETE',
+          headers,
+        })
+        if (!res.ok) throw new Error('Delete failed')
+      } else if (file.source === 'project' && file.project_id) {
+        const res = await fetch(`/api/projects/${file.project_id}/documents/${file.id}`, {
+          method: 'DELETE',
+          headers,
+        })
+        if (!res.ok) throw new Error('Delete failed')
+      }
+      setUploadedFiles(prev => prev.filter(f => f.id !== file.id))
+      showToast('Fil borttagen')
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
+  // ============================================
   // Duplicate template
   // ============================================
 
@@ -552,6 +615,17 @@ export default function DocumentsPage() {
     return true
   })
 
+  const filteredUploads = uploadedFiles.filter(file => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      const match = file.file_name?.toLowerCase().includes(q) ||
+        file.customer_name?.toLowerCase().includes(q) ||
+        file.project_name?.toLowerCase().includes(q)
+      if (!match) return false
+    }
+    return true
+  })
+
   const filteredTemplates = templates.filter(tpl => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -608,6 +682,12 @@ export default function DocumentsPage() {
               className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-blue-600 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Mina dokument ({documents.length})
+            </button>
+            <button
+              onClick={() => { setView('uploads'); setSelectedCategory(null) }}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'uploads' ? 'bg-blue-600 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+            >
+              Uppladdade filer ({uploadedFiles.length})
             </button>
             <button
               onClick={() => { setView('templates'); setSelectedCategory(null) }}
@@ -784,6 +864,77 @@ export default function DocumentsPage() {
                             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
                           >
                             <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : view === 'uploads' ? (
+              /* Uploaded files list */
+              filteredUploads.length === 0 ? (
+                <div className="text-center py-16">
+                  <Upload className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg mb-2">Inga uppladdade filer</p>
+                  <p className="text-gray-400 text-sm">Filer som laddas upp i projekt, deals och kundprofiler visas här</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredUploads.map(file => (
+                    <div
+                      key={`${file.source}-${file.id}`}
+                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all group"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                          {getFileIcon(file.file_type, 'w-5 h-5 text-amber-600')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-medium text-gray-900 truncate mb-1">{file.file_name}</h3>
+                          <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                            <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
+                              file.source === 'customer' ? 'bg-blue-50 text-blue-600' : 'bg-violet-50 text-violet-600'
+                            }`}>
+                              {file.source === 'customer' ? <Users className="w-3 h-3" /> : <FolderKanban className="w-3 h-3" />}
+                              {file.source === 'customer' ? 'Kund' : 'Projekt'}
+                            </span>
+                            {file.customer_name && (
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" /> {file.customer_name}
+                              </span>
+                            )}
+                            {file.project_name && (
+                              <span className="flex items-center gap-1">
+                                <FolderKanban className="w-3 h-3" /> {file.project_name}
+                              </span>
+                            )}
+                            {file.file_size && (
+                              <span>{formatFileSize(file.file_size)}</span>
+                            )}
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" /> {new Date(file.created_at).toLocaleDateString('sv-SE')}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {file.file_url && (
+                            <a
+                              href={file.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-all"
+                              title="Öppna fil"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => deleteUploadedFile(file)}
+                            className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all"
+                            title="Ta bort"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>

@@ -42,7 +42,55 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ documents: documents || [] })
+    // Also fetch uploaded files from customer_document and project_document
+    const [custDocsRes, projDocsRes] = await Promise.all([
+      supabase
+        .from('customer_document')
+        .select('*, customer:customer_id(customer_id, name)')
+        .eq('business_id', business.business_id)
+        .order('uploaded_at', { ascending: false }),
+      supabase
+        .from('project_document')
+        .select('*, project:project_id(project_id, name)')
+        .eq('business_id', business.business_id)
+        .order('created_at', { ascending: false }),
+    ])
+
+    // Normalize uploaded files into a unified shape
+    const customerUploads = (custDocsRes.data || []).map((d: any) => ({
+      id: d.id,
+      source: 'customer' as const,
+      file_name: d.file_name,
+      file_url: d.file_url,
+      file_type: d.file_type,
+      file_size: d.file_size,
+      category: d.category,
+      customer_id: d.customer_id,
+      customer_name: d.customer?.name || null,
+      project_id: null,
+      project_name: null,
+      created_at: d.uploaded_at,
+    }))
+
+    const projectUploads = (projDocsRes.data || []).map((d: any) => ({
+      id: d.id,
+      source: 'project' as const,
+      file_name: d.name,
+      file_url: d.file_path,
+      file_type: d.mime_type,
+      file_size: d.file_size,
+      category: d.category,
+      customer_id: null,
+      customer_name: null,
+      project_id: d.project_id,
+      project_name: d.project?.name || null,
+      created_at: d.created_at,
+    }))
+
+    const uploaded_files = [...customerUploads, ...projectUploads]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+    return NextResponse.json({ documents: documents || [], uploaded_files })
   } catch (error: any) {
     console.error('Get documents error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
