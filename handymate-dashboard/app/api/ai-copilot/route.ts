@@ -51,6 +51,23 @@ async function getBusinessContext(businessId: string, businessName: string) {
     .eq('business_id', businessId)
     .in('status', ['draft', 'sent'])
 
+  // Fetch active time entries (who is checked in)
+  const { data: activeTimers } = await supabase
+    .from('time_entry')
+    .select('time_entry_id, check_in_time, work_category, customer:customer_id(name, customer_id)')
+    .eq('business_id', businessId)
+    .is('end_time', null)
+    .not('check_in_time', 'is', null)
+    .limit(10)
+
+  // Fetch active projects
+  const { data: activeProjects } = await supabase
+    .from('project')
+    .select('project_id, name, status, budget_hours, ai_health_score')
+    .eq('business_id', businessId)
+    .eq('status', 'active')
+    .limit(5)
+
   const formattedBookings = (todayBookings || []).map((b: any) => ({
     customer: b.customer?.name || 'Okänd kund',
     service: b.service_type,
@@ -63,6 +80,15 @@ async function getBusinessContext(businessId: string, businessName: string) {
   return {
     business: businessName,
     todayBookings: formattedBookings,
+    activeTimers: (activeTimers || []).map((t: any) => ({
+      customer: t.customer?.name || 'Okänd',
+      since: t.check_in_time,
+      category: t.work_category,
+    })),
+    activeProjects: (activeProjects || []).map((p: any) => ({
+      name: p.name,
+      healthScore: p.ai_health_score,
+    })),
     openCases: (pendingSuggestions || []).map((s: any) => ({
       customer: s.customer?.name || 'Okänd kund',
       type: s.suggestion_type,
@@ -94,33 +120,83 @@ export async function POST(request: NextRequest) {
     }
 
     const anthropic = getAnthropic()
-    const { question } = await request.json()
+    const { question, mode, context: clientContext } = await request.json()
 
     // Fetch real business context from the database
     const businessContext = await getBusinessContext(authBusiness.business_id, authBusiness.business_name)
 
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 400,
-      system: `Du är en AI-assistent för Handymate, ett bokningssystem för hantverkare.
+    const isJobbuddyMode = mode === 'jobbuddy'
+
+    const systemPrompt = isJobbuddyMode
+      ? `Du är "Jobbkompisen" — en AI-assistent för hantverkare i fält.
+Du hjälper med att snabbt utföra administrativa uppgifter: tidrapporter, fakturor, offerter, projektuppdateringar.
+Svara alltid på svenska, kort och handlingsorienterat.
+
+VIKTIG: Om användaren ber om en åtgärd (skapa faktura, logga tid, etc), inkludera ett "actions"-fält i ditt svar med föreslagna åtgärder.
+
+Varje action ska ha: id (unikt), type (log_time|create_invoice|create_quote|update_project|send_sms|order_material), label (kort), description (detalj), data (relevanta parametrar).
+
+${clientContext?.activeTimer ? `PÅGÅENDE JOBB: Användaren jobbar just nu hos ${clientContext.activeTimer.customer || 'okänd kund'} sedan ${clientContext.activeTimer.duration}. Kategori: ${clientContext.activeTimer.category || 'arbete'}.` : ''}
+
+KONTEXT:
+${JSON.stringify(businessContext, null, 2)}`
+      : `Du är en AI-assistent för Handymate, ett bokningssystem för hantverkare.
 Du hjälper användaren att förstå och hantera deras verksamhet.
 Svara alltid på svenska, kort och koncist.
 Var hjälpsam och ge konkreta förslag när det är möjligt.
 
 KONTEXT OM VERKSAMHETEN:
-${JSON.stringify(businessContext, null, 2)}`,
-      messages: [{ role: 'user', content: question }],
+${JSON.stringify(businessContext, null, 2)}`
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: isJobbuddyMode ? 800 : 400,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: isJobbuddyMode
+            ? `${question}\n\nSvara med JSON-format: { "answer": "ditt svar", "actions": [...] } där actions är en array av åtgärder du föreslår. Om inga åtgärder behövs, returnera tom array.`
+            : question
+        }
+      ],
     })
 
-    const answer = response.content[0].type === 'text'
+    const rawText = response.content[0].type === 'text'
       ? response.content[0].text
-      : 'Kunde inte generera svar.'
+      : ''
 
-    return NextResponse.json({ answer })
+    // Try to parse structured response for jobbuddy mode
+    if (isJobbuddyMode && rawText) {
+      try {
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0])
+          return NextResponse.json({
+            answer: parsed.answer || rawText,
+            actions: (parsed.actions || []).map((a: any, i: number) => ({
+              id: a.id || `action-${Date.now()}-${i}`,
+              type: a.type || 'unknown',
+              label: a.label || a.type,
+              description: a.description || '',
+              data: a.data || {},
+              status: 'pending',
+            })),
+          })
+        }
+      } catch {
+        // JSON parsing failed, return as plain text
+      }
+    }
+
+    return NextResponse.json({
+      answer: rawText || 'Kunde inte generera svar.',
+      actions: [],
+    })
   } catch (error) {
     console.error('AI Copilot error:', error)
     return NextResponse.json(
-      { answer: 'Ett fel uppstod. Försök igen.' },
+      { answer: 'Ett fel uppstod. Försök igen.', actions: [] },
       { status: 500 }
     )
   }

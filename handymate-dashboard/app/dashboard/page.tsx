@@ -392,6 +392,75 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Dagens Plan — Jobbkompisen */}
+        {!loading && bookings.length > 0 && (
+          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-white" />
+                </div>
+                <h2 className="font-semibold text-gray-900">Dagens plan</h2>
+              </div>
+              <span className="text-xs text-gray-400">
+                {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {bookings.slice(0, 4).map((booking) => (
+                <Link
+                  key={booking.booking_id}
+                  href={`/dashboard/bookings/${booking.booking_id}`}
+                  className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="text-sm font-mono text-gray-500 w-12 flex-shrink-0">
+                    {formatTime(booking.scheduled_start)}
+                  </div>
+                  <div className="w-1 h-8 rounded-full bg-gradient-to-b from-blue-400 to-cyan-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {(booking.customer as any)?.name || 'Kund'}
+                    </p>
+                    <p className="text-xs text-gray-400 truncate">
+                      {getServiceFromNotes(booking.notes)}
+                    </p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                </Link>
+              ))}
+            </div>
+
+            {bookings.length > 4 && (
+              <Link
+                href="/dashboard/schedule"
+                className="mt-3 flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium py-2"
+              >
+                Visa alla {bookings.length} bokningar
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            )}
+
+            {/* Smart reminders */}
+            {stats && (stats.quotes.sent > 0 || (stats.ai?.pending_suggestions ?? 0) > 0) && (
+              <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                {stats.quotes.sent > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-amber-600">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{stats.quotes.sent} offerter v\u00E4ntar p\u00E5 svar</span>
+                  </div>
+                )}
+                {(stats.ai?.pending_suggestions ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{stats.ai.pending_suggestions} AI-f\u00F6rslag att granska</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Onboarding Checklist */}
         {showOnboarding && onboardingData && (
           <OnboardingChecklist

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { useJobbuddy } from '@/lib/JobbuddyContext'
 
 interface ActiveEntry {
   time_entry_id: string
@@ -38,6 +39,7 @@ const WORK_CATEGORIES = [
 export default function TimerWidget({ onCheckInOut }: TimerWidgetProps) {
   const business = useBusiness()
   const { user: currentUser } = useCurrentUser()
+  const { setActiveTimer } = useJobbuddy()
 
   const [active, setActive] = useState<ActiveEntry | null>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -54,6 +56,22 @@ export default function TimerWidget({ onCheckInOut }: TimerWidgetProps) {
       fetchActive()
     }
   }, [business.business_id, currentUser?.id])
+
+  // Sync active timer to JobbuddyContext
+  useEffect(() => {
+    if (active) {
+      setActiveTimer({
+        time_entry_id: active.time_entry_id,
+        check_in_time: active.check_in_time,
+        check_in_address: active.check_in_address,
+        break_minutes: active.break_minutes,
+        work_category: active.work_category,
+        customer: active.customer,
+      })
+    } else {
+      setActiveTimer(null)
+    }
+  }, [active, setActiveTimer])
 
   // Tick
   useEffect(() => {
