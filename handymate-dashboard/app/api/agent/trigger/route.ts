@@ -12,6 +12,9 @@ import { executeTool } from './tool-router'
 // without going through Supabase Edge Functions — useful for testing
 // and for the manual trigger use case.
 
+// Allow up to 60s for multi-step agent runs (Vercel Pro)
+export const maxDuration = 60
+
 const MAX_STEPS = 10
 const MODEL = 'claude-sonnet-4-20250514'
 
@@ -66,6 +69,9 @@ export async function POST(request: NextRequest) {
       sync_enabled: boolean
     } | null = null
 
+    // Try to find calendar_connection via business_users first, then fallback to business_id
+    let calendarConnectionId: string | null = null
+
     const { data: businessUser } = await supabase
       .from('business_users')
       .select('id')
@@ -77,12 +83,13 @@ export async function POST(request: NextRequest) {
     if (businessUser) {
       const { data: conn } = await supabase
         .from('calendar_connection')
-        .select('access_token, refresh_token, token_expires_at, calendar_id, account_email, gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, sync_enabled')
+        .select('id, access_token, refresh_token, token_expires_at, calendar_id, account_email, gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, sync_enabled')
         .eq('business_user_id', businessUser.id)
         .eq('provider', 'google')
         .single()
 
       if (conn) {
+        calendarConnectionId = conn.id
         try {
           const tokenResult = await ensureValidToken(conn as any)
           if (tokenResult) {
@@ -93,8 +100,7 @@ export async function POST(request: NextRequest) {
                   access_token: tokenResult.access_token,
                   token_expires_at: new Date(tokenResult.expiry_date).toISOString(),
                 })
-                .eq('business_user_id', businessUser.id)
-                .eq('provider', 'google')
+                .eq('id', conn.id)
             }
             googleConnection = {
               ...conn,
@@ -107,6 +113,44 @@ export async function POST(request: NextRequest) {
           }
         } catch (err) {
           console.error('[AgentTrigger] Google token refresh failed:', err)
+        }
+      }
+    }
+
+    // Fallback: if no business_users row found, try calendar_connection via business_id directly
+    if (!googleConnection) {
+      const { data: conn } = await supabase
+        .from('calendar_connection')
+        .select('id, access_token, refresh_token, token_expires_at, calendar_id, account_email, gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, sync_enabled')
+        .eq('business_id', business.business_id)
+        .eq('provider', 'google')
+        .maybeSingle()
+
+      if (conn) {
+        calendarConnectionId = conn.id
+        try {
+          const tokenResult = await ensureValidToken(conn as any)
+          if (tokenResult) {
+            if (tokenResult.access_token !== conn.access_token) {
+              await supabase
+                .from('calendar_connection')
+                .update({
+                  access_token: tokenResult.access_token,
+                  token_expires_at: new Date(tokenResult.expiry_date).toISOString(),
+                })
+                .eq('id', conn.id)
+            }
+            googleConnection = {
+              ...conn,
+              access_token: tokenResult.access_token,
+              gmail_scope_granted: conn.gmail_scope_granted ?? false,
+              gmail_send_scope_granted: conn.gmail_send_scope_granted ?? false,
+              gmail_sync_enabled: conn.gmail_sync_enabled ?? false,
+              sync_enabled: conn.sync_enabled ?? false,
+            }
+          }
+        } catch (err) {
+          console.error('[AgentTrigger] Google token refresh (fallback) failed:', err)
         }
       }
     }

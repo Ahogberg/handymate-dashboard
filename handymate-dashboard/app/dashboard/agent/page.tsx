@@ -1351,26 +1351,37 @@ function ManualTrigger({ businessId, onTriggered }: {
 }) {
   const [instruction, setInstruction] = useState('')
   const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
+  const [elapsed, setElapsed] = useState(0)
 
   async function handleTrigger() {
     if (!instruction.trim()) return
     setLoading(true)
+    setResult(null)
+    setElapsed(0)
+    const timer = setInterval(() => setElapsed(s => s + 1), 1000)
     try {
       const response = await fetch('/api/agent/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           trigger_type: 'manual',
           trigger_data: { instruction: instruction.trim() },
         }),
       })
+      const data = await response.json()
       if (response.ok) {
+        setResult({ type: 'success', message: `Klart — ${data.tool_calls || 0} verktygsanrop, ${((data.duration_ms || 0) / 1000).toFixed(1)}s` })
         setInstruction('')
         onTriggered()
+      } else {
+        setResult({ type: 'error', message: data.error || `Fel (${response.status})` })
       }
-    } catch {
-      // toast would go here
+    } catch (err: any) {
+      setResult({ type: 'error', message: err.message || 'Nätverksfel — kunde inte nå servern' })
     } finally {
+      clearInterval(timer)
       setLoading(false)
     }
   }
@@ -1386,7 +1397,7 @@ function ManualTrigger({ businessId, onTriggered }: {
           type="text"
           value={instruction}
           onChange={e => setInstruction(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleTrigger()}
+          onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
           placeholder="T.ex. &quot;Sök kund med nummer +46701234567 och skapa en offert&quot;"
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
           disabled={loading}
@@ -1401,9 +1412,19 @@ function ManualTrigger({ businessId, onTriggered }: {
           ) : (
             <Send className="w-4 h-4" />
           )}
-          Kör
+          {loading ? `${elapsed}s…` : 'Kör'}
         </button>
       </div>
+      {result && (
+        <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${
+          result.type === 'success'
+            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            : 'bg-red-50 text-red-700 border border-red-200'
+        }`}>
+          {result.type === 'success' ? <CheckCircle2 className="w-4 h-4 inline mr-1.5" /> : <XCircle className="w-4 h-4 inline mr-1.5" />}
+          {result.message}
+        </div>
+      )}
     </div>
   )
 }
