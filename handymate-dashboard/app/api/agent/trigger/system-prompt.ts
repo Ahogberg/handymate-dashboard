@@ -1,0 +1,137 @@
+// System prompt builder for Next.js runtime
+// Mirrors supabase/functions/agent/system-prompt.ts
+
+interface BusinessContext {
+  business_name: string
+  contact_name: string
+  branch: string
+  service_area: string
+  phone_number: string
+  assigned_phone_number: string
+  pricing_settings: { hourly_rate?: number; vat_rate?: number } | null
+  knowledge_base: {
+    services?: Array<{ name: string; description: string; priceRange: string }>
+    faqs?: Array<{ question: string; answer: string }>
+    emergencyInfo?: string
+  } | null
+  working_hours: Record<string, { active: boolean; start: string; end: string }> | null
+}
+
+const BRANCH_NAMES: Record<string, string> = {
+  electrician: 'Elektriker',
+  plumber: 'Rörmokare',
+  carpenter: 'Snickare',
+  painter: 'Målare',
+  hvac: 'VVS-tekniker',
+  locksmith: 'Låssmed',
+  cleaning: 'Städföretag',
+  other: 'Hantverkare',
+}
+
+export function buildSystemPrompt(
+  business: BusinessContext,
+  triggerType: string,
+  triggerData?: Record<string, unknown>
+): string {
+  const branchLabel = BRANCH_NAMES[business.branch] || business.branch || 'Hantverkare'
+  const hourlyRate = business.pricing_settings?.hourly_rate || 695
+  const vatRate = business.pricing_settings?.vat_rate || 25
+
+  const servicesBlock = business.knowledge_base?.services?.length
+    ? business.knowledge_base.services
+        .map((s) => `- ${s.name}: ${s.description} (${s.priceRange})`)
+        .join('\n')
+    : 'Ej specificerat'
+
+  const dayNames: Record<string, string> = {
+    monday: 'Mån', tuesday: 'Tis', wednesday: 'Ons', thursday: 'Tors',
+    friday: 'Fre', saturday: 'Lör', sunday: 'Sön',
+  }
+  const hoursBlock = business.working_hours
+    ? Object.entries(business.working_hours)
+        .filter(([, v]) => v.active)
+        .map(([day, v]) => `${dayNames[day] || day}: ${v.start}–${v.end}`)
+        .join(', ')
+    : 'Mån-Fre 07:00–17:00'
+
+  const triggerInstructions = getTriggerInstructions(triggerType, triggerData)
+
+  return `Du är en AI-assistent för ${business.business_name}, ett ${branchLabel.toLowerCase()}företag i ${business.service_area || 'Sverige'}.
+
+## Din roll
+Du är en professionell affärsassistent som hjälper ${business.contact_name || 'hantverkaren'} att hantera kunder, bokningar, offerter och kommunikation.
+
+## Företagsinformation
+- **Företag:** ${business.business_name}
+- **Bransch:** ${branchLabel}
+- **Område:** ${business.service_area || 'Ej angivet'}
+- **Timpris:** ${hourlyRate} kr/tim (exkl. moms)
+- **Moms:** ${vatRate}%
+
+## Tjänster
+${servicesBlock}
+
+## Arbetstider
+${hoursBlock}
+
+## Affärsregler
+### ROT-avdrag
+- 30% av arbetskostnaden, max 50 000 kr/år
+### RUT-avdrag
+- 50% av arbetskostnaden, max 75 000 kr/år
+### SMS
+- ALDRIG mellan 21:00 och 08:00
+### Offerter
+- Giltighetstid 30 dagar
+- Separera arbete och material
+
+## Arbetsflöde
+${triggerInstructions}
+
+## Lead Pipeline
+- Vid inkommande samtal/SMS: kvalificera ALLTID som lead först med qualify_lead
+- Heta leads (urgency high/emergency) kräver omedelbar åtgärd
+- Vid lead_nurture: referera till kundens SPECIFIKA förfrågan
+- Vid hot lead: betona brådskan, inkludera jobbtyp och kontaktinfo
+
+## Regler
+- Sök alltid kund innan du skapar ny (search_customers)
+- Kontrollera kalender innan bokning (check_calendar)
+- Skicka aldrig SMS nattetid
+- Max 10 verktygsanrop per körning
+
+Dagens datum: ${new Date().toISOString().split('T')[0]}`
+}
+
+function getTriggerInstructions(
+  triggerType: string,
+  triggerData?: Record<string, unknown>
+): string {
+  switch (triggerType) {
+    case 'phone_call':
+      return `### Samtal avslutat
+1. Kvalificera som lead med qualify_lead
+2. Sök kund, skapa vid behov, vidta åtgärd
+Transkription: ${triggerData?.transcript || '(Saknas)'}
+Telefon: ${triggerData?.phone_number || 'Okänt'}
+Längd: ${triggerData?.duration_seconds || '?'} sek`
+
+    case 'incoming_sms':
+      return `### Inkommande SMS
+1. Kvalificera som lead med qualify_lead
+2. Sök kund, förstå behov, vidta åtgärd
+Från: ${triggerData?.phone_number || 'Okänt'}
+Meddelande: ${triggerData?.message || '(Tomt)'}
+Historik: ${triggerData?.conversation_history || '(Ingen)'}`
+
+    case 'cron':
+      return `### Schemalagt jobb (${triggerData?.cron_type || 'daily_check'})`
+
+    case 'manual':
+      return `### Manuell begäran
+${triggerData?.instruction || '(Ingen instruktion)'}`
+
+    default:
+      return `### ${triggerType}\n${JSON.stringify(triggerData || {})}`
+  }
+}

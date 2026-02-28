@@ -21,6 +21,7 @@ import {
   Bell,
   Lock,
   Globe,
+  Bot,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -78,6 +79,7 @@ const NAV: NavItem[] = [
     ],
   },
   { type: 'link', key: 'pipeline', label: 'Pipeline', icon: TrendingUp, href: '/dashboard/pipeline' },
+  { type: 'link', key: 'agent', label: 'AI Agent', icon: Bot, href: '/dashboard/agent' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
