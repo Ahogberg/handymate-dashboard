@@ -115,7 +115,7 @@ export const toolDefinitions = [
   },
   {
     name: "check_calendar",
-    description: "Kontrollera lediga tider i kalendern.",
+    description: "Kontrollera lediga tider. Visar Handymate-bokningar + Google Calendar-händelser (om anslutet).",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -127,7 +127,7 @@ export const toolDefinitions = [
   },
   {
     name: "create_booking",
-    description: "Skapa en ny bokning. Kontrollera kalendern först.",
+    description: "Skapa en ny bokning. Kontrollera kalendern först. Synkar automatiskt till Google Calendar om anslutet.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -185,7 +185,7 @@ export const toolDefinitions = [
   },
   {
     name: "send_email",
-    description: "Skicka e-post via Resend.",
+    description: "Skicka e-post via Gmail (om anslutet) eller Resend. Gmail ger bättre leverans och visas i Skickat-mappen.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -194,6 +194,18 @@ export const toolDefinitions = [
         body: { type: "string" },
       },
       required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "read_customer_emails",
+    description: "Läs e-posthistorik med en kund via Gmail. Returnerar trådar med ämne, datum och utdrag. Kräver att Gmail är anslutet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        customer_email: { type: "string", description: "Kundens e-postadress" },
+        max_results: { type: "number", description: "Max antal trådar (default 10)" },
+      },
+      required: ["customer_email"],
     },
   },
   // Pipeline

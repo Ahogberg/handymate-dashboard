@@ -41,6 +41,9 @@ import {
   ArrowUpRight,
   Flame,
   GripVertical,
+  Calendar,
+  MailCheck,
+  ExternalLink,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -178,6 +181,7 @@ const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search }> = {
   log_time: { label: 'Logga tid', icon: Clock },
   send_sms: { label: 'Skicka SMS', icon: Smartphone },
   send_email: { label: 'Skicka e-post', icon: Mail },
+  read_customer_emails: { label: 'Läs kundmail', icon: Mail },
   qualify_lead: { label: 'Kvalificera lead', icon: TrendingUp },
   update_lead_status: { label: 'Uppdatera lead', icon: ArrowRight },
   get_lead: { label: 'Hämta lead', icon: Eye },
@@ -1418,6 +1422,12 @@ export default function AgentDashboardPage() {
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [savingSettings, setSavingSettings] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'automations' | 'pipeline'>('overview')
+  const [googleStatus, setGoogleStatus] = useState<{
+    connected: boolean
+    email?: string
+    gmailSyncEnabled?: boolean
+    gmailSendEnabled?: boolean
+  } | null>(null)
 
   // ── Data fetching ────────────────────────────────────────────────
 
@@ -1520,6 +1530,16 @@ export default function AgentDashboardPage() {
     async function loadAll() {
       setLoading(true)
       await Promise.all([fetchRuns(), fetchStats(), fetchChartData(), fetchSettings()])
+      // Fetch Google status (non-blocking)
+      fetch('/api/google/status')
+        .then(r => r.json())
+        .then(data => setGoogleStatus({
+          connected: data.connected ?? false,
+          email: data.email,
+          gmailSyncEnabled: data.gmailSyncEnabled ?? false,
+          gmailSendEnabled: (data.gmailSendScopeGranted && data.gmailSyncEnabled) ?? false,
+        }))
+        .catch(() => setGoogleStatus({ connected: false }))
       setLoading(false)
     }
     loadAll()
@@ -1593,6 +1613,39 @@ export default function AgentDashboardPage() {
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span className="text-xs font-semibold text-emerald-700">Live</span>
           </div>
+          {/* Google integration status badges */}
+          {googleStatus && (
+            <div className="flex items-center gap-2 ml-2">
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
+                googleStatus.connected
+                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-400'
+              }`}>
+                <Calendar className="w-3 h-3" />
+                {googleStatus.connected ? 'Kalender' : 'Kalender av'}
+              </div>
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
+                googleStatus.gmailSyncEnabled
+                  ? googleStatus.gmailSendEnabled
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                  : 'bg-gray-50 border-gray-200 text-gray-400'
+              }`}>
+                <MailCheck className="w-3 h-3" />
+                {googleStatus.gmailSendEnabled
+                  ? 'Gmail R+S'
+                  : googleStatus.gmailSyncEnabled
+                    ? 'Gmail läs'
+                    : 'Gmail av'}
+              </div>
+              {!googleStatus.connected && (
+                <a href="/dashboard/settings?tab=integrations" className="text-xs text-violet-600 hover:underline flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" />
+                  Koppla
+                </a>
+              )}
+            </div>
+          )}
         </div>
         <button
           onClick={() => setShowSettings(!showSettings)}

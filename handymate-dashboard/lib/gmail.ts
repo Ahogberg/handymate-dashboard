@@ -1,6 +1,48 @@
 import { google } from 'googleapis'
 import { getGoogleAuthClient } from './google-calendar'
 
+/**
+ * Send an email via Gmail API.
+ * Requires 'gmail.send' scope to be granted.
+ */
+export async function sendGmailEmail(
+  accessToken: string,
+  params: { to: string; subject: string; body: string }
+): Promise<{ messageId: string; threadId: string }> {
+  const client = getGoogleAuthClient()
+  client.setCredentials({ access_token: accessToken })
+
+  const gmail = google.gmail({ version: 'v1', auth: client })
+
+  // Build RFC 2822 email
+  const messageParts = [
+    `To: ${params.to}`,
+    `Subject: ${params.subject}`,
+    'Content-Type: text/plain; charset=utf-8',
+    'MIME-Version: 1.0',
+    '',
+    params.body,
+  ]
+  const rawMessage = messageParts.join('\r\n')
+
+  // Base64url encode
+  const encoded = Buffer.from(rawMessage)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  const { data } = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw: encoded },
+  })
+
+  return {
+    messageId: data.id || '',
+    threadId: data.threadId || '',
+  }
+}
+
 export interface GmailThread {
   threadId: string
   subject: string

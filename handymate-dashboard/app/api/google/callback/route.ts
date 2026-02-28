@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       // Update existing connection
       const { error: err1 } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, gmail_scope_granted: true })
+        .update({ ...coreFields, gmail_scope_granted: true, gmail_send_scope_granted: true })
         .eq('id', existing.id)
 
       if (err1) {
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
 
       const { error: err1 } = await supabase
         .from('calendar_connection')
-        .insert({ ...insertData, gmail_scope_granted: true })
+        .insert({ ...insertData, gmail_scope_granted: true, gmail_send_scope_granted: true })
 
       if (err1) {
         // Retry without gmail_scope_granted if column doesn't exist

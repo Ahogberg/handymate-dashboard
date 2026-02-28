@@ -15,6 +15,11 @@ interface BusinessContext {
     emergencyInfo?: string
   } | null
   working_hours: Record<string, { active: boolean; start: string; end: string }> | null
+  // Google integration status
+  google_calendar_connected?: boolean
+  google_calendar_email?: string
+  gmail_connected?: boolean
+  gmail_send_enabled?: boolean
 }
 
 const BRANCH_NAMES: Record<string, string> = {
@@ -99,8 +104,33 @@ ${triggerInstructions}
 - Kontrollera kalender innan bokning (check_calendar)
 - Skicka aldrig SMS nattetid
 - Max 10 verktygsanrop per körning
-
+${buildGoogleSection(business)}
 Dagens datum: ${new Date().toISOString().split('T')[0]}`
+}
+
+function buildGoogleSection(business: BusinessContext): string {
+  if (!business.google_calendar_connected && !business.gmail_connected) return ''
+
+  let section = '\n## Google-integrationer'
+
+  if (business.google_calendar_connected) {
+    section += `\n### Google Calendar (${business.google_calendar_email || 'ansluten'})`
+    section += '\n- check_calendar visar BÅDE Handymate-bokningar OCH Google Calendar-händelser'
+    section += '\n- create_booking skapar automatiskt en händelse i Google Calendar'
+    section += '\n- Undvik dubbelbokningar — kontrollera alltid kalendern först'
+  }
+
+  if (business.gmail_connected) {
+    section += '\n### Gmail'
+    section += '\n- Använd read_customer_emails för att läsa e-posthistorik med en kund innan du svarar'
+    if (business.gmail_send_enabled) {
+      section += '\n- send_email skickar via hantverkarens Gmail — visas i Skickat-mappen'
+    } else {
+      section += '\n- send_email använder Resend (Gmail-sändning ej aktiverat)'
+    }
+  }
+
+  return section + '\n'
 }
 
 function getTriggerInstructions(

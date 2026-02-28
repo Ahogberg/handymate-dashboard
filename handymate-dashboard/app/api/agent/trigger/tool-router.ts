@@ -2,11 +2,31 @@
 // Executes tools against Supabase using the server-side client
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
+import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
 
 interface ToolResult {
   success: boolean
   data?: unknown
   error?: string
+}
+
+interface GoogleConnection {
+  access_token: string
+  refresh_token: string
+  token_expires_at: string | null
+  calendar_id: string
+  account_email: string
+  gmail_scope_granted: boolean
+  gmail_send_scope_granted: boolean
+  gmail_sync_enabled: boolean
+  sync_enabled: boolean
+}
+
+interface ToolContext {
+  businessName: string
+  contactEmail: string
+  googleConnection: GoogleConnection | null
 }
 
 function generateId(prefix: string): string {
@@ -23,7 +43,7 @@ export async function executeTool(
   input: Record<string, unknown>,
   supabase: SupabaseClient,
   businessId: string,
-  context: { businessName: string; contactEmail: string }
+  context: ToolContext
 ): Promise<ToolResult> {
   try {
     switch (name) {
@@ -42,9 +62,9 @@ export async function executeTool(
       case 'create_invoice':
         return await createInvoice(supabase, businessId, input)
       case 'check_calendar':
-        return await checkCalendar(supabase, businessId, input)
+        return await checkCalendar(supabase, businessId, input, context)
       case 'create_booking':
-        return await createBooking(supabase, businessId, input)
+        return await createBooking(supabase, businessId, input, context)
       case 'update_project':
         return await updateProject(supabase, businessId, input)
       case 'log_time':
@@ -53,6 +73,8 @@ export async function executeTool(
         return await sendSms(supabase, businessId, input, context)
       case 'send_email':
         return await sendEmail(input, context)
+      case 'read_customer_emails':
+        return await readCustomerEmails(input, context)
       case 'qualify_lead':
         return await qualifyLead(supabase, businessId, input)
       case 'update_lead_status':
@@ -262,10 +284,12 @@ async function createInvoice(
 }
 
 async function checkCalendar(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>,
+  context: ToolContext
 ): Promise<ToolResult> {
-  const { data, error } = await supabase.from('booking')
-    .select('booking_id, customer_id, service_type, scheduled_start, scheduled_end, status')
+  // 1. Query Handymate bookings
+  const { data: bookings, error } = await supabase.from('booking')
+    .select('booking_id, customer_id, service_type, scheduled_start, scheduled_end, status, google_event_id')
     .eq('business_id', businessId)
     .gte('scheduled_start', `${params.from_date}T00:00:00`)
     .lte('scheduled_start', `${params.to_date}T23:59:59`)
@@ -273,11 +297,77 @@ async function checkCalendar(
     .order('scheduled_start', { ascending: true })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { period: `${params.from_date} – ${params.to_date}`, booking_count: data.length, bookings: data } }
+
+  // 2. Enrich with customer names
+  const customerIds = Array.from(new Set((bookings || []).map((b: any) => b.customer_id)))
+  let customerMap: Record<string, string> = {}
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from('customer').select('customer_id, name').in('customer_id', customerIds)
+    customerMap = Object.fromEntries(
+      (customers || []).map((c: any) => [c.customer_id, c.name])
+    )
+  }
+
+  const enrichedBookings = (bookings || []).map((b: any) => ({
+    ...b,
+    customer_name: customerMap[b.customer_id] || 'Okänd',
+    source: 'handymate',
+  }))
+
+  // 3. Fetch Google Calendar events if connected
+  let googleEvents: Array<{
+    id: string; summary: string; description: string | null
+    start: string; end: string; allDay: boolean; source: string
+  }> = []
+
+  if (context.googleConnection?.sync_enabled) {
+    try {
+      const fromDate = new Date(`${params.from_date}T00:00:00`)
+      const toDate = new Date(`${params.to_date}T23:59:59`)
+      const gEvents = await getCalendarEvents(
+        context.googleConnection.access_token,
+        context.googleConnection.calendar_id || 'primary',
+        fromDate, toDate
+      )
+
+      // Deduplicate: exclude Google events already linked to a booking
+      const syncedIds = new Set(
+        (bookings || []).filter((b: any) => b.google_event_id).map((b: any) => b.google_event_id)
+      )
+
+      googleEvents = gEvents
+        .filter(e => !syncedIds.has(e.id))
+        .map(e => ({
+          id: e.id,
+          summary: e.summary,
+          description: e.description,
+          start: e.start.toISOString(),
+          end: e.end.toISOString(),
+          allDay: e.allDay,
+          source: 'google_calendar',
+        }))
+    } catch (err: any) {
+      console.error('[checkCalendar] Google Calendar error:', err.message)
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      period: `${params.from_date} – ${params.to_date}`,
+      booking_count: enrichedBookings.length,
+      google_event_count: googleEvents.length,
+      bookings: enrichedBookings,
+      google_events: googleEvents,
+      google_calendar_connected: !!context.googleConnection?.sync_enabled,
+    },
+  }
 }
 
 async function createBooking(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>,
+  context: ToolContext
 ): Promise<ToolResult> {
   const bookingId = generateId('book')
   const { error } = await supabase.from('booking').insert({
@@ -289,7 +379,54 @@ async function createBooking(
   })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { booking_id: bookingId, message: `Bokning skapad: ${params.service_type}` } }
+
+  // Sync to Google Calendar if connected
+  let googleEventId: string | null = null
+  if (context.googleConnection?.sync_enabled) {
+    try {
+      const { data: customer } = await supabase
+        .from('customer').select('name, address_line, phone_number')
+        .eq('customer_id', params.customer_id as string).single()
+
+      const customerName = customer?.name || 'Kund'
+      const summary = `${params.service_type} – ${customerName}`
+      const description = [
+        `Bokning: ${bookingId}`,
+        `Kund: ${customerName}`,
+        customer?.phone_number ? `Tel: ${customer.phone_number}` : '',
+        customer?.address_line ? `Adress: ${customer.address_line}` : '',
+        `Tjänst: ${params.service_type}`,
+        params.notes ? `Anteckningar: ${params.notes}` : '',
+      ].filter(Boolean).join('\n')
+
+      googleEventId = await createGoogleEvent(
+        context.googleConnection.access_token,
+        context.googleConnection.calendar_id || 'primary',
+        {
+          summary,
+          description,
+          start: new Date(params.scheduled_start as string),
+          end: new Date(params.scheduled_end as string),
+        }
+      )
+
+      if (googleEventId) {
+        await supabase.from('booking').update({
+          google_event_id: googleEventId,
+          synced_to_google_at: new Date().toISOString(),
+        }).eq('booking_id', bookingId)
+      }
+    } catch (err: any) {
+      console.error('[createBooking] Google Calendar sync error:', err.message)
+    }
+  }
+
+  return { success: true, data: {
+    booking_id: bookingId,
+    message: `Bokning skapad: ${params.service_type}`,
+    google_synced: !!googleEventId,
+    google_event_id: googleEventId,
+  }}
 }
 
 async function updateProject(
@@ -380,8 +517,25 @@ async function sendSms(
 }
 
 async function sendEmail(
-  params: Record<string, unknown>, context: { businessName: string; contactEmail: string }
+  params: Record<string, unknown>, context: ToolContext
 ): Promise<ToolResult> {
+  // Prefer Gmail API if connected with send scope
+  if (context.googleConnection?.gmail_send_scope_granted && context.googleConnection?.gmail_sync_enabled) {
+    try {
+      const result = await sendGmailEmail(
+        context.googleConnection.access_token,
+        { to: params.to as string, subject: params.subject as string, body: params.body as string }
+      )
+      return { success: true, data: {
+        message: `E-post skickad via Gmail till ${params.to}`,
+        message_id: result.messageId, thread_id: result.threadId, sent_via: 'gmail',
+      }}
+    } catch (err: any) {
+      console.error('[sendEmail] Gmail send failed, falling back to Resend:', err.message)
+    }
+  }
+
+  // Fallback: Resend API
   const resendKey = process.env.RESEND_API_KEY!
   const from = context.contactEmail
     ? `${context.businessName} <${context.contactEmail}>`
@@ -400,7 +554,41 @@ async function sendEmail(
 
   const result = await response.json()
   if (!response.ok) return { success: false, error: `E-postfel: ${result.message}` }
-  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id } }
+  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id, sent_via: 'resend' } }
+}
+
+// ── Gmail ────────────────────────────────────────────────
+
+async function readCustomerEmails(
+  params: Record<string, unknown>, context: ToolContext
+): Promise<ToolResult> {
+  if (!context.googleConnection?.gmail_scope_granted || !context.googleConnection?.gmail_sync_enabled) {
+    return { success: false, error: 'Gmail är inte anslutet eller aktiverat' }
+  }
+
+  const customerEmail = params.customer_email as string
+  if (!customerEmail || !customerEmail.includes('@')) {
+    return { success: false, error: 'Ogiltig e-postadress' }
+  }
+
+  try {
+    const threads = await getCustomerEmails(
+      context.googleConnection.access_token,
+      customerEmail,
+      (params.max_results as number) || 10
+    )
+
+    return { success: true, data: {
+      customer_email: customerEmail,
+      thread_count: threads.length,
+      threads: threads.map(t => ({
+        threadId: t.threadId, subject: t.subject, snippet: t.snippet,
+        from: t.from, date: t.date, messageCount: t.messageCount, isUnread: t.isUnread,
+      })),
+    }}
+  } catch (err: any) {
+    return { success: false, error: `Gmail-fel: ${err.message}` }
+  }
 }
 
 // ── Pipeline ─────────────────────────────────────────────

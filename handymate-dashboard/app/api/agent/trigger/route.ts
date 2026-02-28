@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { ensureValidToken } from '@/lib/google-calendar'
 import Anthropic from '@anthropic-ai/sdk'
 
 import { toolDefinitions } from './tool-definitions'
@@ -52,8 +53,72 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Fetch Google Calendar/Gmail connection for this business
+    let googleConnection: {
+      access_token: string
+      refresh_token: string
+      token_expires_at: string | null
+      calendar_id: string
+      account_email: string
+      gmail_scope_granted: boolean
+      gmail_send_scope_granted: boolean
+      gmail_sync_enabled: boolean
+      sync_enabled: boolean
+    } | null = null
+
+    const { data: businessUser } = await supabase
+      .from('business_users')
+      .select('id')
+      .eq('business_id', business.business_id)
+      .eq('user_id', business.user_id)
+      .eq('is_active', true)
+      .single()
+
+    if (businessUser) {
+      const { data: conn } = await supabase
+        .from('calendar_connection')
+        .select('access_token, refresh_token, token_expires_at, calendar_id, account_email, gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, sync_enabled')
+        .eq('business_user_id', businessUser.id)
+        .eq('provider', 'google')
+        .single()
+
+      if (conn) {
+        try {
+          const tokenResult = await ensureValidToken(conn as any)
+          if (tokenResult) {
+            if (tokenResult.access_token !== conn.access_token) {
+              await supabase
+                .from('calendar_connection')
+                .update({
+                  access_token: tokenResult.access_token,
+                  token_expires_at: new Date(tokenResult.expiry_date).toISOString(),
+                })
+                .eq('business_user_id', businessUser.id)
+                .eq('provider', 'google')
+            }
+            googleConnection = {
+              ...conn,
+              access_token: tokenResult.access_token,
+              gmail_scope_granted: conn.gmail_scope_granted ?? false,
+              gmail_send_scope_granted: conn.gmail_send_scope_granted ?? false,
+              gmail_sync_enabled: conn.gmail_sync_enabled ?? false,
+              sync_enabled: conn.sync_enabled ?? false,
+            }
+          }
+        } catch (err) {
+          console.error('[AgentTrigger] Google token refresh failed:', err)
+        }
+      }
+    }
+
     const systemPrompt = buildSystemPrompt(
-      bizConfig,
+      {
+        ...bizConfig,
+        google_calendar_connected: !!googleConnection?.sync_enabled,
+        google_calendar_email: googleConnection?.account_email || undefined,
+        gmail_connected: !!googleConnection?.gmail_scope_granted && !!googleConnection?.gmail_sync_enabled,
+        gmail_send_enabled: !!googleConnection?.gmail_send_scope_granted && !!googleConnection?.gmail_sync_enabled,
+      },
       trigger_type,
       trigger_data
     )
@@ -61,6 +126,7 @@ export async function POST(request: NextRequest) {
     const context = {
       businessName: bizConfig.business_name || 'Handymate',
       contactEmail: bizConfig.contact_email || '',
+      googleConnection,
     }
 
     // Build initial user message

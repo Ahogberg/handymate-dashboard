@@ -56,6 +56,7 @@ export async function GET(request: NextRequest) {
       syncError: connection.sync_error || null,
       connectedAt: connection.created_at || null,
       gmailScopeGranted: connection.gmail_scope_granted ?? false,
+      gmailSendScopeGranted: connection.gmail_send_scope_granted ?? false,
       gmailSyncEnabled: connection.gmail_sync_enabled ?? false,
       gmailLastSyncAt: connection.gmail_last_sync_at || null,
     })
