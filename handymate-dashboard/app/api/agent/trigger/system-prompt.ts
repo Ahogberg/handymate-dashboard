@@ -54,9 +54,9 @@ export function buildSystemPrompt(
   }
   const hoursBlock = business.working_hours
     ? Object.entries(business.working_hours)
-        .filter(([, v]) => v.active)
+        .filter(([, v]) => v && v.active)
         .map(([day, v]) => `${dayNames[day] || day}: ${v.start}–${v.end}`)
-        .join(', ')
+        .join(', ') || 'Mån-Fre 07:00–17:00'
     : 'Mån-Fre 07:00–17:00'
 
   const triggerInstructions = getTriggerInstructions(triggerType, triggerData)
