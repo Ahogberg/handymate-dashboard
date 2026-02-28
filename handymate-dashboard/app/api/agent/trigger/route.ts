@@ -268,25 +268,26 @@ export async function POST(request: NextRequest) {
     // Log to agent_runs
     const runId =
       'run_' + Math.random().toString(36).substring(2, 14)
-    await supabase
-      .from('agent_runs')
-      .insert({
-        run_id: runId,
-        business_id: business.business_id,
-        trigger_type,
-        trigger_data: trigger_data || {},
-        steps,
-        tool_calls: toolCallCount,
-        final_response: finalResponse,
-        tokens_used: totalTokens,
-        estimated_cost: estimatedCost,
-        duration_ms: durationMs,
-        status: 'completed',
-        created_at: new Date().toISOString(),
-      })
-      .catch(() => {
-        // Non-blocking
-      })
+    try {
+      await supabase
+        .from('agent_runs')
+        .insert({
+          run_id: runId,
+          business_id: business.business_id,
+          trigger_type,
+          trigger_data: trigger_data || {},
+          steps,
+          tool_calls: toolCallCount,
+          final_response: finalResponse,
+          tokens_used: totalTokens,
+          estimated_cost: estimatedCost,
+          duration_ms: durationMs,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+        })
+    } catch {
+      // Non-blocking — log insert failure doesn't affect response
+    }
 
     return NextResponse.json({
       run_id: runId,
