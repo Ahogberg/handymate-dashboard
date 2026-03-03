@@ -18,6 +18,7 @@ import {
   FileText,
   Receipt,
   Zap,
+  Package,
 } from 'lucide-react'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -317,6 +318,7 @@ export default function Jobbkompisen() {
       case 'create_quote': return <FileText className="w-4 h-4" />
       case 'update_project': return <Zap className="w-4 h-4" />
       case 'send_sms': return <MessageSquare className="w-4 h-4" />
+      case 'order_material': return <Package className="w-4 h-4" />
       default: return <ChevronRight className="w-4 h-4" />
     }
   }
@@ -450,6 +452,7 @@ export default function Jobbkompisen() {
             onFile={handlePhotoFile}
             onAnalyze={analyzePhoto}
             onReset={() => { setPhotoPreview(null); setPhotoResult(null) }}
+            onCreateQuote={() => setIsOpen(false)}
           />
         )}
       </div>
@@ -808,6 +811,7 @@ function PhotoTab({
   onFile,
   onAnalyze,
   onReset,
+  onCreateQuote,
 }: {
   preview: string | null
   analyzing: boolean
@@ -817,6 +821,7 @@ function PhotoTab({
   onFile: (file: File) => void
   onAnalyze: () => void
   onReset: () => void
+  onCreateQuote?: () => void
 }) {
   if (analyzing) {
     return (
@@ -855,7 +860,8 @@ function PhotoTab({
             Ny bild
           </button>
           <a
-            href={`/dashboard/quotes/new?from=photo`}
+            href={`/dashboard/quotes/new?transcript=${encodeURIComponent(result)}`}
+            onClick={onCreateQuote}
             className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
           >
             <FileText className="w-4 h-4" />

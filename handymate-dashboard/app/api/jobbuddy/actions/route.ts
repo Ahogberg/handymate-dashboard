@@ -186,6 +186,43 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true, message: `SMS skickat till ${customer.name}` })
       }
 
+      case 'order_material': {
+        const { items, notes } = data
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          return NextResponse.json({ error: 'Items required for material order' }, { status: 400 })
+        }
+
+        const orderItems = items.map((item: any) => ({
+          name: item.name || item.description || 'Material',
+          sku: item.sku || null,
+          quantity: item.quantity || 1,
+          unit: item.unit || 'st',
+          unit_price: item.unit_price || 0,
+          total: (item.quantity || 1) * (item.unit_price || 0),
+          supplier_name: item.supplier || null,
+        }))
+
+        const total = orderItems.reduce((sum: number, item: any) => sum + (item.total || 0), 0)
+
+        const { error } = await supabase
+          .from('material_order')
+          .insert({
+            business_id: businessId,
+            items: orderItems,
+            total,
+            status: 'draft',
+            notes: notes || 'Skapad via Jobbkompisen',
+          })
+
+        if (error) throw error
+        return NextResponse.json({
+          success: true,
+          message: `Materialbeställning skapad (${orderItems.length} artiklar)`,
+          redirect: '/dashboard/orders',
+        })
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action type: ${action_type}` }, { status: 400 })
     }
