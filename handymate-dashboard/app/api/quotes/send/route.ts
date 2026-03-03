@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -181,6 +182,12 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver create_invoices
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

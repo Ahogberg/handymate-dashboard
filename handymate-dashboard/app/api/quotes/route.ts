@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
 
@@ -114,6 +115,12 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver create_invoices (offerter leder till fakturor)
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -384,6 +391,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Permission check: kräver create_invoices
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
     const { quote_id } = body
@@ -576,6 +589,12 @@ export async function DELETE(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver create_invoices
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

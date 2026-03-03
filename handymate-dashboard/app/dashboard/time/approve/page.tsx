@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { PermissionGate } from '@/components/PermissionGate'
 import Link from 'next/link'
 
 interface PendingWeek {
@@ -101,6 +102,7 @@ export default function ApprovePage() {
   }
 
   return (
+    <PermissionGate permission="approve_time">
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Toast */}
       {toast.show && (
@@ -235,5 +237,6 @@ export default function ApprovePage() {
         )}
       </div>
     </div>
+    </PermissionGate>
   )
 }

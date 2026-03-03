@@ -12,6 +12,7 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { PermissionGate } from '@/components/PermissionGate'
 import { format, addWeeks, subWeeks, startOfWeek } from 'date-fns'
 import { sv } from 'date-fns/locale'
 import Link from 'next/link'
@@ -109,6 +110,7 @@ export default function WeeklyReportPage() {
   }
 
   return (
+    <PermissionGate permission="approve_time">
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
@@ -252,5 +254,6 @@ export default function WeeklyReportPage() {
         )}
       </div>
     </div>
+    </PermissionGate>
   )
 }

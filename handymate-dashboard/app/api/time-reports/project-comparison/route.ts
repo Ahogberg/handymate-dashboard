@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
  * GET - Jämför rapporterad tid vs offerterad tid per projekt
@@ -11,6 +12,12 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver see_financials
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
