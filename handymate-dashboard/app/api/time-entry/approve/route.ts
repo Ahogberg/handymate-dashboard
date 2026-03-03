@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
  * POST /api/time-entry/approve - Godkänn eller avslå tidrapporter
@@ -11,6 +12,12 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver approve_time
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'approve_time')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -96,6 +103,12 @@ export async function GET(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver approve_time
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'approve_time')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

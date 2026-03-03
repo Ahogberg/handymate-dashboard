@@ -81,6 +81,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
     }
 
+    // Skapa owner-rad i business_users
+    const ownerId = 'bu_' + Math.random().toString(36).substr(2, 12)
+    await supabaseAdmin
+      .from('business_users')
+      .insert({
+        id: ownerId,
+        business_id: businessId,
+        user_id: authData.user.id,
+        role: 'owner',
+        name: contactName,
+        email: email,
+        phone: phone || null,
+        is_active: true,
+        can_see_all_projects: true,
+        can_see_financials: true,
+        can_manage_users: true,
+        can_approve_time: true,
+        can_create_invoices: true,
+        accepted_at: new Date().toISOString(),
+      })
+
     const emailConfirmationPending = !authData.session
 
     return NextResponse.json({

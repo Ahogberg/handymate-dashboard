@@ -20,6 +20,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { PermissionGate } from '@/components/PermissionGate'
 import Link from 'next/link'
 
 interface Invoice {
@@ -263,6 +264,7 @@ export default function InvoicesPage() {
   }
 
   return (
+    <PermissionGate permission="see_financials">
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
@@ -671,5 +673,6 @@ export default function InvoicesPage() {
         </div>
       </div>
     </div>
+    </PermissionGate>
   )
 }

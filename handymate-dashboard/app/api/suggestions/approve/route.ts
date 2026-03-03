@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
  * POST - Godkänn ett AI-förslag och utför åtgärden
@@ -13,6 +14,12 @@ export async function POST(request: NextRequest) {
     const authBusiness = await getAuthenticatedBusiness(request)
     if (!authBusiness) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver owner eller admin
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -16,6 +17,12 @@ export async function POST(request: NextRequest) {
     const authBusiness = await getAuthenticatedBusiness(request)
     if (!authBusiness) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver manage_settings
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'manage_settings')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     // Rate limit check (46elks API)
@@ -142,6 +149,12 @@ export async function DELETE(request: NextRequest) {
     const authBusiness = await getAuthenticatedBusiness(request)
     if (!authBusiness) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Permission check: kräver manage_settings
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'manage_settings')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     // Rate limit check (46elks API)

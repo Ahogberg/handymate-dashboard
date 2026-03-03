@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { PermissionGate } from '@/components/PermissionGate'
 import {
   Building2,
   Clock,
@@ -1139,6 +1140,7 @@ export default function SettingsPage() {
   const currentPlan = config.subscription_plan || 'Starter'
 
   return (
+    <PermissionGate permission="manage_settings">
     <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
@@ -3301,6 +3303,7 @@ export default function SettingsPage() {
         )}
       </div>
     </div>
+    </PermissionGate>
   )
 }
 
