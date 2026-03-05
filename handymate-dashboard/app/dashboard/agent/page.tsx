@@ -44,6 +44,9 @@ import {
   Calendar,
   MailCheck,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
+  Code2,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import {
@@ -166,25 +169,88 @@ const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color:
   cron: { label: 'Schemalagd', icon: Clock, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20' },
 }
 
-const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search }> = {
-  search_customers: { label: 'Sök kund', icon: Search },
-  get_customer: { label: 'Hämta kund', icon: Eye },
-  create_customer: { label: 'Skapa kund', icon: UserPlus },
-  update_customer: { label: 'Uppdatera kund', icon: ClipboardList },
-  create_quote: { label: 'Skapa offert', icon: FileText },
-  get_quotes: { label: 'Hämta offerter', icon: FileText },
-  create_invoice: { label: 'Skapa faktura', icon: FileText },
-  check_calendar: { label: 'Kolla kalender', icon: CalendarCheck },
-  create_booking: { label: 'Skapa bokning', icon: CalendarCheck },
-  update_project: { label: 'Uppdatera projekt', icon: ClipboardList },
-  log_time: { label: 'Logga tid', icon: Clock },
-  send_sms: { label: 'Skicka SMS', icon: Smartphone },
-  send_email: { label: 'Skicka e-post', icon: Mail },
-  read_customer_emails: { label: 'Läs kundmail', icon: Mail },
-  qualify_lead: { label: 'Kvalificera lead', icon: TrendingUp },
-  update_lead_status: { label: 'Uppdatera lead', icon: ArrowRight },
-  get_lead: { label: 'Hämta lead', icon: Eye },
-  search_leads: { label: 'Sök leads', icon: Search },
+const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search; friendlyLabel: string }> = {
+  search_customers: { label: 'Sök kund', icon: Search, friendlyLabel: 'Sökte efter kunder' },
+  get_customer: { label: 'Hämta kund', icon: Eye, friendlyLabel: 'Hämtade kundinfo' },
+  create_customer: { label: 'Skapa kund', icon: UserPlus, friendlyLabel: 'Skapade ny kund' },
+  update_customer: { label: 'Uppdatera kund', icon: ClipboardList, friendlyLabel: 'Uppdaterade kund' },
+  create_quote: { label: 'Skapa offert', icon: FileText, friendlyLabel: 'Skapade offert' },
+  get_quotes: { label: 'Hämta offerter', icon: FileText, friendlyLabel: 'Hämtade offerter' },
+  create_invoice: { label: 'Skapa faktura', icon: FileText, friendlyLabel: 'Skapade faktura' },
+  check_calendar: { label: 'Kolla kalender', icon: CalendarCheck, friendlyLabel: 'Kollade lediga tider' },
+  create_booking: { label: 'Skapa bokning', icon: CalendarCheck, friendlyLabel: 'Skapade bokning' },
+  update_project: { label: 'Uppdatera projekt', icon: ClipboardList, friendlyLabel: 'Uppdaterade projekt' },
+  log_time: { label: 'Logga tid', icon: Clock, friendlyLabel: 'Registrerade tid' },
+  send_sms: { label: 'Skicka SMS', icon: Smartphone, friendlyLabel: 'Skickade SMS' },
+  send_email: { label: 'Skicka e-post', icon: Mail, friendlyLabel: 'Skickade e-post' },
+  read_customer_emails: { label: 'Läs kundmail', icon: Mail, friendlyLabel: 'Läste kundmail' },
+  qualify_lead: { label: 'Kvalificera lead', icon: TrendingUp, friendlyLabel: 'Kvalificerade intressent' },
+  update_lead_status: { label: 'Uppdatera lead', icon: ArrowRight, friendlyLabel: 'Uppdaterade intressent' },
+  get_lead: { label: 'Hämta lead', icon: Eye, friendlyLabel: 'Hämtade intressent' },
+  search_leads: { label: 'Sök leads', icon: Search, friendlyLabel: 'Sökte intressenter' },
+  get_daily_stats: { label: 'Dagsrapport', icon: Activity, friendlyLabel: 'Hämtade dagsrapport' },
+  order_material: { label: 'Beställ material', icon: ClipboardList, friendlyLabel: 'Beställde material' },
+}
+
+// Format tool result as human-readable summary
+function formatToolResultSummary(tool: string, result: { success: boolean; data?: unknown; error?: string }): string {
+  if (!result.success) return result.error || 'Något gick fel'
+  const d = result.data as Record<string, unknown> | undefined
+  if (!d) return 'Klart'
+
+  switch (tool) {
+    case 'search_customers':
+    case 'search_leads': {
+      const count = Array.isArray(d) ? d.length : (d.count ?? d.total ?? (Array.isArray(d.customers) ? d.customers.length : (Array.isArray(d.leads) ? d.leads.length : '?')))
+      const noun = tool === 'search_leads' ? 'intressenter' : 'kunder'
+      return `Hittade ${count} ${noun}`
+    }
+    case 'create_quote':
+      return d.quote_id ? `Offert ${d.quote_id} skapad` : 'Offert skapad'
+    case 'create_invoice':
+      return d.invoice_id ? `Faktura ${d.invoice_id} skapad` : 'Faktura skapad'
+    case 'create_customer':
+      return d.name ? `Kund "${d.name}" skapad` : 'Kund skapad'
+    case 'create_booking':
+      return d.booking_date ? `Bokning ${d.booking_date} skapad` : 'Bokning skapad'
+    case 'send_sms':
+      return d.status === 'sent' || d.success ? 'SMS skickat' : 'SMS köat'
+    case 'send_email':
+      return d.status === 'sent' || d.success ? 'E-post skickat' : 'E-post köat'
+    case 'check_calendar': {
+      const slots = Array.isArray(d.available_slots) ? d.available_slots.length : (Array.isArray(d.slots) ? d.slots.length : null)
+      return slots !== null ? `${slots} lediga tider hittades` : 'Kalender kollad'
+    }
+    case 'get_customer':
+      return d.name ? `${d.name}` : 'Kundinfo hämtad'
+    case 'get_lead':
+      return d.name ? `${d.name}` : 'Intressent hämtad'
+    case 'qualify_lead':
+      return d.score !== undefined ? `Poäng: ${d.score}/100` : 'Intressent kvalificerad'
+    case 'update_lead_status':
+      return d.status ? `Status: ${d.status}` : 'Status uppdaterad'
+    case 'log_time':
+      return d.duration_minutes ? `${d.duration_minutes} min registrerade` : 'Tid registrerad'
+    case 'read_customer_emails': {
+      const emailCount = Array.isArray(d) ? d.length : (Array.isArray(d.emails) ? d.emails.length : null)
+      return emailCount !== null ? `${emailCount} mail hittade` : 'Mail hämtade'
+    }
+    case 'get_daily_stats':
+      return 'Dagsrapport hämtad'
+    default:
+      return 'Klart'
+  }
+}
+
+// Simple markdown-to-HTML renderer for agent responses
+function renderSimpleMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, '<ul class="list-disc list-inside space-y-1 my-1">$&</ul>')
+    .replace(/\n{2,}/g, '</p><p class="mt-2">')
+    .replace(/\n/g, '<br/>')
 }
 
 const RULE_TYPE_CONFIG: Record<string, { label: string; icon: typeof FileText; color: string; bg: string }> = {
@@ -297,7 +363,7 @@ function ActivityItem({ run, isSelected, onClick }: {
             </span>
             <span className="flex items-center gap-1">
               <Zap className="w-3 h-3" />
-              {run.tool_calls} verktyg
+              {run.tool_calls} steg
             </span>
             <span>{formatDuration(run.duration_ms)}</span>
           </div>
@@ -312,48 +378,39 @@ function ActivityItem({ run, isSelected, onClick }: {
 function ToolStep({ call, index, total }: {
   call: NonNullable<AgentStep['tool_calls']>[0]; index: number; total: number
 }) {
-  const config = TOOL_CONFIG[call.tool] || { label: call.tool, icon: Zap }
+  const config = TOOL_CONFIG[call.tool] || { label: call.tool, icon: Zap, friendlyLabel: call.tool }
   const ToolIcon = config.icon
+  const summary = formatToolResultSummary(call.tool, call.result)
 
   return (
     <div className="flex gap-3">
       {/* Timeline */}
       <div className="flex flex-col items-center w-8 flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center z-10 shadow-sm shadow-teal-500/20">
-          <ToolIcon className="w-4 h-4 text-white" />
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center z-10 shadow-sm ${
+          call.result.success
+            ? 'bg-teal-100 text-teal-600 shadow-teal-500/20'
+            : 'bg-red-100 text-red-500 shadow-red-500/20'
+        }`}>
+          {call.result.success
+            ? <ToolIcon className="w-4 h-4" />
+            : <XCircle className="w-4 h-4" />
+          }
         </div>
         {index < total - 1 && (
           <div className="w-0.5 flex-1 bg-gradient-to-b from-teal-300 to-gray-200 min-h-[16px]" />
         )}
       </div>
       {/* Content */}
-      <div className="flex-1 bg-gray-50 rounded-lg p-3 border border-gray-200 mb-3">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-semibold text-gray-900 font-mono">{call.tool}</span>
-          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-            call.result.success ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-          }`}>
-            {call.result.success ? 'OK' : 'Fel'}
-          </span>
+      <div className="flex-1 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900">{config.friendlyLabel}</span>
+          {!call.result.success && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-700">Fel</span>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider mb-1">Inmatning</p>
-            <pre className="text-xs text-gray-600 bg-white p-2 rounded border border-gray-200 overflow-auto max-h-32 font-mono leading-relaxed">
-              {JSON.stringify(call.input, null, 2)}
-            </pre>
-          </div>
-          <div>
-            <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider mb-1">Resultat</p>
-            <pre className={`text-xs p-2 rounded border overflow-auto max-h-32 font-mono leading-relaxed ${
-              call.result.success
-                ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
-                : 'text-red-700 bg-red-50 border-red-200'
-            }`}>
-              {JSON.stringify(call.result.data || call.result.error, null, 2)}
-            </pre>
-          </div>
-        </div>
+        <p className={`text-xs mt-0.5 ${call.result.success ? 'text-gray-500' : 'text-red-500'}`}>
+          {summary}
+        </p>
       </div>
     </div>
   )
@@ -364,9 +421,11 @@ function ToolStep({ call, index, total }: {
 function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   const trigger = TRIGGER_CONFIG[run.trigger_type] || TRIGGER_CONFIG.manual
   const TriggerIcon = trigger.icon
+  const [showTech, setShowTech] = useState(false)
 
   // Flatten all tool calls from steps
   const allToolCalls = run.steps.flatMap(s => s.tool_calls || [])
+  const successCount = allToolCalls.filter(c => c.result.success).length
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in">
@@ -394,23 +453,26 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Summary */}
-        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed">
-          {run.final_response || '(Inget svar)'}
-        </div>
+        {/* Summary — rendered as formatted text */}
+        <div
+          className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed [&_strong]:font-semibold [&_em]:italic [&_ul]:ml-2 [&_li]:text-gray-600"
+          dangerouslySetInnerHTML={{
+            __html: run.final_response
+              ? `<p>${renderSimpleMarkdown(run.final_response)}</p>`
+              : '<p class="text-gray-400 italic">(Inget svar)</p>'
+          }}
+        />
 
-        {/* Meta */}
+        {/* Meta — only user-friendly info */}
         <div className="flex gap-6 mt-3">
           {[
-            { label: 'Starttid', value: formatTime(run.created_at) },
+            { label: 'Tid', value: formatTime(run.created_at) },
             { label: 'Varaktighet', value: formatDuration(run.duration_ms) },
-            { label: 'Steg', value: String(run.steps.length) },
-            { label: 'Tokens', value: run.tokens_used.toLocaleString() },
-            { label: 'Kostnad', value: formatCost(run.estimated_cost) },
+            { label: 'Steg', value: `${successCount}/${allToolCalls.length} OK` },
           ].map(item => (
             <div key={item.label}>
               <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">{item.label}</p>
-              <p className="text-sm font-semibold text-gray-900 font-mono mt-0.5">{item.value}</p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">{item.value}</p>
             </div>
           ))}
         </div>
@@ -419,14 +481,72 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
       {/* Tool Calls Timeline */}
       <div className="p-5">
         <p className="text-sm font-bold text-gray-900 mb-4">
-          Agentens steg ({allToolCalls.length})
+          Vad AI-assistenten gjorde ({allToolCalls.length} steg)
         </p>
         {allToolCalls.length > 0 ? (
           allToolCalls.map((call, i) => (
             <ToolStep key={i} call={call} index={i} total={allToolCalls.length} />
           ))
         ) : (
-          <p className="text-sm text-gray-400 italic">Inga verktygsanrop</p>
+          <p className="text-sm text-gray-400 italic">Inga steg utförda</p>
+        )}
+      </div>
+
+      {/* Technical Details Toggle */}
+      <div className="border-t border-gray-100">
+        <button
+          onClick={() => setShowTech(!showTech)}
+          className="w-full px-5 py-3 flex items-center gap-2 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+        >
+          <Code2 className="w-3.5 h-3.5" />
+          <span>Visa tekniska detaljer</span>
+          {showTech ? <ChevronUp className="w-3.5 h-3.5 ml-auto" /> : <ChevronDown className="w-3.5 h-3.5 ml-auto" />}
+        </button>
+        {showTech && (
+          <div className="px-5 pb-5 space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Tokens</p>
+                <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">{run.tokens_used.toLocaleString()}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Kostnad</p>
+                <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">{formatCost(run.estimated_cost)}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Run ID</p>
+                <p className="text-xs font-mono text-gray-500 mt-0.5 truncate">{run.run_id}</p>
+              </div>
+            </div>
+            {allToolCalls.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Rå verktygsdata</p>
+                {allToolCalls.map((call, i) => (
+                  <div key={i} className="mb-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <p className="text-xs font-mono font-semibold text-gray-700 mb-1">{call.tool}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase mb-0.5">Input</p>
+                        <pre className="text-[11px] text-gray-600 bg-white p-2 rounded border border-gray-200 overflow-auto max-h-32 font-mono leading-relaxed">
+                          {JSON.stringify(call.input, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-gray-400 uppercase mb-0.5">Result</p>
+                        <pre className={`text-[11px] p-2 rounded border overflow-auto max-h-32 font-mono leading-relaxed ${
+                          call.result.success
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                            : 'text-red-700 bg-red-50 border-red-200'
+                        }`}>
+                          {JSON.stringify(call.result.data || call.result.error, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -1371,7 +1491,7 @@ function ManualTrigger({ businessId, onTriggered }: {
       })
       const data = await response.json()
       if (response.ok) {
-        setResult({ type: 'success', message: `Klart — ${data.tool_calls || 0} verktygsanrop, ${((data.duration_ms || 0) / 1000).toFixed(1)}s` })
+        setResult({ type: 'success', message: `Klart — ${data.tool_calls || 0} steg, ${((data.duration_ms || 0) / 1000).toFixed(1)}s` })
         setInstruction('')
         onTriggered()
       } else {
