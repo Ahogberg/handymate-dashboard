@@ -141,6 +141,91 @@ const BRANCH_KNOWLEDGE: Record<string, BranchKnowledge> = {
     commonPriceFactors: ['Bostadens storlek', 'Städfrekvens', 'Skick', 'Speciella önskemål'],
   },
 
+  construction: {
+    services: [
+      { name: 'Nybyggnation', description: 'Nybygge av hus, garage, förråd eller tillbyggnad', estimatedHours: 160 },
+      { name: 'Renovering', description: 'Totalrenovering av badrum, kök eller hela bostaden', estimatedHours: 80 },
+      { name: 'Tillbyggnad', description: 'Utbyggnad av befintlig bostad med extra rum eller yta', estimatedHours: 120 },
+      { name: 'Fasadrenovering', description: 'Byte eller renovering av fasadmaterial', estimatedHours: 40 },
+      { name: 'Grundarbete', description: 'Grundläggning, dränering och markarbeten', estimatedHours: 40 },
+    ],
+    faqs: [
+      { question: 'Behöver jag bygglov?', answer: 'De flesta större byggen kräver bygglov. Vi hjälper er med ansökan och kontakt med kommunen.' },
+      { question: 'Hur lång tid tar en renovering?', answer: 'Det beror på projektets storlek. Ett badrum tar 3-5 veckor, ett kök 2-4 veckor. Vi ger tidsuppskattning i offerten.' },
+      { question: 'Hanterar ni ROT-avdraget?', answer: 'Ja, vi sköter allt med Skatteverket. ROT-avdrag ger 30% rabatt på arbetskostnaden upp till 50 000 kr per person och år.' },
+    ],
+    emergencyInfo: 'Vid akuta skador (storm, vatten, brand) — kontakta oss omedelbart så prioriterar vi ditt ärende. Dokumentera skadan med foton för försäkringen.',
+    commonPriceFactors: ['Projektets storlek', 'Materialval', 'Tillgänglighet', 'Markförhållanden'],
+  },
+
+  roofing: {
+    services: [
+      { name: 'Takbyte', description: 'Komplett byte av tak inklusive underlag och pannor', estimatedHours: 40 },
+      { name: 'Takläggning', description: 'Läggning av nytt tak på nybygge eller tillbyggnad', estimatedHours: 24 },
+      { name: 'Takinspektion', description: 'Kontroll av takets skick, läckor och skador', estimatedHours: 2 },
+      { name: 'Plåtarbete', description: 'Installation av plåttak, hängrännor och stuprör', estimatedHours: 16 },
+      { name: 'Takfönster', description: 'Installation eller byte av takfönster', estimatedHours: 4 },
+    ],
+    faqs: [
+      { question: 'Hur vet jag om taket behöver bytas?', answer: 'Tecken: läckande tak, mossa, trasiga pannor, hängande hängrännor. Vi gör kostnadsfri inspektion.' },
+      { question: 'Vad kostar det att lägga om taket?', answer: 'Pris beror på storlek och material. Räkna med 800-1500 kr/kvm. Vi ger alltid fast pris i offerten.' },
+      { question: 'Hur länge håller ett nytt tak?', answer: 'Betongpannor håller 40-60 år, plåttak 50+ år, papp 15-25 år.' },
+    ],
+    emergencyInfo: 'Vid stormskada eller akut läcka — kontakta oss direkt. Vi kan göra akut täckning. Dokumentera med foton för försäkringen.',
+    commonPriceFactors: ['Takyta (kvm)', 'Materialval', 'Taklutning', 'Tillgänglighet'],
+  },
+
+  flooring: {
+    services: [
+      { name: 'Parkettläggning', description: 'Läggning av parkett, massivt trägolv eller laminat', estimatedHours: 8 },
+      { name: 'Kakel & klinker', description: 'Plattsättning i badrum, kök och hall', estimatedHours: 16 },
+      { name: 'Golvslipning', description: 'Slipning och lackning av trägolv', estimatedHours: 8 },
+      { name: 'Vinyl/Plastgolv', description: 'Läggning av vinyl, linoleum eller plastgolv', estimatedHours: 6 },
+      { name: 'Golvavjämning', description: 'Avjämning av ojämna golv inför golvläggning', estimatedHours: 4 },
+    ],
+    faqs: [
+      { question: 'Vilket golv passar bäst?', answer: 'Det beror på rum och användning. Parkett passar vardagsrum, klinker badrum, vinyl kök. Vi hjälper er välja.' },
+      { question: 'Kan ni slipa mitt gamla trägolv?', answer: 'Ja, de flesta trägolv kan slipas 3-5 gånger. Vi bedömer skicket och ger rekommendation.' },
+      { question: 'Hur lång tid tar golvläggning?', answer: 'Ett rum (15 kvm) tar en dag för parkett, 2-3 dagar för kakel.' },
+    ],
+    emergencyInfo: 'Golvarbeten är sällan akuta. Vid vattenskador som påverkat golvet — kontakta oss och er försäkring parallellt.',
+    commonPriceFactors: ['Golvyta (kvm)', 'Materialval', 'Avjämningsbehov', 'Mönsterläggning'],
+  },
+
+  gardening: {
+    services: [
+      { name: 'Trädgårdsskötsel', description: 'Regelbunden skötsel: klippning, ogräsrensning, beskärning', estimatedHours: 4 },
+      { name: 'Häckklippning', description: 'Klippning och formning av häckar', estimatedHours: 3 },
+      { name: 'Trädfällning', description: 'Fällning av träd med stubbrytning', estimatedHours: 4 },
+      { name: 'Stenläggning', description: 'Läggning av plattor, marksten eller natursten', estimatedHours: 16 },
+      { name: 'Plantering', description: 'Plantering av buskar, träd, häckar och blommor', estimatedHours: 4 },
+    ],
+    faqs: [
+      { question: 'Kan jag få RUT-avdrag?', answer: 'Ja, trädgårdsarbete i hemmet ger RUT-avdrag på 50% av arbetskostnaden upp till 75 000 kr per år.' },
+      { question: 'Tar ni hand om avfall?', answer: 'Ja, vi forslar bort allt trädgårdsavfall. Kostnaden ingår i offerten.' },
+      { question: 'Jobbar ni året runt?', answer: 'Vi anpassar arbetet efter säsong. Vintertid erbjuder vi snöröjning och planering inför våren.' },
+    ],
+    emergencyInfo: 'Vid stormskador med fallna träd — kontakta oss för akut bortforsling och säkring av området.',
+    commonPriceFactors: ['Trädgårdens storlek', 'Typ av arbete', 'Avfallshantering', 'Materialval'],
+  },
+
+  moving: {
+    services: [
+      { name: 'Lägenhetsflytt', description: 'Flytt av lägenhet inklusive packning vid behov', estimatedHours: 6 },
+      { name: 'Villaflytt', description: 'Flytt av villa med möbler, lådor och tunga föremål', estimatedHours: 10 },
+      { name: 'Kontorsflytt', description: 'Flytt av kontor med IT-utrustning och möbler', estimatedHours: 12 },
+      { name: 'Magasinering', description: 'Förvaring av möbler och tillhörigheter', estimatedHours: 2 },
+      { name: 'Packhjälp', description: 'Professionell packning och emballering', estimatedHours: 4 },
+    ],
+    faqs: [
+      { question: 'Vad kostar en flytt?', answer: 'Pris beror på avstånd, mängd och våningsplan. En 2:a kostar ofta 4000-8000 kr. Vi ger fast pris efter besiktning.' },
+      { question: 'Är mina saker försäkrade?', answer: 'Ja, vi har ansvarsförsäkring. Vi rekommenderar att kontrollera er hemförsäkring för extra trygghet.' },
+      { question: 'Kan jag få RUT-avdrag?', answer: 'Ja, flytt av bohag ger RUT-avdrag på 50% av arbetskostnaden. Vi hanterar avdraget direkt.' },
+    ],
+    emergencyInfo: 'Behöver du akut flytt? Kontakta oss så försöker vi ordna personal inom 24 timmar.',
+    commonPriceFactors: ['Avstånd', 'Mängd bohag', 'Våningsplan (hiss?)', 'Packningstjänst'],
+  },
+
   other: {
     services: [
       { name: 'Konsultation', description: 'Rådgivning och bedömning av arbete som behöver utföras', estimatedHours: 1 },
@@ -166,6 +251,11 @@ const BRANCH_MAPPING: Record<string, string> = {
   'hvac': 'hvac',
   'locksmith': 'locksmith',
   'cleaning': 'cleaning',
+  'construction': 'construction',
+  'roofing': 'roofing',
+  'flooring': 'flooring',
+  'gardening': 'gardening',
+  'moving': 'moving',
   'other': 'other',
   // Swedish names (if used)
   'elektriker': 'electrician',
@@ -175,6 +265,11 @@ const BRANCH_MAPPING: Record<string, string> = {
   'vvs': 'hvac',
   'låssmed': 'locksmith',
   'städ': 'cleaning',
+  'bygg': 'construction',
+  'tak': 'roofing',
+  'golv': 'flooring',
+  'trädgård': 'gardening',
+  'flytt': 'moving',
   'annat': 'other',
 }
 
@@ -208,6 +303,11 @@ export function getBranchDisplayName(branch: string): string {
     hvac: 'VVS',
     locksmith: 'Låssmed',
     cleaning: 'Städ',
+    construction: 'Bygg',
+    roofing: 'Tak',
+    flooring: 'Golvläggning',
+    gardening: 'Trädgård',
+    moving: 'Flytt',
     other: 'Annat',
   }
   return displayNames[branch] || branch

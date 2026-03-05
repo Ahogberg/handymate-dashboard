@@ -16,7 +16,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Play,
   PhoneCall,
   PhoneIncoming,
   PhoneOutgoing,
@@ -43,6 +42,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
 import Link from 'next/link'
+import CustomerTimeline from '@/components/CustomerTimeline'
 
 interface Customer {
   customer_id: string
@@ -85,30 +85,7 @@ interface Activity {
   created_by: string
 }
 
-interface GmailThread {
-  threadId: string
-  subject: string
-  snippet: string
-  from: string
-  to: string
-  date: string
-  messageCount: number
-  isUnread: boolean
-}
-
-interface GmailMessage {
-  messageId: string
-  threadId: string
-  subject: string
-  from: string
-  to: string
-  date: string
-  snippet: string
-  bodyText: string | null
-  bodyHtml: string | null
-}
-
-type TimelineFilter = 'all' | 'calls' | 'sms' | 'email' | 'notes'
+// GmailThread, GmailMessage, TimelineFilter moved to CustomerTimeline component
 
 interface Booking {
   booking_id: string
@@ -175,13 +152,7 @@ export default function CustomerDetailPage() {
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
 
-  // Gmail / Timeline
-  const [emailThreads, setEmailThreads] = useState<GmailThread[]>([])
-  const [emailLoading, setEmailLoading] = useState(false)
-  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>('all')
-  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null)
-  const [threadMessages, setThreadMessages] = useState<Record<string, GmailMessage[]>>({})
-  const [threadLoading, setThreadLoading] = useState(false)
+  // Timeline is now handled by CustomerTimeline component
 
   // Portal
   const [portalToken, setPortalToken] = useState<string | null>(null)
@@ -252,49 +223,10 @@ export default function CustomerDetailPage() {
       // Tasks table may not exist yet
     }
 
-    // Fetch Gmail threads if customer has email
-    if (customerData?.email) {
-      fetchEmailThreads(customerData.email)
-    }
-
     setLoading(false)
   }
 
-  async function fetchEmailThreads(email: string) {
-    setEmailLoading(true)
-    try {
-      const res = await fetch(`/api/gmail/customer-emails?email=${encodeURIComponent(email)}`)
-      if (res.ok) {
-        const data = await res.json()
-        setEmailThreads(data.threads || [])
-      }
-    } catch {
-      // Gmail not configured or not enabled — silent
-    } finally {
-      setEmailLoading(false)
-    }
-  }
-
-  async function fetchThreadMessages(threadId: string) {
-    if (threadMessages[threadId]) {
-      // Already loaded
-      setExpandedThreadId(expandedThreadId === threadId ? null : threadId)
-      return
-    }
-    setExpandedThreadId(threadId)
-    setThreadLoading(true)
-    try {
-      const res = await fetch(`/api/gmail/thread-messages?threadId=${encodeURIComponent(threadId)}`)
-      if (res.ok) {
-        const data = await res.json()
-        setThreadMessages(prev => ({ ...prev, [threadId]: data.messages || [] }))
-      }
-    } catch {
-      // silent
-    } finally {
-      setThreadLoading(false)
-    }
-  }
+  // Email threads and thread messages are now handled by CustomerTimeline component
 
   async function fetchTasks() {
     try {
@@ -496,88 +428,10 @@ export default function CustomerDetailPage() {
     }
   }
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'call_inbound': return <PhoneIncoming className="w-4 h-4 text-emerald-600" />
-      case 'call_outbound': return <PhoneOutgoing className="w-4 h-4 text-blue-400" />
-      case 'call_logged': return <PhoneCall className="w-4 h-4 text-blue-600" />
-      case 'sms_sent': return <Send className="w-4 h-4 text-cyan-600" />
-      case 'sms_received': return <MessageSquare className="w-4 h-4 text-cyan-400" />
-      case 'booking_created': return <Calendar className="w-4 h-4 text-amber-400" />
-      case 'job_completed': return <CheckCircle className="w-4 h-4 text-emerald-600" />
-      case 'note_added': return <FileText className="w-4 h-4 text-gray-500" />
-      case 'rating_received': return <Star className="w-4 h-4 text-yellow-400" />
-      case 'email_thread': return <Mail className="w-4 h-4 text-purple-500" />
-      default: return <Clock className="w-4 h-4 text-gray-500" />
-    }
-  }
-
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('sv-SE', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins}:${secs.toString().padStart(2, '0')}`
-  }
-
-  const parseEmailDate = (dateStr: string): Date => {
-    const d = new Date(dateStr)
-    return isNaN(d.getTime()) ? new Date() : d
-  }
-
-  const extractEmailName = (from: string): string => {
-    const match = from.match(/^"?([^"<]+)"?\s*</)
-    return match ? match[1].trim() : from.split('@')[0]
-  }
-
-  // Build unified timeline
-  const getFilteredTimeline = () => {
-    // Build activity items
-    let filteredActivities = activities
-    if (timelineFilter === 'calls') {
-      filteredActivities = activities.filter(a => a.activity_type.startsWith('call_'))
-    } else if (timelineFilter === 'sms') {
-      filteredActivities = activities.filter(a => a.activity_type.startsWith('sms_'))
-    } else if (timelineFilter === 'notes') {
-      filteredActivities = activities.filter(a => a.activity_type === 'note_added')
-    } else if (timelineFilter === 'email') {
-      filteredActivities = []
-    }
-
-    const activityItems = filteredActivities.map(a => ({
-      type: 'activity' as const,
-      id: a.activity_id,
-      date: new Date(a.created_at),
-      data: a,
-    }))
-
-    // Build email items
-    const showEmails = timelineFilter === 'all' || timelineFilter === 'email'
-    const emailItems = showEmails ? emailThreads.map(t => ({
-      type: 'email' as const,
-      id: t.threadId,
-      date: parseEmailDate(t.date),
-      data: t,
-    })) : []
-
-    // Merge and sort by date descending
-    const allItems = [...activityItems, ...emailItems]
-    allItems.sort((a, b) => b.date.getTime() - a.date.getTime())
-    return allItems
-  }
-
   const getJobStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Schemalagt</span>
+        return <span className="px-2 py-1 text-xs rounded-full bg-teal-600/20 text-teal-500 border border-teal-500/30">Schemalagt</span>
       case 'in_progress':
         return <span className="px-2 py-1 text-xs rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Pågående</span>
       case 'completed':
@@ -592,7 +446,7 @@ export default function CustomerDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -609,8 +463,8 @@ export default function CustomerDetailPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-6xl mx-auto">
@@ -660,7 +514,7 @@ export default function CustomerDetailPage() {
 
                 {customer.email && (
                   <a href={`mailto:${customer.email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
-                    <Mail className="w-4 h-4 text-blue-400" />
+                    <Mail className="w-4 h-4 text-teal-500" />
                     <span className="text-gray-900 text-sm truncate">{customer.email}</span>
                   </a>
                 )}
@@ -723,7 +577,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowLogCallModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <PhoneCall className="w-4 h-4 text-blue-600" />
+                  <PhoneCall className="w-4 h-4 text-sky-700" />
                   <span className="text-gray-900 text-sm">Logga samtal</span>
                 </button>
                 
@@ -731,7 +585,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowSendSMSModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <MessageSquare className="w-4 h-4 text-cyan-600" />
+                  <MessageSquare className="w-4 h-4 text-teal-600" />
                   <span className="text-gray-900 text-sm">Skicka SMS</span>
                 </button>
                 
@@ -739,7 +593,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowAddNoteModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <FileText className="w-4 h-4 text-cyan-400" />
+                  <FileText className="w-4 h-4 text-teal-400" />
                   <span className="text-gray-900 text-sm">Lägg till anteckning</span>
                 </button>
                 
@@ -824,7 +678,7 @@ export default function CustomerDetailPage() {
                   <button
                     onClick={generatePortalLink}
                     disabled={generatingPortal}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
                   >
                     {generatingPortal ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -870,7 +724,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('timeline')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'timeline'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -880,7 +734,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('bookings')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'bookings'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -890,7 +744,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('documents')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'documents'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -900,7 +754,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('tasks')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'tasks'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -910,179 +764,7 @@ export default function CustomerDetailPage() {
 
             {/* Timeline */}
             {activeTab === 'timeline' && (
-              <div className="space-y-3">
-                {/* Timeline filter */}
-                <div className="flex gap-1.5 flex-wrap">
-                  {([
-                    { key: 'all', label: 'Alla' },
-                    { key: 'calls', label: 'Samtal' },
-                    { key: 'sms', label: 'SMS' },
-                    { key: 'email', label: 'E-post' },
-                    { key: 'notes', label: 'Anteckningar' },
-                  ] as { key: TimelineFilter; label: string }[]).map(f => (
-                    <button
-                      key={f.key}
-                      onClick={() => setTimelineFilter(f.key)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        timelineFilter === f.key
-                          ? 'bg-blue-100 text-blue-600 border border-blue-200'
-                          : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      {f.label}
-                      {f.key === 'email' && emailThreads.length > 0 && (
-                        <span className="ml-1 text-[10px] opacity-70">({emailThreads.length})</span>
-                      )}
-                    </button>
-                  ))}
-                  {emailLoading && <Loader2 className="w-4 h-4 text-gray-400 animate-spin self-center ml-1" />}
-                </div>
-
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-                  {(() => {
-                    const timeline = getFilteredTimeline()
-                    if (timeline.length === 0) {
-                      return (
-                        <div className="p-8 text-center">
-                          <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                          <p className="text-gray-400">
-                            {timelineFilter === 'email' ? 'Inga e-postmeddelanden hittade' : 'Ingen aktivitet ännu'}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-1">
-                            {timelineFilter === 'email'
-                              ? 'Gmail-koppling krävs i Inställningar → Integrationer'
-                              : 'Logga ett samtal eller skicka ett SMS för att komma igång'}
-                          </p>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div className="divide-y divide-gray-200">
-                        {timeline.map((item) => {
-                          if (item.type === 'activity') {
-                            const activity = item.data
-                            return (
-                              <div key={activity.activity_id} className="p-4 hover:bg-gray-100/30 transition-all">
-                                <div className="flex gap-4">
-                                  <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                                    {getActivityIcon(activity.activity_type)}
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <p className="font-medium text-gray-900 text-sm">{activity.title}</p>
-                                      <span className="text-xs text-gray-400 whitespace-nowrap">
-                                        {activity.created_by && activity.created_by !== 'user' && activity.created_by !== 'system' && (
-                                          <span className="mr-1">{activity.created_by} &middot;</span>
-                                        )}
-                                        {formatDate(activity.created_at)}
-                                      </span>
-                                    </div>
-                                    {activity.description && (
-                                      <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
-                                    )}
-                                    {activity.duration_seconds && (
-                                      <p className="text-xs text-gray-400 mt-1">
-                                        Längd: {formatDuration(activity.duration_seconds)}
-                                      </p>
-                                    )}
-                                    {activity.transcript && (
-                                      <details className="mt-2">
-                                        <summary className="text-xs text-blue-600 cursor-pointer hover:text-blue-500">
-                                          Visa transkription
-                                        </summary>
-                                        <p className="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 whitespace-pre-wrap">
-                                          {activity.transcript}
-                                        </p>
-                                      </details>
-                                    )}
-                                    {activity.recording_url && (
-                                      <button className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500">
-                                        <Play className="w-3 h-3" />
-                                        Spela upp inspelning
-                                      </button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          }
-
-                          // Email thread item
-                          const thread = item.data
-                          const isExpanded = expandedThreadId === thread.threadId
-                          const messages = threadMessages[thread.threadId]
-                          return (
-                            <div key={thread.threadId} className="p-4 hover:bg-gray-100/30 transition-all">
-                              <div className="flex gap-4">
-                                <div className="flex-shrink-0 w-8 h-8 bg-purple-50 rounded-full flex items-center justify-center">
-                                  <Mail className="w-4 h-4 text-purple-500" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <p className="font-medium text-gray-900 text-sm truncate">
-                                        {thread.subject}
-                                      </p>
-                                      <p className="text-xs text-gray-400 mt-0.5">
-                                        {extractEmailName(thread.from)}
-                                        {thread.messageCount > 1 && (
-                                          <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">
-                                            {thread.messageCount} meddelanden
-                                          </span>
-                                        )}
-                                        {thread.isUnread && (
-                                          <span className="ml-1.5 w-2 h-2 bg-blue-500 rounded-full inline-block" />
-                                        )}
-                                      </p>
-                                    </div>
-                                    <span className="text-xs text-gray-400 whitespace-nowrap">
-                                      {formatDate(parseEmailDate(thread.date).toISOString())}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{thread.snippet}</p>
-
-                                  <button
-                                    onClick={() => fetchThreadMessages(thread.threadId)}
-                                    className="mt-2 text-xs text-purple-600 hover:text-purple-500 flex items-center gap-1"
-                                  >
-                                    {threadLoading && expandedThreadId === thread.threadId ? (
-                                      <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                      <Mail className="w-3 h-3" />
-                                    )}
-                                    {isExpanded && messages ? 'Dölj konversation' : 'Visa konversation'}
-                                  </button>
-
-                                  {/* Expanded thread messages */}
-                                  {isExpanded && messages && (
-                                    <div className="mt-3 space-y-2">
-                                      {messages.map((msg) => (
-                                        <div key={msg.messageId} className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                          <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs font-medium text-gray-700">
-                                              {extractEmailName(msg.from)}
-                                            </span>
-                                            <span className="text-[10px] text-gray-400">
-                                              {formatDate(parseEmailDate(msg.date).toISOString())}
-                                            </span>
-                                          </div>
-                                          <div className="text-xs text-gray-600 whitespace-pre-wrap break-words max-h-48 overflow-y-auto">
-                                            {msg.bodyText || msg.snippet}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                </div>
-              </div>
+              <CustomerTimeline customerId={customerId} customerEmail={customer?.email} />
             )}
 
             {/* Bookings */}
@@ -1092,7 +774,7 @@ export default function CustomerDetailPage() {
                   <div className="p-8 text-center">
                     <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-400">Inga bokningar</p>
-                    <Link href="/dashboard/bookings" className="text-sm text-blue-600 hover:text-blue-500 mt-2 inline-block">
+                    <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
                       Skapa första bokningen →
                     </Link>
                   </div>
@@ -1154,7 +836,7 @@ export default function CustomerDetailPage() {
                     <select
                       value={uploadCategory}
                       onChange={(e) => setUploadCategory(e.target.value)}
-                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[44px]"
+                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 min-h-[44px]"
                     >
                       <option value="drawing">Ritning</option>
                       <option value="sketch">Skiss</option>
@@ -1164,7 +846,7 @@ export default function CustomerDetailPage() {
                       <option value="other">Övrigt</option>
                     </select>
 
-                    <label className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90 cursor-pointer transition-all min-h-[44px]">
+                    <label className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 cursor-pointer transition-all min-h-[44px]">
                       {uploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
@@ -1199,7 +881,7 @@ export default function CustomerDetailPage() {
                         <div key={doc.id} className="p-4 hover:bg-gray-50 transition-all flex items-center gap-4">
                           <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
                             {doc.file_type?.startsWith('image/') ? (
-                              <Image className="w-5 h-5 text-blue-500" />
+                              <Image className="w-5 h-5 text-teal-600" />
                             ) : doc.file_type?.includes('pdf') ? (
                               <FileText className="w-5 h-5 text-red-500" />
                             ) : (
@@ -1221,7 +903,7 @@ export default function CustomerDetailPage() {
                               href={doc.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              className="p-2.5 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                               title="Öppna"
                             >
                               <Download className="w-4 h-4" />
@@ -1252,19 +934,19 @@ export default function CustomerDetailPage() {
                       value={newTaskTitle}
                       onChange={e => setNewTaskTitle(e.target.value)}
                       placeholder="Ny uppgift..."
-                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 min-h-[44px]"
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 min-h-[44px]"
                       onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
                     />
                     <input
                       type="date"
                       value={newTaskDueDate}
                       onChange={e => setNewTaskDueDate(e.target.value)}
-                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-blue-400 min-h-[44px]"
+                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-teal-400 min-h-[44px]"
                     />
                     <button
                       onClick={handleAddTask}
                       disabled={!newTaskTitle.trim() || taskSaving}
-                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] flex items-center gap-1.5"
+                      className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-xl hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] flex items-center gap-1.5"
                     >
                       {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       Lägg till
@@ -1282,7 +964,7 @@ export default function CustomerDetailPage() {
                     {tasks.map(task => (
                       <div key={task.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
                         <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-teal-400'}`}>
                             {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                           </div>
                         </button>
@@ -1334,7 +1016,7 @@ export default function CustomerDetailPage() {
                       onClick={() => setEditForm({ ...editForm, customer_type: value })}
                       className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm font-medium transition-all min-h-[44px] ${
                         editForm.customer_type === value
-                          ? 'bg-blue-50 border-blue-400 text-blue-700'
+                          ? 'bg-teal-50 border-teal-400 text-teal-700'
                           : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
                     >
@@ -1353,7 +1035,7 @@ export default function CustomerDetailPage() {
                   type="text"
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -1362,12 +1044,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Organisationsnummer</label>
                     <input type="text" value={editForm.org_number || ''} onChange={(e) => setEditForm({ ...editForm, org_number: e.target.value })} placeholder="XXXXXX-XXXX"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Kontaktperson</label>
                     <input type="text" value={editForm.contact_person || ''} onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                   </div>
                 </>
               )}
@@ -1375,19 +1057,19 @@ export default function CustomerDetailPage() {
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Telefon *</label>
                 <input type="tel" value={editForm.phone_number || ''} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} placeholder="+46..."
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">E-post</label>
                 <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Adress</label>
                 <input type="text" value={editForm.address_line || ''} onChange={(e) => setEditForm({ ...editForm, address_line: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
               </div>
 
               {(editForm.customer_type === 'company' || editForm.customer_type === 'brf') && (
@@ -1395,12 +1077,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Referens / Er märkning</label>
                     <input type="text" value={editForm.reference || ''} onChange={(e) => setEditForm({ ...editForm, reference: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
                     <input type="text" value={editForm.invoice_address || ''} onChange={(e) => setEditForm({ ...editForm, invoice_address: e.target.value })} placeholder="Om annan än besöksadress"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                   </div>
                 </>
               )}
@@ -1409,7 +1091,7 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Antal lägenheter</label>
                   <input type="number" value={editForm.apartment_count || ''} onChange={(e) => setEditForm({ ...editForm, apartment_count: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                 </div>
               )}
 
@@ -1417,14 +1099,14 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
                   <input type="text" value={editForm.personal_number || ''} onChange={(e) => setEditForm({ ...editForm, personal_number: e.target.value })} placeholder="YYYYMMDD-XXXX"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
                 </div>
               )}
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Fastighetsbeteckning</label>
                 <input type="text" value={editForm.property_designation || ''} onChange={(e) => setEditForm({ ...editForm, property_designation: e.target.value })} placeholder="T.ex. Stockholm Söder 1:23"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
               </div>
             </div>
 
@@ -1435,7 +1117,7 @@ export default function CustomerDetailPage() {
               <button
                 onClick={saveEdit}
                 disabled={editSaving}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
               >
                 {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Spara
@@ -1534,7 +1216,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('outbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'outbound'
-                    ? 'bg-blue-100 border border-blue-300 text-gray-900'
+                    ? 'bg-teal-100 border border-teal-300 text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1545,7 +1227,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('inbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'inbound'
-                    ? 'bg-blue-100 border border-blue-300 text-gray-900'
+                    ? 'bg-teal-100 border border-teal-300 text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1562,7 +1244,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
               placeholder="5"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
 
@@ -1573,7 +1255,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Vad pratade ni om?"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
         </div>
@@ -1588,7 +1270,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : 'Spara'}
           </button>
@@ -1639,7 +1321,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
           rows={4}
           placeholder="Skriv din anteckning..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
         />
 
         <div className="flex gap-3 mt-6">
@@ -1652,7 +1334,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving || !note.trim()}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : 'Spara'}
           </button>
@@ -1731,7 +1413,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           rows={4}
           placeholder="Skriv ditt meddelande..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
         />
         
         <p className="text-xs text-gray-400 mt-2">{message.length} tecken</p>
@@ -1746,7 +1428,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           <button
             onClick={handleSend}
             disabled={sending || !message.trim()}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {sending ? 'Skickar...' : 'Skicka'}
           </button>

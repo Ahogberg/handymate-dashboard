@@ -297,7 +297,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
     if (pilot.subscriptionStatus === 'trial') {
       const daysLeft = trialEnd ? Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0
       return (
-        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-teal-600/20 text-teal-500 border border-teal-500/30">
           <Clock className="w-3 h-3" />
           Trial ({daysLeft}d)
         </span>
@@ -314,7 +314,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -335,15 +335,15 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -359,7 +359,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <p className="text-xs text-gray-400">Totalt</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-400">{stats.trial}</p>
+                <p className="text-2xl font-bold text-teal-500">{stats.trial}</p>
                 <p className="text-xs text-gray-400">Trial</p>
               </div>
               <div className="text-center">
@@ -367,7 +367,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <p className="text-xs text-gray-400">Aktiva</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">{stats.withPhone}</p>
+                <p className="text-2xl font-bold text-sky-700">{stats.withPhone}</p>
                 <p className="text-xs text-gray-400">Med nummer</p>
               </div>
             </div>
@@ -377,7 +377,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
         {/* Create Form */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Plus className="w-5 h-5 text-blue-600" />
+            <Plus className="w-5 h-5 text-sky-700" />
             Onboarda ny pilot
           </h2>
 
@@ -409,7 +409,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   <p className="text-sm text-gray-500">Meddelande till piloten:</p>
                   <button
                     onClick={copyToClipboard}
-                    className="flex items-center gap-1 px-3 py-1 text-sm text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1 text-sm text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
                   >
                     {copied ? (
                       <>
@@ -451,7 +451,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.businessName}
                   onChange={(e) => setForm({ ...form, businessName: e.target.value })}
                   placeholder="Elexperten Stockholm AB"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -465,7 +465,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.contactName}
                   onChange={(e) => setForm({ ...form, contactName: e.target.value })}
                   placeholder="Johan Svensson"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -479,7 +479,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: formatPhoneNumber(e.target.value) })}
                   placeholder="+46 70 123 45 67"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -493,7 +493,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
                   placeholder="johan@foretag.se"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -504,7 +504,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <select
                   value={form.branch}
                   onChange={(e) => setForm({ ...form, branch: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   {BRANCHES.map(b => (
                     <option key={b.value} value={b.value}>{b.label}</option>
@@ -522,7 +522,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                   value={form.serviceArea}
                   onChange={(e) => setForm({ ...form, serviceArea: e.target.value })}
                   placeholder="Stockholm, Solna, Sundbyberg"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -530,7 +530,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <button
                   onClick={handleCreate}
                   disabled={creating}
-                  className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {creating ? (
                     <>
@@ -608,7 +608,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       </td>
                       <td className="px-4 py-3">
                         {pilot.assignedPhoneNumber ? (
-                          <code className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          <code className="text-sm text-sky-700 bg-teal-50 px-2 py-1 rounded">
                             {pilot.assignedPhoneNumber}
                           </code>
                         ) : (
@@ -624,7 +624,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       <td className="px-4 py-3">
                         <button
                           onClick={() => handleImpersonate(pilot.businessId)}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
                         >
                           <LogIn className="w-3 h-3" />
                           Logga in som

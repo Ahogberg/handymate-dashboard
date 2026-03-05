@@ -47,10 +47,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verifiera att businessId finns, belongs to the authenticated user, och skapades nyligen
+    // Verifiera att businessId finns och belongs to the authenticated user
     const { data: business, error: fetchError } = await supabase
       .from('business_config')
-      .select('business_id, assigned_phone_number, business_name, created_at, user_id')
+      .select('business_id, assigned_phone_number, business_name, user_id')
       .eq('business_id', businessId)
       .single()
 
@@ -61,13 +61,6 @@ export async function POST(request: NextRequest) {
     // Verify that the authenticated user owns this business
     if (business.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
-    // Kolla att kontot skapades nyligen (inom 1 timme)
-    const createdAt = new Date(business.created_at)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-    if (createdAt < oneHourAgo) {
-      return NextResponse.json({ error: 'Onboarding session expired' }, { status: 403 })
     }
 
     if (business.assigned_phone_number) {

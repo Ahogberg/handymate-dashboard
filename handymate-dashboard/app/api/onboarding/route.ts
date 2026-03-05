@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { seedAllDefaults } from '@/lib/seed-defaults'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,7 +72,7 @@ export async function PUT(request: NextRequest) {
     // Build update object
     const updates: Record<string, unknown> = {}
 
-    if (typeof step === 'number' && step >= 1 && step <= 7) {
+    if (typeof step === 'number' && step >= 1 && step <= 8) {
       updates.onboarding_step = step
     }
 
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
 
     const updates: Record<string, unknown> = {
-      onboarding_step: 7,
+      onboarding_step: 8,
       onboarding_completed_at: new Date().toISOString(),
     }
 
@@ -173,34 +174,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Create default pipeline stages if none exist
-    const { data: existingStages } = await supabase
-      .from('pipeline_stage')
-      .select('id')
-      .eq('business_id', business.business_id)
-      .limit(1)
+    // Seed all defaults (idempotent — safe to run multiple times)
+    const seedResult = await seedAllDefaults(
+      supabase,
+      business.business_id,
+      branch || 'other'
+    )
 
-    if (!existingStages || existingStages.length === 0) {
-      const defaultStages = [
-        { name: 'Ny förfrågan', position: 0, color: '#3B82F6' },
-        { name: 'Offert skickad', position: 1, color: '#F59E0B' },
-        { name: 'Förhandling', position: 2, color: '#8B5CF6' },
-        { name: 'Accepterad', position: 3, color: '#10B981' },
-        { name: 'Avslutad', position: 4, color: '#6B7280' },
-      ]
-
-      await supabase
-        .from('pipeline_stage')
-        .insert(
-          defaultStages.map((s, i) => ({
-            id: `ps_${business.business_id}_${i}`,
-            business_id: business.business_id,
-            ...s,
-          }))
-        )
-    }
-
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, seeded: seedResult })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
     console.error('POST /api/onboarding finalize error:', msg)

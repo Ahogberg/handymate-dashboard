@@ -316,7 +316,7 @@ export async function checkCalendar(
   const { data: bookings, error } = await supabase
     .from("booking")
     .select(
-      "booking_id, customer_id, service_type, scheduled_start, scheduled_end, status, notes"
+      "booking_id, customer_id, scheduled_start, scheduled_end, status, notes, google_event_id"
     )
     .eq("business_id", businessId)
     .gte("scheduled_start", `${params.from_date}T00:00:00`)
@@ -365,13 +365,13 @@ export async function createBooking(
   businessId: string,
   params: {
     customer_id: string
-    service_type: string
+    service_type?: string
     scheduled_start: string
     scheduled_end: string
     notes?: string
   }
 ): Promise<ToolResult> {
-  console.log(`[Tool] create_booking: ${params.service_type} @ ${params.scheduled_start}`)
+  console.log(`[Tool] create_booking: ${params.service_type || 'Bokning'} @ ${params.scheduled_start}`)
 
   // Verify customer
   const { data: customer } = await supabase
@@ -390,12 +390,10 @@ export async function createBooking(
     booking_id: bookingId,
     business_id: businessId,
     customer_id: params.customer_id,
-    service_type: params.service_type,
     scheduled_start: params.scheduled_start,
     scheduled_end: params.scheduled_end,
     status: "pending",
-    notes: params.notes || null,
-    source: "ai_suggestion",
+    notes: [params.service_type, params.notes].filter(Boolean).join(' — ') || null,
     created_at: new Date().toISOString(),
   })
 
@@ -410,10 +408,10 @@ export async function createBooking(
     success: true,
     data: {
       booking_id: bookingId,
-      message: `Bokning skapad: ${params.service_type} med ${customer.name}`,
+      message: `Bokning skapad: ${params.service_type || 'Bokning'} med ${customer.name}`,
       details: {
         customer_name: customer.name,
-        service_type: params.service_type,
+        service_type: params.service_type || null,
         start: params.scheduled_start,
         end: params.scheduled_end,
         status: "pending",
@@ -459,7 +457,7 @@ export async function updateProject(
     .update(updates)
     .eq("business_id", businessId)
     .eq("booking_id", params.booking_id)
-    .select("booking_id, service_type, status, notes")
+    .select("booking_id, status, notes")
     .single()
 
   if (error) {

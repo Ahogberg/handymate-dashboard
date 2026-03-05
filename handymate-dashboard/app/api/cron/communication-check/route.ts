@@ -1,31 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { runCommunicationAI } from '@/lib/communication-ai'
+import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 
+/**
+ * GET /api/cron/communication-check - Daily communication check via AI agent.
+ * Keeps: Finding active businesses.
+ * Delegates: Customer communication evaluation to AI agent.
+ */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret (for Vercel Cron Jobs or manual trigger)
     const authHeader = request.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const supabase = getServerSupabase()
-
-    // Get all active businesses with communication enabled
-    const { data: settings } = await supabase
-      .from('communication_settings')
-      .select('business_id')
-      .eq('auto_enabled', true)
-
-    // Also include businesses without settings (defaults to enabled)
-    const { data: allBusinesses } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .limit(100)
-
-    const settingsBusinessIds = new Set((settings || []).map((s: any) => s.business_id))
-    const disabledBusinesses = new Set<string>()
+    const today = new Date().toISOString().split('T')[0]
 
     // Find explicitly disabled businesses
     const { data: disabledSettings } = await supabase
@@ -33,36 +23,36 @@ export async function GET(request: NextRequest) {
       .select('business_id')
       .eq('auto_enabled', false)
 
-    for (const ds of disabledSettings || []) {
-      disabledBusinesses.add(ds.business_id)
-    }
+    const disabledBusinesses = new Set((disabledSettings || []).map((d: any) => d.business_id))
 
-    // Active = has settings with auto_enabled OR has no settings at all (defaults enabled)
+    // Get all active businesses (excluding disabled)
+    const { data: allBusinesses } = await supabase
+      .from('business_config')
+      .select('business_id')
+      .limit(100)
+
     const activeBusinessIds = (allBusinesses || [])
       .map((b: any) => b.business_id)
       .filter((id: string) => !disabledBusinesses.has(id))
 
-    const results: Array<{ businessId: string; evaluated: number; sent: number }> = []
-
+    let agentTriggered = 0
     for (const businessId of activeBusinessIds) {
-      try {
-        const result = await runCommunicationAI(businessId)
-        results.push({
-          businessId,
-          evaluated: result.evaluated,
-          sent: result.sent,
-        })
-      } catch (err) {
-        console.error(`Communication check failed for ${businessId}:`, err)
-      }
+      const result = await triggerAgentInternal(
+        businessId,
+        'cron',
+        {
+          cron_type: 'communication_check',
+          instruction: 'Kör daglig kommunikationskontroll. Identifiera kunder som inte kontaktats på länge, offerter utan svar, och bokningar som behöver bekräftelse. Skicka lämpliga uppföljningar via SMS eller email.',
+        },
+        makeIdempotencyKey('comm', businessId, today)
+      )
+      if (result.success) agentTriggered++
     }
 
     return NextResponse.json({
       success: true,
-      businesses: results.length,
-      totalEvaluated: results.reduce((sum, r) => sum + r.evaluated, 0),
-      totalSent: results.reduce((sum, r) => sum + r.sent, 0),
-      details: results,
+      businesses: activeBusinessIds.length,
+      agent_triggered: agentTriggered,
     })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

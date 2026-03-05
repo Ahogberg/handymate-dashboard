@@ -41,7 +41,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
           </div>
         )}
         <div className="space-y-3">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto" />
+          <Loader2 className="w-8 h-8 text-sky-700 animate-spin mx-auto" />
           <p className="text-gray-900 font-medium">Analyserar bild...</p>
           <div className="space-y-2 text-sm text-gray-400">
             <p>Identifierar arbete och material...</p>
@@ -70,7 +70,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => cameraInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
               >
                 <Camera className="w-5 h-5" />
                 Ta bild
@@ -120,7 +120,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
             </button>
             <button
               onClick={submitImage}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
             >
               Analysera bild
             </button>

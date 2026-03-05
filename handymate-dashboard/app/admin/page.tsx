@@ -45,15 +45,15 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  starter: 'bg-blue-500',
-  professional: 'bg-cyan-500',
-  business: 'bg-violet-500',
+  starter: 'bg-teal-600',
+  professional: 'bg-teal-500',
+  business: 'bg-teal-500',
 }
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
-  starter: 'bg-blue-100 text-blue-700 border-blue-200',
-  professional: 'bg-cyan-100 text-cyan-700 border-cyan-200',
-  business: 'bg-violet-100 text-violet-700 border-violet-200',
+  starter: 'bg-teal-100 text-teal-700 border-teal-200',
+  professional: 'bg-teal-100 text-teal-700 border-teal-200',
+  business: 'bg-teal-100 text-teal-700 border-teal-200',
 }
 
 function formatSEK(amount: number): string {
@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -150,15 +150,15 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
             </button>
             <a
               href="/admin/onboard"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
             >
               <UserPlus className="w-4 h-4" />
               Onboarda pilot
@@ -200,8 +200,8 @@ export default function AdminDashboardPage() {
               {/* Total businesses */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <Building2 className="w-5 h-5 text-blue-600" />
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-5 h-5 text-sky-700" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Totalt</span>
                 </div>
@@ -224,8 +224,8 @@ export default function AdminDashboardPage() {
               {/* MRR */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-cyan-100 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-cyan-600" />
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-teal-600" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">MRR</span>
                 </div>
@@ -236,8 +236,8 @@ export default function AdminDashboardPage() {
               {/* New this month */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center">
-                    <UserPlus className="w-5 h-5 text-violet-600" />
+                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-teal-600" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Denna månad</span>
                 </div>
@@ -252,7 +252,7 @@ export default function AdminDashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-blue-500" />
+                  <FileText className="w-4 h-4 text-teal-600" />
                   <span className="text-xs text-gray-400 font-medium">Offerter</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.total_quotes}</p>
@@ -260,7 +260,7 @@ export default function AdminDashboardPage() {
 
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <Receipt className="w-4 h-4 text-cyan-500" />
+                  <Receipt className="w-4 h-4 text-teal-500" />
                   <span className="text-xs text-gray-400 font-medium">Fakturor</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.total_invoices}</p>
@@ -276,7 +276,7 @@ export default function AdminDashboardPage() {
 
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="w-4 h-4 text-violet-500" />
+                  <MessageSquare className="w-4 h-4 text-teal-500" />
                   <span className="text-xs text-gray-400 font-medium">SMS (månad)</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.sms_this_month}</p>
@@ -401,18 +401,18 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <a
                   href="/admin/onboard"
-                  className="group flex items-center justify-between bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:border-blue-300 hover:shadow-md transition-all"
+                  className="group flex items-center justify-between bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:border-teal-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                      <UserPlus className="w-5 h-5 text-blue-600" />
+                    <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center group-hover:bg-teal-200 transition-colors">
+                      <UserPlus className="w-5 h-5 text-sky-700" />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">Pilot Onboarding</p>
                       <p className="text-xs text-gray-500">Skapa och hantera pilotkonton</p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors" />
                 </a>
               </div>
             </div>

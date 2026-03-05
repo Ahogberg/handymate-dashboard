@@ -7,7 +7,7 @@ import { Inbox, Mic, Volume2, Loader2 } from 'lucide-react'
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center py-20">
-    <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+    <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
   </div>
 )
 
@@ -49,11 +49,11 @@ export default function CallsPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-white border border-blue-300'
+                  ? 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-white border border-teal-300'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
-              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-blue-600' : ''}`} />
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.key ? 'text-sky-700' : ''}`} />
               {tab.label}
             </button>
           ))}

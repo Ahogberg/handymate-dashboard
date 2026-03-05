@@ -315,6 +315,10 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
               <td class="text-right">${formatCurrency(item.total)}</td>
             </tr>`
           }).join('')}
+          <tr class="subtotal-row">
+            <td colspan="5" class="text-right">Summa arbete</td>
+            <td class="text-right">${formatCurrency(laborItems.reduce((s: number, i: any) => s + (i.total || 0), 0))}</td>
+          </tr>
         ` : ''}
 
         ${materialItems.length > 0 ? `
@@ -336,6 +340,10 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
               <td class="text-right">${formatCurrency(item.total)}</td>
             </tr>`
           }).join('')}
+          <tr class="subtotal-row">
+            <td colspan="5" class="text-right">Summa material</td>
+            <td class="text-right">${formatCurrency(materialItems.reduce((s: number, i: any) => s + (i.total || 0), 0))}</td>
+          </tr>
         ` : ''}
 
         ${serviceItems.length > 0 ? `
@@ -357,6 +365,10 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
               <td class="text-right">${formatCurrency(item.total)}</td>
             </tr>`
           }).join('')}
+          <tr class="subtotal-row">
+            <td colspan="5" class="text-right">Summa tjänster</td>
+            <td class="text-right">${formatCurrency(serviceItems.reduce((s: number, i: any) => s + (i.total || 0), 0))}</td>
+          </tr>
         ` : ''}
       </tbody>
     </table>`
@@ -1130,7 +1142,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       </div>
       ` : ''}
       <div class="summary-row subtotal">
-        <span>Netto</span>
+        <span>Netto (exkl. moms)</span>
         <span>${formatCurrency(quote.subtotal || (quote.total / 1.25))}</span>
       </div>
       ${quote.discount_amount > 0 ? `

@@ -445,8 +445,8 @@ export default function PricelistPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -477,7 +477,7 @@ export default function PricelistPage() {
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Building className="w-5 h-5 text-blue-600" />
+              <Building className="w-5 h-5 text-sky-700" />
               Leverantörer
             </h2>
             <button
@@ -486,7 +486,7 @@ export default function PricelistPage() {
                 setSupplierForm({ name: '', customer_number: '', contact_email: '', contact_phone: '' })
                 setShowSupplierModal(true)
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-100 border border-blue-300 rounded-xl text-blue-600 hover:bg-blue-500/30 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-100 border border-teal-300 rounded-xl text-sky-700 hover:bg-teal-600/30 text-sm"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -504,7 +504,7 @@ export default function PricelistPage() {
                   key={supplier.supplier_id}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
                     selectedSupplier === supplier.supplier_id
-                      ? 'bg-blue-100 border-blue-300'
+                      ? 'bg-teal-100 border-teal-300'
                       : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                   }`}
                   onClick={() => setSelectedSupplier(
@@ -528,7 +528,7 @@ export default function PricelistPage() {
                           setImportSupplierId(supplier.supplier_id)
                           setShowImportModal(true)
                         }}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                        className="p-1.5 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded"
                         title="Importera produkter"
                       >
                         <Upload className="w-4 h-4" />
@@ -570,7 +570,7 @@ export default function PricelistPage() {
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Package className="w-5 h-5 text-cyan-600" />
+              <Package className="w-5 h-5 text-teal-600" />
               Produkter
               <span className="text-sm font-normal text-gray-400">({totalProducts})</span>
             </h2>
@@ -582,14 +582,14 @@ export default function PricelistPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Sök produkter..."
-                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-500"
                 />
               </div>
               {categories.length > 0 && (
                 <select
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:border-blue-500"
+                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:border-teal-500"
                 >
                   <option value="">Alla kategorier</option>
                   {categories.map(cat => (
@@ -603,7 +603,7 @@ export default function PricelistPage() {
                   resetProductForm()
                   setShowProductModal(true)
                 }}
-                className="flex items-center gap-2 px-4 py-2 bg-cyan-100 border border-fuchsia-500/30 rounded-xl text-cyan-600 hover:bg-cyan-500/30 text-sm whitespace-nowrap"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-100 border border-teal-500/30 rounded-xl text-teal-600 hover:bg-teal-500/30 text-sm whitespace-nowrap"
               >
                 <Plus className="w-4 h-4" />
                 Ny produkt
@@ -712,7 +712,7 @@ export default function PricelistPage() {
                   type="text"
                   value={supplierForm.name}
                   onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   placeholder="T.ex. Ahlsell, Elektroskandia"
                 />
               </div>
@@ -722,7 +722,7 @@ export default function PricelistPage() {
                   type="text"
                   value={supplierForm.customer_number}
                   onChange={(e) => setSupplierForm({ ...supplierForm, customer_number: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   placeholder="Ditt kundnummer hos leverantören"
                 />
               </div>
@@ -733,7 +733,7 @@ export default function PricelistPage() {
                     type="email"
                     value={supplierForm.contact_email}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_email: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   />
                 </div>
                 <div>
@@ -742,7 +742,7 @@ export default function PricelistPage() {
                     type="tel"
                     value={supplierForm.contact_phone}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_phone: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   />
                 </div>
               </div>
@@ -757,7 +757,7 @@ export default function PricelistPage() {
               <button
                 onClick={handleSaveSupplier}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium disabled:opacity-50"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Spara
@@ -786,7 +786,7 @@ export default function PricelistPage() {
                   type="text"
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -796,7 +796,7 @@ export default function PricelistPage() {
                     type="text"
                     value={productForm.sku}
                     onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   />
                 </div>
                 <div>
@@ -805,7 +805,7 @@ export default function PricelistPage() {
                     type="text"
                     value={productForm.category}
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   />
                 </div>
               </div>
@@ -814,7 +814,7 @@ export default function PricelistPage() {
                 <select
                   value={productForm.supplier_id}
                   onChange={(e) => setProductForm({ ...productForm, supplier_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                 >
                   <option value="">Ingen leverantör</option>
                   {suppliers.map(s => (
@@ -829,7 +829,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.purchase_price}
                     onChange={(e) => setProductForm({ ...productForm, purchase_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                     step="0.01"
                   />
                 </div>
@@ -839,7 +839,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.markup_percent}
                     onChange={(e) => setProductForm({ ...productForm, markup_percent: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                   />
                 </div>
                 <div>
@@ -848,7 +848,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.sell_price}
                     onChange={(e) => setProductForm({ ...productForm, sell_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500"
                     step="0.01"
                   />
                 </div>
@@ -864,7 +864,7 @@ export default function PricelistPage() {
               <button
                 onClick={handleSaveProduct}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium disabled:opacity-50"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 Spara
@@ -880,7 +880,7 @@ export default function PricelistPage() {
           <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-blue-600" />
+                <FileSpreadsheet className="w-5 h-5 text-sky-700" />
                 Importera produkter
               </h3>
               <button onClick={closeImportModal} className="text-gray-400 hover:text-gray-900">
@@ -896,7 +896,7 @@ export default function PricelistPage() {
                 </p>
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-300 transition-colors"
+                  className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-teal-300 transition-colors"
                 >
                   <Upload className="w-10 h-10 text-gray-400 mx-auto mb-3" />
                   <p className="text-gray-900 font-medium">Klicka för att välja fil</p>
@@ -994,7 +994,7 @@ export default function PricelistPage() {
                   <button
                     onClick={handlePreviewImport}
                     disabled={importing || !columnMapping.name}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium disabled:opacity-50"
                   >
                     {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                     Förhandsgranska
@@ -1072,7 +1072,7 @@ export default function PricelistPage() {
                   <button
                     onClick={handleImport}
                     disabled={importing || importPreview.valid === 0}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium disabled:opacity-50"
                   >
                     {importing && <Loader2 className="w-4 h-4 animate-spin" />}
                     Importera {importPreview.valid} produkter
@@ -1084,7 +1084,7 @@ export default function PricelistPage() {
             {/* Step 4: Importing */}
             {importStep === 'importing' && (
               <div className="text-center py-12">
-                <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+                <Loader2 className="w-12 h-12 text-sky-700 animate-spin mx-auto mb-4" />
                 <p className="text-gray-900 font-medium">Importerar produkter...</p>
                 <p className="text-gray-400 text-sm">Detta kan ta en stund</p>
               </div>

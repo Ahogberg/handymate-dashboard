@@ -130,7 +130,6 @@ export async function PUT(request: NextRequest) {
     if (body.reference !== undefined) updateData.reference = body.reference || null
     if (body.apartment_count !== undefined) updateData.apartment_count = body.apartment_count ? parseInt(body.apartment_count) : null
     if (body.customer_rating !== undefined) updateData.customer_rating = body.customer_rating
-    if (body.job_status !== undefined) updateData.job_status = body.job_status
 
     const { data: customer, error } = await supabase
       .from('customer')

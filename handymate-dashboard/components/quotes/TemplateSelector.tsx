@@ -105,7 +105,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
             onClick={() => setCategoryFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
               categoryFilter === 'all'
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                ? 'bg-teal-600 text-white'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
           >
@@ -117,7 +117,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
               onClick={() => setCategoryFilter(cat)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 categoryFilter === cat
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  ? 'bg-teal-600 text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
@@ -129,7 +129,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
 
       {loading ? (
         <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+          <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
         </div>
       ) : sortedTemplates.length === 0 ? (
         <div className="text-center py-8">
@@ -148,7 +148,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
             return (
               <div
                 key={t.id}
-                className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-blue-300 transition-all group"
+                className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-teal-300 transition-all group"
               >
                 <button
                   onClick={() => toggleFavorite(t.id, !!t.is_favorite)}
@@ -168,7 +168,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                       </span>
                     )}
                     {t.category && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-600 rounded">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-sky-700 rounded">
                         {t.category}
                       </span>
                     )}

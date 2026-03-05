@@ -295,7 +295,7 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
           <p className="text-gray-500 text-sm">Laddar offert...</p>
         </div>
       </div>
@@ -308,13 +308,13 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -328,7 +328,7 @@ export default function QuoteSignPage() {
             <p className="text-gray-500 mb-6">{errorMessage}</p>
             <a
               href="/"
-              className="inline-block px-6 py-3 text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
+              className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-teal-600 transition-colors"
             >
               Tillbaka till startsidan
             </a>
@@ -344,13 +344,13 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -397,13 +397,13 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -414,7 +414,7 @@ export default function QuoteSignPage() {
               <CheckCircle className="w-10 h-10 text-emerald-600" />
             </div>
             <h2 className="text-2xl font-bold mb-2">
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-teal-600 bg-clip-text text-transparent">
                 Tack!
               </span>
             </h2>
@@ -451,18 +451,18 @@ export default function QuoteSignPage() {
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
             <Zap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">
-            <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+            <span className="bg-teal-600 bg-clip-text text-transparent">
               {quote.business_name}
             </span>
           </h1>
@@ -474,8 +474,8 @@ export default function QuoteSignPage() {
           {/* Title & Description */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                <FileText className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+                <FileText className="w-5 h-5 text-sky-700" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">
@@ -508,7 +508,7 @@ export default function QuoteSignPage() {
               return (
                 <div key={type}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-blue-600">{group.icon}</span>
+                    <span className="text-sky-700">{group.icon}</span>
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">
                       {group.label}
                     </h3>
@@ -649,8 +649,8 @@ export default function QuoteSignPage() {
         {/* Signature Card */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-8">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-              <PenTool className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+              <PenTool className="w-5 h-5 text-sky-700" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">Signera offerten</h3>
@@ -670,7 +670,7 @@ export default function QuoteSignPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Ditt fullständiga namn"
               required
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all"
             />
           </div>
 
@@ -726,7 +726,7 @@ export default function QuoteSignPage() {
             type="button"
             onClick={handleSubmit}
             disabled={state === 'signing' || !name.trim() || !hasDrawn}
-            className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {state === 'signing' ? (
               <>
@@ -758,7 +758,7 @@ export default function QuoteSignPage() {
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 pb-8">
           Drivs av{' '}
-          <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent font-medium">
+          <span className="bg-teal-600 bg-clip-text text-transparent font-medium">
             Handymate
           </span>
         </p>

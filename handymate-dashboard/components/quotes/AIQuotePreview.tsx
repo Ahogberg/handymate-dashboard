@@ -107,7 +107,7 @@ export default function AIQuotePreview({
       {/* Header with confidence */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-blue-600" />
+          <Sparkles className="w-5 h-5 text-sky-700" />
           <h2 className="text-lg font-semibold text-gray-900">AI-förslag</h2>
         </div>
         <span className={`text-sm font-medium ${confidenceColor}`}>
@@ -135,7 +135,7 @@ export default function AIQuotePreview({
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
           />
         </div>
         <div>
@@ -144,7 +144,7 @@ export default function AIQuotePreview({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
           />
         </div>
       </div>
@@ -154,7 +154,7 @@ export default function AIQuotePreview({
         <div className="flex items-center justify-between mb-2">
           <label className="text-xs text-gray-400">Offertrader</label>
           <div className="flex gap-2">
-            <button onClick={() => addItem('labor')} className="text-xs text-blue-400 hover:text-blue-700">+ Arbete</button>
+            <button onClick={() => addItem('labor')} className="text-xs text-teal-500 hover:text-teal-700">+ Arbete</button>
             <button onClick={() => addItem('material')} className="text-xs text-emerald-600 hover:text-emerald-700">+ Material</button>
           </div>
         </div>
@@ -162,7 +162,7 @@ export default function AIQuotePreview({
           {items.map(item => (
             <div key={item.id} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
               <span className={`px-1.5 py-0.5 text-[10px] rounded ${
-                item.type === 'labor' ? 'bg-blue-100 text-blue-400' : 'bg-emerald-100 text-emerald-600'
+                item.type === 'labor' ? 'bg-teal-100 text-teal-500' : 'bg-emerald-100 text-emerald-600'
               }`}>
                 {item.type === 'labor' ? 'Arb' : 'Mat'}
               </span>
@@ -233,7 +233,7 @@ export default function AIQuotePreview({
       {priceComparison.count > 0 && (
         <div className="p-3 bg-gray-50 border border-gray-300 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-4 h-4 text-cyan-600" />
+            <TrendingUp className="w-4 h-4 text-teal-600" />
             <span className="text-sm font-medium text-gray-900">Jämfört med din historik</span>
           </div>
           <p className="text-xs text-gray-500">
@@ -257,7 +257,7 @@ export default function AIQuotePreview({
         </button>
         <button
           onClick={handleAccept}
-          className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 text-sm min-h-[48px]"
+          className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 text-sm min-h-[48px]"
         >
           Använd förslaget
         </button>

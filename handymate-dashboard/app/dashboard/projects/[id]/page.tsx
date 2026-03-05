@@ -244,7 +244,7 @@ const STATUS_MAP: Record<string, string> = {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  planning: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+  planning: 'bg-teal-600/20 text-teal-500 border-teal-500/30',
   active: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
   paused: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   completed: 'bg-gray-100 text-gray-500 border-gray-300',
@@ -921,7 +921,7 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -966,8 +966,8 @@ export default function ProjectDetailPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -1017,7 +1017,7 @@ export default function ProjectDetailPage() {
                     key={key}
                     onClick={() => updateProjectStatus(key)}
                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-all ${
-                      key === project.status ? 'text-blue-600 bg-gray-50' : 'text-gray-700'
+                      key === project.status ? 'text-sky-700 bg-gray-50' : 'text-gray-700'
                     }`}
                   >
                     {label}
@@ -1041,7 +1041,7 @@ export default function ProjectDetailPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                  ? 'bg-teal-600 text-white'
                   : 'bg-gray-100 text-gray-500 hover:text-white'
               }`}
             >
@@ -1056,7 +1056,7 @@ export default function ProjectDetailPage() {
             {/* Project info card */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-blue-600" />
+                <Briefcase className="w-5 h-5 text-sky-700" />
                 Projektinfo
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1075,7 +1075,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <p className="text-sm text-gray-400">Kund</p>
                   {project.customer ? (
-                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-blue-600 hover:text-blue-500">
+                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-sky-700 hover:text-teal-600">
                       {project.customer.name}
                     </Link>
                   ) : (
@@ -1085,7 +1085,7 @@ export default function ProjectDetailPage() {
                 {quote && (
                   <div>
                     <p className="text-sm text-gray-400">Kopplad offert</p>
-                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-sky-700 hover:text-teal-600 flex items-center gap-1">
                       {quote.title || 'Offert'} <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                   </div>
@@ -1103,14 +1103,14 @@ export default function ProjectDetailPage() {
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-cyan-600" />
+                  <Target className="w-5 h-5 text-teal-600" />
                   Framsteg
                 </h2>
                 <span className="text-2xl font-bold text-gray-900">{project.progress_percent}%</span>
               </div>
               <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
+                  className="h-full bg-teal-600 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(project.progress_percent, 100)}%` }}
                 />
               </div>
@@ -1163,7 +1163,7 @@ export default function ProjectDetailPage() {
             {(project.budget_hours || project.budget_amount) && summary && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-cyan-400" />
+                  <BarChart3 className="w-5 h-5 text-teal-400" />
                   Budget vs Utfall
                 </h2>
                 <div className="space-y-4">
@@ -1205,28 +1205,28 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <Link
                 href="/dashboard/time"
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
-                <Timer className="w-5 h-5 text-blue-600" />
+                <Timer className="w-5 h-5 text-sky-700" />
                 <span className="text-sm text-gray-700">Lagg till tid</span>
               </Link>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
-                <Layers className="w-5 h-5 text-cyan-400" />
+                <Layers className="w-5 h-5 text-teal-400" />
                 <span className="text-sm text-gray-700">Nytt delmoment</span>
               </button>
               <button
                 onClick={() => { setActiveTab('changes'); setChangeModal(true) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
                 <span className="text-sm text-gray-700">Ny ATA</span>
               </button>
               <button
                 onClick={() => setActiveTab('economy')}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-blue-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
                 <Receipt className="w-5 h-5 text-emerald-600" />
                 <span className="text-sm text-gray-700">Fakturera</span>
@@ -1240,12 +1240,12 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-blue-600" />
+                <Calendar className="w-5 h-5 text-sky-700" />
                 Planerade arbetstillfällen ({projectSchedule.length})
               </h2>
               <Link
                 href={`/dashboard/schedule?project=${projectId}`}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Planera arbete
@@ -1296,7 +1296,7 @@ export default function ProjectDetailPage() {
                       <span className={`text-xs px-2 py-1 rounded-full border shrink-0 ${
                         entry.status === 'completed' ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                           : entry.status === 'cancelled' ? 'bg-red-100 text-red-600 border-red-500/30'
-                          : 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                          : 'bg-teal-600/20 text-teal-500 border-teal-500/30'
                       }`}>
                         {entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat'}
                       </span>
@@ -1315,7 +1315,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">Delmoment</h2>
               <button
                 onClick={() => setMilestoneModal({ open: true, editing: null })}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lagg till delmoment
@@ -1341,7 +1341,7 @@ export default function ProjectDetailPage() {
                         {ms.status === 'completed' ? (
                           <CheckCircle className="w-6 h-6 text-emerald-600" />
                         ) : ms.status === 'in_progress' ? (
-                          <CircleDot className="w-6 h-6 text-blue-400" />
+                          <CircleDot className="w-6 h-6 text-teal-500" />
                         ) : (
                           <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
                         )}
@@ -1356,7 +1356,7 @@ export default function ProjectDetailPage() {
                             ms.status === 'completed'
                               ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                               : ms.status === 'in_progress'
-                              ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                              ? 'bg-teal-600/20 text-teal-500 border-teal-500/30'
                               : 'bg-gray-100 text-gray-500 border-gray-300'
                           }`}>
                             {ms.status === 'completed' ? 'Klart' : ms.status === 'in_progress' ? 'Pagaende' : 'Vantande'}
@@ -1407,7 +1407,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">ATA (Andring/Tillagg/Avgaende)</h2>
               <button
                 onClick={() => setChangeModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Ny ATA
@@ -1515,7 +1515,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">Tidrapporter</h2>
               <Link
                 href="/dashboard/time"
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lagg till tid
@@ -1544,7 +1544,7 @@ export default function ProjectDetailPage() {
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga tidrapporter annu</p>
-                <Link href="/dashboard/time" className="text-sm text-blue-600 hover:text-blue-500 mt-2 inline-block">
+                <Link href="/dashboard/time" className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
                   Lagg till din forsta tidrapport
                 </Link>
               </div>
@@ -1571,7 +1571,7 @@ export default function ProjectDetailPage() {
                           <span className="text-sm text-gray-900">{formatDate(entry.work_date)}</span>
                           <div className="flex items-center gap-2">
                             {entry.work_type?.name && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-600 border border-blue-300">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-teal-100 text-sky-700 border border-teal-300">
                                 {entry.work_type.name}
                               </span>
                             )}
@@ -1600,7 +1600,7 @@ export default function ProjectDetailPage() {
                         <div className="col-span-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-600 border border-blue-300">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-teal-100 text-sky-700 border border-teal-300">
                               {entry.work_type.name}
                             </span>
                           )}
@@ -1653,7 +1653,7 @@ export default function ProjectDetailPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowProductSearch(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl text-sm hover:opacity-90"
+                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-sm hover:opacity-90"
                 >
                   <Plus className="w-4 h-4" /> Lägg till material
                 </button>
@@ -1755,7 +1755,7 @@ export default function ProjectDetailPage() {
                                   setEditingMaterial(mat.material_id)
                                   setEditValues({ quantity: mat.quantity, markup_percent: mat.markup_percent })
                                 }}
-                                className="p-1 text-gray-400 hover:text-blue-600"
+                                className="p-1 text-gray-400 hover:text-sky-700"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
@@ -1790,14 +1790,14 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
+                <Users className="w-5 h-5 text-sky-700" />
                 Tilldelade ({projectTeam.length})
               </h2>
               {can('see_all_projects') && (
                 <div className="relative">
                   <button
                     onClick={() => setShowAddMember(!showAddMember)}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-4 h-4" />
                     Lagg till
@@ -1886,18 +1886,18 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-gray-700">Malldokument</h3>
-                  <a href="/dashboard/documents" className="text-xs text-blue-600 hover:text-blue-500">Alla dokument &rarr;</a>
+                  <a href="/dashboard/documents" className="text-xs text-sky-700 hover:text-teal-600">Alla dokument &rarr;</a>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {generatedDocs.map((gd: any) => (
                     <a
                       key={gd.id}
                       href="/dashboard/documents"
-                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition block"
+                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-teal-300 transition block"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-blue-600" />
+                        <div className="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-sky-700" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{gd.title}</p>
@@ -1906,7 +1906,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${
                           gd.status === 'signed' ? 'bg-emerald-100 text-emerald-700' :
-                          gd.status === 'completed' ? 'bg-blue-100 text-blue-500' :
+                          gd.status === 'completed' ? 'bg-teal-100 text-teal-600' :
                           'bg-gray-100 text-gray-500'
                         }`}>
                           {gd.status === 'signed' ? 'Signerad' : gd.status === 'completed' ? 'Klar' : 'Utkast'}
@@ -1928,7 +1928,7 @@ export default function ProjectDetailPage() {
                     onClick={() => setDocCategory(cat)}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition ${
                       docCategory === cat
-                        ? 'bg-blue-100 text-blue-500 border-blue-300'
+                        ? 'bg-teal-100 text-teal-600 border-teal-300'
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -1936,7 +1936,7 @@ export default function ProjectDetailPage() {
                   </button>
                 ))}
               </div>
-              <label className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
+              <label className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 Ladda upp
                 <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploading} />
@@ -1951,8 +1951,8 @@ export default function ProjectDetailPage() {
                   return (
                     <div key={doc.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
                       <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-cyan-500/20' : 'bg-blue-100'}`}>
-                          {isImage ? <Image className="w-5 h-5 text-cyan-400" /> : <FileText className="w-5 h-5 text-blue-600" />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
+                          {isImage ? <Image className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-sky-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
@@ -1964,7 +1964,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
                           onClick={() => handleDocDownload(doc.id)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500"
+                          className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
                         >
                           <Download className="w-3.5 h-3.5" /> Ladda ner
                         </button>
@@ -1999,7 +1999,7 @@ export default function ProjectDetailPage() {
               </h2>
               <button
                 onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" /> Ny anteckning
               </button>
@@ -2045,7 +2045,7 @@ export default function ProjectDetailPage() {
                     <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                       <button
                         onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-500"
+                        className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
                       >
                         <Edit className="w-3.5 h-3.5" /> Redigera
                       </button>
@@ -2088,7 +2088,7 @@ export default function ProjectDetailPage() {
               </h2>
               <button
                 onClick={() => setShowChecklistCreate(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" /> Ny checklista
               </button>
@@ -2099,7 +2099,7 @@ export default function ProjectDetailPage() {
               <div className="space-y-4">
                 <button
                   onClick={() => setActiveChecklist(null)}
-                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-500"
+                  className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600"
                 >
                   <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
                 </button>
@@ -2138,7 +2138,7 @@ export default function ProjectDetailPage() {
                           type="checkbox"
                           checked={item.checked || false}
                           onChange={() => handleToggleChecklistItem(activeChecklist.id, idx)}
-                          className="w-4 h-4 rounded border-gray-300 text-blue-600 bg-gray-100 focus:ring-blue-500"
+                          className="w-4 h-4 rounded border-gray-300 text-sky-700 bg-gray-100 focus:ring-teal-500"
                         />
                         <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                           {item.text}
@@ -2173,7 +2173,7 @@ export default function ProjectDetailPage() {
                       <button
                         key={cl.id}
                         onClick={() => setActiveChecklist(cl)}
-                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 transition"
+                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-900">{cl.name}</h3>
@@ -2223,7 +2223,7 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {profitLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
               </div>
             ) : profitability ? (
               <>
@@ -2298,7 +2298,7 @@ export default function ProjectDetailPage() {
                   {/* Resultat */}
                   <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-blue-600" />
+                      <TrendingUp className="w-4 h-4 text-sky-700" />
                       <p className="text-sm font-medium text-gray-500">Resultat</p>
                     </div>
                     <p className={`text-2xl font-bold mb-1 ${profitability.margin.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -2312,7 +2312,7 @@ export default function ProjectDetailPage() {
                   {/* Fakturering */}
                   <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Receipt className="w-4 h-4 text-cyan-400" />
+                      <Receipt className="w-4 h-4 text-teal-400" />
                       <p className="text-sm font-medium text-gray-500">Fakturering</p>
                     </div>
                     <div className="space-y-2">
@@ -2332,7 +2332,7 @@ export default function ProjectDetailPage() {
                 {/* Budget usage bars */}
                 <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                   <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-cyan-400" />
+                    <BarChart3 className="w-5 h-5 text-teal-400" />
                     Budgetforbrukning
                   </h2>
                   <div className="space-y-4">
@@ -2378,7 +2378,7 @@ export default function ProjectDetailPage() {
                     </h2>
                     <button
                       onClick={() => setCostModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-sky-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       Lagg till kostnad
@@ -2453,7 +2453,7 @@ export default function ProjectDetailPage() {
                   <button
                     onClick={createInvoiceFromTime}
                     disabled={creatingInvoice}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
                   >
                     {creatingInvoice ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -2477,13 +2477,13 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-violet-600" />
+                <Activity className="w-5 h-5 text-teal-600" />
                 Projektanalys
               </h2>
               <button
                 onClick={triggerHealthAnalysis}
                 disabled={analyzingHealth}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-violet-600 bg-violet-50 rounded-xl hover:bg-violet-100 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-teal-600 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors disabled:opacity-50"
               >
                 {analyzingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Kör analys
@@ -2525,7 +2525,7 @@ export default function ProjectDetailPage() {
               </div>
               {aiLogLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-5 h-5 text-violet-600 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />
                 </div>
               ) : aiLogs.length === 0 ? (
                 <div className="text-center py-12">
@@ -2540,10 +2540,10 @@ export default function ProjectDetailPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                            log.event_type === 'daily_health_check' ? 'bg-blue-400'
+                            log.event_type === 'daily_health_check' ? 'bg-teal-500'
                               : log.event_type === 'quote_accepted' ? 'bg-emerald-400'
-                              : log.event_type === 'time_logged' ? 'bg-cyan-400'
-                              : log.event_type === 'milestone_completed' ? 'bg-violet-400'
+                              : log.event_type === 'time_logged' ? 'bg-teal-400'
+                              : log.event_type === 'milestone_completed' ? 'bg-teal-400'
                               : log.event_type === 'invoice_paid' ? 'bg-amber-400'
                               : 'bg-gray-400'
                           }`} />
@@ -2690,7 +2690,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
               onChange={e => setName(e.target.value)}
               placeholder="T.ex. Stomresning"
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div>
@@ -2700,7 +2700,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
               onChange={e => setDescription(e.target.value)}
               rows={2}
               placeholder="Valfri beskrivning"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -2713,7 +2713,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div>
@@ -2724,7 +2724,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
                 onChange={e => setBudgetAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           </div>
@@ -2734,7 +2734,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
               type="date"
               value={dueDate}
               onChange={e => setDueDate(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
         </div>
@@ -2749,7 +2749,7 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
           <button
             onClick={handleSave}
             disabled={saving || !name.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
@@ -2847,7 +2847,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
               rows={3}
               placeholder="Beskriv andringar/tillagg..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -2859,7 +2859,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div>
@@ -2871,7 +2871,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           </div>
@@ -2887,7 +2887,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
           <button
             onClick={handleSave}
             disabled={saving || !description.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Skapa
@@ -2984,7 +2984,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
               onChange={e => setDescription(e.target.value)}
               placeholder="T.ex. Elektriker AB, hyra stegar..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -2996,7 +2996,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div>
@@ -3005,7 +3005,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           </div>
@@ -3021,7 +3021,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
           <button
             onClick={handleSave}
             disabled={saving || !amount}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Lagg till
@@ -3090,7 +3090,7 @@ function LogModal({ editing, onClose, onSave }: {
                 type="date"
                 value={logDate}
                 onChange={e => setLogDate(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div>
@@ -3102,7 +3102,7 @@ function LogModal({ editing, onClose, onSave }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           </div>
@@ -3113,7 +3113,7 @@ function LogModal({ editing, onClose, onSave }: {
               <select
                 value={weather}
                 onChange={e => setWeather(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               >
                 <option value="">Välj...</option>
                 {weatherOptions.map(w => (
@@ -3128,7 +3128,7 @@ function LogModal({ editing, onClose, onSave }: {
                 value={temperature}
                 onChange={e => setTemperature(e.target.value)}
                 placeholder="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           </div>
@@ -3141,7 +3141,7 @@ function LogModal({ editing, onClose, onSave }: {
               rows={3}
               placeholder="Beskriv dagens arbete..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
 
@@ -3152,7 +3152,7 @@ function LogModal({ editing, onClose, onSave }: {
               value={materialsUsed}
               onChange={e => setMaterialsUsed(e.target.value)}
               placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
 
@@ -3163,7 +3163,7 @@ function LogModal({ editing, onClose, onSave }: {
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Övriga anteckningar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
         </div>
@@ -3178,7 +3178,7 @@ function LogModal({ editing, onClose, onSave }: {
           <button
             onClick={handleSubmit}
             disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
@@ -3235,7 +3235,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
                   onClick={() => { setSelectedTemplate(t); setCustomName(''); setCustomItems('') }}
                   className={`p-3 rounded-xl text-left text-sm border transition ${
                     selectedTemplate?.id === t.id
-                      ? 'bg-blue-100 border-blue-300 text-blue-500'
+                      ? 'bg-teal-100 border-teal-300 text-teal-600'
                       : 'bg-gray-100 border-gray-300 text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -3262,7 +3262,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               value={customName}
               onChange={e => { setCustomName(e.target.value); setSelectedTemplate(null) }}
               placeholder="T.ex. Slutbesiktning badrum"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
 
@@ -3273,7 +3273,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               onChange={e => { setCustomItems(e.target.value); setSelectedTemplate(null) }}
               rows={5}
               placeholder={"Kontrollera tätskikt\nTesta golvvärme\nKontrollera fall mot brunn"}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
         </div>
@@ -3288,7 +3288,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
           <button
             onClick={handleCreate}
             disabled={!selectedTemplate && (!customName.trim() || !customItems.trim())}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             Skapa checklista
           </button>

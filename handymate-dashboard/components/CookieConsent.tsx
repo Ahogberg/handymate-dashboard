@@ -29,7 +29,7 @@ export default function CookieConsent() {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-gray-700">
             Vi använder cookies för att förbättra din upplevelse.{' '}
-            <Link href="/privacy" className="text-blue-600 hover:underline">
+            <Link href="/privacy" className="text-sky-700 hover:underline">
               Läs vår integritetspolicy
             </Link>
           </p>
@@ -43,7 +43,7 @@ export default function CookieConsent() {
           </button>
           <button
             onClick={() => accept('all')}
-            className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg hover:opacity-90 transition-opacity"
+            className="flex-1 sm:flex-none px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:opacity-90 transition-opacity"
           >
             Godkänn alla
           </button>

@@ -126,8 +126,29 @@ interface Task {
   customer_id: string | null
   deal_id: string | null
   project_id: string | null
+  assigned_to: string | null
+  assigned_user: { id: string; name: string; color: string } | null
   completed_at: string | null
+  created_by: string | null
   created_at: string
+}
+
+interface TaskActivity {
+  id: string
+  task_id: string
+  actor: string | null
+  action: string
+  description: string
+  old_value: string | null
+  new_value: string | null
+  created_at: string
+}
+
+interface TeamMember {
+  id: string
+  name: string
+  color: string
+  role: string
 }
 
 interface DealNote {
@@ -261,7 +282,7 @@ function getTriggeredByLabel(t: string): string {
 
 function getTriggeredByStyle(t: string): string {
   switch (t) {
-    case 'ai': return 'bg-blue-100 text-blue-600 border-blue-200'
+    case 'ai': return 'bg-teal-100 text-sky-700 border-teal-200'
     case 'user': return 'bg-gray-100 text-gray-600 border-gray-200'
     case 'system': return 'bg-gray-100 text-gray-500 border-gray-200'
     default: return 'bg-gray-100 text-gray-500 border-gray-200'
@@ -323,7 +344,12 @@ export default function PipelinePage() {
   const [dealTasks, setDealTasks] = useState<Task[]>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [newTaskDueTime, setNewTaskDueTime] = useState('')
+  const [newTaskAssignee, setNewTaskAssignee] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
+  const [taskActivities, setTaskActivities] = useState<TaskActivity[]>([])
 
   // Link customer to deal
   const [linkCustomerSearch, setLinkCustomerSearch] = useState('')
@@ -560,6 +586,18 @@ export default function PipelinePage() {
     }
   }
 
+  // Team members (for task assignment)
+  const fetchTeamMembers = useCallback(async () => {
+    try {
+      const res = await fetch('/api/team')
+      if (!res.ok) return
+      const data = await res.json()
+      setTeamMembers((data.members || []).filter((m: any) => m.is_active).map((m: any) => ({
+        id: m.id, name: m.name, color: m.color || '#3B82F6', role: m.role
+      })))
+    } catch { /* silent */ }
+  }, [])
+
   // Deal tasks
   const fetchDealTasks = useCallback(async (dealId: string) => {
     try {
@@ -569,6 +607,17 @@ export default function PipelinePage() {
       setDealTasks(data.tasks || [])
     } catch {
       setDealTasks([])
+    }
+  }, [])
+
+  const fetchTaskActivities = useCallback(async (taskId: string) => {
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}&include_activities=true`)
+      if (!res.ok) return
+      const data = await res.json()
+      setTaskActivities(data.activities || [])
+    } catch {
+      setTaskActivities([])
     }
   }, [])
 
@@ -584,11 +633,15 @@ export default function PipelinePage() {
           deal_id: selectedDeal.id,
           customer_id: selectedDeal.customer_id,
           due_date: newTaskDueDate || null,
+          due_time: newTaskDueTime || null,
+          assigned_to: newTaskAssignee || null,
         })
       })
       if (!res.ok) throw new Error()
       setNewTaskTitle('')
       setNewTaskDueDate('')
+      setNewTaskDueTime('')
+      setNewTaskAssignee('')
       fetchDealTasks(selectedDeal.id)
       showToast('Uppgift skapad', 'success')
     } catch {
@@ -715,11 +768,11 @@ export default function PipelinePage() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      await Promise.all([fetchPipeline(), fetchAiActivities()])
+      await Promise.all([fetchPipeline(), fetchAiActivities(), fetchTeamMembers()])
       setLoading(false)
     }
     load()
-  }, [fetchPipeline, fetchAiActivities])
+  }, [fetchPipeline, fetchAiActivities, fetchTeamMembers])
 
   // ------------------------------------------
   // Deal actions
@@ -1000,6 +1053,10 @@ export default function PipelinePage() {
     setNewNoteContent('')
     setNewTaskTitle('')
     setNewTaskDueDate('')
+    setNewTaskDueTime('')
+    setNewTaskAssignee('')
+    setExpandedTaskId(null)
+    setTaskActivities([])
     setCustomerTags([])
     setLastContact(null)
     setShowLinkCustomer(false)
@@ -1114,7 +1171,7 @@ export default function PipelinePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -1122,8 +1179,8 @@ export default function PipelinePage() {
   return (
     <div className="min-h-screen bg-slate-50 relative">
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-blue-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-50 rounded-full blur-[128px]" />
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-teal-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative z-10 flex flex-col h-screen">
@@ -1131,7 +1188,7 @@ export default function PipelinePage() {
         <header className="flex-shrink-0 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white/60 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center">
                 <FolderKanban className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -1145,10 +1202,10 @@ export default function PipelinePage() {
             <div className="flex items-center gap-2">
               <div className="relative" ref={filterRef}>
                 <button onClick={() => setShowFilter(!showFilter)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-blue-50 border-blue-300 text-blue-600' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-teal-50 border-teal-300 text-sky-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
                   <Filter className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">Filter</span>
-                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-blue-500" />}
+                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-teal-600" />}
                 </button>
                 {showFilter && (
                   <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-4 shadow-xl z-50">
@@ -1158,13 +1215,13 @@ export default function PipelinePage() {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input type="text" placeholder="Sök deal eller kund..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-400" />
+                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                         </div>
                       </div>
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-blue-400">
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-teal-400">
                           <option value="all">Alla</option>
                           <option value="urgent">Brådskande</option>
                           <option value="high">Hög</option>
@@ -1172,7 +1229,7 @@ export default function PipelinePage() {
                           <option value="low">Låg</option>
                         </select>
                       </div>
-                      {hasActiveFilters && <button onClick={() => { setFilterSearch(''); setFilterPriority('all') }} className="text-xs text-blue-600 hover:text-blue-500">Rensa filter</button>}
+                      {hasActiveFilters && <button onClick={() => { setFilterSearch(''); setFilterPriority('all') }} className="text-xs text-sky-700 hover:text-teal-600">Rensa filter</button>}
                     </div>
                   </div>
                 )}
@@ -1184,7 +1241,7 @@ export default function PipelinePage() {
                 <span className="hidden sm:inline text-sm">Steg</span>
               </button>
               <button onClick={() => { setShowNewDeal(true); fetchCustomers() }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium hover:from-blue-600 hover:to-cyan-600 transition-all shadow-lg shadow-blue-500/10">
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
               </button>
             </div>
@@ -1212,7 +1269,7 @@ export default function PipelinePage() {
               const isDropTarget = dragOverStageId === stage.id
               return (
                 <div key={stage.id}
-                  className={`flex-shrink-0 w-[280px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-blue-400 bg-blue-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
+                  className={`flex-shrink-0 w-[280px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
                   onDragOver={e => handleDragOver(e, stage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, stage)}>
                   <div className="flex-shrink-0 px-3 py-2.5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
@@ -1298,7 +1355,7 @@ export default function PipelinePage() {
           <div className="flex-shrink-0 border-t border-gray-200 bg-white/60 backdrop-blur-sm">
             <button onClick={() => setAiPanelOpen(!aiPanelOpen)} className="w-full flex items-center justify-between px-4 lg:px-6 py-3 hover:bg-white/80 transition-colors">
               <div className="flex items-center gap-2">
-                <Bot className="w-4 h-4 text-blue-600" />
+                <Bot className="w-4 h-4 text-sky-700" />
                 <span className="text-sm font-medium text-gray-900">AI-aktivitet</span>
                 <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{aiActivities.length}</span>
               </div>
@@ -1308,14 +1365,14 @@ export default function PipelinePage() {
               <div className="max-h-64 overflow-y-auto px-4 lg:px-6 pb-4 space-y-2">
                 {aiActivities.map(act => (
                   <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-white border-gray-200'}`}>
-                    <Bot className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <Bot className="w-4 h-4 text-sky-700 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <span className="text-sm text-gray-900">{act.description || 'AI-åtgärd'}</span>
                       {act.deal_title && <span className="text-xs text-gray-400 ml-1">({act.deal_title})</span>}
                       {act.ai_reason && <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-gray-400">{timeAgo(act.created_at)}</span>
-                        {act.ai_confidence != null && <span className="text-xs text-blue-500">{Math.round(act.ai_confidence * 100)}%</span>}
+                        {act.ai_confidence != null && <span className="text-xs text-teal-600">{Math.round(act.ai_confidence * 100)}%</span>}
                       </div>
                     </div>
                     {!act.undone_at ? (
@@ -1334,9 +1391,9 @@ export default function PipelinePage() {
         {stats && (
           <div className="flex-shrink-0 border-t border-gray-200 px-4 lg:px-6 py-3 bg-white/60 backdrop-blur-sm">
             <div className="flex items-center gap-4 lg:gap-8 overflow-x-auto text-xs">
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-blue-500" /><span className="text-gray-500">Aktiva:</span><span className="text-gray-900 font-medium">{stats.totalDeals}</span><span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span></div>
+              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-teal-600" /><span className="text-gray-500">Aktiva:</span><span className="text-gray-900 font-medium">{stats.totalDeals}</span><span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span></div>
               <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-gray-500">Vunna:</span><span className="text-gray-900 font-medium">{formatValueCompact(stats.wonValue)}</span></div>
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-blue-400" /><span className="text-gray-500">Nya idag:</span><span className="text-gray-900 font-medium">{stats.newLeadsToday}</span></div>
+              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-teal-500" /><span className="text-gray-500">Nya idag:</span><span className="text-gray-900 font-medium">{stats.newLeadsToday}</span></div>
               <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-gray-500">Uppföljning:</span><span className="text-gray-900 font-medium">{stats.needsFollowUp}</span></div>
             </div>
           </div>
@@ -1359,9 +1416,9 @@ export default function PipelinePage() {
                       {editingTitle ? (
                         <div className="flex items-center gap-2">
                           <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
-                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-blue-400" autoFocus
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-teal-400" autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
-                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-4 h-4" /></button>
+                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-teal-50 text-sky-700 hover:bg-teal-100 transition-colors"><Save className="w-4 h-4" /></button>
                         </div>
                       ) : (
                         <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full min-w-0">
@@ -1388,7 +1445,7 @@ export default function PipelinePage() {
                       onClick={() => setDealTab(tab.key)}
                       className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                         dealTab === tab.key
-                          ? 'border-blue-600 text-blue-600'
+                          ? 'border-teal-600 text-sky-700'
                           : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
                       }`}
                     >
@@ -1396,7 +1453,7 @@ export default function PipelinePage() {
                       <span className="hidden sm:inline">{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          dealTab === tab.key ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'
+                          dealTab === tab.key ? 'bg-teal-100 text-sky-700' : 'bg-gray-100 text-gray-500'
                         }`}>{tab.count}</span>
                       )}
                     </button>
@@ -1417,9 +1474,9 @@ export default function PipelinePage() {
                         {editingValue ? (
                           <div className="flex items-center gap-2">
                             <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
-                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-blue-400" autoFocus
+                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-teal-400" autoFocus
                               onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
-                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-teal-50 text-sky-700 hover:bg-teal-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-semibold text-sm">
@@ -1431,7 +1488,7 @@ export default function PipelinePage() {
                         <span className="text-sm text-gray-400">Prioritet</span>
                         {editingPriority ? (
                           <select value={selectedDeal.priority} onChange={e => { updateDealField(selectedDeal.id, 'priority', e.target.value); setEditingPriority(false) }} onBlur={() => setEditingPriority(false)} autoFocus
-                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-blue-400">
+                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-teal-400">
                             <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                           </select>
                         ) : (
@@ -1447,7 +1504,7 @@ export default function PipelinePage() {
                       <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Target className="w-4 h-4 text-blue-600" />
+                            <Target className="w-4 h-4 text-sky-700" />
                             <span className="text-sm font-medium text-gray-900">Lead-kvalificering</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -1477,7 +1534,7 @@ export default function PipelinePage() {
                                 <div key={key} className="flex items-center gap-2 text-xs">
                                   <span className="w-16 text-gray-400 truncate">{meta.label}</span>
                                   <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                    <div className="h-1.5 rounded-full bg-blue-500 transition-all" style={{ width: `${(val / meta.max) * 100}%` }} />
+                                    <div className="h-1.5 rounded-full bg-teal-600 transition-all" style={{ width: `${(val / meta.max) * 100}%` }} />
                                   </div>
                                   <span className="text-gray-500 w-10 text-right">{val}/{meta.max}</span>
                                 </div>
@@ -1539,7 +1596,7 @@ export default function PipelinePage() {
                         {!showLinkCustomer ? (
                           <button
                             onClick={() => { setShowLinkCustomer(true); fetchCustomers() }}
-                            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-blue-600 transition-colors"
+                            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-sky-700 transition-colors"
                           >
                             <User className="w-4 h-4" />
                             Koppla kund till denna deal
@@ -1557,7 +1614,7 @@ export default function PipelinePage() {
                               value={linkCustomerSearch}
                               onChange={e => setLinkCustomerSearch(e.target.value)}
                               placeholder="Sök kund..."
-                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
                               autoFocus
                             />
                             <div className="max-h-40 overflow-y-auto space-y-1">
@@ -1568,7 +1625,7 @@ export default function PipelinePage() {
                                   <button
                                     key={c.customer_id}
                                     onClick={() => handleLinkCustomer(c.customer_id)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-blue-50 transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-teal-50 transition-colors"
                                   >
                                     <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                                     <div className="min-w-0">
@@ -1594,7 +1651,7 @@ export default function PipelinePage() {
                             <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
                             {selectedDeal.customer.customer_type && (
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                                selectedDeal.customer.customer_type === 'company' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                selectedDeal.customer.customer_type === 'company' ? 'bg-teal-50 text-sky-700 border-teal-200' :
                                 selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
                                 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}>
@@ -1627,7 +1684,7 @@ export default function PipelinePage() {
                         </div>
                         <Link
                           href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
-                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-sky-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
                         >
                           <span className="font-medium">Visa kundkort</span>
                           <ChevronRight className="w-4 h-4" />
@@ -1640,8 +1697,8 @@ export default function PipelinePage() {
                       <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
                       <div className="flex flex-wrap gap-2">
                         <Link href={selectedDeal.customer_id ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}` : '/dashboard/quotes/new'}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                          <FileText className="w-4 h-4 text-blue-600" /> Skapa offert
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+                          <FileText className="w-4 h-4 text-sky-700" /> Skapa offert
                         </Link>
                         {!getStageForDeal(selectedDeal)?.is_lost && (
                           <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
@@ -1649,7 +1706,7 @@ export default function PipelinePage() {
                           </button>
                         )}
                         {selectedDeal.quote_id && (
-                          <Link href={`/dashboard/quotes/${selectedDeal.quote_id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-blue-300 hover:bg-blue-50 transition-colors">
+                          <Link href={`/dashboard/quotes/${selectedDeal.quote_id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
                             <FileText className="w-4 h-4 text-emerald-600" /> Visa offert
                           </Link>
                         )}
@@ -1659,14 +1716,14 @@ export default function PipelinePage() {
                     {/* Activity log */}
                     <div>
                       <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Aktivitetslogg</h4>
-                      {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-blue-600 animate-spin" /></div>
+                      {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-sky-700 animate-spin" /></div>
                         : detailActivities.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
                         : (
                           <div className="space-y-2">
                             {detailActivities.map(act => (
                               <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-gray-50/50 border-gray-200'}`}>
                                 <div className="mt-0.5">
-                                  {act.triggered_by === 'ai' ? <Bot className="w-4 h-4 text-blue-600" /> : act.triggered_by === 'system' ? <Sparkles className="w-4 h-4 text-gray-400" /> : <User className="w-4 h-4 text-gray-500" />}
+                                  {act.triggered_by === 'ai' ? <Bot className="w-4 h-4 text-sky-700" /> : act.triggered_by === 'system' ? <Sparkles className="w-4 h-4 text-gray-400" /> : <User className="w-4 h-4 text-gray-500" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -1695,52 +1752,170 @@ export default function PipelinePage() {
                 {dealTab === 'tasks' && (
                   <div className="space-y-4">
                     {/* Add task form */}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="text"
-                        value={newTaskTitle}
-                        onChange={e => setNewTaskTitle(e.target.value)}
-                        placeholder="Ny uppgift..."
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400"
-                        onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
-                      />
-                      <input
-                        type="date"
-                        value={newTaskDueDate}
-                        onChange={e => setNewTaskDueDate(e.target.value)}
-                        className="px-2 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-blue-400 w-32"
-                      />
-                      <button
-                        onClick={handleAddTask}
-                        disabled={!newTaskTitle.trim() || taskSaving}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                      >
-                        {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                        <span className="hidden sm:inline">Lägg till</span>
-                      </button>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newTaskTitle}
+                          onChange={e => setNewTaskTitle(e.target.value)}
+                          placeholder="Ny uppgift..."
+                          className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
+                        />
+                        <button
+                          onClick={handleAddTask}
+                          disabled={!newTaskTitle.trim() || taskSaving}
+                          className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-sm rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                        >
+                          {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                          <span className="hidden sm:inline">Lägg till</span>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <input
+                          type="date"
+                          value={newTaskDueDate}
+                          onChange={e => setNewTaskDueDate(e.target.value)}
+                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 w-32"
+                        />
+                        <select
+                          value={newTaskDueTime}
+                          onChange={e => setNewTaskDueTime(e.target.value)}
+                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 w-24"
+                        >
+                          <option value="">Tid</option>
+                          {Array.from({ length: 24 * 4 }, (_, i) => {
+                            const h = String(Math.floor(i / 4)).padStart(2, '0')
+                            const m = String((i % 4) * 15).padStart(2, '0')
+                            return <option key={i} value={`${h}:${m}`}>{h}:{m}</option>
+                          })}
+                        </select>
+                        {teamMembers.length > 0 && (
+                          <select
+                            value={newTaskAssignee}
+                            onChange={e => setNewTaskAssignee(e.target.value)}
+                            className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 flex-1 min-w-[120px]"
+                          >
+                            <option value="">Tilldela...</option>
+                            {teamMembers.map(m => (
+                              <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
 
                     {/* Task list */}
                     {dealTasks.length > 0 ? (
                       <div className="space-y-1">
-                        {dealTasks.map(task => (
-                          <div key={task.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 group transition-colors">
-                            <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
-                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-blue-400'}`}>
-                                {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                        {dealTasks.map(task => {
+                          const isOverdue = task.due_date && new Date(task.due_date + (task.due_time ? `T${task.due_time}` : 'T23:59:59')) < new Date() && task.status !== 'done'
+                          const isExpanded = expandedTaskId === task.id
+                          const initials = task.assigned_user?.name
+                            ? task.assigned_user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                            : null
+                          return (
+                            <div key={task.id} className="rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
+                              <div className={`flex items-center gap-3 px-3 py-2.5 group ${isOverdue ? 'bg-red-50/50' : ''}`}>
+                                <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
+                                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : isOverdue ? 'border-red-400 hover:border-red-500' : 'border-gray-300 hover:border-teal-400'}`}>
+                                    {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
+                                  </div>
+                                </button>
+                                <button onClick={() => { if (isExpanded) { setExpandedTaskId(null) } else { setExpandedTaskId(task.id); fetchTaskActivities(task.id) } }} className="flex-1 text-left min-w-0">
+                                  <span className={`text-sm block truncate ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{task.title}</span>
+                                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                    {task.due_date && (
+                                      <span className={`text-[11px] flex items-center gap-0.5 ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                                        <Calendar className="w-3 h-3" />
+                                        {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                                        {task.due_time && ` ${task.due_time.slice(0, 5)}`}
+                                        {isOverdue && ' (försenad)'}
+                                      </span>
+                                    )}
+                                    <span className="text-[11px] text-gray-300">
+                                      {new Date(task.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} {new Date(task.created_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                </button>
+                                {initials && (
+                                  <div
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                    style={{ backgroundColor: task.assigned_user?.color || '#3B82F6' }}
+                                    title={task.assigned_user?.name || ''}
+                                  >
+                                    {initials}
+                                  </div>
+                                )}
+                                <button onClick={() => handleDeleteTask(task.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Ta bort">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
                               </div>
-                            </button>
-                            <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{task.title}</span>
-                            {task.due_date && (
-                              <span className={`text-xs flex-shrink-0 ${new Date(task.due_date) < new Date() && task.status !== 'done' ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
-                                {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
-                              </span>
-                            )}
-                            <button onClick={() => handleDeleteTask(task.id)} className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0" title="Ta bort">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                              {/* Expanded detail with activity timeline */}
+                              {isExpanded && (
+                                <div className="px-3 pb-3 border-t border-gray-100">
+                                  <div className="flex items-center gap-2 mt-2 mb-2 flex-wrap">
+                                    {teamMembers.length > 0 && (
+                                      <select
+                                        value={task.assigned_to || ''}
+                                        onChange={async e => {
+                                          const val = e.target.value || null
+                                          await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, assigned_to: val }) })
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          fetchTaskActivities(task.id)
+                                        }}
+                                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-teal-400"
+                                      >
+                                        <option value="">Ej tilldelad</option>
+                                        {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                      </select>
+                                    )}
+                                    <select
+                                      value={task.priority}
+                                      onChange={async e => {
+                                        await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, priority: e.target.value }) })
+                                        if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                        fetchTaskActivities(task.id)
+                                      }}
+                                      className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-teal-400"
+                                    >
+                                      <option value="low">Låg</option>
+                                      <option value="medium">Medium</option>
+                                      <option value="high">Hög</option>
+                                    </select>
+                                  </div>
+                                  {/* Activity timeline */}
+                                  <div className="mt-2">
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">Händelselogg</span>
+                                    {taskActivities.length > 0 ? (
+                                      <div className="mt-1 space-y-1">
+                                        {taskActivities.map(act => (
+                                          <div key={act.id} className="flex items-start gap-2 text-[11px]">
+                                            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
+                                              act.action === 'created' ? 'bg-teal-600' :
+                                              act.action === 'completed' ? 'bg-green-500' :
+                                              act.action === 'assigned' ? 'bg-purple-500' :
+                                              act.action === 'deleted' ? 'bg-red-500' :
+                                              'bg-gray-400'
+                                            }`} />
+                                            <div className="flex-1 min-w-0">
+                                              <span className="text-gray-600">{act.description}</span>
+                                              <span className="text-gray-300 ml-1.5">
+                                                {new Date(act.created_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} {new Date(act.created_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className="text-[11px] text-gray-300 mt-1">Ingen aktivitet ännu</p>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -1762,7 +1937,7 @@ export default function PipelinePage() {
                           <select
                             value={dealUploadCategory}
                             onChange={(e) => setDealUploadCategory(e.target.value)}
-                            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-blue-400"
+                            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-teal-400"
                           >
                             <option value="drawing">Ritning</option>
                             <option value="sketch">Skiss</option>
@@ -1771,12 +1946,12 @@ export default function PipelinePage() {
                             <option value="photo">Foto</option>
                             <option value="other">Övrigt</option>
                           </select>
-                          <label className="flex items-center gap-1.5 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-600 font-medium hover:bg-blue-100 cursor-pointer transition-colors">
+                          <label className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-teal-100 cursor-pointer transition-colors">
                             {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                             {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
                             <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
                           </label>
-                          <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-blue-600 hover:text-blue-500">
+                          <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-teal-600">
                             Visa alla i kundkort
                           </Link>
                         </div>
@@ -1788,7 +1963,7 @@ export default function PipelinePage() {
                               <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
                                 <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                                   {doc.file_type?.startsWith('image/') ? (
-                                    <ImageIcon className="w-4 h-4 text-blue-500" />
+                                    <ImageIcon className="w-4 h-4 text-teal-600" />
                                   ) : doc.file_type?.includes('pdf') ? (
                                     <FileText className="w-4 h-4 text-red-500" />
                                   ) : (
@@ -1805,7 +1980,7 @@ export default function PipelinePage() {
                                     <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
                                   </div>
                                 </div>
-                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" title="Öppna">
+                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Öppna">
                                   <Download className="w-4 h-4" />
                                 </a>
                               </div>
@@ -1838,14 +2013,14 @@ export default function PipelinePage() {
                         value={newNoteContent}
                         onChange={e => setNewNoteContent(e.target.value)}
                         placeholder="Skriv en anteckning..."
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-blue-400 resize-none"
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 resize-none"
                         rows={3}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
                       />
                       <button
                         onClick={handleAddNote}
                         disabled={!newNoteContent.trim() || noteSaving}
-                        className="self-end px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="self-end px-4 py-2 bg-teal-700 text-white text-sm rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {noteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Spara'}
                       </button>
@@ -1861,11 +2036,11 @@ export default function PipelinePage() {
                                 <textarea
                                   value={editNoteContent}
                                   onChange={e => setEditNoteContent(e.target.value)}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-blue-400 resize-none"
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-teal-400 resize-none"
                                   rows={4}
                                 />
                                 <div className="flex gap-2">
-                                  <button onClick={() => handleUpdateNote(note.id)} className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700">Spara</button>
+                                  <button onClick={() => handleUpdateNote(note.id)} className="px-3 py-1.5 text-xs bg-teal-700 text-white rounded-lg hover:bg-teal-800">Spara</button>
                                   <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
                                 </div>
                               </div>
@@ -1878,7 +2053,7 @@ export default function PipelinePage() {
                                     {timeAgo(note.created_at)}
                                   </span>
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Ta bort"><Trash2 className="w-3.5 h-3.5" /></button>
                                   </div>
                                 </div>
@@ -1977,18 +2152,18 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Titel *</label>
                   <input type="text" value={newDealForm.title} onChange={e => setNewDealForm(prev => ({ ...prev, title: e.target.value }))} placeholder="T.ex. Badrumsrenovering Andersson"
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-400" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Kund</label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} placeholder="Sök kund..."
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-400" />
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   </div>
                   {newDealForm.customer_id && (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <span className="text-xs text-blue-600">Vald: {customers.find(c => c.customer_id === newDealForm.customer_id)?.name || 'Okänd'}</span>
+                      <span className="text-xs text-sky-700">Vald: {customers.find(c => c.customer_id === newDealForm.customer_id)?.name || 'Okänd'}</span>
                       <button onClick={() => setNewDealForm(prev => ({ ...prev, customer_id: '' }))} className="text-xs text-gray-400 hover:text-gray-900"><X className="w-3 h-3" /></button>
                     </div>
                   )}
@@ -2008,12 +2183,12 @@ export default function PipelinePage() {
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Värde (kr)</label>
                     <input type="number" value={newDealForm.value} onChange={e => setNewDealForm(prev => ({ ...prev, value: e.target.value }))} placeholder="0"
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-400" />
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                     <select value={newDealForm.priority} onChange={e => setNewDealForm(prev => ({ ...prev, priority: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-blue-400">
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-teal-400">
                       <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                     </select>
                   </div>
@@ -2021,13 +2196,13 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
                   <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={2}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-blue-400 resize-none" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-none" />
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
                 <button onClick={() => setShowNewDeal(false)} className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
                 <button onClick={createDeal} disabled={newDealSubmitting || !newDealForm.title.trim()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium hover:from-blue-600 hover:to-cyan-600 transition-all disabled:opacity-50">
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all disabled:opacity-50">
                   {newDealSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Skapa deal
                 </button>
               </div>
@@ -2069,7 +2244,7 @@ export default function PipelinePage() {
                     type="text"
                     value={stageEdits[stage.id]?.name || stage.name}
                     onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], name: e.target.value } }))}
-                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
 
                   {/* Reorder */}
@@ -2109,13 +2284,13 @@ export default function PipelinePage() {
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 placeholder="Nytt steg, t.ex. 'Platsbedömning'"
-                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 min-h-[44px]"
+                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 min-h-[44px]"
                 onKeyDown={(e) => e.key === 'Enter' && addNewStage()}
               />
               <button
                 onClick={addNewStage}
                 disabled={stageSaving || !newStageName.trim()}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all min-h-[44px]"
               >
                 <Plus className="w-4 h-4" />
                 Lägg till
@@ -2129,7 +2304,7 @@ export default function PipelinePage() {
               <button
                 onClick={saveStageEdits}
                 disabled={stageSaving}
-                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
               >
                 {stageSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Spara ändringar
@@ -2216,10 +2391,10 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
             <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>
-            {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" /></span>}
+            {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" /></span>}
             {deal.lead_source_platform && <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 ${
               deal.lead_source_platform === 'offerta' ? 'bg-orange-100 text-orange-700' :
-              deal.lead_source_platform === 'servicefinder' ? 'bg-blue-100 text-blue-700' :
+              deal.lead_source_platform === 'servicefinder' ? 'bg-teal-100 text-teal-700' :
               deal.lead_source_platform === 'byggahus' ? 'bg-yellow-100 text-yellow-700' :
               'bg-gray-100 text-gray-600'
             }`}>{
@@ -2237,7 +2412,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
       <div className="flex items-center justify-between mt-2 ml-3.5">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>
-          {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-blue-400'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
+          {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-teal-500'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
         </div>
         <div className="flex items-center gap-2">
           {deal.response_time_seconds != null && deal.response_time_seconds > 0 && (

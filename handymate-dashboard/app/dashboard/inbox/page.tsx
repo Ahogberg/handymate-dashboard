@@ -414,8 +414,8 @@ export default function InboxPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -430,7 +430,7 @@ export default function InboxPage() {
       <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center mb-6">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 mr-4">
+          <div className="p-3 rounded-xl bg-teal-600 mr-4">
             <Inbox className="w-6 h-6 text-gray-900" />
           </div>
           <div>
@@ -445,7 +445,7 @@ export default function InboxPage() {
             onClick={() => setActiveTab('suggestions')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'suggestions'
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                ? 'bg-teal-600 text-white'
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
             }`}
           >
@@ -462,7 +462,7 @@ export default function InboxPage() {
             onClick={() => setActiveTab('recordings')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'recordings'
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                ? 'bg-teal-600 text-white'
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
             }`}
           >
@@ -519,13 +519,13 @@ export default function InboxPage() {
                 onClick={() => setStatusFilter('all')}
                 className={`p-4 rounded-xl border transition-all ${
                   statusFilter === 'all'
-                    ? 'bg-blue-100 border-blue-300'
+                    ? 'bg-teal-100 border-teal-300'
                     : 'bg-white border-gray-200 hover:border-gray-300'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-blue-600' : 'text-gray-900'}`}>
+                  <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-400'}`} />
+                  <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-900'}`}>
                     {stats.pending + stats.approved + stats.rejected}
                   </span>
                 </div>
@@ -575,8 +575,8 @@ export default function InboxPage() {
                                 }}
                                 className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                                   playingId === group.recording.recording_id
-                                    ? 'bg-gradient-to-br from-blue-500 to-cyan-500 border-blue-300'
-                                    : 'bg-gray-50 border-gray-300 hover:border-blue-300'
+                                    ? 'bg-teal-600 border-teal-300'
+                                    : 'bg-gray-50 border-gray-300 hover:border-teal-300'
                                 }`}
                               >
                                 {playingId === group.recording.recording_id ? (
@@ -664,13 +664,13 @@ export default function InboxPage() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {group.extractedInfo.address && (
                                 <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                                  <MapPin className="w-4 h-4 text-blue-600" />
+                                  <MapPin className="w-4 h-4 text-sky-700" />
                                   <span className="text-sm text-gray-700">{group.extractedInfo.address}</span>
                                 </div>
                               )}
                               {group.extractedInfo.preferredDate && (
                                 <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                                  <Calendar className="w-4 h-4 text-blue-600" />
+                                  <Calendar className="w-4 h-4 text-sky-700" />
                                   <span className="text-sm text-gray-700">{group.extractedInfo.preferredDate}</span>
                                 </div>
                               )}
@@ -707,10 +707,10 @@ export default function InboxPage() {
                                   <div className="flex items-start justify-between gap-4">
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
                                       <div className={`p-2 rounded-lg ${
-                                        suggestion.status === 'pending' ? 'bg-blue-100' : 'bg-gray-200/50'
+                                        suggestion.status === 'pending' ? 'bg-teal-100' : 'bg-gray-200/50'
                                       }`}>
                                         <Icon className={`w-4 h-4 ${
-                                          suggestion.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
+                                          suggestion.status === 'pending' ? 'text-sky-700' : 'text-gray-400'
                                         }`} />
                                       </div>
 
@@ -866,9 +866,9 @@ export default function InboxPage() {
                           disabled={!recording.recording_url}
                           className={`w-11 h-11 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                             playingId === recording.recording_id
-                              ? 'bg-gradient-to-br from-blue-500 to-cyan-500 border-blue-300'
+                              ? 'bg-teal-600 border-teal-300'
                               : recording.recording_url
-                              ? 'bg-gray-50 border-gray-300 hover:border-blue-300'
+                              ? 'bg-gray-50 border-gray-300 hover:border-teal-300'
                               : 'bg-gray-100/30 border-gray-200 opacity-50'
                           }`}
                         >
@@ -910,7 +910,7 @@ export default function InboxPage() {
                           <button
                             onClick={() => handleTranscribe(recording.recording_id)}
                             disabled={actionLoading === recording.recording_id}
-                            className="flex items-center gap-2 px-3 py-2.5 bg-blue-100 border border-blue-300 rounded-lg text-blue-600 text-sm hover:bg-blue-500/30 disabled:opacity-50 min-h-[44px]"
+                            className="flex items-center gap-2 px-3 py-2.5 bg-teal-100 border border-teal-300 rounded-lg text-sky-700 text-sm hover:bg-teal-600/30 disabled:opacity-50 min-h-[44px]"
                           >
                             {actionLoading === recording.recording_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />

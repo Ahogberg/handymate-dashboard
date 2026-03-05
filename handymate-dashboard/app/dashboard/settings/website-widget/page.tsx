@@ -229,7 +229,7 @@ export default function WebsiteWidgetPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -250,7 +250,7 @@ export default function WebsiteWidgetPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Globe className="w-6 h-6 text-blue-600" />
+            <Globe className="w-6 h-6 text-sky-700" />
             Hemsida-widget
           </h1>
           <p className="text-sm text-gray-500 mt-1">
@@ -278,7 +278,7 @@ export default function WebsiteWidgetPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-colors"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -315,16 +315,16 @@ export default function WebsiteWidgetPage() {
         <div className="space-y-6">
           {analyticsLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+              <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
             </div>
           ) : analytics ? (
             <>
               {/* KPI Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                  { label: 'Konversationer', value: analytics.total_conversations, icon: MessageSquare, color: 'text-blue-600 bg-blue-50' },
+                  { label: 'Konversationer', value: analytics.total_conversations, icon: MessageSquare, color: 'text-sky-700 bg-teal-50' },
                   { label: 'Leads skapade', value: analytics.leads_created, icon: Users, color: 'text-green-600 bg-green-50' },
-                  { label: 'Konverteringsgrad', value: `${analytics.conversion_rate}%`, icon: Target, color: 'text-violet-600 bg-violet-50' },
+                  { label: 'Konverteringsgrad', value: `${analytics.conversion_rate}%`, icon: Target, color: 'text-teal-600 bg-teal-50' },
                   { label: 'Snitt meddelanden', value: analytics.avg_messages_per_conversation, icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
                 ].map((kpi, i) => (
                   <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
@@ -396,7 +396,7 @@ export default function WebsiteWidgetPage() {
             <div className="text-center py-16">
               <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-sm text-gray-500">Kunde inte ladda statistik</p>
-              <button onClick={fetchAnalytics} className="mt-2 text-sm text-blue-600 hover:underline">
+              <button onClick={fetchAnalytics} className="mt-2 text-sm text-sky-700 hover:underline">
                 Försök igen
               </button>
             </div>
@@ -416,7 +416,7 @@ export default function WebsiteWidgetPage() {
               value={config.widget_bot_name}
               onChange={e => setConfig(prev => ({ ...prev, widget_bot_name: e.target.value }))}
               placeholder={`${business.business_name}s assistent`}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <p className="text-xs text-gray-400 mt-1">Lämna tomt för standardnamn</p>
           </div>
@@ -430,7 +430,7 @@ export default function WebsiteWidgetPage() {
               value={config.widget_welcome_message}
               onChange={e => setConfig(prev => ({ ...prev, widget_welcome_message: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
             />
           </div>
 
@@ -477,7 +477,7 @@ export default function WebsiteWidgetPage() {
                   onClick={() => setConfig(prev => ({ ...prev, widget_position: pos }))}
                   className={`flex-1 px-4 py-3 rounded-lg border text-sm font-medium transition-colors ${
                     config.widget_position === pos
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700'
                       : 'border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
@@ -512,12 +512,12 @@ export default function WebsiteWidgetPage() {
                     onChange={e => setNewQuestion(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addQuickQuestion()}
                     placeholder="Ny snabbfråga..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   />
                   <button
                     onClick={addQuickQuestion}
                     disabled={!newQuestion.trim()}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg disabled:opacity-30 transition-colors"
+                    className="p-2 text-sky-700 hover:bg-teal-50 rounded-lg disabled:opacity-30 transition-colors"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -563,7 +563,7 @@ export default function WebsiteWidgetPage() {
                   setConfig(prev => ({ ...prev, [opt.key]: !prev[opt.key] }))
                 }
                 className={`relative w-11 h-6 rounded-full transition-colors ${
-                  config[opt.key] ? 'bg-blue-600' : 'bg-gray-200'
+                  config[opt.key] ? 'bg-teal-700' : 'bg-gray-200'
                 }`}
               >
                 <span
@@ -587,7 +587,7 @@ export default function WebsiteWidgetPage() {
               type="number"
               value={config.widget_max_estimate}
               onChange={e => setConfig(prev => ({ ...prev, widget_max_estimate: parseInt(e.target.value) || 0 }))}
-              className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
             />
             <span className="text-sm text-gray-400 ml-2">kr</span>
           </div>
@@ -599,7 +599,7 @@ export default function WebsiteWidgetPage() {
           {/* Embed code */}
           <div className="bg-white border border-gray-200 rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
-              <Code className="w-4 h-4 text-blue-600" />
+              <Code className="w-4 h-4 text-sky-700" />
               Installationskod
             </h3>
             <p className="text-xs text-gray-500 mb-4">

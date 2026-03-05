@@ -334,8 +334,8 @@ export default function Jobbkompisen() {
         onClick={() => setIsOpen(true)}
         className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all z-50 ${
           hasActiveJob
-            ? 'bg-gradient-to-br from-emerald-500 to-cyan-500 shadow-emerald-500/20'
-            : 'bg-gradient-to-br from-blue-500 to-cyan-500 shadow-blue-500/10'
+            ? 'bg-gradient-to-br from-emerald-500 to-teal-500 shadow-emerald-500/20'
+            : 'bg-teal-600 shadow-teal-500/10'
         }`}
       >
         {hasActiveJob ? (
@@ -357,7 +357,7 @@ export default function Jobbkompisen() {
   return (
     <div className="fixed bottom-6 right-6 w-[400px] max-w-[calc(100vw-48px)] h-[560px] max-h-[calc(100vh-48px)] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200 z-50">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 bg-teal-600 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-gray-900" />
           <span className="font-semibold text-gray-900">Jobbkompisen</span>
@@ -384,7 +384,7 @@ export default function Jobbkompisen() {
             onClick={() => setActiveTab(tab.id)}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm font-medium transition-all ${
               activeTab === tab.id
-                ? 'text-blue-600 border-b-2 border-blue-500 bg-blue-50/50'
+                ? 'text-sky-700 border-b-2 border-teal-500 bg-teal-50/50'
                 : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
             }`}
           >
@@ -522,7 +522,7 @@ function ChatTab({
               <div
                 className={`max-w-[85%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
                   message.role === 'user'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-800 border border-gray-200'
                 }`}
               >
@@ -542,7 +542,7 @@ function ChatTab({
                         ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
                         : executingActions.has(action.id)
                           ? 'bg-gray-50 border border-gray-200 text-gray-400'
-                          : 'bg-blue-50 border border-blue-200 text-blue-700 hover:bg-blue-100'
+                          : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
                     }`}
                   >
                     {executingActions.has(action.id) ? (
@@ -582,12 +582,12 @@ function ChatTab({
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSend()}
             placeholder="Fr\u00E5ga din jobbkompis..."
-            className="flex-1 px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+            className="flex-1 px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
           />
           <button
             onClick={onSend}
             disabled={loading}
-            className="w-10 h-10 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0"
+            className="w-10 h-10 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 transition-opacity flex-shrink-0"
           >
             <Send className="w-4 h-4" />
           </button>
@@ -638,8 +638,8 @@ function VoiceTab({
     return (
       <div className="flex-1 overflow-y-auto p-4">
         {/* What AI understood */}
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-xl">
-          <p className="text-xs font-medium text-blue-600 mb-1">F\u00F6rstod:</p>
+        <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-xl">
+          <p className="text-xs font-medium text-sky-700 mb-1">F\u00F6rstod:</p>
           <p className="text-sm text-gray-900">{result.understood}</p>
         </div>
 
@@ -657,18 +657,18 @@ function VoiceTab({
                     ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
                     : executingActions.has(action.id)
                       ? 'bg-gray-50 border border-gray-200 text-gray-400'
-                      : 'bg-white border border-gray-200 text-gray-900 hover:bg-blue-50 hover:border-blue-200'
+                      : 'bg-white border border-gray-200 text-gray-900 hover:bg-teal-50 hover:border-teal-200'
                 }`}
               >
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  action.status === 'done' ? 'bg-emerald-100' : 'bg-blue-100'
+                  action.status === 'done' ? 'bg-emerald-100' : 'bg-teal-100'
                 }`}>
                   {executingActions.has(action.id) ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                    <Loader2 className="w-4 h-4 animate-spin text-sky-700" />
                   ) : action.status === 'done' ? (
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                   ) : (
-                    <span className="text-blue-600">{actionIcon(action.type)}</span>
+                    <span className="text-sky-700">{actionIcon(action.type)}</span>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -684,7 +684,7 @@ function VoiceTab({
         {pendingActions.length > 1 && (
           <button
             onClick={() => onExecuteAll(result.actions)}
-            className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity mb-3"
+            className="w-full py-3 bg-teal-600 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity mb-3"
           >
             Utf\u00F6r alla ({pendingActions.length} \u00E5tg\u00E4rder)
           </button>
@@ -712,7 +712,7 @@ function VoiceTab({
   if (processing) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6">
-        <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-3" />
+        <Loader2 className="w-10 h-10 text-teal-600 animate-spin mb-3" />
         <p className="text-gray-900 font-medium">Analyserar...</p>
         <p className="text-xs text-gray-400 mt-1">Transkriberar och f\u00F6rst\u00E5r dina instruktioner</p>
       </div>
@@ -739,7 +739,7 @@ function VoiceTab({
           </button>
           <button
             onClick={onProcess}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium text-sm hover:opacity-90"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90"
           >
             <Zap className="w-4 h-4" />
             Analysera
@@ -762,7 +762,7 @@ function VoiceTab({
         className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all ${
           isRecording
             ? 'bg-red-500 shadow-lg shadow-red-500/30'
-            : 'bg-gradient-to-br from-blue-500 to-cyan-500 shadow-lg shadow-blue-500/20 hover:scale-105'
+            : 'bg-teal-600 shadow-lg shadow-teal-500/20 hover:scale-105'
         }`}
       >
         {isRecording ? (
@@ -831,7 +831,7 @@ function PhotoTab({
             <img src={preview} alt="" className="w-full h-full object-cover" />
           </div>
         )}
-        <Loader2 className="w-8 h-8 text-blue-500 animate-spin mb-3" />
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin mb-3" />
         <p className="text-gray-900 font-medium">Analyserar bild...</p>
         <div className="mt-2 space-y-1 text-xs text-gray-400 text-center">
           <p>Identifierar arbete och material...</p>
@@ -847,8 +847,8 @@ function PhotoTab({
         <div className="rounded-xl overflow-hidden mb-4 border border-gray-200">
           <img src={preview} alt="" className="w-full max-h-[150px] object-cover" />
         </div>
-        <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl mb-4">
-          <p className="text-xs font-medium text-blue-600 mb-1">Analys</p>
+        <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl mb-4">
+          <p className="text-xs font-medium text-sky-700 mb-1">Analys</p>
           <p className="text-sm text-gray-900 whitespace-pre-wrap">{result}</p>
         </div>
         <div className="flex gap-3">
@@ -862,7 +862,7 @@ function PhotoTab({
           <a
             href={`/dashboard/quotes/new?transcript=${encodeURIComponent(result)}`}
             onClick={onCreateQuote}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white text-sm font-medium hover:opacity-90"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
           >
             <FileText className="w-4 h-4" />
             Skapa offert
@@ -889,7 +889,7 @@ function PhotoTab({
           </button>
           <button
             onClick={onAnalyze}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium text-sm hover:opacity-90"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90"
           >
             <Zap className="w-4 h-4" />
             Analysera
@@ -908,7 +908,7 @@ function PhotoTab({
         <div className="flex flex-col gap-2">
           <button
             onClick={() => cameraInputRef.current?.click()}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium text-sm hover:opacity-90"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90"
           >
             <Camera className="w-4 h-4" />
             Ta bild

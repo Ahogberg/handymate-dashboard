@@ -45,7 +45,6 @@ import {
   MailCheck,
   ExternalLink,
 } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import {
   AreaChart,
@@ -161,10 +160,10 @@ interface AutomationHistoryItem {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color: string; bg: string }> = {
-  phone_call: { label: 'Telefonsamtal', icon: Phone, color: 'text-cyan-400', bg: 'bg-cyan-500/10 border-cyan-500/20' },
-  incoming_sms: { label: 'Inkommande SMS', icon: MessageSquare, color: 'text-violet-400', bg: 'bg-violet-500/10 border-violet-500/20' },
+  phone_call: { label: 'Telefonsamtal', icon: Phone, color: 'text-teal-400', bg: 'bg-teal-600/10 border-teal-500/20' },
+  incoming_sms: { label: 'Inkommande SMS', icon: MessageSquare, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
   manual: { label: 'Manuell', icon: Settings2, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-  cron: { label: 'Schemalagd', icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500/10 border-blue-500/20' },
+  cron: { label: 'Schemalagd', icon: Clock, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20' },
 }
 
 const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search }> = {
@@ -190,11 +189,11 @@ const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search }> = {
 
 const RULE_TYPE_CONFIG: Record<string, { label: string; icon: typeof FileText; color: string; bg: string }> = {
   quote_followup: { label: 'Offertuppföljning', icon: FileText, color: 'text-amber-500', bg: 'bg-amber-50 border-amber-200' },
-  booking_reminder: { label: 'Bokningspåminnelse', icon: CalendarCheck, color: 'text-blue-500', bg: 'bg-blue-50 border-blue-200' },
+  booking_reminder: { label: 'Bokningspåminnelse', icon: CalendarCheck, color: 'text-sky-600', bg: 'bg-teal-50 border-teal-200' },
   invoice_reminder: { label: 'Fakturapåminnelse', icon: FileText, color: 'text-red-500', bg: 'bg-red-50 border-red-200' },
   lead_response: { label: 'Lead-respons', icon: Phone, color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-200' },
-  project_complete: { label: 'Projekt-avslut', icon: CheckCircle2, color: 'text-violet-500', bg: 'bg-violet-50 border-violet-200' },
-  lead_qualify: { label: 'Lead-kvalificering', icon: TrendingUp, color: 'text-cyan-500', bg: 'bg-cyan-50 border-cyan-200' },
+  project_complete: { label: 'Projekt-avslut', icon: CheckCircle2, color: 'text-teal-500', bg: 'bg-teal-50 border-teal-200' },
+  lead_qualify: { label: 'Lead-kvalificering', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
   lead_nurture: { label: 'Lead-uppföljning', icon: MessageSquare, color: 'text-indigo-500', bg: 'bg-indigo-50 border-indigo-200' },
   lead_hot_alert: { label: 'Het lead-alert', icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-50 border-orange-200' },
 }
@@ -270,7 +269,7 @@ function ActivityItem({ run, isSelected, onClick }: {
     <button
       onClick={onClick}
       className={`w-full text-left px-5 py-4 border-b border-gray-100 transition-all hover:bg-gray-50 ${
-        isSelected ? 'bg-blue-50/50 border-l-[3px] border-l-cyan-500' : 'border-l-[3px] border-l-transparent'
+        isSelected ? 'bg-teal-50/50 border-l-[3px] border-l-teal-500' : 'border-l-[3px] border-l-transparent'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -320,11 +319,11 @@ function ToolStep({ call, index, total }: {
     <div className="flex gap-3">
       {/* Timeline */}
       <div className="flex flex-col items-center w-8 flex-shrink-0">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center z-10 shadow-sm shadow-cyan-500/20">
+        <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-600 flex items-center justify-center z-10 shadow-sm shadow-teal-500/20">
           <ToolIcon className="w-4 h-4 text-white" />
         </div>
         {index < total - 1 && (
-          <div className="w-0.5 flex-1 bg-gradient-to-b from-cyan-300 to-gray-200 min-h-[16px]" />
+          <div className="w-0.5 flex-1 bg-gradient-to-b from-teal-300 to-gray-200 min-h-[16px]" />
         )}
       </div>
       {/* Content */}
@@ -339,7 +338,7 @@ function ToolStep({ call, index, total }: {
         </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider mb-1">Input</p>
+            <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider mb-1">Inmatning</p>
             <pre className="text-xs text-gray-600 bg-white p-2 rounded border border-gray-200 overflow-auto max-h-32 font-mono leading-relaxed">
               {JSON.stringify(call.input, null, 2)}
             </pre>
@@ -514,7 +513,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-violet-500" />
+          <Shield className="w-5 h-5 text-teal-500" />
           <h3 className="text-sm font-bold text-gray-900">Agentens autonomi</h3>
         </div>
         {saving && (
@@ -548,7 +547,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
                 className="flex-shrink-0"
               >
                 {isEnabled ? (
-                  <ToggleRight className="w-8 h-8 text-cyan-500" />
+                  <ToggleRight className="w-8 h-8 text-teal-600" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-gray-300" />
                 )}
@@ -569,7 +568,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
               type="number"
               value={settings.require_approval_above}
               onChange={e => onUpdate('require_approval_above', Number(e.target.value))}
-              className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
             />
             <span className="text-sm text-gray-500">kr</span>
             <span className="text-xs text-gray-400 ml-2">
@@ -585,9 +584,9 @@ function AutonomySettings({ settings, onUpdate, saving }: {
 // ── Pipeline Constants ─────────────────────────────────────────────
 
 const PIPELINE_COLUMNS: Array<{ status: string; label: string; color: string; bg: string }> = [
-  { status: 'new', label: 'Nya', color: 'text-blue-600', bg: 'bg-blue-500' },
-  { status: 'contacted', label: 'Kontaktade', color: 'text-cyan-600', bg: 'bg-cyan-500' },
-  { status: 'qualified', label: 'Kvalificerade', color: 'text-violet-600', bg: 'bg-violet-500' },
+  { status: 'new', label: 'Nya', color: 'text-sky-700', bg: 'bg-teal-500' },
+  { status: 'contacted', label: 'Kontaktade', color: 'text-teal-600', bg: 'bg-teal-600' },
+  { status: 'qualified', label: 'Kvalificerade', color: 'text-teal-700', bg: 'bg-teal-500' },
   { status: 'quote_sent', label: 'Offert skickad', color: 'text-amber-600', bg: 'bg-amber-500' },
   { status: 'won', label: 'Vunna', color: 'text-emerald-600', bg: 'bg-emerald-500' },
   { status: 'lost', label: 'Förlorade', color: 'text-gray-500', bg: 'bg-gray-400' },
@@ -595,7 +594,7 @@ const PIPELINE_COLUMNS: Array<{ status: string; label: string; color: string; bg
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   low: { label: 'Låg', color: 'text-gray-500', bg: 'bg-gray-100' },
-  medium: { label: 'Medel', color: 'text-blue-600', bg: 'bg-blue-100' },
+  medium: { label: 'Medel', color: 'text-sky-700', bg: 'bg-teal-100' },
   high: { label: 'Hög', color: 'text-orange-600', bg: 'bg-orange-100' },
   emergency: { label: 'Akut', color: 'text-red-600', bg: 'bg-red-100' },
 }
@@ -682,7 +681,7 @@ function LeadDetail({ lead, onClose, onStatusChange }: {
         {/* Score bar */}
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-gray-500">Lead Score</span>
+            <span className="text-xs font-medium text-gray-500">Lead-poäng</span>
             <span className="text-sm font-bold text-gray-900">{lead.score}/100</span>
           </div>
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -696,7 +695,7 @@ function LeadDetail({ lead, onClose, onStatusChange }: {
         {/* Meta grid */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-white rounded-lg p-2 border border-gray-200">
-            <p className="text-[10px] text-gray-400 uppercase font-medium">Urgency</p>
+            <p className="text-[10px] text-gray-400 uppercase font-medium"> Brådskande</p>
             <p className={`text-sm font-semibold ${urgency.color}`}>{urgency.label}</p>
           </div>
           <div className="bg-white rounded-lg p-2 border border-gray-200">
@@ -901,14 +900,14 @@ function PipelineTab({ businessId }: { businessId: string }) {
           label="Totala leads"
           value={stats?.total_leads || 0}
           icon={Target}
-          color="bg-blue-500"
+          color="bg-teal-500"
         />
         <StatCard
           label="Pipeline-värde"
           value={stats?.total_pipeline_value ? `${(stats.total_pipeline_value / 1000).toFixed(0)}k` : '0'}
           suffix=" kr"
           icon={DollarSign}
-          color="bg-violet-500"
+          color="bg-teal-500"
         />
         <StatCard
           label="Konvertering"
@@ -922,7 +921,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
           value={stats?.avg_conversion_days || 0}
           suffix=" dagar"
           icon={Clock}
-          color="bg-cyan-500"
+          color="bg-teal-600"
         />
       </div>
 
@@ -945,7 +944,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
               onClick={() => setFilterUrgency(f.key)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 filterUrgency === f.key
-                  ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                  ? 'bg-teal-50 text-teal-700 border border-teal-200'
                   : 'text-gray-500 border border-transparent hover:bg-gray-50'
               }`}
             >
@@ -966,7 +965,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
               onClick={() => setFilterScore(f.key)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 filterScore === f.key
-                  ? 'bg-violet-50 text-violet-700 border border-violet-200'
+                  ? 'bg-teal-50 text-teal-800 border border-teal-200'
                   : 'text-gray-500 border border-transparent hover:bg-gray-50'
               }`}
             >
@@ -1068,7 +1067,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
               {riskLabels[rule.risk_level]}
             </span>
             {pendingCount > 0 && (
-              <span className="text-[10px] font-bold bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full">
                 {pendingCount} väntande
               </span>
             )}
@@ -1079,12 +1078,12 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
           <div className="flex items-center gap-4 mt-3">
             <div className="flex items-center gap-1.5">
               <Timer className="w-3.5 h-3.5 text-gray-400" />
-              <label className="text-[10px] text-gray-400 uppercase font-medium">Delay</label>
+              <label className="text-[10px] text-gray-400 uppercase font-medium"> Fördröjning</label>
               <input
                 type="number"
                 value={rule.delay_hours}
                 onChange={e => onUpdate('delay_hours', Number(e.target.value))}
-                className="w-16 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
+                className="w-16 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-teal-500/30"
                 min={1}
               />
               <span className="text-[10px] text-gray-400">tim</span>
@@ -1096,7 +1095,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
                 type="number"
                 value={rule.max_attempts}
                 onChange={e => onUpdate('max_attempts', Number(e.target.value))}
-                className="w-12 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-cyan-500/30"
+                className="w-12 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-teal-500/30"
                 min={1}
                 max={10}
               />
@@ -1114,7 +1113,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
           disabled={saving}
         >
           {rule.enabled ? (
-            <ToggleRight className="w-9 h-9 text-cyan-500" />
+            <ToggleRight className="w-9 h-9 text-teal-600" />
           ) : (
             <ToggleLeft className="w-9 h-9 text-gray-300" />
           )}
@@ -1271,9 +1270,9 @@ function AutomationTab({ businessId }: { businessId: string }) {
     <div className="space-y-6">
       {/* Preview summary */}
       {totalPending > 0 && (
-        <div className="bg-gradient-to-r from-cyan-50 to-blue-50 rounded-xl border border-cyan-200 p-4 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center flex-shrink-0">
-            <Timer className="w-5 h-5 text-cyan-600" />
+        <div className="bg-teal-50 rounded-xl border border-teal-200 p-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+            <Timer className="w-5 h-5 text-teal-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">
@@ -1317,7 +1316,7 @@ function AutomationTab({ businessId }: { businessId: string }) {
           <button
             onClick={handleSeedRules}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-medium hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 transition-all shadow-sm"
+            className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-all shadow-sm"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin inline mr-1" />
@@ -1389,7 +1388,7 @@ function ManualTrigger({ businessId, onTriggered }: {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-3">
-        <Bot className="w-5 h-5 text-cyan-500" />
+        <Bot className="w-5 h-5 text-teal-600" />
         <h3 className="text-sm font-bold text-gray-900">Ge agenten en uppgift</h3>
       </div>
       <div className="flex gap-2">
@@ -1399,13 +1398,13 @@ function ManualTrigger({ businessId, onTriggered }: {
           onChange={e => setInstruction(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
           placeholder="T.ex. &quot;Sök kund med nummer +46701234567 och skapa en offert&quot;"
-          className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+          className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
           disabled={loading}
         />
         <button
           onClick={handleTrigger}
           disabled={loading || !instruction.trim()}
-          className="px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 text-white text-sm font-medium hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-sm shadow-cyan-500/20"
+          className="px-4 py-2.5 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-sm shadow-teal-500/20"
         >
           {loading ? (
             <RefreshCw className="w-4 h-4 animate-spin" />
@@ -1455,94 +1454,49 @@ export default function AgentDashboardPage() {
   const fetchRuns = useCallback(async () => {
     if (!business?.business_id) return
 
-    const { data, error } = await supabase
-      .from('agent_runs')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    if (!error && data) {
-      setRuns(data as AgentRun[])
-    }
+    try {
+      const res = await fetch('/api/agent/data?type=runs', { credentials: 'include' })
+      if (res.ok) {
+        const { runs: data } = await res.json()
+        setRuns((data || []) as AgentRun[])
+      }
+    } catch {}
   }, [business?.business_id])
 
   const fetchStats = useCallback(async () => {
     if (!business?.business_id) return
 
-    const { data, count } = await supabase
-      .from('agent_runs')
-      .select('status, tool_calls, tokens_used, duration_ms', { count: 'exact' })
-      .eq('business_id', business.business_id)
-
-    if (data) {
-      const completed = data.filter((r: any) => r.status === 'completed').length
-      const failed = data.filter((r: any) => r.status === 'failed').length
-      const totalToolCalls = data.reduce((s: number, r: any) => s + (r.tool_calls || 0), 0)
-      const totalTokens = data.reduce((s: number, r: any) => s + (r.tokens_used || 0), 0)
-      const avgDuration = data.length > 0
-        ? Math.round(data.reduce((s: number, r: any) => s + (r.duration_ms || 0), 0) / data.length)
-        : 0
-
-      setStats({
-        total_runs: count || 0,
-        completed,
-        failed,
-        total_tool_calls: totalToolCalls,
-        total_tokens: totalTokens,
-        avg_duration_ms: avgDuration,
-      })
-    }
+    try {
+      const res = await fetch('/api/agent/data?type=stats', { credentials: 'include' })
+      if (res.ok) {
+        const { stats: data } = await res.json()
+        if (data) setStats(data)
+      }
+    } catch {}
   }, [business?.business_id])
 
   const fetchChartData = useCallback(async () => {
     if (!business?.business_id) return
 
-    // Last 7 days
-    const days = []
-    const dayNames = ['Sön', 'Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör']
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
-      days.push({
-        date: d.toISOString().split('T')[0],
-        day: dayNames[d.getDay()],
-      })
-    }
-
-    const weekAgo = days[0].date
-    const { data } = await supabase
-      .from('agent_runs')
-      .select('created_at, tool_calls')
-      .eq('business_id', business.business_id)
-      .gte('created_at', `${weekAgo}T00:00:00`)
-
-    const chart = days.map(d => {
-      const dayRuns = (data || []).filter((r: any) =>
-        r.created_at.startsWith(d.date)
-      )
-      return {
-        day: d.day,
-        runs: dayRuns.length,
-        tools: dayRuns.reduce((s: number, r: any) => s + (r.tool_calls || 0), 0),
+    try {
+      const res = await fetch('/api/agent/data?type=chart', { credentials: 'include' })
+      if (res.ok) {
+        const { chart } = await res.json()
+        if (chart) setChartData(chart)
       }
-    })
-
-    setChartData(chart)
+    } catch {}
   }, [business?.business_id])
 
   const fetchSettings = useCallback(async () => {
     if (!business?.business_id) return
 
-    const { data } = await supabase
-      .from('agent_settings')
-      .select('settings')
-      .eq('business_id', business.business_id)
-      .single()
-
-    if (data?.settings) {
-      setAgentSettings({ ...DEFAULT_SETTINGS, ...data.settings })
-    }
+    try {
+      const res = await fetch('/api/agent/data?type=settings', { credentials: 'include' })
+      if (res.ok) {
+        const { settings } = await res.json()
+        if (settings) setAgentSettings({ ...DEFAULT_SETTINGS, ...settings })
+      }
+    } catch {}
   }, [business?.business_id])
 
   useEffect(() => {
@@ -1573,13 +1527,14 @@ export default function AgentDashboardPage() {
     setAgentSettings(updated)
     setSavingSettings(true)
 
-    await supabase
-      .from('agent_settings')
-      .upsert({
-        business_id: business.business_id,
-        settings: updated,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'business_id' })
+    try {
+      await fetch('/api/agent/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'update_settings', settings: updated }),
+      })
+    } catch {}
 
     setSavingSettings(false)
   }
@@ -1601,11 +1556,11 @@ export default function AgentDashboardPage() {
     return (
       <div className="p-4 sm:p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-sm shadow-cyan-500/20">
+          <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-sm shadow-teal-500/20">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">AI Agent</h1>
+            <h1 className="text-xl font-bold text-gray-900">AI-assistent</h1>
             <p className="text-sm text-gray-500">Laddar...</p>
           </div>
         </div>
@@ -1623,23 +1578,23 @@ export default function AgentDashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-sm shadow-cyan-500/20">
+          <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-sm shadow-teal-500/20">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">AI Agent</h1>
+            <h1 className="text-xl font-bold text-gray-900">AI-assistent</h1>
             <p className="text-sm text-gray-500">Realtidsöversikt</p>
           </div>
           <div className="flex items-center gap-1.5 ml-4 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-700">Live</span>
+            <span className="text-xs font-semibold text-emerald-700"> Realtid</span>
           </div>
           {/* Google integration status badges */}
           {googleStatus && (
             <div className="flex items-center gap-2 ml-2">
               <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
                 googleStatus.connected
-                  ? 'bg-blue-50 border-blue-200 text-blue-700'
+                  ? 'bg-teal-50 border-teal-200 text-teal-800'
                   : 'bg-gray-50 border-gray-200 text-gray-400'
               }`}>
                 <Calendar className="w-3 h-3" />
@@ -1649,7 +1604,7 @@ export default function AgentDashboardPage() {
                 googleStatus.gmailSyncEnabled
                   ? googleStatus.gmailSendEnabled
                     ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-blue-50 border-blue-200 text-blue-700'
+                    : 'bg-teal-50 border-teal-200 text-teal-800'
                   : 'bg-gray-50 border-gray-200 text-gray-400'
               }`}>
                 <MailCheck className="w-3 h-3" />
@@ -1660,7 +1615,7 @@ export default function AgentDashboardPage() {
                     : 'Gmail av'}
               </div>
               {!googleStatus.connected && (
-                <a href="/dashboard/settings?tab=integrations" className="text-xs text-violet-600 hover:underline flex items-center gap-1">
+                <a href="/dashboard/settings?tab=integrations" className="text-xs text-teal-700 hover:underline flex items-center gap-1">
                   <ExternalLink className="w-3 h-3" />
                   Koppla
                 </a>
@@ -1672,12 +1627,12 @@ export default function AgentDashboardPage() {
           onClick={() => setShowSettings(!showSettings)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
             showSettings
-              ? 'bg-violet-50 border-violet-200 text-violet-700'
+              ? 'bg-teal-50 border-teal-200 text-teal-800'
               : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
           }`}
         >
           <Shield className="w-4 h-4" />
-          Autonomi
+          AI-inställningar
         </button>
       </div>
 
@@ -1733,10 +1688,10 @@ export default function AgentDashboardPage() {
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Agent Runs" value={stats?.total_runs || 0} icon={Bot} color="bg-cyan-500" />
-            <StatCard label="Verktygsanrop" value={stats?.total_tool_calls || 0} icon={Zap} color="bg-violet-500" />
+            <StatCard label="Utförda uppgifter" value={stats?.total_runs || 0} icon={Bot} color="bg-teal-600" />
+            <StatCard label="Åtgärder" value={stats?.total_tool_calls || 0} icon={Zap} color="bg-teal-500" />
             <StatCard label="Lyckade" value={successRate} suffix="%" icon={CheckCircle2} color="bg-emerald-500" />
-            <StatCard label="Snitt tid" value={formatDuration(stats?.avg_duration_ms || 0)} icon={Clock} color="bg-blue-500" />
+            <StatCard label="Snitt tid" value={formatDuration(stats?.avg_duration_ms || 0)} icon={Clock} color="bg-teal-500" />
           </div>
 
           {/* Chart */}
@@ -1757,7 +1712,7 @@ export default function AgentDashboardPage() {
                   labelStyle={{ color: '#94a3b8' }}
                 />
                 <Area type="monotone" dataKey="runs" stroke="#06b6d4" strokeWidth={2.5} fill="url(#gradRuns)" name="Runs" />
-                <Line type="monotone" dataKey="tools" stroke="#8b5cf6" strokeWidth={2} dot={false} name="Verktygsanrop" />
+                <Line type="monotone" dataKey="tools" stroke="#0f766e" strokeWidth={2} dot={false} name="Åtgärder" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -1788,7 +1743,7 @@ export default function AgentDashboardPage() {
                       onClick={() => setFilterType(f.key)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                         filterType === f.key
-                          ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                          ? 'bg-teal-50 text-teal-700 border border-teal-200'
                           : 'text-gray-500 border border-transparent hover:bg-gray-50'
                       }`}
                     >

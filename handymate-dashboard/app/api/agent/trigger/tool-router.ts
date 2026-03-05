@@ -83,6 +83,8 @@ export async function executeTool(
         return await getLeadTool(supabase, businessId, input)
       case 'search_leads':
         return await searchLeads(supabase, businessId, input)
+      case 'get_daily_stats':
+        return await getDailyStats(supabase, businessId, input)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -98,7 +100,7 @@ async function getCustomer(
 ): Promise<ToolResult> {
   const { data, error } = await supabase
     .from('customer')
-    .select('customer_id, name, phone_number, email, address_line, customer_rating, job_status, created_at')
+    .select('customer_id, name, phone_number, email, address_line, customer_rating, created_at')
     .eq('business_id', businessId)
     .eq('customer_id', params.customer_id)
     .single()
@@ -107,7 +109,7 @@ async function getCustomer(
 
   const { data: bookings } = await supabase
     .from('booking')
-    .select('booking_id, service_type, scheduled_start, status')
+    .select('booking_id, scheduled_start, scheduled_end, status, notes')
     .eq('customer_id', params.customer_id as string)
     .eq('business_id', businessId)
     .order('scheduled_start', { ascending: false })
@@ -124,7 +126,7 @@ async function searchCustomers(
 
   const { data, error } = await supabase
     .from('customer')
-    .select('customer_id, name, phone_number, email, address_line, job_status')
+    .select('customer_id, name, phone_number, email, address_line')
     .eq('business_id', businessId)
     .or(`name.ilike.%${query}%,phone_number.ilike.%${query}%,email.ilike.%${query}%`)
     .limit((params.limit as number) || 10)
@@ -155,7 +157,6 @@ async function createCustomer(
     phone_number: params.phone_number,
     email: params.email || null,
     address_line: params.address_line || null,
-    job_status: 'lead',
     created_at: new Date().toISOString(),
   })
 
@@ -189,7 +190,15 @@ async function createQuote(
   const items = (params.items as any[]).map(i => ({ ...i, total: i.quantity * i.unit_price }))
   const laborTotal = items.filter(i => i.type === 'labor').reduce((s, i) => s + i.total, 0)
   const materialTotal = items.filter(i => i.type === 'material').reduce((s, i) => s + i.total, 0)
-  const total = laborTotal + materialTotal
+  const subtotal = laborTotal + materialTotal
+
+  // Fetch VAT rate from business_config (default 25%)
+  const { data: bizVat } = await supabase
+    .from('business_config').select('default_vat_rate, pricing_settings')
+    .eq('business_id', businessId).single()
+  const vatRate = bizVat?.default_vat_rate ?? bizVat?.pricing_settings?.vat_rate ?? 25
+  const vatAmount = Math.round(subtotal * (vatRate / 100))
+  const total = subtotal + vatAmount
 
   let rotRutDeduction = 0
   if (params.rot_rut_type === 'rot') rotRutDeduction = Math.min(laborTotal * 0.3, 50000)
@@ -202,7 +211,8 @@ async function createQuote(
   const { error } = await supabase.from('quotes').insert({
     quote_id: quoteId, business_id: businessId, customer_id: params.customer_id,
     title: params.title, status: 'draft', items: JSON.stringify(items),
-    labor_total: laborTotal, material_total: materialTotal, total,
+    labor_total: laborTotal, material_total: materialTotal,
+    subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
     rot_rut_type: params.rot_rut_type || null,
     rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
     valid_until: validUntil.toISOString(), created_at: new Date().toISOString(),
@@ -211,7 +221,11 @@ async function createQuote(
   if (error) return { success: false, error: error.message }
   return { success: true, data: {
     quote_id: quoteId, message: `Offert "${params.title}" skapad`,
-    summary: { labor_total: laborTotal, material_total: materialTotal, total, rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction }
+    summary: {
+      labor_total: laborTotal, material_total: materialTotal,
+      subtotal_ex_vat: subtotal, vat_rate: vatRate, vat_amount: vatAmount, total_incl_vat: total,
+      rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
+    }
   }}
 }
 
@@ -252,8 +266,15 @@ async function createInvoice(
   }
 
   const subtotal = items.reduce((s: number, i: any) => s + (i.total || i.quantity * i.unit_price), 0)
-  const vatAmount = subtotal * 0.25
+
+  // Fetch VAT rate from business_config (default 25%)
+  const { data: bizVat } = await supabase
+    .from('business_config').select('default_vat_rate, pricing_settings')
+    .eq('business_id', businessId).single()
+  const vatRate = bizVat?.default_vat_rate ?? bizVat?.pricing_settings?.vat_rate ?? 25
+  const vatAmount = Math.round(subtotal * (vatRate / 100))
   const total = subtotal + vatAmount
+
   const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + (i.total || 0), 0)
   let rotRutDeduction = 0
   if (rotRutType === 'rot') rotRutDeduction = Math.min(laborTotal * 0.3, 50000)
@@ -272,7 +293,7 @@ async function createInvoice(
   const { error } = await supabase.from('invoice').insert({
     invoice_id: invoiceId, business_id: businessId, customer_id: params.customer_id,
     quote_id: params.quote_id || null, invoice_number: invoiceNumber, status: 'draft',
-    items: JSON.stringify(items), subtotal, vat_rate: 25, vat_amount: vatAmount, total,
+    items: JSON.stringify(items), subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
     rot_rut_type: rotRutType, rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: dueDate.toISOString().split('T')[0],
@@ -289,7 +310,7 @@ async function checkCalendar(
 ): Promise<ToolResult> {
   // 1. Query Handymate bookings
   const { data: bookings, error } = await supabase.from('booking')
-    .select('booking_id, customer_id, service_type, scheduled_start, scheduled_end, status, google_event_id')
+    .select('booking_id, customer_id, scheduled_start, scheduled_end, status, notes, google_event_id')
     .eq('business_id', businessId)
     .gte('scheduled_start', `${params.from_date}T00:00:00`)
     .lte('scheduled_start', `${params.to_date}T23:59:59`)
@@ -372,9 +393,9 @@ async function createBooking(
   const bookingId = generateId('book')
   const { error } = await supabase.from('booking').insert({
     booking_id: bookingId, business_id: businessId, customer_id: params.customer_id,
-    service_type: params.service_type, scheduled_start: params.scheduled_start,
+    scheduled_start: params.scheduled_start,
     scheduled_end: params.scheduled_end, status: 'pending',
-    notes: params.notes || null, source: 'ai_suggestion',
+    notes: [params.service_type, params.notes].filter(Boolean).join(' — ') || null,
     created_at: new Date().toISOString(),
   })
 
@@ -482,11 +503,32 @@ async function sendSms(
   if (!to.startsWith('+')) return { success: false, error: 'Telefonnumret måste börja med +46' }
   if (message.length > 1600) return { success: false, error: `Meddelandet är ${message.length} tecken (max 1600)` }
 
-  // Check night hours
+  // Night block: queue SMS for 08:00 next morning (skip if DISABLE_SMS_NIGHT_BLOCK is set)
   const now = new Date()
-  const swedenHour = (now.getUTCHours() + 1) % 24 // CET rough
-  if (swedenHour >= 21 || swedenHour < 8) {
-    return { success: false, error: `Klockan är ${swedenHour}. SMS skickas ej 21–08.` }
+  const swedenHour = parseInt(
+    new Intl.DateTimeFormat('sv-SE', { hour: 'numeric', hour12: false, timeZone: 'Europe/Stockholm' }).format(now)
+  )
+  if ((swedenHour >= 21 || swedenHour < 8) && !process.env.DISABLE_SMS_NIGHT_BLOCK) {
+    // Calculate next 08:00 Stockholm time
+    const stockholm = new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Europe/Stockholm', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(now) // "YYYY-MM-DD"
+    const [y, m, d] = stockholm.split('-').map(Number)
+    // If before 08:00 → today at 08:00, otherwise → tomorrow at 08:00
+    const sendDate = swedenHour < 8 ? new Date(`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}T08:00:00+01:00`)
+      : new Date(`${y}-${String(m).padStart(2,'0')}-${String(d + 1).padStart(2,'0')}T08:00:00+01:00`)
+    const sendAfter = sendDate.toISOString()
+
+    const queueId = 'smq_' + Math.random().toString(36).substring(2, 14)
+    const senderName = (context.businessName || 'Handymate').substring(0, 11)
+    await supabase.from('sms_queue').insert({
+      queue_id: queueId, business_id: businessId,
+      phone_to: to, sender_name: senderName, message,
+      send_after: sendAfter, status: 'queued', created_at: now.toISOString(),
+    })
+
+    console.log(`[SMS Queued] Nattspärr kl ${swedenHour}:xx → köat till ${sendAfter} → ${to}`)
+    return { success: true, data: { queued: true, queue_id: queueId, send_after: sendAfter, message: `SMS köat — skickas ${swedenHour < 8 ? 'idag' : 'imorgon'} kl 08:00` } }
   }
 
   const elksUser = process.env.ELKS_API_USER!
@@ -511,6 +553,15 @@ async function sendSms(
     business_id: businessId, direction: 'outbound',
     phone_from: senderName, phone_to: to, message,
     status: 'sent', elks_id: result.id, created_at: new Date().toISOString(),
+  }).catch(() => {})
+
+  // Also log to sms_conversation for conversation history continuity
+  await supabase.from('sms_conversation').insert({
+    business_id: businessId,
+    phone_number: to,
+    role: 'assistant',
+    content: message,
+    created_at: new Date().toISOString(),
   }).catch(() => {})
 
   return { success: true, data: { message: `SMS skickat till ${to}`, sms_id: result.id } }
@@ -606,9 +657,9 @@ async function qualifyLead(
     .eq('conversation_id', conversationId)
     .single()
 
-  let transcript = conversation?.transcript || ''
+  let transcript = conversation?.content || ''
   let phone = (params.phone as string) || conversation?.phone_number || ''
-  let contactName = (params.name as string) || conversation?.customer_name || ''
+  let contactName = (params.name as string) || ''
   let source = (params.source as string) || 'manual'
 
   if (!transcript) {
@@ -792,4 +843,127 @@ async function searchLeads(
   const { data, error } = await q
   if (error) return { success: false, error: error.message }
   return { success: true, data: { count: data.length, leads: data } }
+}
+
+// ── Stats ─────────────────────────────────────────────────
+
+async function getDailyStats(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const date = (params.date as string) || new Date().toISOString().split('T')[0]
+  const dayStart = `${date}T00:00:00`
+  const dayEnd = `${date}T23:59:59`
+
+  // Previous day for comparison
+  const prevDate = new Date(date)
+  prevDate.setDate(prevDate.getDate() - 1)
+  const prevDateStr = prevDate.toISOString().split('T')[0]
+
+  const [
+    callsToday, smsInToday, smsOutToday,
+    newCustomers, leadsToday, quotesToday,
+    invoicesMonth, bookingsToday, timeEntriesToday,
+    agentRuns, pendingQueue
+  ] = await Promise.all([
+    // Calls today
+    supabase.from('call_recording').select('recording_id', { count: 'exact', head: true })
+      .eq('business_id', businessId).gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Inbound SMS today
+    supabase.from('sms_conversation').select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId).eq('role', 'user').gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Outbound SMS today
+    supabase.from('sms_log').select('sms_id', { count: 'exact', head: true })
+      .eq('business_id', businessId).eq('direction', 'outbound').gte('created_at', dayStart).lte('created_at', dayEnd),
+    // New customers today
+    supabase.from('customer').select('customer_id', { count: 'exact', head: true })
+      .eq('business_id', businessId).gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Leads today (with details)
+    supabase.from('leads').select('lead_id, status, urgency, score, job_type')
+      .eq('business_id', businessId).gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Quotes today
+    supabase.from('quotes').select('quote_id, status, subtotal, total')
+      .eq('business_id', businessId).gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Invoices this month (for revenue)
+    supabase.from('invoice').select('invoice_id, status, subtotal, total')
+      .eq('business_id', businessId).gte('invoice_date', date.substring(0, 7) + '-01'),
+    // Bookings scheduled for today
+    supabase.from('booking').select('booking_id, status, scheduled_start, notes')
+      .eq('business_id', businessId).gte('scheduled_start', dayStart).lte('scheduled_start', dayEnd),
+    // Time entries today
+    supabase.from('time_entry').select('duration_minutes, is_billable, hourly_rate')
+      .eq('business_id', businessId).eq('work_date', date),
+    // Agent runs today
+    supabase.from('agent_runs').select('run_id, trigger_type, status', { count: 'exact', head: true })
+      .eq('business_id', businessId).gte('created_at', dayStart).lte('created_at', dayEnd),
+    // Queued SMS pending
+    supabase.from('sms_queue').select('queue_id', { count: 'exact', head: true })
+      .eq('business_id', businessId).eq('status', 'queued'),
+  ])
+
+  const leads = leadsToday.data || []
+  const quotes = quotesToday.data || []
+  const invoices = invoicesMonth.data || []
+  const bookings = bookingsToday.data || []
+  const timeEntries = timeEntriesToday.data || []
+
+  const totalHours = timeEntries.reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0) / 60
+  const billableHours = timeEntries.filter((e: any) => e.is_billable).reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0) / 60
+  const paidInvoices = invoices.filter((i: any) => i.status === 'paid')
+  const monthlyRevenue = paidInvoices.reduce((s: number, i: any) => s + (i.total || 0), 0)
+  const monthlyRevenueExVat = paidInvoices.reduce((s: number, i: any) => s + (i.subtotal || Math.round((i.total || 0) / 1.25)), 0)
+  const pendingInvoices = invoices.filter((i: any) => i.status === 'sent' || i.status === 'overdue')
+  const quotesTotal = quotes.reduce((s: number, q: any) => s + (q.total || 0), 0)
+  const quotesTotalExVat = quotes.reduce((s: number, q: any) => s + (q.subtotal || Math.round((q.total || 0) / 1.25)), 0)
+
+  return {
+    success: true,
+    data: {
+      date,
+      communication: {
+        calls: callsToday.count || 0,
+        sms_inbound: smsInToday.count || 0,
+        sms_outbound: smsOutToday.count || 0,
+        sms_queued: pendingQueue.count || 0,
+      },
+      customers: {
+        new_today: newCustomers.count || 0,
+      },
+      leads: {
+        new_today: leads.length,
+        by_urgency: {
+          emergency: leads.filter((l: any) => l.urgency === 'emergency').length,
+          high: leads.filter((l: any) => l.urgency === 'high').length,
+          medium: leads.filter((l: any) => l.urgency === 'medium').length,
+          low: leads.filter((l: any) => l.urgency === 'low').length,
+        },
+        avg_score: leads.length > 0 ? Math.round(leads.reduce((s: number, l: any) => s + (l.score || 0), 0) / leads.length) : 0,
+      },
+      quotes: {
+        created_today: quotes.length,
+        total_value_incl_vat: quotesTotal,
+        total_value_ex_vat: quotesTotalExVat,
+      },
+      bookings: {
+        scheduled_today: bookings.length,
+        by_status: {
+          pending: bookings.filter((b: any) => b.status === 'pending').length,
+          confirmed: bookings.filter((b: any) => b.status === 'confirmed').length,
+          completed: bookings.filter((b: any) => b.status === 'completed').length,
+        },
+      },
+      time_tracking: {
+        total_hours: +totalHours.toFixed(1),
+        billable_hours: +billableHours.toFixed(1),
+      },
+      revenue: {
+        monthly_paid_incl_vat: monthlyRevenue,
+        monthly_paid_ex_vat: monthlyRevenueExVat,
+        pending_invoices: pendingInvoices.length,
+        pending_amount_incl_vat: pendingInvoices.reduce((s: number, i: any) => s + (i.total || 0), 0),
+      },
+      agent: {
+        runs_today: agentRuns.count || 0,
+      },
+    },
+  }
 }

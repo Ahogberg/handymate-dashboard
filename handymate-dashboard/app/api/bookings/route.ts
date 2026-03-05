@@ -103,9 +103,8 @@ export async function POST(request: NextRequest) {
         customer_id: customer_id || null,
         scheduled_start,
         scheduled_end: scheduled_end || null,
-        service_type: service_type || null,
         status: 'confirmed',
-        notes: notes || null,
+        notes: [service_type, notes].filter(Boolean).join(' — ') || null,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -143,7 +142,6 @@ export async function PUT(request: NextRequest) {
     if (body.scheduled_end !== undefined) updates.scheduled_end = body.scheduled_end
     if (body.status !== undefined) updates.status = body.status
     if (body.notes !== undefined) updates.notes = body.notes
-    if (body.service_type !== undefined) updates.service_type = body.service_type
     updates.updated_at = new Date().toISOString()
 
     const { data: booking, error } = await supabase

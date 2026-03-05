@@ -191,7 +191,7 @@ export default function QuoteTemplateEditorPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+        <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
       </div>
     )
   }
@@ -200,7 +200,7 @@ export default function QuoteTemplateEditorPage() {
     return (
       <div className="p-6 text-center">
         <p className="text-zinc-400">Mall hittades inte.</p>
-        <Link href="/dashboard/settings/quote-templates" className="text-violet-400 hover:underline mt-2 inline-block">
+        <Link href="/dashboard/settings/quote-templates" className="text-teal-400 hover:underline mt-2 inline-block">
           Tillbaka till mallar
         </Link>
       </div>
@@ -226,7 +226,7 @@ export default function QuoteTemplateEditorPage() {
         <button
           onClick={saveTemplate}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg hover:opacity-90 transition-opacity"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Spara
@@ -242,7 +242,7 @@ export default function QuoteTemplateEditorPage() {
               type="text"
               value={template.name}
               onChange={e => updateField('name', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
             />
           </div>
           <div>
@@ -251,7 +251,7 @@ export default function QuoteTemplateEditorPage() {
               type="text"
               value={template.branch}
               onChange={e => updateField('branch', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
               placeholder="t.ex. bygg, el, vvs"
             />
           </div>
@@ -261,7 +261,7 @@ export default function QuoteTemplateEditorPage() {
               type="text"
               value={template.category}
               onChange={e => updateField('category', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
               placeholder="t.ex. Badrum, Kök"
             />
           </div>
@@ -271,7 +271,7 @@ export default function QuoteTemplateEditorPage() {
               type="text"
               value={template.description}
               onChange={e => updateField('description', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-violet-500"
+              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-teal-500"
               placeholder="Kort beskrivning av mallen"
             />
           </div>
@@ -320,7 +320,7 @@ export default function QuoteTemplateEditorPage() {
                 type="text"
                 value={item.description}
                 onChange={e => updateItem(index, 'description', e.target.value)}
-                className={`flex-1 bg-transparent border-b border-zinc-700 px-1 py-0.5 text-sm focus:outline-none focus:border-violet-500 ${
+                className={`flex-1 bg-transparent border-b border-zinc-700 px-1 py-0.5 text-sm focus:outline-none focus:border-teal-500 ${
                   item.item_type === 'heading' ? 'font-bold text-white' :
                   item.item_type === 'text' ? 'italic text-zinc-400' :
                   'text-zinc-200'
@@ -334,7 +334,7 @@ export default function QuoteTemplateEditorPage() {
                     type="number"
                     value={item.quantity || ''}
                     onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                    className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-violet-500"
+                    className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-teal-500"
                     placeholder="Antal"
                   />
                   <select
@@ -350,7 +350,7 @@ export default function QuoteTemplateEditorPage() {
                     type="number"
                     value={item.unit_price || ''}
                     onChange={e => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                    className="w-20 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-violet-500"
+                    className="w-20 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-teal-500"
                     placeholder="À-pris"
                   />
                   <span className="w-20 text-right text-sm text-zinc-400">
@@ -371,7 +371,7 @@ export default function QuoteTemplateEditorPage() {
                     type="checkbox"
                     checked={item.is_rot_eligible}
                     onChange={e => updateItem(index, 'is_rot_eligible', e.target.checked)}
-                    className="rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500"
+                    className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500"
                   />
                   ROT
                 </label>
@@ -405,14 +405,14 @@ export default function QuoteTemplateEditorPage() {
                 type="text"
                 value={entry.label}
                 onChange={e => updatePaymentEntry(index, 'label', e.target.value)}
-                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-violet-500"
+                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-teal-500"
                 placeholder="Benämning"
               />
               <input
                 type="number"
                 value={entry.percent || ''}
                 onChange={e => updatePaymentEntry(index, 'percent', parseFloat(e.target.value) || 0)}
-                className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-violet-500"
+                className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-teal-500"
                 placeholder="%"
               />
               <span className="text-sm text-zinc-500">%</span>
@@ -420,7 +420,7 @@ export default function QuoteTemplateEditorPage() {
                 type="text"
                 value={entry.due_description}
                 onChange={e => updatePaymentEntry(index, 'due_description', e.target.value)}
-                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-violet-500"
+                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-teal-500"
                 placeholder="Förfaller"
               />
               <button onClick={() => removePaymentEntry(index)} className="text-zinc-600 hover:text-red-400">
@@ -449,7 +449,7 @@ export default function QuoteTemplateEditorPage() {
             <select
               value={template.detail_level}
               onChange={e => updateField('detail_level', e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500"
+              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500"
             >
               <option value="detailed">Detaljerad (alla rader)</option>
               <option value="subtotals_only">Enbart delsummor</option>
@@ -461,7 +461,7 @@ export default function QuoteTemplateEditorPage() {
               type="checkbox"
               checked={template.show_unit_prices}
               onChange={e => updateField('show_unit_prices', e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500"
+              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500"
             />
             Visa à-priser
           </label>
@@ -470,7 +470,7 @@ export default function QuoteTemplateEditorPage() {
               type="checkbox"
               checked={template.show_quantities}
               onChange={e => updateField('show_quantities', e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500"
+              className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500"
             />
             Visa antal
           </label>
@@ -480,7 +480,7 @@ export default function QuoteTemplateEditorPage() {
                 type="checkbox"
                 checked={template.rot_enabled}
                 onChange={e => updateField('rot_enabled', e.target.checked)}
-                className="rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500"
+                className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500"
               />
               ROT-avdrag
             </label>
@@ -489,7 +489,7 @@ export default function QuoteTemplateEditorPage() {
                 type="checkbox"
                 checked={template.rut_enabled}
                 onChange={e => updateField('rut_enabled', e.target.checked)}
-                className="rounded border-zinc-600 bg-zinc-800 text-violet-500 focus:ring-violet-500"
+                className="rounded border-zinc-600 bg-zinc-800 text-teal-500 focus:ring-teal-500"
               />
               RUT-avdrag
             </label>
@@ -502,7 +502,7 @@ export default function QuoteTemplateEditorPage() {
         <button
           onClick={saveTemplate}
           disabled={saving}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg font-medium"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg font-medium"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Spara mall
@@ -545,7 +545,7 @@ function TextArea({ label, value, onChange }: { label: string; value: string; on
         value={value}
         onChange={e => onChange(e.target.value)}
         rows={3}
-        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-violet-500 resize-y"
+        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-teal-500 resize-y"
       />
     </div>
   )

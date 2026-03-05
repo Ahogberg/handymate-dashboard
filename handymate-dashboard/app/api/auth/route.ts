@@ -105,11 +105,8 @@ if (action === 'register') {
       can_create_invoices: true,
     })
 
-  // 4. Seed automation rules + lead scoring rules
-  await Promise.all([
-    supabaseAdmin.rpc('seed_automation_rules', { p_business_id: businessId }),
-    supabaseAdmin.rpc('seed_lead_scoring_rules', { p_business_id: businessId }),
-  ]).catch((err) => console.error('Seed error (non-blocking):', err))
+  // 4. Seeding deferred to onboarding finalize (POST /api/onboarding)
+  // automation_rules, lead_scoring_rules, pipeline_stages, etc. are all seeded there
 
   // Kontrollera om email confirmation behövs
   const emailConfirmationPending = !authData.session

@@ -183,7 +183,7 @@ export default function AssistantPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen pt-16 sm:pt-8">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-blue-100 rounded-full blur-[128px]"></div>
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-teal-100 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-2xl mx-auto">
@@ -207,7 +207,7 @@ export default function AssistantPage() {
             disabled={!isSupported || isProcessing}
             className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all ${
               isListening
-                ? 'bg-gradient-to-r from-blue-500 to-cyan-500 shadow-lg shadow-violet-500/50'
+                ? 'bg-teal-600 shadow-lg shadow-teal-500/50'
                 : 'bg-gray-100 hover:bg-gray-200 border border-gray-300'
             } disabled:opacity-50`}
           >
@@ -222,8 +222,8 @@ export default function AssistantPage() {
             {/* Pulse rings when listening */}
             {isListening && (
               <>
-                <span className="absolute inset-0 rounded-full bg-blue-500/30 animate-ping"></span>
-                <span className="absolute inset-[-8px] rounded-full border-2 border-blue-300 animate-pulse"></span>
+                <span className="absolute inset-0 rounded-full bg-teal-600/30 animate-ping"></span>
+                <span className="absolute inset-[-8px] rounded-full border-2 border-teal-300 animate-pulse"></span>
               </>
             )}
           </button>
@@ -254,11 +254,11 @@ export default function AssistantPage() {
             <div className="flex items-start gap-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                 currentResponse.action !== 'unknown'
-                  ? 'bg-blue-100'
+                  ? 'bg-teal-100'
                   : 'bg-amber-100'
               }`}>
                 {currentResponse.action !== 'unknown' ? (
-                  <Volume2 className="w-5 h-5 text-blue-600" />
+                  <Volume2 className="w-5 h-5 text-sky-700" />
                 ) : (
                   <HelpCircle className="w-5 h-5 text-amber-600" />
                 )}
@@ -289,7 +289,7 @@ export default function AssistantPage() {
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={handleConfirm}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90"
+                      className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
                     >
                       <CheckCircle className="w-4 h-4" />
                       Ja, fortsätt
@@ -314,7 +314,7 @@ export default function AssistantPage() {
             <h2 className="text-lg font-semibold text-gray-900">Snabbkommandon</h2>
             <button
               onClick={() => setShowHelp(!showHelp)}
-              className="text-sm text-blue-600 hover:text-blue-500"
+              className="text-sm text-sky-700 hover:text-teal-600"
             >
               {showHelp ? 'Dölj hjälp' : 'Visa hjälp'}
             </button>
@@ -327,8 +327,8 @@ export default function AssistantPage() {
                 onClick={() => handleQuickCommand(cmd.example)}
                 className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-left"
               >
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <cmd.icon className="w-5 h-5 text-blue-600" />
+                <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                  <cmd.icon className="w-5 h-5 text-sky-700" />
                 </div>
                 <div className="flex-1">
                   <p className="text-gray-900 font-medium">{cmd.label}</p>

@@ -262,7 +262,7 @@ export default function NewInvoicePage() {
   if (loading) {
     return (
       <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -271,8 +271,8 @@ export default function NewInvoicePage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Time Entry Modal */}
@@ -298,7 +298,7 @@ export default function NewInvoicePage() {
                         key={entryId}
                         className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                           selectedTimeEntries.includes(entryId)
-                            ? 'bg-blue-50 border-blue-300'
+                            ? 'bg-teal-50 border-teal-300'
                             : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                         }`}
                       >
@@ -312,7 +312,7 @@ export default function NewInvoicePage() {
                               setSelectedTimeEntries(selectedTimeEntries.filter(id => id !== entryId))
                             }
                           }}
-                          className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          className="w-5 h-5 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
                         />
                         <div className="flex-1">
                           <p className="text-gray-900 font-medium">
@@ -341,7 +341,7 @@ export default function NewInvoicePage() {
               <button
                 onClick={addTimeEntriesToInvoice}
                 disabled={selectedTimeEntries.length === 0}
-                className="px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 Lägg till ({selectedTimeEntries.length})
               </button>
@@ -375,7 +375,7 @@ export default function NewInvoicePage() {
             <button
               onClick={handleCreate}
               disabled={creating || items.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Skapa faktura
@@ -395,7 +395,7 @@ export default function NewInvoicePage() {
                   <select
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map(c => (
@@ -408,7 +408,7 @@ export default function NewInvoicePage() {
                   <select
                     value={dueDays}
                     onChange={(e) => setDueDays(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     <option value={10}>10 dagar</option>
                     <option value={15}>15 dagar</option>
@@ -427,7 +427,7 @@ export default function NewInvoicePage() {
                     type="date"
                     value={invoiceDate}
                     onChange={(e) => setInvoiceDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -435,7 +435,7 @@ export default function NewInvoicePage() {
                   <select
                     value={vatRate}
                     onChange={(e) => setVatRate(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     <option value={25}>25%</option>
                     <option value={12}>12%</option>
@@ -449,7 +449,7 @@ export default function NewInvoicePage() {
                     type="text"
                     value={ourReference}
                     onChange={(e) => setOurReference(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -458,7 +458,7 @@ export default function NewInvoicePage() {
                     type="text"
                     value={yourReference}
                     onChange={(e) => setYourReference(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -469,7 +469,7 @@ export default function NewInvoicePage() {
                 <select
                   value={rotRutType}
                   onChange={(e) => setRotRutType(e.target.value)}
-                  className="w-full max-w-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full max-w-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="">Inget avdrag</option>
                   <option value="rot">ROT-avdrag (30%)</option>

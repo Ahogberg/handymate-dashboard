@@ -1,49 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 /**
  * POST - Uppdatera öppettider under onboarding
- * Body: { businessId: string, working_hours: object }
+ * Body: { businessId?: string, working_hours: object }
  */
 export async function POST(request: NextRequest) {
   try {
     const supabase = getServerSupabase()
-    const { businessId, working_hours } = await request.json()
-
-    if (!businessId) {
-      return NextResponse.json({ error: 'Missing businessId' }, { status: 400 })
-    }
+    const body = await request.json()
+    const { working_hours } = body
 
     if (!working_hours) {
       return NextResponse.json({ error: 'Missing working_hours' }, { status: 400 })
     }
 
-    // Verifiera att businessId finns och skapades nyligen (inom 1 timme)
-    const { data: business, error: fetchError } = await supabase
-      .from('business_config')
-      .select('business_id, created_at')
-      .eq('business_id', businessId)
-      .single()
+    // Try authenticated business first, fall back to businessId for fresh signups
+    let businessId: string | null = null
 
-    if (fetchError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
+    const auth = await getAuthenticatedBusiness(request)
+    if (auth) {
+      businessId = auth.business_id
+    } else if (body.businessId) {
+      // Fallback for fresh signup (no session yet — verify business exists and is recent)
+      const { data: business } = await supabase
+        .from('business_config')
+        .select('business_id, created_at')
+        .eq('business_id', body.businessId)
+        .single()
+
+      if (business) {
+        const createdAt = new Date(business.created_at)
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+        if (createdAt >= twoHoursAgo) {
+          businessId = business.business_id
+        }
+      }
     }
 
-    // Kolla att kontot skapades nyligen (inom 1 timme)
-    const createdAt = new Date(business.created_at)
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-    if (createdAt < oneHourAgo) {
-      return NextResponse.json({ error: 'Onboarding session expired' }, { status: 403 })
+    if (!businessId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Uppdatera working_hours + markera onboarding som klar
+    // Only update working_hours — do NOT mark onboarding as complete here
     const { error: updateError } = await supabase
       .from('business_config')
-      .update({
-        working_hours: working_hours,
-        onboarding_completed_at: new Date().toISOString(),
-        onboarding_step: 7,
-      })
+      .update({ working_hours })
       .eq('business_id', businessId)
 
     if (updateError) {
@@ -59,10 +62,9 @@ export async function POST(request: NextRequest) {
       message: 'Öppettider sparade'
     })
 
-  } catch (error: any) {
-    console.error('Onboarding hours error:', error)
-    return NextResponse.json({
-      error: error.message || 'Failed to save working hours'
-    }, { status: 500 })
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Failed to save working hours'
+    console.error('Onboarding hours error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
   }
 }

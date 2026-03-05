@@ -51,7 +51,6 @@ export const toolDefinitions = [
         phone_number: { type: "string" },
         email: { type: "string" },
         address_line: { type: "string" },
-        job_status: { type: "string" },
       },
       required: ["customer_id"],
     },
@@ -132,12 +131,12 @@ export const toolDefinitions = [
       type: "object" as const,
       properties: {
         customer_id: { type: "string" },
-        service_type: { type: "string" },
+        service_type: { type: "string", description: "Typ av jobb (sparas i notes)" },
         scheduled_start: { type: "string" },
         scheduled_end: { type: "string" },
         notes: { type: "string" },
       },
-      required: ["customer_id", "service_type", "scheduled_start", "scheduled_end"],
+      required: ["customer_id", "scheduled_start", "scheduled_end"],
     },
   },
   {
@@ -263,6 +262,18 @@ export const toolDefinitions = [
         from_date: { type: "string" },
         to_date: { type: "string" },
         limit: { type: "number" },
+      },
+      required: [],
+    },
+  },
+  // Stats
+  {
+    name: "get_daily_stats",
+    description: "Hämta daglig statistik: samtal, SMS, leads, offerter, bokningar, tid, intäkter. Använd för morgonrapport.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        date: { type: "string", description: "YYYY-MM-DD (default: idag)" },
       },
       required: [],
     },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -99,13 +100,31 @@ export async function POST(request: NextRequest) {
       console.error('Error saving transcript:', updateError)
     }
 
-    // Trigga AI-analys
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
-    fetch(`${appUrl}/api/voice/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recording_id })
-    }).catch(err => console.error('Failed to trigger analysis:', err))
+    // Trigger AI agent for call analysis (primary path)
+    // Agent will: qualify lead, create/find customer, suggest next steps
+    try {
+      triggerAgentFireAndForget(
+        recording.business_id,
+        'phone_call',
+        {
+          recording_id,
+          transcript,
+          phone_number: recording.phone_from || recording.phone_to || '',
+          duration_seconds: recording.duration_seconds || 0,
+          direction: recording.direction || 'inbound',
+        },
+        makeIdempotencyKey('call', recording_id)
+      )
+    } catch (agentErr) {
+      console.error('[Transcribe] Agent trigger failed, falling back to analyze:', agentErr)
+      // Fallback: use legacy standalone analysis
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+      fetch(`${appUrl}/api/voice/analyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recording_id })
+      }).catch(err => console.error('Failed to trigger analysis:', err))
+    }
 
     return NextResponse.json({
       success: true,

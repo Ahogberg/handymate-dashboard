@@ -133,7 +133,7 @@ function getStatusLabel(status: string): { text: string; className: string } {
     case 'active':
       return { text: 'Aktiv', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
     case 'trialing':
-      return { text: 'Provperiod', className: 'bg-blue-100 text-blue-700 border-blue-200' }
+      return { text: 'Provperiod', className: 'bg-teal-100 text-teal-700 border-teal-200' }
     case 'past_due':
       return { text: 'Forfallt', className: 'bg-red-100 text-red-700 border-red-200' }
     case 'cancelled':
@@ -234,8 +234,8 @@ export default function BillingPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto">
@@ -275,7 +275,7 @@ export default function BillingPage() {
               <div className="p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
                       <CreditCard className="w-6 h-6 text-white" />
                     </div>
                     <div>
@@ -317,7 +317,7 @@ export default function BillingPage() {
                     <button
                       onClick={handleManageSubscription}
                       disabled={portalLoading}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                       {portalLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -398,13 +398,13 @@ export default function BillingPage() {
                       key={plan.id}
                       className={`relative bg-white rounded-2xl border-2 p-6 transition-all ${
                         isCurrent
-                          ? 'border-cyan-400 shadow-md shadow-cyan-100'
+                          ? 'border-teal-400 shadow-md shadow-cyan-100'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       {isCurrent && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                          <span className="bg-teal-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
                             Nuvarande plan
                           </span>
                         </div>
@@ -438,7 +438,7 @@ export default function BillingPage() {
                         <button
                           onClick={() => handleCheckout(plan.id)}
                           disabled={checkoutLoading === plan.id}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-teal-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                           {checkoutLoading === plan.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -556,7 +556,7 @@ function BillingEventIcon({ type }: { type: string }) {
     case 'refund':
       return <ArrowDownRight className="w-4 h-4 text-emerald-500" />
     case 'upgrade':
-      return <ArrowUpRight className="w-4 h-4 text-blue-500" />
+      return <ArrowUpRight className="w-4 h-4 text-teal-600" />
     case 'downgrade':
       return <ArrowDownRight className="w-4 h-4 text-amber-500" />
     default:

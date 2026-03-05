@@ -133,7 +133,7 @@ export default function OrdersPage() {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
       case 'pending': return 'bg-amber-100 text-amber-600 border-amber-200'
-      case 'ordered': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'ordered': return 'bg-teal-100 text-teal-500 border-teal-500/30'
       case 'delivered': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -189,8 +189,8 @@ export default function OrdersPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -211,7 +211,7 @@ export default function OrdersPage() {
           </div>
           <Link
             href="/dashboard/orders/new"
-            className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center justify-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny beställning
@@ -222,8 +222,8 @@ export default function OrdersPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Package className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                <Package className="w-5 h-5 text-sky-700" />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-900">{stats.total}</p>
@@ -233,8 +233,8 @@ export default function OrdersPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Send className="w-5 h-5 text-blue-400" />
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                <Send className="w-5 h-5 text-teal-500" />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-900">{stats.ordered}</p>
@@ -279,7 +279,7 @@ export default function OrdersPage() {
                 key={f.id}
                 onClick={() => setFilter(f.id as typeof filter)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === f.id ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' : 'text-gray-500 hover:text-white'
+                  filter === f.id ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-white'
                 }`}
               >
                 {f.label}
@@ -294,7 +294,7 @@ export default function OrdersPage() {
               placeholder="Sök beställning..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
         </div>
@@ -307,7 +307,7 @@ export default function OrdersPage() {
               <p className="text-gray-500 mb-2">Inga beställningar hittades</p>
               <Link
                 href="/dashboard/orders/new"
-                className="text-blue-600 hover:text-blue-500 text-sm"
+                className="text-sky-700 hover:text-teal-600 text-sm"
               >
                 Skapa din första beställning →
               </Link>
@@ -318,8 +318,8 @@ export default function OrdersPage() {
                 <div key={order.order_id} className="p-4 hover:bg-gray-100/30 transition-all">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-300">
-                        <Package className="w-5 h-5 text-blue-600" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300">
+                        <Package className="w-5 h-5 text-sky-700" />
                       </div>
                       <div>
                         <div className="flex items-center gap-3">
@@ -355,7 +355,7 @@ export default function OrdersPage() {
                           <button
                             onClick={() => handleSend(order.order_id)}
                             disabled={sendingId === order.order_id || !order.supplier?.contact_email}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
+                            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-teal-600 rounded-lg text-white hover:opacity-90 disabled:opacity-50"
                             title={order.supplier?.contact_email ? 'Skicka till leverantör' : 'Leverantören saknar email'}
                           >
                             {sendingId === order.order_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

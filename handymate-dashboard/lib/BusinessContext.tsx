@@ -9,6 +9,7 @@ interface Business {
   contact_email: string
   plan: 'starter' | 'professional' | 'business'
   onboarding_step: number
+  onboarding_completed_at: string | null
 }
 
 export const BusinessContext = createContext<Business | null>(null)

@@ -180,7 +180,7 @@ export default function QuoteTemplatesPage() {
           )}
           <button
             onClick={createNew}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             Ny mall
@@ -195,7 +195,7 @@ export default function QuoteTemplatesPage() {
             onClick={() => setBranchFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
               branchFilter === 'all'
-                ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                 : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700 hover:text-white'
             }`}
           >
@@ -207,7 +207,7 @@ export default function QuoteTemplatesPage() {
               onClick={() => setBranchFilter(b!)}
               className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
                 branchFilter === b
-                  ? 'bg-violet-500/20 text-violet-300 border border-violet-500/30'
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                   : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700 hover:text-white'
               }`}
             >
@@ -220,7 +220,7 @@ export default function QuoteTemplatesPage() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-violet-400" />
+          <Loader2 className="w-6 h-6 animate-spin text-teal-400" />
         </div>
       )}
 
@@ -235,7 +235,7 @@ export default function QuoteTemplatesPage() {
           <button
             onClick={seedTemplates}
             disabled={seeding}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg hover:opacity-90"
           >
             {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             Generera exempelmallar
@@ -291,7 +291,7 @@ export default function QuoteTemplatesPage() {
                   <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs rounded">ROT</span>
                 )}
                 {template.rut_enabled && (
-                  <span className="px-2 py-0.5 bg-blue-500/10 text-blue-400 text-xs rounded">RUT</span>
+                  <span className="px-2 py-0.5 bg-teal-600/10 text-teal-500 text-xs rounded">RUT</span>
                 )}
               </div>
 

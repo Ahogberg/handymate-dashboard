@@ -366,8 +366,8 @@ export default function AIInboxPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -383,7 +383,7 @@ export default function AIInboxPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 mr-4">
+            <div className="p-3 rounded-xl bg-teal-600 mr-4">
               <Sparkles className="w-6 h-6 text-gray-900" />
             </div>
             <div>
@@ -433,13 +433,13 @@ export default function AIInboxPage() {
             onClick={() => setStatusFilter('all')}
             className={`p-4 rounded-xl border transition-all ${
               statusFilter === 'all'
-                ? 'bg-blue-100 border-blue-300'
+                ? 'bg-teal-100 border-teal-300'
                 : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-blue-600' : 'text-gray-400'}`} />
-              <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-blue-600' : 'text-gray-900'}`}>
+              <Sparkles className={`w-5 h-5 ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-400'}`} />
+              <span className={`text-2xl font-bold ${statusFilter === 'all' ? 'text-sky-700' : 'text-gray-900'}`}>
                 {stats.pending + stats.approved + stats.rejected}
               </span>
             </div>
@@ -488,8 +488,8 @@ export default function AIInboxPage() {
                             }}
                             className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                               playingId === group.recording.recording_id
-                                ? 'bg-gradient-to-br from-blue-500 to-cyan-500 border-blue-300'
-                                : 'bg-gray-50 border-gray-300 hover:border-blue-300'
+                                ? 'bg-teal-600 border-teal-300'
+                                : 'bg-gray-50 border-gray-300 hover:border-teal-300'
                             }`}
                           >
                             {playingId === group.recording.recording_id ? (
@@ -583,13 +583,13 @@ export default function AIInboxPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {group.extractedInfo.address && (
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                              <MapPin className="w-4 h-4 text-blue-600" />
+                              <MapPin className="w-4 h-4 text-sky-700" />
                               <span className="text-sm text-gray-700">{group.extractedInfo.address}</span>
                             </div>
                           )}
                           {group.extractedInfo.preferredDate && (
                             <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
-                              <Calendar className="w-4 h-4 text-blue-600" />
+                              <Calendar className="w-4 h-4 text-sky-700" />
                               <span className="text-sm text-gray-700">{group.extractedInfo.preferredDate}</span>
                             </div>
                           )}
@@ -629,11 +629,11 @@ export default function AIInboxPage() {
                                 <div className="flex items-start gap-3 min-w-0 flex-1">
                                   <div className={`p-2 rounded-lg ${
                                     suggestion.status === 'pending'
-                                      ? 'bg-blue-100'
+                                      ? 'bg-teal-100'
                                       : 'bg-gray-200/50'
                                   }`}>
                                     <Icon className={`w-4 h-4 ${
-                                      suggestion.status === 'pending' ? 'text-blue-600' : 'text-gray-400'
+                                      suggestion.status === 'pending' ? 'text-sky-700' : 'text-gray-400'
                                     }`} />
                                   </div>
 

@@ -91,7 +91,7 @@ export default function WeeklyReportPage() {
     if (day.minutes === 0) return 'bg-gray-50 text-gray-400'
     if (day.overtime > 0) return 'bg-orange-50 text-orange-700 border-orange-200'
     if (day.minutes >= dailyLimit * 60) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    return 'bg-blue-50 text-blue-700 border-blue-200'
+    return 'bg-teal-50 text-teal-700 border-teal-200'
   }
 
   const getWeekNumber = () => {
@@ -104,7 +104,7 @@ export default function WeeklyReportPage() {
   if (loading && !data) {
     return (
       <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-sky-700" />
       </div>
     )
   }
@@ -113,7 +113,7 @@ export default function WeeklyReportPage() {
     <PermissionGate permission="approve_time">
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative">
@@ -124,7 +124,7 @@ export default function WeeklyReportPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 mr-4">
+            <div className="p-3 rounded-xl bg-teal-600 mr-4">
               <Users className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -141,7 +141,7 @@ export default function WeeklyReportPage() {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button onClick={() => setCurrentWeek(new Date())}
-            className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm font-medium hover:border-blue-300 min-w-[200px] text-center">
+            className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm font-medium hover:border-teal-300 min-w-[200px] text-center">
             V{getWeekNumber()} &middot; {format(weekStart, 'd MMM', { locale: sv })} – {format(new Date(weekStart.getTime() + 6 * 86400000), 'd MMM yyyy', { locale: sv })}
           </button>
           <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
@@ -210,9 +210,9 @@ export default function WeeklyReportPage() {
                     return (
                       <div
                         key={day.date}
-                        className={`p-3 text-center ${isToday ? 'ring-2 ring-inset ring-blue-400' : ''}`}
+                        className={`p-3 text-center ${isToday ? 'ring-2 ring-inset ring-teal-400' : ''}`}
                       >
-                        <p className={`text-xs font-medium mb-1 ${isToday ? 'text-blue-600' : 'text-gray-500'}`}>
+                        <p className={`text-xs font-medium mb-1 ${isToday ? 'text-sky-700' : 'text-gray-500'}`}>
                           {DAY_NAMES[i]}
                         </p>
                         <div className={`rounded-lg p-2 border ${getDayColor(day, data!.config.dailyLimit)}`}>

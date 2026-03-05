@@ -131,7 +131,7 @@ export default function BookingDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'scheduled': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      case 'scheduled': return 'bg-teal-600/20 text-teal-500 border-teal-500/30'
       case 'in_progress': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
       case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-500/30'
@@ -152,7 +152,7 @@ export default function BookingDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -168,8 +168,8 @@ export default function BookingDetailPage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -198,7 +198,7 @@ export default function BookingDetailPage() {
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Bokningsinformation</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-sky-700 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-400">Datum & tid</p>
                     <p className="text-gray-900">{formatDateTime(booking.scheduled_start)}</p>
@@ -206,7 +206,7 @@ export default function BookingDetailPage() {
                 </div>
                 {booking.customer && (
                   <Link href={`/dashboard/customers/${booking.customer.customer_id}`} className="flex items-start gap-3 hover:bg-gray-50 rounded-lg p-2 -m-2 transition-all">
-                    <User className="w-5 h-5 text-cyan-400 mt-0.5" />
+                    <User className="w-5 h-5 text-teal-400 mt-0.5" />
                     <div>
                       <p className="text-sm text-gray-400">Kund</p>
                       <p className="text-gray-900">{booking.customer.name}</p>
@@ -252,7 +252,7 @@ export default function BookingDetailPage() {
                 onChange={(e) => setJobNotes(e.target.value)}
                 placeholder="Skriv anteckningar om jobbet här..."
                 rows={4}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
               />
               <button
                 onClick={() => updateJobStatus(booking.job_status || 'scheduled')}
@@ -317,7 +317,7 @@ export default function BookingDetailPage() {
                 )}
                 {booking.customer && (
                   <Link href={`/dashboard/customers/${booking.customer.customer_id}`} className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
-                    <User className="w-4 h-4 text-cyan-400" />
+                    <User className="w-4 h-4 text-teal-400" />
                     <span className="text-gray-900 text-sm">Visa kundprofil</span>
                   </Link>
                 )}
@@ -338,7 +338,7 @@ export default function BookingDetailPage() {
               <p className="text-gray-500 text-sm mt-2">Vill du skicka ett uppföljnings-SMS till kunden för att be om betyg?</p>
             </div>
             <div className="space-y-3">
-              <button onClick={() => updateJobStatus('completed', true)} disabled={updating} className="w-full flex items-center justify-center gap-2 p-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50">
+              <button onClick={() => updateJobStatus('completed', true)} disabled={updating} className="w-full flex items-center justify-center gap-2 p-4 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50">
                 {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" /> Ja, skicka SMS</>}
               </button>
               <button onClick={() => updateJobStatus('completed', false)} disabled={updating} className="w-full p-4 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50">

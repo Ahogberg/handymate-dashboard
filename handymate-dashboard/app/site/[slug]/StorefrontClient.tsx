@@ -90,13 +90,13 @@ interface ColorScheme {
 
 const COLOR_SCHEMES: Record<string, ColorScheme> = {
   blue: {
-    gradient: 'from-blue-600 via-blue-700 to-indigo-900',
-    accent: 'bg-blue-600',
-    accentBg: 'bg-blue-50',
-    accentLight: 'bg-blue-600/10',
-    accentHover: 'hover:bg-blue-700',
-    accentText: 'text-blue-600',
-    ring: 'focus:ring-blue-500',
+    gradient: 'from-teal-700 via-blue-700 to-indigo-900',
+    accent: 'bg-teal-700',
+    accentBg: 'bg-teal-50',
+    accentLight: 'bg-teal-700/10',
+    accentHover: 'hover:bg-teal-800',
+    accentText: 'text-sky-700',
+    ring: 'focus:ring-teal-500',
   },
   green: {
     gradient: 'from-green-600 via-emerald-700 to-teal-900',
@@ -108,7 +108,7 @@ const COLOR_SCHEMES: Record<string, ColorScheme> = {
     ring: 'focus:ring-green-500',
   },
   teal: {
-    gradient: 'from-teal-600 via-cyan-700 to-blue-900',
+    gradient: 'from-teal-600 via-teal-700 to-teal-900',
     accent: 'bg-teal-600',
     accentBg: 'bg-teal-50',
     accentLight: 'bg-teal-600/10',

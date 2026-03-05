@@ -209,7 +209,7 @@ export default function ProjectsPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'planning': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'active': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'active': return 'bg-teal-100 text-teal-500 border-teal-500/30'
       case 'paused': return 'bg-amber-100 text-amber-600 border-amber-200'
       case 'completed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
@@ -241,7 +241,7 @@ export default function ProjectsPage() {
     const usage = (actual / budget) * 100
     if (usage > 100) return 'bg-red-500'
     if (usage > 80) return 'bg-amber-500'
-    return 'bg-gradient-to-r from-blue-500 to-cyan-500'
+    return 'bg-teal-600'
   }
 
   const visibleProjects = projects.filter(p => {
@@ -272,8 +272,8 @@ export default function ProjectsPage() {
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -293,7 +293,7 @@ export default function ProjectsPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90"
+            className="flex items-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90"
           >
             <Plus className="w-5 h-5" />
             Nytt projekt
@@ -304,7 +304,7 @@ export default function ProjectsPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <FolderKanban className="w-4 h-4 text-blue-400" />
+              <FolderKanban className="w-4 h-4 text-teal-500" />
               <span className="text-xs text-gray-400">Aktiva</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
@@ -345,7 +345,7 @@ export default function ProjectsPage() {
                 onClick={() => setFilter(f.key as any)}
                 className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                   filter === f.key
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-white text-gray-500 hover:text-white border border-gray-200'
                 }`}
               >
@@ -360,7 +360,7 @@ export default function ProjectsPage() {
               placeholder="Sök projekt..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
         </div>
@@ -369,7 +369,7 @@ export default function ProjectsPage() {
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+              <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
             </div>
           ) : filteredProjects.length === 0 ? (
             <div className="text-center py-20">
@@ -445,7 +445,7 @@ export default function ProjectsPage() {
                         {project.project_type === 'fixed_price' && <span>Fast pris</span>}
                         {project.project_type === 'mixed' && <span>Blandat</span>}
                         {project.ai_auto_created && (
-                          <span className="text-violet-500">Auto</span>
+                          <span className="text-teal-500">Auto</span>
                         )}
                       </div>
                     </div>
@@ -491,7 +491,7 @@ export default function ProjectsPage() {
                         <span className="text-sm font-medium text-gray-900">{project.progress_percent}%</span>
                         <div className="h-1.5 bg-gray-100 rounded-full w-14 ml-auto mt-1">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 transition-all"
+                            className="h-full rounded-full bg-teal-600 transition-all"
                             style={{ width: `${project.progress_percent}%` }}
                           />
                         </div>
@@ -534,7 +534,7 @@ export default function ProjectsPage() {
                   value={newProject.name}
                   onChange={e => setNewProject({ ...newProject, name: e.target.value })}
                   placeholder="T.ex. Badrumsrenovering Svensson"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -543,7 +543,7 @@ export default function ProjectsPage() {
                 <select
                   value={newProject.customer_id}
                   onChange={e => setNewProject({ ...newProject, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
@@ -555,7 +555,7 @@ export default function ProjectsPage() {
                 <select
                   value={newProject.project_type}
                   onChange={e => setNewProject({ ...newProject, project_type: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="hourly">Löpande räkning</option>
                   <option value="fixed_price">Fast pris</option>
@@ -571,7 +571,7 @@ export default function ProjectsPage() {
                     value={newProject.budget_hours}
                     onChange={e => setNewProject({ ...newProject, budget_hours: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -581,7 +581,7 @@ export default function ProjectsPage() {
                     value={newProject.budget_amount}
                     onChange={e => setNewProject({ ...newProject, budget_amount: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -593,7 +593,7 @@ export default function ProjectsPage() {
                     type="date"
                     value={newProject.start_date}
                     onChange={e => setNewProject({ ...newProject, start_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -602,7 +602,7 @@ export default function ProjectsPage() {
                     type="date"
                     value={newProject.end_date}
                     onChange={e => setNewProject({ ...newProject, end_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -610,7 +610,7 @@ export default function ProjectsPage() {
               {/* Dokument */}
               <div>
                 <label className="block text-sm text-gray-500 mb-2">Dokument</label>
-                <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer hover:border-blue-400 hover:text-blue-500 transition">
+                <label className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 cursor-pointer hover:border-teal-400 hover:text-teal-600 transition">
                   <Upload className="w-4 h-4" />
                   <span className="text-sm">Välj filer att bifoga...</span>
                   <input
@@ -649,7 +649,7 @@ export default function ProjectsPage() {
                 <button
                   onClick={handleCreateProject}
                   disabled={creating || !newProject.name.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {creating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                   {creating && pendingFiles.length > 0 ? 'Skapar & laddar upp...' : 'Skapa projekt'}

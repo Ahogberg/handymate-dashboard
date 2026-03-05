@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDueEnrollments, processEnrollmentStep } from '@/lib/nurture'
+import { getDueEnrollments } from '@/lib/nurture'
+import { getServerSupabase } from '@/lib/supabase'
+import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 
 /**
- * Cron job: Bearbeta aktiva nurture-enrollments.
- * Körs var 15:e minut (eller valfritt intervall).
- * Auth: Bearer CRON_SECRET
+ * Cron job: Process due nurture-enrollments via AI agent.
+ * Keeps: Finding due enrollments, enrollment state management.
+ * Delegates: Message composition and sending to AI agent.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -23,35 +25,78 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const results = []
-    let successCount = 0
-    let errorCount = 0
+    const supabase = getServerSupabase()
+    const today = new Date().toISOString().split('T')[0]
+
+    // Group by business
+    const byBusiness = new Map<string, Array<{ enrollment: any; customer: any; step: any }>>()
 
     for (const enrollment of dueEnrollments) {
-      try {
-        const result = await processEnrollmentStep(enrollment.id)
-        results.push({
-          enrollment_id: enrollment.id,
-          ...result,
-        })
-        if (result.success) successCount++
-        else errorCount++
-      } catch (err: any) {
-        errorCount++
-        results.push({
-          enrollment_id: enrollment.id,
-          success: false,
-          error: err.message,
-        })
+      // Get enrollment details for agent context
+      const { data: details } = await supabase
+        .from('nurture_enrollment')
+        .select(`
+          id, business_id, customer_id, current_step, status,
+          customer:customer_id (name, phone_number, email),
+          sequence:sequence_id (name, steps)
+        `)
+        .eq('id', enrollment.id)
+        .single()
+
+      if (!details || !details.customer) continue
+
+      const steps = (details.sequence as any)?.steps || []
+      const currentStep = steps[details.current_step] || null
+      if (!currentStep) continue
+
+      const list = byBusiness.get(details.business_id) || []
+      list.push({
+        enrollment: details,
+        customer: details.customer,
+        step: currentStep,
+      })
+      byBusiness.set(details.business_id, list)
+
+      // Advance enrollment state
+      const nextStepIndex = details.current_step + 1
+      if (nextStepIndex >= steps.length) {
+        await supabase.from('nurture_enrollment').update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        }).eq('id', enrollment.id)
+      } else {
+        const nextDelay = steps[nextStepIndex]?.delay_hours || 24
+        await supabase.from('nurture_enrollment').update({
+          current_step: nextStepIndex,
+          next_step_at: new Date(Date.now() + nextDelay * 60 * 60 * 1000).toISOString(),
+        }).eq('id', enrollment.id)
       }
+    }
+
+    // Trigger agent per business
+    let agentTriggered = 0
+    for (const [businessId, items] of Array.from(byBusiness)) {
+      const stepList = items.map((item: any) => {
+        const c = item.customer as any
+        return `- Kund: ${c?.name || 'Okänd'}, telefon: ${c?.phone_number || 'saknas'}, email: ${c?.email || 'saknas'}. Kanal: ${item.step.channel || 'sms'}. Mall: "${item.step.template || item.step.message || 'Uppföljningsmeddelande'}"`
+      }).join('\n')
+
+      const result = await triggerAgentInternal(
+        businessId,
+        'cron',
+        {
+          cron_type: 'nurture',
+          instruction: `Bearbeta nurture-steg: skicka personliga meddelanden till följande kunder. Anpassa tonen efter mallen men gör det naturligt:\n\n${stepList}`,
+        },
+        makeIdempotencyKey('nurture', businessId, today, String(items.length))
+      )
+      if (result.success) agentTriggered++
     }
 
     return NextResponse.json({
       success: true,
       processed: dueEnrollments.length,
-      success_count: successCount,
-      error_count: errorCount,
-      results,
+      agent_triggered: agentTriggered,
     })
   } catch (error: any) {
     console.error('Nurture cron error:', error)

@@ -170,6 +170,102 @@ export const BRANCH_CHECKLISTS: Record<string, ChecklistTemplate[]> = {
       ],
     },
   ],
+
+  construction: [
+    {
+      name: 'Byggarbetsplats - Daglig kontroll',
+      category: 'safety',
+      items: [
+        item('Arbetsmiljöriskbedömning', true),
+        item('Skyddsutrustning kontrollerad'),
+        item('Ställning inspekterad'),
+        item('El och vatten säkrat'),
+        item('Avspärrning på plats'),
+        item('Byggavfall sorterat'),
+        item('Dokumentera dagbok', true),
+      ],
+    },
+  ],
+
+  roofing: [
+    {
+      name: 'Takarbete - Säkerhet',
+      category: 'safety',
+      items: [
+        item('Fallskydd monterat', true),
+        item('Stege kontrollerad'),
+        item('Väderförhållanden ok', true),
+        item('Underlag inspekterat'),
+        item('Material transporterat upp'),
+        item('Slutkontroll täthet', true),
+        item('Dokumentera med foto', true),
+      ],
+    },
+  ],
+
+  flooring: [
+    {
+      name: 'Golvläggning - Kvalitet',
+      category: 'quality',
+      items: [
+        item('Fuktmätning utförd', true),
+        item('Underlag kontrollerat'),
+        item('Golvavjämning vid behov'),
+        item('Aklimatisering av material'),
+        item('Kontrollera mönster/riktning'),
+        item('Kontrollera nivå och bukt', true),
+        item('Slutbesiktning', true),
+      ],
+    },
+  ],
+
+  gardening: [
+    {
+      name: 'Trädgårdsarbete - Checklista',
+      category: 'quality',
+      items: [
+        item('Markera grävområde'),
+        item('Kontrollera ledningar/rör'),
+        item('Material levererat'),
+        item('Jordberedning utförd'),
+        item('Plantering enligt plan'),
+        item('Vattning vid slutförande'),
+        item('Slutfoto', true),
+      ],
+    },
+  ],
+
+  moving: [
+    {
+      name: 'Flytt - Checklista',
+      category: 'quality',
+      items: [
+        item('Inventering av bohag'),
+        item('Skyddsmaterial på plats'),
+        item('Hiss bokad (om tillämpligt)'),
+        item('Tunga föremål planerade'),
+        item('Allt lastat och säkrat', true),
+        item('Kontroll av utrymmen efter flytt', true),
+        item('Kund godkänt leverans', true),
+      ],
+    },
+  ],
+
+  cleaning: [
+    {
+      name: 'Flyttstäd - Checklista',
+      category: 'quality',
+      items: [
+        item('Kök - ugn, spis, kyl rengjorda', true),
+        item('Badrum - kakel, fog, brunn', true),
+        item('Fönster putsade in- och utsida'),
+        item('Golv dammsugs och våttorkas', true),
+        item('Garderober och skåp torkade'),
+        item('Balkong/uteplats sopade'),
+        item('Slutkontroll rum för rum', true),
+      ],
+    },
+  ],
 }
 
 export const GENERIC_CHECKLISTS: ChecklistTemplate[] = [

@@ -255,7 +255,7 @@ export default function TimerWidget({ onCheckInOut }: TimerWidgetProps) {
                       onClick={() => setWorkCategory(cat.value)}
                       className={`flex-1 py-2 text-xs rounded-lg border text-center transition-colors ${
                         workCategory === cat.value
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
+                          ? 'bg-teal-50 border-teal-300 text-teal-700'
                           : 'bg-gray-50 border-gray-200 text-gray-600'
                       }`}
                     >
@@ -323,7 +323,7 @@ export default function TimerWidget({ onCheckInOut }: TimerWidgetProps) {
                     onClick={() => setWorkCategory(cat.value)}
                     className={`flex-1 py-2 text-xs rounded-lg border text-center transition-colors ${
                       workCategory === cat.value
-                        ? 'bg-blue-50 border-blue-300 text-blue-700'
+                        ? 'bg-teal-50 border-teal-300 text-teal-700'
                         : 'bg-gray-50 border-gray-200 text-gray-600'
                     }`}
                   >

@@ -34,15 +34,15 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
 
   if (inline) {
     return (
-      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 rounded-xl">
-        <Lock className="w-5 h-5 text-violet-500 flex-shrink-0" />
+      <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-teal-50 to-teal-50 border border-teal-200 rounded-xl">
+        <Lock className="w-5 h-5 text-teal-500 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-gray-900">{gate.name} ingår i {targetLabel}</p>
           <p className="text-xs text-gray-500 mt-0.5">Uppgradera för att låsa upp denna funktion</p>
         </div>
         <Link
           href="/dashboard/settings/billing"
-          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+          className="flex-shrink-0 px-3 py-1.5 text-xs font-medium bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg hover:opacity-90 transition-opacity"
         >
           Uppgradera
         </Link>
@@ -54,7 +54,7 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
     <div className="max-w-lg mx-auto mt-12 p-8">
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-500 to-fuchsia-500 px-6 py-5">
+        <div className="bg-gradient-to-r from-teal-500 to-teal-500 px-6 py-5">
           <div className="flex items-center gap-3">
             <Sparkles className="w-6 h-6 text-white" />
             <h2 className="text-lg font-semibold text-white">Uppgradera till {targetLabel}</h2>
@@ -73,7 +73,7 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
               <ul className="space-y-2">
                 {upgradeHighlights.map(h => (
                   <li key={h.key} className="flex items-center gap-2 text-sm text-gray-700">
-                    <Check className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-teal-500 flex-shrink-0" />
                     {h.name}
                   </li>
                 ))}
@@ -88,7 +88,7 @@ export default function UpgradePrompt({ featureKey, inline = false }: UpgradePro
 
           <Link
             href="/dashboard/settings/billing"
-            className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
+            className="flex items-center justify-center gap-2 w-full px-6 py-3 bg-gradient-to-r from-teal-500 to-teal-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity"
           >
             Uppgradera nu – {targetPrice.toLocaleString('sv-SE')} kr/mån
             <ArrowRight className="w-4 h-4" />

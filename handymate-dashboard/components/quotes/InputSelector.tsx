@@ -11,25 +11,25 @@ interface InputSelectorProps {
 
 export default function InputSelector({ onSelect, hasCallSuggestions }: InputSelectorProps) {
   const methods = [
-    { id: 'photo' as InputMethod, icon: Camera, label: 'Ta foto', description: 'Fotografera jobbet', color: 'violet' },
-    { id: 'voice' as InputMethod, icon: Mic, label: 'Beskriv med röst', description: 'Spela in beskrivning', color: 'fuchsia' },
-    { id: 'text' as InputMethod, icon: Keyboard, label: 'Skriv manuellt', description: 'Beskriv med text', color: 'cyan' },
+    { id: 'photo' as InputMethod, icon: Camera, label: 'Ta foto', description: 'Fotografera jobbet', color: 'teal' },
+    { id: 'voice' as InputMethod, icon: Mic, label: 'Beskriv med röst', description: 'Spela in beskrivning', color: 'sky' },
+    { id: 'text' as InputMethod, icon: Keyboard, label: 'Skriv manuellt', description: 'Beskriv med text', color: 'slate' },
     { id: 'template' as InputMethod, icon: FileStack, label: 'Från mall', description: 'Välj sparad jobbmall', color: 'amber' },
     ...(hasCallSuggestions ? [{ id: 'call' as InputMethod, icon: Phone, label: 'Från samtal', description: 'Använd AI-förslag', color: 'emerald' }] : [])
   ]
 
   const colorMap: Record<string, string> = {
-    violet: 'from-blue-500/20 to-violet-500/5 border-blue-300 hover:border-blue-500/60',
-    fuchsia: 'from-fuchsia-500/20 to-cyan-500/5 border-fuchsia-500/30 hover:border-fuchsia-500/60',
-    cyan: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 hover:border-cyan-500/60',
+    teal: 'from-teal-600/20 to-teal-500/5 border-teal-300 hover:border-teal-500/60',
+    sky: 'from-sky-500/20 to-sky-500/5 border-sky-300 hover:border-sky-500/60',
+    slate: 'from-slate-500/20 to-slate-500/5 border-slate-300 hover:border-slate-500/60',
     amber: 'from-amber-500/20 to-amber-500/5 border-amber-200 hover:border-amber-500/60',
     emerald: 'from-emerald-500/20 to-emerald-500/5 border-emerald-200 hover:border-emerald-500/60',
   }
 
   const iconColorMap: Record<string, string> = {
-    violet: 'text-blue-600',
-    fuchsia: 'text-cyan-600',
-    cyan: 'text-cyan-600',
+    teal: 'text-teal-600',
+    sky: 'text-sky-600',
+    slate: 'text-slate-600',
     amber: 'text-amber-600',
     emerald: 'text-emerald-600',
   }

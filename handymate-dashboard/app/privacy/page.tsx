@@ -8,7 +8,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-12 sm:py-16">
-        <Link href="/" className="text-sm text-blue-600 hover:underline mb-6 inline-block">&larr; Tillbaka</Link>
+        <Link href="/" className="text-sm text-sky-700 hover:underline mb-6 inline-block">&larr; Tillbaka</Link>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Integritetspolicy</h1>
         <p className="text-sm text-gray-500 mb-8">Senast uppdaterad: 2026-02-11</p>
 
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Vem ansvarar för dina personuppgifter?</h2>
             <p className="text-gray-700 leading-relaxed">
               Handymate AB (nedan &quot;Handymate&quot;, &quot;vi&quot;, &quot;oss&quot;) är personuppgiftsansvarig för behandlingen av dina personuppgifter.
-              Du når oss på <a href="mailto:privacy@handymate.se" className="text-blue-600 hover:underline">privacy@handymate.se</a>.
+              Du når oss på <a href="mailto:privacy@handymate.se" className="text-sky-700 hover:underline">privacy@handymate.se</a>.
             </p>
           </section>
 
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
               <li><strong>Återkalla</strong> samtycke när som helst.</li>
             </ul>
             <p className="text-sm text-gray-600 mt-3">
-              Kontakta oss på <a href="mailto:privacy@handymate.se" className="text-blue-600 hover:underline">privacy@handymate.se</a> eller
+              Kontakta oss på <a href="mailto:privacy@handymate.se" className="text-sky-700 hover:underline">privacy@handymate.se</a> eller
               använd dataexport- och raderingsfunktionerna i inställningarna.
             </p>
           </section>
@@ -120,7 +120,7 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Klagomål</h2>
             <p className="text-gray-700">
               Om du anser att vi hanterar dina personuppgifter felaktigt har du rätt att lämna klagomål till
-              Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" className="text-blue-600 hover:underline" target="_blank" rel="noopener noreferrer">www.imy.se</a>.
+              Integritetsskyddsmyndigheten (IMY), <a href="https://www.imy.se" className="text-sky-700 hover:underline" target="_blank" rel="noopener noreferrer">www.imy.se</a>.
             </p>
           </section>
         </div>

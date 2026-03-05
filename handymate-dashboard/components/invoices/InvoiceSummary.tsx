@@ -99,7 +99,7 @@ export default function InvoiceSummary({
               value={personalNumber || ''}
               onChange={(e) => onFieldChange('personalNumber', e.target.value)}
               placeholder="ÅÅÅÅMMDD-XXXX"
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           {rotRutType === 'rot' && (
@@ -110,7 +110,7 @@ export default function InvoiceSummary({
                 value={propertyDesignation || ''}
                 onChange={(e) => onFieldChange('propertyDesignation', e.target.value)}
                 placeholder="Kommun Trakt 1:23"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
           )}

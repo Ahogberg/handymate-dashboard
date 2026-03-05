@@ -258,7 +258,7 @@ export default function CustomerPortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -284,10 +284,10 @@ export default function CustomerPortalPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <p className="text-sm text-blue-700 font-medium">{portal.business.name}</p>
+          <p className="text-sm text-teal-700 font-medium">{portal.business.name}</p>
           <h1 className="text-lg font-semibold text-gray-900">
             {selectedProject ? (
-              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-blue-700">
+              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-teal-700">
                 <ArrowLeft className="w-4 h-4" />
                 {selectedProjectData?.name}
               </button>
@@ -313,14 +313,14 @@ export default function CustomerPortalPage() {
                 onClick={() => { setActiveTab(tab.id); setSelectedInvoice(null) }}
                 className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all ${
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-700'
+                    ? 'border-teal-500 text-teal-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
                 {tab.badge ? (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-blue-500 text-gray-900 rounded-full">{tab.badge}</span>
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-teal-600 text-gray-900 rounded-full">{tab.badge}</span>
                 ) : null}
               </button>
             ))}
@@ -332,7 +332,7 @@ export default function CustomerPortalPage() {
       <main className="max-w-2xl mx-auto px-4 py-6">
         {loadingTab ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+            <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
           </div>
         ) : (
           <>
@@ -348,13 +348,13 @@ export default function CustomerPortalPage() {
                   <button
                     key={p.project_id}
                     onClick={() => setSelectedProject(p.project_id)}
-                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 hover:shadow-sm transition-all"
+                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-gray-900">{p.name}</h3>
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         p.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        p.status === 'active' || p.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
+                        p.status === 'active' || p.status === 'in_progress' ? 'bg-teal-100 text-teal-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
                         {getProjectStatusText(p.status)}
@@ -368,13 +368,13 @@ export default function CustomerPortalPage() {
                           <span>{p.progress}%</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
+                          <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
                         </div>
                       </div>
                     )}
 
                     {p.nextVisit && (
-                      <div className="flex items-center gap-2 text-sm text-blue-700 mb-2">
+                      <div className="flex items-center gap-2 text-sm text-teal-700 mb-2">
                         <Calendar className="w-4 h-4" />
                         Nasta besok: {formatDateTime(p.nextVisit.start_time)}
                       </div>
@@ -386,7 +386,7 @@ export default function CustomerPortalPage() {
                       </p>
                     )}
 
-                    <div className="flex items-center justify-end mt-2 text-sm text-blue-600">
+                    <div className="flex items-center justify-end mt-2 text-sm text-sky-700">
                       Se detaljer <ChevronRight className="w-4 h-4" />
                     </div>
                   </button>
@@ -403,7 +403,7 @@ export default function CustomerPortalPage() {
                     <span className="text-sm font-medium text-gray-500">Status</span>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       selectedProjectData.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-blue-100 text-blue-700'
+                      'bg-teal-100 text-teal-700'
                     }`}>
                       {getProjectStatusText(selectedProjectData.status)}
                     </span>
@@ -415,7 +415,7 @@ export default function CustomerPortalPage() {
                         <span>{selectedProjectData.progress}%</span>
                       </div>
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
+                        <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
                       </div>
                     </div>
                   )}
@@ -423,14 +423,14 @@ export default function CustomerPortalPage() {
 
                 {/* Next visit */}
                 {selectedProjectData.nextVisit && (
-                  <div className="bg-blue-50 rounded-xl border border-blue-200 p-4">
-                    <div className="flex items-center gap-2 text-blue-700 font-medium mb-1">
+                  <div className="bg-teal-50 rounded-xl border border-teal-200 p-4">
+                    <div className="flex items-center gap-2 text-teal-700 font-medium mb-1">
                       <Calendar className="w-4 h-4" />
                       Kommande besok
                     </div>
-                    <p className="text-sm text-blue-700">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
+                    <p className="text-sm text-teal-700">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
                     {selectedProjectData.nextVisit.title && (
-                      <p className="text-sm text-blue-600 mt-1">{selectedProjectData.nextVisit.title}</p>
+                      <p className="text-sm text-sky-700 mt-1">{selectedProjectData.nextVisit.title}</p>
                     )}
                   </div>
                 )}
@@ -445,8 +445,8 @@ export default function CustomerPortalPage() {
                           {m.status === 'completed' ? (
                             <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                           ) : m.status === 'in_progress' ? (
-                            <div className="w-5 h-5 border-2 border-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                            <div className="w-5 h-5 border-2 border-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
+                              <div className="w-2 h-2 bg-teal-600 rounded-full" />
                             </div>
                           ) : (
                             <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex-shrink-0" />
@@ -508,7 +508,7 @@ export default function CustomerPortalPage() {
                         {['sent', 'opened'].includes(q.status) && q.sign_token && (
                           <a
                             href={`/quote/${q.sign_token}`}
-                            className="px-3 py-2 text-sm bg-blue-500 text-gray-900 rounded-lg hover:bg-blue-600 font-medium"
+                            className="px-3 py-2 text-sm bg-teal-600 text-gray-900 rounded-lg hover:bg-teal-700 font-medium"
                           >
                             Godkann
                           </a>
@@ -535,7 +535,7 @@ export default function CustomerPortalPage() {
                     <button
                       key={inv.invoice_id}
                       onClick={() => setSelectedInvoice(inv.invoice_id)}
-                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-blue-300 hover:shadow-sm transition-all"
+                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -564,7 +564,7 @@ export default function CustomerPortalPage() {
                             <p className="text-xs text-emerald-600">efter {inv.rot_rut_type.toUpperCase()}-avdrag ({formatCurrency(inv.rot_rut_deduction)})</p>
                           )}
                         </div>
-                        <span className="text-sm text-blue-600 flex items-center gap-1">
+                        <span className="text-sm text-sky-700 flex items-center gap-1">
                           Detaljer <ChevronRight className="w-4 h-4" />
                         </span>
                       </div>
@@ -593,7 +593,7 @@ export default function CustomerPortalPage() {
                   {/* Back button */}
                   <button
                     onClick={() => setSelectedInvoice(null)}
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 mb-2"
+                    className="flex items-center gap-2 text-sm text-sky-700 hover:text-teal-700 mb-2"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Tillbaka till fakturor
@@ -603,7 +603,7 @@ export default function CustomerPortalPage() {
                   <div className={`rounded-xl p-4 ${
                     inv.status === 'paid' ? 'bg-emerald-50 border border-emerald-200' :
                     inv.status === 'overdue' ? 'bg-red-50 border border-red-200' :
-                    'bg-blue-50 border border-blue-200'
+                    'bg-teal-50 border border-teal-200'
                   }`}>
                     <div className="flex items-center gap-3">
                       {inv.status === 'paid' ? (
@@ -611,13 +611,13 @@ export default function CustomerPortalPage() {
                       ) : inv.status === 'overdue' ? (
                         <AlertCircle className="w-6 h-6 text-red-600" />
                       ) : (
-                        <Clock className="w-6 h-6 text-blue-600" />
+                        <Clock className="w-6 h-6 text-sky-700" />
                       )}
                       <div>
                         <h3 className={`font-semibold ${
                           inv.status === 'paid' ? 'text-emerald-700' :
                           inv.status === 'overdue' ? 'text-red-700' :
-                          'text-blue-700'
+                          'text-teal-700'
                         }`}>
                           {inv.status === 'paid' ? 'Betald' :
                            inv.status === 'overdue' ? `Forsenad - ${daysOverdue} dagar` :
@@ -626,7 +626,7 @@ export default function CustomerPortalPage() {
                         <p className={`text-sm ${
                           inv.status === 'paid' ? 'text-emerald-600' :
                           inv.status === 'overdue' ? 'text-red-600' :
-                          'text-blue-600'
+                          'text-sky-700'
                         }`}>
                           {inv.status === 'paid' && inv.paid_at
                             ? `Betalades ${formatDate(inv.paid_at)}`
@@ -757,34 +757,34 @@ export default function CustomerPortalPage() {
                         {paymentInfo.bankgiro && (
                           <div>
                             <p className="text-xs text-gray-400">Bankgiro</p>
-                            <p className="text-base font-semibold text-blue-400">{paymentInfo.bankgiro}</p>
+                            <p className="text-base font-semibold text-teal-500">{paymentInfo.bankgiro}</p>
                           </div>
                         )}
                         {paymentInfo.plusgiro && (
                           <div>
                             <p className="text-xs text-gray-400">Plusgiro</p>
-                            <p className="text-base font-semibold text-blue-400">{paymentInfo.plusgiro}</p>
+                            <p className="text-base font-semibold text-teal-500">{paymentInfo.plusgiro}</p>
                           </div>
                         )}
                         {paymentInfo.swish && (
                           <div>
                             <p className="text-xs text-gray-400">Swish</p>
-                            <p className="text-base font-semibold text-blue-400">{paymentInfo.swish}</p>
+                            <p className="text-base font-semibold text-teal-500">{paymentInfo.swish}</p>
                           </div>
                         )}
                         {paymentInfo.bank_account && (
                           <div>
                             <p className="text-xs text-gray-400">Bankkonto</p>
-                            <p className="text-base font-semibold text-blue-400">{paymentInfo.bank_account}</p>
+                            <p className="text-base font-semibold text-teal-500">{paymentInfo.bank_account}</p>
                           </div>
                         )}
                         <div>
                           <p className="text-xs text-gray-400">OCR-nummer</p>
-                          <p className="text-base font-mono font-semibold text-blue-400">{ocrNumber}</p>
+                          <p className="text-base font-mono font-semibold text-teal-500">{ocrNumber}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-400">Att betala</p>
-                          <p className="text-base font-semibold text-blue-400">
+                          <p className="text-base font-semibold text-teal-500">
                             {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)}
                           </p>
                         </div>
@@ -846,7 +846,7 @@ export default function CustomerPortalPage() {
                     >
                       <div className={`rounded-2xl px-4 py-2.5 ${
                         msg.direction === 'inbound'
-                          ? 'bg-blue-500 text-gray-900 rounded-br-md'
+                          ? 'bg-teal-600 text-gray-900 rounded-br-md'
                           : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
                       }`}>
                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
@@ -868,12 +868,12 @@ export default function CustomerPortalPage() {
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder="Skriv meddelande..."
-                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-300"
+                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-300"
                     />
                     <button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || sendingMessage}
-                      className="px-4 py-3 bg-blue-500 text-gray-900 rounded-xl hover:bg-blue-600 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
+                      className="px-4 py-3 bg-teal-600 text-gray-900 rounded-xl hover:bg-teal-700 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
                     >
                       {sendingMessage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                     </button>
@@ -891,8 +891,8 @@ export default function CustomerPortalPage() {
           <div className="max-w-2xl mx-auto px-4 py-4 text-center text-sm text-gray-500">
             <p>{portal.business.name}</p>
             <div className="flex items-center justify-center gap-4 mt-1">
-              {portal.business.phone && <a href={`tel:${portal.business.phone}`} className="text-blue-600 hover:underline">{portal.business.phone}</a>}
-              {portal.business.email && <a href={`mailto:${portal.business.email}`} className="text-blue-600 hover:underline">{portal.business.email}</a>}
+              {portal.business.phone && <a href={`tel:${portal.business.phone}`} className="text-sky-700 hover:underline">{portal.business.phone}</a>}
+              {portal.business.email && <a href={`mailto:${portal.business.email}`} className="text-sky-700 hover:underline">{portal.business.email}</a>}
             </div>
           </div>
         </footer>

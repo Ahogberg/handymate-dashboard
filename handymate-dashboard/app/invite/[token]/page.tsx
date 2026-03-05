@@ -115,7 +115,7 @@ export default function InviteAcceptPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -125,13 +125,13 @@ export default function InviteAcceptPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -150,7 +150,7 @@ export default function InviteAcceptPage() {
             </p>
             <a
               href="/login"
-              className="inline-block px-6 py-3 text-sm font-medium text-blue-600 hover:text-blue-500 transition-colors"
+              className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-teal-600 transition-colors"
             >
               Tillbaka till inloggning
             </a>
@@ -165,8 +165,8 @@ export default function InviteAcceptPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl" />
         </div>
 
         <div className="relative w-full max-w-md mx-4">
@@ -176,7 +176,7 @@ export default function InviteAcceptPage() {
             </div>
             <h2 className="text-xl font-bold text-gray-900 mb-2">Välkommen!</h2>
             <p className="text-gray-500 mb-4">Ditt konto har skapats. Omdirigerar...</p>
-            <Loader2 className="w-5 h-5 text-blue-600 animate-spin mx-auto" />
+            <Loader2 className="w-5 h-5 text-sky-700 animate-spin mx-auto" />
           </div>
         </div>
       </div>
@@ -187,14 +187,14 @@ export default function InviteAcceptPage() {
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-50 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-fuchsia-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-md mx-4 py-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
             <Zap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -205,11 +205,11 @@ export default function InviteAcceptPage() {
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold text-gray-900 mb-2">
               Du har blivit inbjuden till{' '}
-              <span className="bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-teal-600 bg-clip-text text-transparent">
                 {invite.business_name}
               </span>
             </h2>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-600 border border-blue-500/20">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-teal-50 text-sky-700 border border-teal-500/20">
               {roleLabels[invite.role] || invite.role}
               {invite.title ? ` – ${invite.title}` : ''}
             </span>
@@ -228,7 +228,7 @@ export default function InviteAcceptPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Ditt namn"
                 required
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
 
@@ -254,7 +254,7 @@ export default function InviteAcceptPage() {
                   placeholder="Minst 6 tecken"
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 pr-12 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-3 pr-12 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
                 <button
                   type="button"
@@ -279,7 +279,7 @@ export default function InviteAcceptPage() {
                 placeholder="Upprepa lösenord"
                 required
                 minLength={6}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
 
@@ -294,7 +294,7 @@ export default function InviteAcceptPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+              className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
             >
               {submitting ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -308,7 +308,7 @@ export default function InviteAcceptPage() {
         {/* Footer */}
         <p className="text-center text-sm text-gray-400 mt-6">
           Har du redan ett konto?{' '}
-          <a href="/login" className="text-blue-600 hover:text-blue-500">
+          <a href="/login" className="text-sky-700 hover:text-teal-600">
             Logga in
           </a>
         </p>

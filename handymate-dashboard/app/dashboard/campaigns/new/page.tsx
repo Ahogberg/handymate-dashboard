@@ -261,8 +261,8 @@ const messageSuggestions = [
     <div className="p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -290,7 +290,7 @@ const messageSuggestions = [
             <div key={s.num} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step >= s.num 
-                  ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white' 
+                  ? 'bg-teal-600 text-white' 
                   : 'bg-gray-100 text-gray-400'
               }`}>
                 {step > s.num ? <Check className="w-4 h-4" /> : s.num}
@@ -322,11 +322,11 @@ const messageSuggestions = [
                     onClick={() => setFilterType(f.id as FilterType)}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       filterType === f.id 
-                        ? 'bg-blue-50 border-blue-300' 
+                        ? 'bg-teal-50 border-teal-300' 
                         : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                     }`}
                   >
-                    <f.icon className={`w-5 h-5 mb-2 ${filterType === f.id ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <f.icon className={`w-5 h-5 mb-2 ${filterType === f.id ? 'text-sky-700' : 'text-gray-400'}`} />
                     <p className={`text-sm font-medium ${filterType === f.id ? 'text-gray-900' : 'text-gray-700'}`}>
                       {f.label}
                     </p>
@@ -346,10 +346,10 @@ const messageSuggestions = [
                         placeholder="Sök kund..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
                     </div>
-                    <button onClick={selectAll} className="text-sm text-blue-600 hover:text-blue-500">
+                    <button onClick={selectAll} className="text-sm text-sky-700 hover:text-teal-600">
                       Välj alla
                     </button>
                     <button onClick={deselectAll} className="text-sm text-gray-400 hover:text-gray-700">
@@ -367,7 +367,7 @@ const messageSuggestions = [
                         key={customer.customer_id}
                         className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${
                           selectedCustomers.has(customer.customer_id)
-                            ? 'bg-blue-50 border border-blue-300'
+                            ? 'bg-teal-50 border border-teal-300'
                             : 'bg-gray-50 border border-transparent hover:bg-gray-100'
                         }`}
                       >
@@ -375,7 +375,7 @@ const messageSuggestions = [
                           type="checkbox"
                           checked={selectedCustomers.has(customer.customer_id)}
                           onChange={() => toggleCustomer(customer.customer_id)}
-                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-blue-600 focus:ring-blue-500/50 mr-3"
+                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700 focus:ring-teal-500/50 mr-3"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{customer.name || 'Okänd'}</p>
@@ -395,8 +395,8 @@ const messageSuggestions = [
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100">
-                    <Users className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 rounded-lg bg-teal-100">
+                    <Users className="w-5 h-5 text-sky-700" />
                   </div>
                   <div>
                     <p className="text-gray-900 font-medium">{recipientCount} mottagare</p>
@@ -406,7 +406,7 @@ const messageSuggestions = [
                 <button
                   onClick={() => setStep(2)}
                   disabled={recipientCount === 0}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Fortsätt
                 </button>
@@ -425,7 +425,7 @@ const messageSuggestions = [
         value={campaignName}
         onChange={(e) => setCampaignName(e.target.value)}
         placeholder="T.ex. Vårens reaktivering"
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
       />
     </div>
 
@@ -437,12 +437,12 @@ const messageSuggestions = [
           onClick={() => setCampaignType('interactive')}
           className={`p-4 rounded-xl border text-left transition-all ${
             campaignType === 'interactive'
-              ? 'bg-blue-50 border-blue-300'
+              ? 'bg-teal-50 border-teal-300'
               : 'bg-gray-50 border-gray-300 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center gap-3 mb-2">
-            <MessageSquare className={`w-5 h-5 ${campaignType === 'interactive' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <MessageSquare className={`w-5 h-5 ${campaignType === 'interactive' ? 'text-sky-700' : 'text-gray-400'}`} />
             <span className={`font-medium ${campaignType === 'interactive' ? 'text-gray-900' : 'text-gray-700'}`}>
               Interaktiv
             </span>
@@ -456,12 +456,12 @@ const messageSuggestions = [
           onClick={() => setCampaignType('broadcast')}
           className={`p-4 rounded-xl border text-left transition-all ${
             campaignType === 'broadcast'
-              ? 'bg-blue-50 border-blue-300'
+              ? 'bg-teal-50 border-teal-300'
               : 'bg-gray-50 border-gray-300 hover:border-gray-300'
           }`}
         >
           <div className="flex items-center gap-3 mb-2">
-            <Send className={`w-5 h-5 ${campaignType === 'broadcast' ? 'text-blue-600' : 'text-gray-400'}`} />
+            <Send className={`w-5 h-5 ${campaignType === 'broadcast' ? 'text-sky-700' : 'text-gray-400'}`} />
             <span className={`font-medium ${campaignType === 'broadcast' ? 'text-gray-900' : 'text-gray-700'}`}>
               Broadcast
             </span>
@@ -493,7 +493,7 @@ const messageSuggestions = [
       
       {/* Förslag */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <Sparkles className="w-4 h-4 text-blue-600" />
+        <Sparkles className="w-4 h-4 text-sky-700" />
         <span className="text-sm text-gray-500">Förslag:</span>
         {messageSuggestions.map((s, i) => (
           <button
@@ -511,7 +511,7 @@ const messageSuggestions = [
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Skriv ditt meddelande här..."
         rows={5}
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
       />
       
       <div className="flex items-center justify-between mt-3">
@@ -538,7 +538,7 @@ const messageSuggestions = [
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Förhandsgranskning</h2>
       <div className="bg-gray-50 rounded-2xl p-4 max-w-sm">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-gray-900" />
           </div>
           <span className="text-sm font-medium text-gray-900">{business.business_name}</span>
@@ -552,7 +552,7 @@ const messageSuggestions = [
         {campaignType === 'interactive' && (
           <div className="space-y-2">
             <div className="flex justify-end">
-              <div className="bg-blue-600 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
+              <div className="bg-teal-700 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
                 <p className="text-sm text-gray-900">JA, gärna!</p>
               </div>
             </div>
@@ -578,7 +578,7 @@ const messageSuggestions = [
       <button
         onClick={() => setStep(3)}
         disabled={!campaignName || !message}
-        className="px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Fortsätt
       </button>
@@ -615,7 +615,7 @@ const messageSuggestions = [
   <span className="text-gray-900 font-medium flex items-center gap-2">
     {campaignType === 'interactive' ? (
       <>
-        <Sparkles className="w-4 h-4 text-blue-600" />
+        <Sparkles className="w-4 h-4 text-sky-700" />
         Interaktiv (AI-svar)
       </>
     ) : (
@@ -648,7 +648,7 @@ const messageSuggestions = [
               <button
                 onClick={handleSend}
                 disabled={sending}
-                className="flex items-center px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-8 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? (
                   <>

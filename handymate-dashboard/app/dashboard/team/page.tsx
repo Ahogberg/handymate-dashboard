@@ -112,8 +112,8 @@ function getStatusInfo(member: TeamMember): { label: string; className: string }
 }
 
 function getRoleBadge(role: string): { label: string; className: string } {
-  if (role === 'owner') return { label: 'Agare', className: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-500 border-blue-300' }
-  if (role === 'admin') return { label: 'Admin', className: 'bg-blue-100 text-blue-400 border-blue-500/30' }
+  if (role === 'owner') return { label: 'Agare', className: 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-teal-600 border-teal-300' }
+  if (role === 'admin') return { label: 'Admin', className: 'bg-teal-100 text-teal-500 border-teal-500/30' }
   return { label: 'Anstalld', className: 'bg-gray-100 text-gray-500 border-gray-300' }
 }
 
@@ -145,8 +145,8 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
-        checked ? 'bg-blue-500' : 'bg-gray-200'
+      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
+        checked ? 'bg-teal-600' : 'bg-gray-200'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       <span
@@ -463,8 +463,8 @@ export default function TeamPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen pt-16 sm:pt-8">
       {/* Background gradient blobs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast notification */}
@@ -484,7 +484,7 @@ export default function TeamPage() {
           <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <UserPlus className="w-5 h-5 text-blue-600" />
+                <UserPlus className="w-5 h-5 text-sky-700" />
                 Bjud in teammedlem
               </h3>
               <button onClick={() => setInviteModalOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
@@ -501,7 +501,7 @@ export default function TeamPage() {
                   value={inviteForm.email}
                   onChange={e => setInviteForm(prev => ({ ...prev, email: e.target.value }))}
                   placeholder="namn@foretag.se"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -513,7 +513,7 @@ export default function TeamPage() {
                   value={inviteForm.name}
                   onChange={e => setInviteForm(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Förnamn Efternamn"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -523,7 +523,7 @@ export default function TeamPage() {
                 <select
                   value={inviteForm.role}
                   onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'employee')}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 >
                   <option value="admin">Admin</option>
                   <option value="employee">Anstalld</option>
@@ -538,7 +538,7 @@ export default function TeamPage() {
                   value={inviteForm.title}
                   onChange={e => setInviteForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="T.ex. Elektriker, Snickare"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -550,7 +550,7 @@ export default function TeamPage() {
                   value={inviteForm.phone}
                   onChange={e => setInviteForm(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+46..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -562,7 +562,7 @@ export default function TeamPage() {
                   value={inviteForm.hourly_rate}
                   onChange={e => setInviteForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -598,7 +598,7 @@ export default function TeamPage() {
               <button
                 onClick={handleInviteSubmit}
                 disabled={actionLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -663,7 +663,7 @@ export default function TeamPage() {
                   type="text"
                   value={editForm.name}
                   onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -674,7 +674,7 @@ export default function TeamPage() {
                   value={editingMember.role === 'owner' ? 'owner' : editForm.role}
                   onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'employee')}
                   disabled={editingMember.role === 'owner'}
-                  className={`w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 ${
+                  className={`w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 ${
                     editingMember.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
@@ -692,7 +692,7 @@ export default function TeamPage() {
                   value={editForm.title}
                   onChange={e => setEditForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="T.ex. Elektriker, Snickare"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -704,7 +704,7 @@ export default function TeamPage() {
                   value={editForm.phone}
                   onChange={e => setEditForm(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="+46..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -716,7 +716,7 @@ export default function TeamPage() {
                   value={editForm.hourly_rate}
                   onChange={e => setEditForm(prev => ({ ...prev, hourly_rate: e.target.value }))}
                   placeholder="0"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 />
               </div>
 
@@ -754,7 +754,7 @@ export default function TeamPage() {
               <button
                 onClick={handleEditSubmit}
                 disabled={actionLoading}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-xl bg-teal-600 text-white font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Spara ändringar
@@ -829,7 +829,7 @@ export default function TeamPage() {
           {can('manage_users') && (
             <button
               onClick={openInviteModal}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity text-sm"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white font-medium hover:opacity-90 transition-opacity text-sm"
             >
               <Plus className="w-4 h-4" />
               Bjud in
@@ -841,8 +841,8 @@ export default function TeamPage() {
         {showEmptyState ? (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 sm:p-16 text-center">
             <div className="flex justify-center mb-6">
-              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 flex items-center justify-center border border-blue-300">
-                <Users className="w-10 h-10 text-blue-600" />
+              <div className="w-20 h-20 rounded-full bg-gradient-to-r from-teal-600/20 to-teal-500/20 flex items-center justify-center border border-teal-300">
+                <Users className="w-10 h-10 text-sky-700" />
               </div>
             </div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Du arbetar ensam just nu</h2>
@@ -852,7 +852,7 @@ export default function TeamPage() {
             {can('manage_users') && (
               <button
                 onClick={openInviteModal}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-teal-600 text-white font-medium hover:opacity-90 transition-opacity"
               >
                 <UserPlus className="w-5 h-5" />
                 Bjud in teammedlem
@@ -869,7 +869,7 @@ export default function TeamPage() {
                   onClick={() => setFilter(tab.key)}
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     filter === tab.key
-                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                      ? 'bg-teal-600 text-white'
                       : 'bg-white text-gray-500 hover:text-white border border-gray-200'
                   }`}
                 >
@@ -889,7 +889,7 @@ export default function TeamPage() {
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 placeholder="Sök på namn eller e-post..."
-                className="w-full pl-11 pr-4 py-3 bg-white shadow-sm border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50"
+                className="w-full pl-11 pr-4 py-3 bg-white shadow-sm border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
               />
               {searchTerm && (
                 <button

@@ -93,7 +93,7 @@ export default function PayrollPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-green-500 mr-4">
+            <div className="p-3 rounded-xl bg-emerald-600 mr-4">
               <Wallet className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -208,9 +208,9 @@ export default function PayrollPage() {
                     )}
                     {p.allowance_days > 0 && (
                       <div className="text-center">
-                        <p className="text-xs text-cyan-600">Traktamente</p>
-                        <p className="text-sm font-bold text-cyan-600">{p.allowance_days}d</p>
-                        <p className="text-xs text-cyan-400">{fmtKr(p.allowance_amount)}</p>
+                        <p className="text-xs text-teal-600">Traktamente</p>
+                        <p className="text-sm font-bold text-teal-600">{p.allowance_days}d</p>
+                        <p className="text-xs text-teal-400">{fmtKr(p.allowance_amount)}</p>
                       </div>
                     )}
                   </div>

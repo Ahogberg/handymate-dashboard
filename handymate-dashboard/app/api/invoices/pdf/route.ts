@@ -275,10 +275,10 @@ export async function GET(request: NextRequest) {
 
   <div class="totals">
     <div class="totals-box">
-      <div class="totals-row"><span>Delsumma</span><span>${formatSEK(invoice.subtotal)}</span></div>
+      <div class="totals-row"><span>Netto (exkl. moms)</span><span>${formatSEK(invoice.subtotal)}</span></div>
       ${invoice.discount_amount ? `<div class="totals-row deduction"><span>Rabatt</span><span>-${formatSEK(invoice.discount_amount)}</span></div>` : ''}
       <div class="totals-row"><span>Moms (${invoice.vat_rate}%)</span><span>${formatSEK(invoice.vat_amount)}</span></div>
-      <div class="totals-row total"><span>Totalt</span><span>${formatSEK(invoice.total)}</span></div>
+      <div class="totals-row total"><span>Totalt inkl. moms</span><span>${formatSEK(invoice.total)}</span></div>
       ${hasRotRut ? `
         <div class="totals-row deduction"><span>${rotRutLabel}-avdrag</span><span>-${formatSEK(invoice.rot_rut_deduction)}</span></div>
         <div class="totals-row customer-pays"><span>Att betala</span><span>${formatSEK(invoice.customer_pays)}</span></div>

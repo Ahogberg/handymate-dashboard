@@ -212,7 +212,7 @@ export default function QuoteStandardTextsPage() {
           )}
           <button
             onClick={() => { setShowNew(true); setNewType(activeTab) }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:opacity-90 transition-opacity"
           >
             <Plus className="w-4 h-4" />
             Ny text
@@ -230,7 +230,7 @@ export default function QuoteStandardTextsPage() {
               onClick={() => setActiveTab(type.value)}
               className={`px-4 py-2.5 text-sm whitespace-nowrap transition-colors border-b-2 -mb-px ${
                 activeTab === type.value
-                  ? 'border-blue-500 text-blue-600 font-medium'
+                  ? 'border-teal-500 text-sky-700 font-medium'
                   : 'border-transparent text-gray-500 hover:text-gray-900 hover:border-gray-300'
               }`}
             >
@@ -248,7 +248,7 @@ export default function QuoteStandardTextsPage() {
       {/* Loading */}
       {loading && (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+          <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
         </div>
       )}
 
@@ -278,7 +278,7 @@ export default function QuoteStandardTextsPage() {
             </button>
             <button
               onClick={() => { setShowNew(true); setNewType(activeTab) }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:opacity-90"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:opacity-90"
             >
               <Plus className="w-4 h-4" />
               Skapa ny
@@ -289,7 +289,7 @@ export default function QuoteStandardTextsPage() {
 
       {/* New text form */}
       {showNew && (
-        <div className="bg-white border border-blue-200 rounded-xl p-5 mb-4 shadow-sm">
+        <div className="bg-white border border-teal-200 rounded-xl p-5 mb-4 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">
             Ny {activeTypeInfo?.label.toLowerCase() || 'text'}
           </h3>
@@ -302,7 +302,7 @@ export default function QuoteStandardTextsPage() {
                 onChange={e => setNewName(e.target.value)}
                 placeholder="T.ex. Standard inledning"
                 autoFocus
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div>
@@ -312,7 +312,7 @@ export default function QuoteStandardTextsPage() {
                 onChange={e => setNewContent(e.target.value)}
                 rows={5}
                 placeholder="Skriv din text här..."
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
               />
             </div>
             <div className="flex gap-2 justify-end">
@@ -325,7 +325,7 @@ export default function QuoteStandardTextsPage() {
               <button
                 onClick={createNew}
                 disabled={!newName.trim() || saving}
-                className="flex items-center gap-1 px-4 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-1 px-4 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Spara
@@ -353,7 +353,7 @@ export default function QuoteStandardTextsPage() {
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
                       autoFocus
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                     />
                   </div>
                   <div>
@@ -362,7 +362,7 @@ export default function QuoteStandardTextsPage() {
                       value={editContent}
                       onChange={e => setEditContent(e.target.value)}
                       rows={6}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-y"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                   <div className="flex gap-2 justify-end">
@@ -376,7 +376,7 @@ export default function QuoteStandardTextsPage() {
                     <button
                       onClick={saveEdit}
                       disabled={saving}
-                      className="flex items-center gap-1 px-4 py-1.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
+                      className="flex items-center gap-1 px-4 py-1.5 bg-teal-600 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                       Spara
@@ -390,7 +390,7 @@ export default function QuoteStandardTextsPage() {
                     <div className="flex items-center gap-2">
                       <h3 className="font-medium text-gray-900">{text.name}</h3>
                       {text.is_default && (
-                        <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-medium rounded">
+                        <span className="px-1.5 py-0.5 bg-teal-50 text-sky-700 text-[10px] font-medium rounded">
                           Standard
                         </span>
                       )}

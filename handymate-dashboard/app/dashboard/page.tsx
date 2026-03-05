@@ -328,13 +328,13 @@ export default function DashboardPage() {
                 <div
                   className={`w-full max-w-[56px] rounded-t-md transition-all ${
                     isToday
-                      ? 'bg-gradient-to-t from-blue-500 to-cyan-400'
+                      ? 'bg-teal-500'
                       : 'bg-gray-200 hover:bg-gray-300'
                   }`}
                   style={{ height: `${height}%`, minHeight: '4px' }}
                 />
               </div>
-              <span className={`text-xs mt-1.5 font-medium ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>
+              <span className={`text-xs mt-1.5 font-medium ${isToday ? 'text-sky-700' : 'text-gray-400'}`}>
                 {dayName}
               </span>
             </div>
@@ -348,16 +348,16 @@ export default function DashboardPage() {
     switch (type) {
       case 'booking_created':
       case 'booking_updated':
-        return <Calendar className="w-3.5 h-3.5 text-blue-500" />
+        return <Calendar className="w-3.5 h-3.5 text-sky-600" />
       case 'quote_sent':
       case 'quote_accepted':
       case 'quote_declined':
-        return <FileText className="w-3.5 h-3.5 text-cyan-500" />
+        return <FileText className="w-3.5 h-3.5 text-teal-600" />
       case 'invoice_sent':
       case 'invoice_paid':
         return <Receipt className="w-3.5 h-3.5 text-amber-500" />
       case 'call_recorded':
-        return <Mic className="w-3.5 h-3.5 text-purple-500" />
+        return <Mic className="w-3.5 h-3.5 text-teal-500" />
       default:
         return <Activity className="w-3.5 h-3.5 text-gray-400" />
     }
@@ -377,8 +377,8 @@ export default function DashboardPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-sky-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative">
@@ -397,8 +397,8 @@ export default function DashboardPage() {
           <div className="mb-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-teal-700" />
                 </div>
                 <h2 className="font-semibold text-gray-900">Dagens plan</h2>
               </div>
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                   <div className="text-sm font-mono text-gray-500 w-12 flex-shrink-0">
                     {formatTime(booking.scheduled_start)}
                   </div>
-                  <div className="w-1 h-8 rounded-full bg-gradient-to-b from-blue-400 to-cyan-400 flex-shrink-0" />
+                  <div className="w-1 h-8 rounded-full bg-teal-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {(booking.customer as any)?.name || 'Kund'}
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                       {getServiceFromNotes(booking.notes)}
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-blue-500 transition-colors flex-shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-sky-600 transition-colors flex-shrink-0" />
                 </Link>
               ))}
             </div>
@@ -434,7 +434,7 @@ export default function DashboardPage() {
             {bookings.length > 4 && (
               <Link
                 href="/dashboard/schedule"
-                className="mt-3 flex items-center justify-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium py-2"
+                className="mt-3 flex items-center justify-center gap-1 text-xs text-sky-700 hover:text-teal-700 font-medium py-2"
               >
                 Visa alla {bookings.length} bokningar
                 <ArrowRight className="w-3 h-3" />
@@ -451,7 +451,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 {(stats.ai?.pending_suggestions ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-blue-600">
+                  <div className="flex items-center gap-2 text-xs text-sky-700">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{stats.ai.pending_suggestions} AI-f\u00F6rslag att granska</span>
                   </div>
@@ -475,10 +475,10 @@ export default function DashboardPage() {
         {/* AI Inbox Banner — fixed: no floating "0" when pending_suggestions is 0 */}
         {(stats?.ai?.pending_suggestions ?? 0) > 0 && (
           <Link href="/dashboard/ai-inbox">
-            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl hover:border-blue-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-xl hover:border-teal-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
+                  <div className="p-2 rounded-lg bg-teal-600">
                     <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -490,7 +490,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-blue-600" />
+                <ArrowRight className="w-5 h-5 text-sky-700" />
               </div>
             </div>
           </Link>
@@ -499,10 +499,10 @@ export default function DashboardPage() {
         {/* Phone setup banner — show when phone not configured and onboarding dismissed */}
         {!showOnboarding && onboardingData && !onboardingData.assigned_phone_number && (
           <Link href="/dashboard/settings/phone">
-            <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl hover:border-blue-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-xl hover:border-teal-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-500">
+                  <div className="p-2 rounded-lg bg-teal-600">
                     <Phone className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -514,7 +514,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <span className="text-blue-600 font-medium text-sm flex items-center gap-1">
+                <span className="text-sky-700 font-medium text-sm flex items-center gap-1">
                   Kom igång <ArrowRight className="w-4 h-4" />
                 </span>
               </div>
@@ -527,22 +527,22 @@ export default function DashboardPage() {
           (() => {
             const reminders = []
             if (!onboardingData.google_calendar_connected && !dismissedReminders.has('google')) {
-              reminders.push({ id: 'google', icon: Calendar, gradient: 'from-red-50 to-orange-50', border: 'border-red-200', iconBg: 'from-red-500 to-orange-500', title: 'Koppla Google Calendar för att synka bokningar', desc: 'Dina bokningar visas i Google Calendar automatiskt.', href: '/dashboard/settings?tab=integrations', cta: 'Koppla nu' })
+              reminders.push({ id: 'google', icon: Calendar, bgColor: 'bg-orange-50', border: 'border-orange-200', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', title: 'Koppla Google Calendar för att synka bokningar', desc: 'Dina bokningar visas i Google Calendar automatiskt.', href: '/dashboard/settings?tab=integrations', cta: 'Koppla nu' })
             }
             if (!onboardingData.gmail_enabled && !dismissedReminders.has('gmail')) {
-              reminders.push({ id: 'gmail', icon: Mail, gradient: 'from-blue-50 to-cyan-50', border: 'border-blue-200', iconBg: 'from-blue-500 to-cyan-500', title: 'Koppla Gmail för att se all kundkommunikation', desc: 'Se email-historik direkt i kundkortet.', href: '/dashboard/settings?tab=integrations', cta: 'Aktivera' })
+              reminders.push({ id: 'gmail', icon: Mail, bgColor: 'bg-teal-50', border: 'border-teal-200', iconBg: 'bg-teal-100', iconColor: 'text-teal-600', title: 'Koppla Gmail för att se all kundkommunikation', desc: 'Se email-historik direkt i kundkortet.', href: '/dashboard/settings?tab=integrations', cta: 'Aktivera' })
             }
             if ((!onboardingData.lead_sources || onboardingData.lead_sources.length === 0) && !dismissedReminders.has('leads')) {
-              reminders.push({ id: 'leads', icon: Globe, gradient: 'from-emerald-50 to-teal-50', border: 'border-emerald-200', iconBg: 'from-emerald-500 to-teal-500', title: 'Konfigurera lead-källor för att få in kunder automatiskt', desc: 'Ta emot förfrågningar från Offerta, ServiceFinder m.fl.', href: '/dashboard/settings?tab=integrations', cta: 'Kom igång' })
+              reminders.push({ id: 'leads', icon: Globe, bgColor: 'bg-emerald-50', border: 'border-emerald-200', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', title: 'Konfigurera lead-källor för att få in kunder automatiskt', desc: 'Ta emot förfrågningar från Offerta, ServiceFinder m.fl.', href: '/dashboard/settings?tab=integrations', cta: 'Kom igång' })
             }
             const r = reminders[0]
             if (!r) return null
             return (
-              <div className={`mb-6 p-4 bg-gradient-to-r ${r.gradient} border ${r.border} rounded-xl`}>
+              <div className={`mb-6 p-4 ${r.bgColor} border ${r.border} rounded-xl`}>
                 <div className="flex items-center justify-between">
                   <Link href={r.href} className="flex items-center gap-3 flex-1">
-                    <div className={`p-2 rounded-lg bg-gradient-to-br ${r.iconBg}`}>
-                      <r.icon className="w-5 h-5 text-white" />
+                    <div className={`p-2 rounded-lg ${r.iconBg}`}>
+                      <r.icon className={`w-5 h-5 ${r.iconColor}`} />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">{r.title}</p>
@@ -550,7 +550,7 @@ export default function DashboardPage() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-2 ml-3">
-                    <Link href={r.href} className="text-blue-600 font-medium text-sm flex items-center gap-1 whitespace-nowrap">
+                    <Link href={r.href} className="text-sky-700 font-medium text-sm flex items-center gap-1 whitespace-nowrap">
                       {r.cta} <ArrowRight className="w-4 h-4" />
                     </Link>
                     <button
@@ -579,8 +579,8 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
           <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500">
-                <Calendar className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-teal-50">
+                <Calendar className="w-4 h-4 text-teal-600" />
               </div>
               <TrendIndicator value={stats?.bookings?.trend || 0} />
             </div>
@@ -590,8 +590,8 @@ export default function DashboardPage() {
 
           <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-500">
-                <Users className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-sky-50">
+                <Users className="w-4 h-4 text-sky-600" />
               </div>
               <TrendIndicator value={stats?.customers?.trend || 0} />
             </div>
@@ -601,8 +601,8 @@ export default function DashboardPage() {
 
           <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-green-500">
-                <Mic className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-emerald-50">
+                <Mic className="w-4 h-4 text-emerald-600" />
               </div>
               <TrendIndicator value={stats?.calls?.trend || 0} />
             </div>
@@ -612,18 +612,18 @@ export default function DashboardPage() {
 
           <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500">
-                <Clock className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-amber-50">
+                <Clock className="w-4 h-4 text-amber-600" />
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats?.time?.week_hours || 0}h</p>
             <p className="text-xs text-gray-400">Arbetad tid vecka</p>
           </div>
 
-          <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-blue-300 transition-all">
+          <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-teal-300 transition-all">
             <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-rose-500">
-                <FolderKanban className="w-4 h-4 text-white" />
+              <div className="p-2 rounded-lg bg-slate-100">
+                <FolderKanban className="w-4 h-4 text-slate-600" />
               </div>
               <ArrowRight className="w-3 h-3 text-gray-400" />
             </div>
@@ -640,7 +640,7 @@ export default function DashboardPage() {
                 <Zap className="w-4 h-4 text-amber-500" />
                 Svarstid
               </h3>
-              <Link href="/dashboard/analytics" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+              <Link href="/dashboard/analytics" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
                 Detaljer <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -681,7 +681,7 @@ export default function DashboardPage() {
                   <div key={bucket.key} className="flex items-center gap-2 text-xs">
                     <span className="w-14 text-gray-500 text-right">{bucket.label}</span>
                     <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div className="h-2 rounded-full bg-blue-500 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
+                      <div className="h-2 rounded-full bg-teal-500 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
                     </div>
                     <span className="w-8 text-gray-400 text-right">{count}</span>
                     <span className="w-10 text-gray-400 text-right">({Math.round(pct)}%)</span>
@@ -701,18 +701,18 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-600" />
+                <Calendar className="w-4 h-4 text-sky-700" />
                 Dagens bokningar
                 <span className="text-sm font-normal text-gray-400">({todaysBookingsCount})</span>
               </h2>
-              <Link href="/dashboard/bookings" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+              <Link href="/dashboard/bookings" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
                 Visa alla <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
             {bookings.length === 0 ? (
               <div className="p-4 flex items-center justify-between">
                 <p className="text-sm text-gray-400">Inga bokningar idag</p>
-                <Link href="/dashboard/bookings" className="text-sm text-blue-600 hover:text-blue-500 font-medium">
+                <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-sky-600 font-medium">
                   Skapa bokning
                 </Link>
               </div>
@@ -722,8 +722,8 @@ export default function DashboardPage() {
                   <div key={booking.booking_id} className="px-4 py-3 hover:bg-gray-50/50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center min-w-0">
-                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100 flex-shrink-0">
-                          <Clock className="w-4 h-4 text-blue-600" />
+                        <div className="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center border border-teal-100 flex-shrink-0">
+                          <Clock className="w-4 h-4 text-sky-700" />
                         </div>
                         <div className="ml-3 min-w-0">
                           <p className="font-medium text-gray-900 text-sm truncate">
@@ -752,7 +752,7 @@ export default function DashboardPage() {
                 ))}
                 {bookings.length > 4 && (
                   <div className="p-3 text-center">
-                    <Link href="/dashboard/bookings" className="text-sm text-blue-600 hover:text-blue-500 font-medium">
+                    <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-sky-600 font-medium">
                       +{bookings.length - 4} fler bokningar →
                     </Link>
                   </div>
@@ -765,10 +765,10 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-blue-600" />
+                <TrendingUp className="w-4 h-4 text-sky-700" />
                 Säljtratt
               </h2>
-              <Link href="/dashboard/pipeline" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+              <Link href="/dashboard/pipeline" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
                 Pipeline <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -778,7 +778,7 @@ export default function DashboardPage() {
                 return (
                   <div className="py-4 text-center">
                     <p className="text-sm text-gray-400">Ingen pipeline-data ännu</p>
-                    <Link href="/dashboard/pipeline" className="text-sm text-blue-600 hover:text-blue-500 mt-1 inline-block">
+                    <Link href="/dashboard/pipeline" className="text-sm text-sky-700 hover:text-sky-600 mt-1 inline-block">
                       Gå till pipeline →
                     </Link>
                   </div>
@@ -796,9 +796,9 @@ export default function DashboardPage() {
                       {totalDeals === 0 ? 'Inga aktiva deals i pipeline' : '1 aktiv deal i pipeline'}
                     </p>
                     {pipelineStats.totalValue > 0 && (
-                      <p className="text-sm text-gray-500 mt-1">{formatCurrency(pipelineStats.totalValue)} kr i pipeline</p>
+                      <p className="text-sm text-gray-500 mt-1">{formatCurrency(pipelineStats.totalValue)} kr exkl. moms i pipeline</p>
                     )}
-                    <Link href="/dashboard/pipeline" className="text-sm text-blue-600 hover:text-blue-500 mt-2 inline-block">
+                    <Link href="/dashboard/pipeline" className="text-sm text-sky-700 hover:text-sky-600 mt-2 inline-block">
                       Öppna pipeline →
                     </Link>
                   </div>
@@ -857,10 +857,10 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-4">
                       <span className="text-gray-500">{pipelineStats.totalDeals} aktiva</span>
                       {pipelineStats.totalValue > 0 && (
-                        <span className="text-gray-500">{formatCurrency(pipelineStats.totalValue)} kr</span>
+                        <span className="text-gray-500">{formatCurrency(pipelineStats.totalValue)} kr exkl. moms</span>
                       )}
                       {pipelineStats.wonValue > 0 && (
-                        <span className="text-emerald-600 font-medium">{formatCurrency(pipelineStats.wonValue)} kr vunnet</span>
+                        <span className="text-emerald-600 font-medium">{formatCurrency(pipelineStats.wonValue)} kr vunnet exkl. moms</span>
                       )}
                     </div>
                     {pipelineStats.lostCount > 0 && (
@@ -891,7 +891,7 @@ export default function DashboardPage() {
           {/* Senaste aktivitet */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2 mb-4">
-              <Activity className="w-4 h-4 text-blue-600" />
+              <Activity className="w-4 h-4 text-sky-700" />
               Senaste aktivitet
             </h2>
             {recentActivity.length === 0 ? (
@@ -922,11 +922,11 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-blue-600" />
+                <BarChart3 className="w-4 h-4 text-sky-700" />
                 Projektlönsamhet
               </h2>
               {profitProjects.length > 0 && (
-                <Link href="/dashboard/projects" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                <Link href="/dashboard/projects" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
                   Alla projekt <ArrowRight className="w-3 h-3" />
                 </Link>
               )}
@@ -946,7 +946,7 @@ export default function DashboardPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-sm text-gray-900 truncate">{p.name}</p>
                         <p className="text-xs text-gray-400">
-                          {formatCurrency(p.revenue)} kr intäkter
+                          {formatCurrency(p.revenue)} kr inkl. moms
                         </p>
                       </div>
                       <div className="flex items-center gap-2 ml-2 shrink-0">
@@ -976,7 +976,7 @@ export default function DashboardPage() {
                   <Activity className="w-4 h-4 text-amber-500" />
                   Kräver uppmärksamhet
                 </h2>
-                <Link href="/dashboard/projects" className="text-xs text-blue-600 hover:text-blue-500 flex items-center gap-1">
+                <Link href="/dashboard/projects" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
                   Alla projekt <ArrowRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -1005,13 +1005,13 @@ export default function DashboardPage() {
           {/* ═══ Row 3: Dagens schema + Snabbåtgärder ═══ */}
 
           {/* Dagens schema */}
-          <Link href="/dashboard/schedule" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-blue-300 transition-all group">
+          <Link href="/dashboard/schedule" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-teal-300 transition-all group">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <CalendarDays className="w-4 h-4 text-blue-600" />
+                <CalendarDays className="w-4 h-4 text-sky-700" />
                 Dagens schema
               </h2>
-              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+              <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-sky-700 transition-colors" />
             </div>
             {scheduleToday.count === 0 ? (
               <p className="text-sm text-gray-400">Inga schemalagda aktiviteter idag</p>
@@ -1029,7 +1029,7 @@ export default function DashboardPage() {
                     </div>
                   ))}
                   {scheduleToday.count > 3 && (
-                    <p className="text-xs text-blue-600">+{scheduleToday.count - 3} fler</p>
+                    <p className="text-xs text-sky-700">+{scheduleToday.count - 3} fler</p>
                   )}
                 </div>
               </>
@@ -1042,28 +1042,28 @@ export default function DashboardPage() {
             <div className="grid grid-cols-2 gap-3">
               <Link
                 href="/dashboard/quotes/new"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-blue-50 hover:border-blue-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
+                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
               >
-                <FileText className="w-6 h-6 text-blue-600 mb-2 group-hover:scale-110 transition-transform" />
+                <FileText className="w-6 h-6 text-sky-700 mb-2 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-medium text-gray-700">Ny offert</span>
               </Link>
               <Link
                 href="/dashboard/invoices"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-cyan-50 hover:border-cyan-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
+                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
               >
-                <Receipt className="w-6 h-6 text-cyan-600 mb-2 group-hover:scale-110 transition-transform" />
+                <Receipt className="w-6 h-6 text-teal-600 mb-2 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-medium text-gray-700">Ny faktura</span>
               </Link>
               <Link
                 href="/dashboard/bookings"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-emerald-50 hover:border-emerald-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
+                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
               >
                 <Calendar className="w-6 h-6 text-emerald-600 mb-2 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-medium text-gray-700">Ny bokning</span>
               </Link>
               <Link
                 href="/dashboard/customers"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-amber-50 hover:border-amber-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
+                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
               >
                 <UserPlus className="w-6 h-6 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-medium text-gray-700">Ny kund</span>
@@ -1076,7 +1076,7 @@ export default function DashboardPage() {
         {stats?.bookings_per_day && stats.bookings_per_day.length > 0 && (
           <div className="mt-4 sm:mt-6 bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-blue-600" />
+              <BarChart3 className="w-4 h-4 text-sky-700" />
               Bokningar senaste 7 dagarna
             </h2>
             <BookingsChart data={stats.bookings_per_day} />

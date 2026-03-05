@@ -411,7 +411,7 @@ export default function CalendarPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
-      case 'completed': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'completed': return 'bg-teal-100 text-teal-500 border-teal-500/30'
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -439,8 +439,8 @@ export default function CalendarPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -467,7 +467,7 @@ export default function CalendarPage() {
                 <select
                   value={bookingForm.customer_id}
                   onChange={(e) => setBookingForm({ ...bookingForm, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -481,7 +481,7 @@ export default function CalendarPage() {
                   type="date"
                   value={bookingForm.date}
                   onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -491,7 +491,7 @@ export default function CalendarPage() {
                     type="time"
                     value={bookingForm.start_time}
                     onChange={(e) => setBookingForm({ ...bookingForm, start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -500,7 +500,7 @@ export default function CalendarPage() {
                     type="time"
                     value={bookingForm.end_time}
                     onChange={(e) => setBookingForm({ ...bookingForm, end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -510,7 +510,7 @@ export default function CalendarPage() {
                   <select
                     value={bookingForm.status}
                     onChange={(e) => setBookingForm({ ...bookingForm, status: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     <option value="confirmed">Bekräftad</option>
                     <option value="completed">Slutförd</option>
@@ -526,7 +526,7 @@ export default function CalendarPage() {
                   onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
                   placeholder="T.ex. Elinstallation - 3 nya uttag"
                   rows={3}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
                 />
               </div>
             </div>
@@ -536,7 +536,7 @@ export default function CalendarPage() {
               <button
                 onClick={handleBookingSubmit}
                 disabled={actionLoading || customers.length === 0}
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingBooking ? 'Spara' : 'Skapa'}
@@ -561,7 +561,7 @@ export default function CalendarPage() {
                 <select
                   value={timeForm.customer_id}
                   onChange={(e) => setTimeForm({ ...timeForm, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="">Ingen kund vald</option>
                   {customers.map(c => (
@@ -575,7 +575,7 @@ export default function CalendarPage() {
                   <select
                     value={timeForm.business_user_id}
                     onChange={(e) => setTimeForm({ ...timeForm, business_user_id: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     <option value="">Ingen vald</option>
                     {teamMembers.map(m => (
@@ -590,7 +590,7 @@ export default function CalendarPage() {
                   type="date"
                   value={timeForm.work_date}
                   onChange={(e) => setTimeForm({ ...timeForm, work_date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -603,7 +603,7 @@ export default function CalendarPage() {
                       setTimeForm({ ...timeForm, start_time: e.target.value })
                       calculateHours(e.target.value, timeForm.end_time)
                     }}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -615,7 +615,7 @@ export default function CalendarPage() {
                       setTimeForm({ ...timeForm, end_time: e.target.value })
                       calculateHours(timeForm.start_time, e.target.value)
                     }}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -627,7 +627,7 @@ export default function CalendarPage() {
                     step="0.5"
                     value={timeForm.duration_minutes ? String(Math.round((parseFloat(timeForm.duration_minutes) / 60) * 10) / 10) : ''}
                     onChange={(e) => setTimeForm({ ...timeForm, duration_minutes: String(Math.round(parseFloat(e.target.value || '0') * 60)) })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div>
@@ -636,7 +636,7 @@ export default function CalendarPage() {
                     type="number"
                     value={timeForm.hourly_rate}
                     onChange={(e) => setTimeForm({ ...timeForm, hourly_rate: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
               </div>
@@ -646,7 +646,7 @@ export default function CalendarPage() {
                     type="checkbox"
                     checked={timeForm.is_billable}
                     onChange={(e) => setTimeForm({ ...timeForm, is_billable: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500/50"
+                    className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500/50"
                   />
                   Fakturerbar tid
                 </label>
@@ -658,7 +658,7 @@ export default function CalendarPage() {
                   onChange={(e) => setTimeForm({ ...timeForm, description: e.target.value })}
                   placeholder="Vad gjordes?"
                   rows={2}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
                 />
               </div>
             </div>
@@ -668,7 +668,7 @@ export default function CalendarPage() {
               <button
                 onClick={handleTimeSubmit}
                 disabled={actionLoading}
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingTimeEntry ? 'Spara' : 'Registrera'}
@@ -695,7 +695,7 @@ export default function CalendarPage() {
                 onClick={() => setActiveTab('bookings')}
                 className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
                   activeTab === 'bookings'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'text-gray-500 hover:text-white'
                 }`}
               >
@@ -706,7 +706,7 @@ export default function CalendarPage() {
                 onClick={() => setActiveTab('time')}
                 className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
                   activeTab === 'time'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'text-gray-500 hover:text-white'
                 }`}
               >
@@ -717,14 +717,14 @@ export default function CalendarPage() {
 
             {/* Tab-specific controls */}
             {activeTab === 'bookings' && (
-              <button onClick={openCreateBookingModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
+              <button onClick={openCreateBookingModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
                 <Plus className="w-4 h-4 mr-2" />
                 Ny bokning
               </button>
             )}
 
             {activeTab === 'time' && (
-              <button onClick={openCreateTimeModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
+              <button onClick={openCreateTimeModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
                 <Plus className="w-4 h-4 mr-2" />
                 Registrera tid
               </button>
@@ -763,7 +763,7 @@ export default function CalendarPage() {
                 <select
                   value={filterUserId}
                   onChange={(e) => setFilterUserId(e.target.value)}
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 >
                   <option value="all">Alla medarbetare</option>
                   {teamMembers.map(m => (
@@ -780,8 +780,8 @@ export default function CalendarPage() {
           <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
             <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-sky-700" />
                 </div>
                 <div>
                   <p className="text-lg sm:text-2xl font-bold text-gray-900">{timeTotals.hours.toFixed(1)}h</p>
@@ -802,8 +802,8 @@ export default function CalendarPage() {
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-teal-500" />
                 </div>
                 <div>
                   <p className="text-lg sm:text-2xl font-bold text-gray-900">{timeTotals.count}</p>
@@ -823,11 +823,11 @@ export default function CalendarPage() {
                   <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-400">{bookingFilter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
                   {customers.length > 0 ? (
-                    <button onClick={openCreateBookingModal} className="mt-4 text-blue-600 hover:text-blue-500">
+                    <button onClick={openCreateBookingModal} className="mt-4 text-sky-700 hover:text-teal-600">
                       Skapa din första bokning →
                     </button>
                   ) : (
-                    <a href="/dashboard/customers" className="mt-4 text-blue-600 hover:text-blue-500 block">
+                    <a href="/dashboard/customers" className="mt-4 text-sky-700 hover:text-teal-600 block">
                       Skapa en kund först →
                     </a>
                   )}
@@ -840,8 +840,8 @@ export default function CalendarPage() {
                       <div key={booking.booking_id} className="p-4">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-300 flex-shrink-0">
-                              <User className="w-5 h-5 text-blue-600" />
+                            <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300 flex-shrink-0">
+                              <User className="w-5 h-5 text-sky-700" />
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-gray-900 truncate">{booking.customer?.name || 'Okänd'}</p>
@@ -887,8 +887,8 @@ export default function CalendarPage() {
                         <tr key={booking.booking_id} className="hover:bg-gray-100/30 transition-all">
                           <td className="px-6 py-4">
                             <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl flex items-center justify-center border border-blue-300">
-                                <User className="w-5 h-5 text-blue-600" />
+                              <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300">
+                                <User className="w-5 h-5 text-sky-700" />
                               </div>
                               <div className="ml-4">
                                 <p className="font-medium text-gray-900">{booking.customer?.name || 'Okänd'}</p>
@@ -936,7 +936,7 @@ export default function CalendarPage() {
                 <div className="text-center py-12">
                   <Timer className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-400">Ingen tid registrerad denna vecka</p>
-                  <button onClick={openCreateTimeModal} className="mt-4 text-blue-600 hover:text-blue-500">
+                  <button onClick={openCreateTimeModal} className="mt-4 text-sky-700 hover:text-teal-600">
                     Registrera din första tid →
                   </button>
                 </div>

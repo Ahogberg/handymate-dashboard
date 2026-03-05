@@ -26,7 +26,7 @@ export async function getCustomer(
   const { data, error } = await supabase
     .from("customer")
     .select(
-      "customer_id, name, phone_number, email, address_line, customer_rating, job_status, created_at"
+      "customer_id, name, phone_number, email, address_line, customer_rating, created_at"
     )
     .eq("business_id", businessId)
     .eq("customer_id", params.customer_id)
@@ -39,7 +39,7 @@ export async function getCustomer(
   // Fetch recent bookings for context
   const { data: bookings } = await supabase
     .from("booking")
-    .select("booking_id, service_type, scheduled_start, status")
+    .select("booking_id, scheduled_start, scheduled_end, status, notes")
     .eq("customer_id", params.customer_id)
     .eq("business_id", businessId)
     .order("scheduled_start", { ascending: false })
@@ -81,7 +81,7 @@ export async function searchCustomers(
   const { data, error } = await supabase
     .from("customer")
     .select(
-      "customer_id, name, phone_number, email, address_line, job_status"
+      "customer_id, name, phone_number, email, address_line"
     )
     .eq("business_id", businessId)
     .or(
@@ -139,7 +139,6 @@ export async function createCustomer(
       phone_number: params.phone_number,
       email: params.email || null,
       address_line: params.address_line || null,
-      job_status: "lead",
       created_at: new Date().toISOString(),
     })
     .select()
@@ -171,7 +170,7 @@ export async function updateCustomer(
     phone_number?: string
     email?: string
     address_line?: string
-    job_status?: string
+    customer_rating?: number
   }
 ): Promise<ToolResult> {
   console.log(`[Tool] update_customer: ${params.customer_id}`)

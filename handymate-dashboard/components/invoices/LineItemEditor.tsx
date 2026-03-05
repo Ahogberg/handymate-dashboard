@@ -38,7 +38,7 @@ const UNITS = [
 
 const ITEM_TYPE_CONFIG: Record<InvoiceItemType, { label: string; color: string; bgColor: string }> = {
   item: { label: 'Rad', color: 'text-gray-600', bgColor: 'bg-gray-100' },
-  heading: { label: 'Rubrik', color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  heading: { label: 'Rubrik', color: 'text-sky-700', bgColor: 'bg-teal-50' },
   text: { label: 'Fritext', color: 'text-purple-600', bgColor: 'bg-purple-50' },
   subtotal: { label: 'Delsumma', color: 'text-amber-600', bgColor: 'bg-amber-50' },
   discount: { label: 'Rabatt', color: 'text-green-600', bgColor: 'bg-green-50' },
@@ -126,8 +126,8 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
         onDrop={() => handleDrop(index)}
         onDragEnd={handleDragEnd}
         className={`group rounded-xl border transition-all ${
-          isDragging ? 'opacity-50 border-blue-300' :
-          isDragOver ? 'border-blue-400 bg-blue-50/50' :
+          isDragging ? 'opacity-50 border-teal-300' :
+          isDragOver ? 'border-teal-400 bg-teal-50/50' :
           'border-gray-200 bg-white hover:border-gray-300'
         }`}
       >
@@ -172,7 +172,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
               value={item.description}
               onChange={(e) => updateItem(index, { description: e.target.value })}
               placeholder="Rubrik..."
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           )}
 
@@ -183,7 +183,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
               onChange={(e) => updateItem(index, { description: e.target.value })}
               placeholder="Fritext..."
               rows={2}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 resize-none"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           )}
 
@@ -212,7 +212,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                   value={item.description}
                   onChange={(e) => updateItem(index, { description: e.target.value })}
                   placeholder={itemType === 'discount' ? 'Rabattbeskrivning...' : 'Beskrivning...'}
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div className="flex items-end gap-2">
@@ -223,7 +223,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                     step="0.5"
                     value={item.quantity}
                     onChange={(e) => updateItem(index, { quantity: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div className="w-24">
@@ -231,7 +231,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                   <select
                     value={item.unit}
                     onChange={(e) => updateItem(index, { unit: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   >
                     {UNITS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
@@ -244,7 +244,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                     type="number"
                     value={Math.abs(item.unit_price)}
                     onChange={(e) => updateItem(index, { unit_price: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                 </div>
                 <div className="w-28 text-right">
@@ -284,7 +284,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => addItem('item')}
-          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-blue-50 border border-blue-200 rounded-xl text-blue-600 hover:bg-blue-100 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 text-sm bg-teal-50 border border-teal-200 rounded-xl text-sky-700 hover:bg-teal-100 transition-colors"
         >
           <Plus className="w-4 h-4" />
           Rad

@@ -264,7 +264,7 @@ export default function ProductSearchModal({
         <div className="flex-1 overflow-y-auto">
           {loadingSuppliers ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+              <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
               <span className="ml-3 text-gray-500">Laddar grossister...</span>
             </div>
           ) : suppliers.length === 0 ? (
@@ -277,7 +277,7 @@ export default function ProductSearchModal({
               <Link
                 href="/dashboard/settings/pricelist"
                 onClick={onClose}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
               >
                 <Settings className="w-4 h-4" />
                 Gå till inställningar
@@ -293,7 +293,7 @@ export default function ProductSearchModal({
                     onClick={() => handleSupplierChange(s.key)}
                     className={`px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition-all ${
                       activeSupplier === s.key
-                        ? 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-white border border-blue-300'
+                        ? 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-white border border-teal-300'
                         : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                   >
@@ -313,7 +313,7 @@ export default function ProductSearchModal({
                     onChange={(e) => handleQueryChange(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Sök produkt..."
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder:text-gray-400 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-500/25 transition-colors"
+                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder:text-gray-400 focus:outline-none focus:border-teal-300 focus:ring-1 focus:ring-teal-500/25 transition-colors"
                   />
                 </div>
 
@@ -332,7 +332,7 @@ export default function ProductSearchModal({
                         onClick={() => handleCategoryChange('')}
                         className={`w-full px-4 py-2 text-sm text-left transition-colors ${
                           !category
-                            ? 'text-blue-600 bg-blue-50'
+                            ? 'text-sky-700 bg-teal-50'
                             : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                         }`}
                       >
@@ -344,7 +344,7 @@ export default function ProductSearchModal({
                           onClick={() => handleCategoryChange(cat)}
                           className={`w-full px-4 py-2 text-sm text-left transition-colors ${
                             category === cat
-                              ? 'text-blue-600 bg-blue-50'
+                              ? 'text-sky-700 bg-teal-50'
                               : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
                           }`}
                         >
@@ -372,7 +372,7 @@ export default function ProductSearchModal({
               {/* Loading state */}
               {loading && (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-sky-700 animate-spin" />
                   <span className="ml-3 text-gray-500 text-sm">Söker...</span>
                 </div>
               )}
@@ -391,7 +391,7 @@ export default function ProductSearchModal({
                         key={product.external_id}
                         className={`border rounded-xl transition-all ${
                           isExpanded
-                            ? 'border-blue-300 bg-blue-500/5'
+                            ? 'border-teal-300 bg-teal-600/5'
                             : 'border-gray-200 bg-white hover:border-gray-300'
                         }`}
                       >
@@ -484,7 +484,7 @@ export default function ProductSearchModal({
                                           parseFloat(e.target.value) || 0,
                                       }))
                                     }
-                                    className="w-20 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm text-gray-900 text-right focus:outline-none focus:border-blue-300"
+                                    className="w-20 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-sm text-gray-900 text-right focus:outline-none focus:border-teal-300"
                                   />
                                   <span className="text-sm text-gray-500">%</span>
                                 </div>
@@ -493,7 +493,7 @@ export default function ProductSearchModal({
                                 <label className="block text-xs text-gray-400 mb-1">
                                   Kundpris
                                 </label>
-                                <p className="text-sm font-semibold text-blue-600">
+                                <p className="text-sm font-semibold text-sky-700">
                                   {formatPrice(
                                     Math.round(sellPrice * 100) / 100
                                   )}
@@ -509,7 +509,7 @@ export default function ProductSearchModal({
                               )}
                             <button
                               onClick={() => handleSelect(product)}
-                              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
                             >
                               <Plus className="w-4 h-4" />
                               Lägg till

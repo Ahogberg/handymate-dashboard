@@ -37,9 +37,9 @@ export async function qualifyLead(
     .single()
 
   // Also check call_recording if not found in conversations
-  let transcript = conversation?.transcript || ""
+  let transcript = conversation?.content || ""
   let phone = params.phone || conversation?.phone_number || ""
-  let contactName = params.name || conversation?.customer_name || ""
+  let contactName = params.name || ""
   let source = params.source || "manual"
 
   if (!transcript) {

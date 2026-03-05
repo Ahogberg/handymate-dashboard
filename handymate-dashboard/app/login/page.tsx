@@ -49,15 +49,15 @@ export default function LoginPage() {
     <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-blue-100 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-cyan-500/15 rounded-full blur-[128px]"></div>
+        <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-teal-100 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-teal-500/15 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative w-full max-w-md mx-4">
         {/* Logo */}
         <div className="text-center mb-8">
           <a href="https://handymate.se" className="inline-block">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/10">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
           </a>
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="din@epost.se"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
@@ -93,13 +93,13 @@ export default function LoginPage() {
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                 placeholder="Ditt lösenord"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
             
 <div className="text-right">
-  <a href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+  <a href="/forgot-password" className="text-sm text-sky-700 hover:text-teal-600">
     Glömt lösenordet?
   </a>
 </div>
@@ -112,7 +112,7 @@ export default function LoginPage() {
             <button
               onClick={handleLogin}
               disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
+              className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center disabled:opacity-50"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -129,7 +129,7 @@ export default function LoginPage() {
         {/* Footer */}
         <p className="text-center text-sm text-gray-400 mt-6">
           Har du inget konto?{' '}
-          <a href="/signup" className="text-blue-600 hover:text-blue-500">
+          <a href="/signup" className="text-sky-700 hover:text-teal-600">
             Skapa konto
           </a>
         </p>

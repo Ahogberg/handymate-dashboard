@@ -23,7 +23,7 @@ export default function DashboardLayout({
 
   // Redirect to onboarding if not completed
   useEffect(() => {
-    if (!loading && business && business.onboarding_step < 7) {
+    if (!loading && business && !business.onboarding_completed_at && business.onboarding_step < 8) {
       router.push('/onboarding')
     }
   }, [loading, business, router])
@@ -41,7 +41,7 @@ export default function DashboardLayout({
   }
 
   // Don't render dashboard while redirecting to onboarding
-  if (business.onboarding_step < 7) {
+  if (!business.onboarding_completed_at && business.onboarding_step < 8) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>

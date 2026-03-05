@@ -267,8 +267,8 @@ export default function WarrantiesPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Calendar className="w-5 h-5 text-blue-600" />
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                <Calendar className="w-5 h-5 text-sky-700" />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-900">{warranties.length}</p>
@@ -354,7 +354,7 @@ export default function WarrantiesPage() {
                           <span className={`px-2 py-0.5 text-xs rounded-full border font-medium ${getStatusStyle(w.status)}`}>
                             {getStatusText(w.status)}
                           </span>
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-blue-50 text-blue-600 border border-blue-200">
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-teal-50 text-sky-700 border border-teal-200">
                             {getTypeText(w.warranty_type)}
                           </span>
                           {isExpiringSoon && (

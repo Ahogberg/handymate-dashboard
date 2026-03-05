@@ -167,7 +167,7 @@ export default function KnowledgeBasePage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -175,8 +175,8 @@ export default function KnowledgeBasePage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -200,7 +200,7 @@ export default function KnowledgeBasePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Spara
@@ -211,13 +211,13 @@ export default function KnowledgeBasePage() {
           {/* Bransch */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-blue-600" />
+              <Zap className="w-5 h-5 text-sky-700" />
               Bransch
             </h2>
             <select
               value={kb.industry}
               onChange={(e) => handleIndustryChange(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             >
               <option value="">Välj bransch...</option>
               {INDUSTRIES.map(ind => (
@@ -231,7 +231,7 @@ export default function KnowledgeBasePage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-cyan-600" />
+                <FileText className="w-5 h-5 text-teal-600" />
                 Tjänster & Priser
               </h2>
               <button
@@ -260,28 +260,28 @@ export default function KnowledgeBasePage() {
                         value={service.name}
                         onChange={(e) => updateService(index, 'name', e.target.value)}
                         placeholder="Tjänstens namn"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
                       <input
                         type="text"
                         value={service.price_indication}
                         onChange={(e) => updateService(index, 'price_indication', e.target.value)}
                         placeholder="Prisindikation (t.ex. 'Från 995 kr')"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
                       <input
                         type="text"
                         value={service.typical_duration}
                         onChange={(e) => updateService(index, 'typical_duration', e.target.value)}
                         placeholder="Tidsåtgång (t.ex. '1-2 timmar')"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
                       <input
                         type="text"
                         value={service.description}
                         onChange={(e) => updateService(index, 'description', e.target.value)}
                         placeholder="Kort beskrivning"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                       />
                     </div>
                   </div>
@@ -322,14 +322,14 @@ export default function KnowledgeBasePage() {
                       value={faq.question}
                       onChange={(e) => updateFAQ(index, 'question', e.target.value)}
                       placeholder="Frågan kunden ställer"
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                     />
                     <textarea
                       value={faq.answer}
                       onChange={(e) => updateFAQ(index, 'answer', e.target.value)}
                       placeholder="Svaret AI:n ska ge"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                     />
                   </div>
                 ))}
@@ -364,7 +364,7 @@ export default function KnowledgeBasePage() {
                       value={emergency}
                       onChange={(e) => updateEmergency(index, e.target.value)}
                       placeholder="Beskrivning av akut situation"
-                      className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                      className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                     />
                     <button onClick={() => removeEmergency(index)} className="p-2 text-gray-400 hover:text-red-600">
                       <X className="w-4 h-4" />
@@ -389,7 +389,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.quote}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, quote: e.target.value } })}
                   placeholder="T.ex. 'Vi ger alltid prisuppskattning innan'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div>
@@ -399,7 +399,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.payment}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, payment: e.target.value } })}
                   placeholder="T.ex. 'Faktura 30 dagar eller Swish'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div>
@@ -409,7 +409,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.warranty}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, warranty: e.target.value } })}
                   placeholder="T.ex. '2 års garanti på arbete'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
               <div>
@@ -419,7 +419,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.cancellation}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, cancellation: e.target.value } })}
                   placeholder="T.ex. 'Avboka senast 24h innan'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>
             </div>

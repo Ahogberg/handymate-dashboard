@@ -147,7 +147,7 @@ async function findBookingReminders(
 
   const { data: bookings } = await supabase
     .from("booking")
-    .select("booking_id, customer_id, service_type, scheduled_start, scheduled_end")
+    .select("booking_id, customer_id, scheduled_start, scheduled_end, notes")
     .eq("business_id", rule.business_id)
     .in("status", ["pending", "confirmed"])
     .gte("scheduled_start", `${tomorrowStr}T00:00:00`)
@@ -192,7 +192,7 @@ async function findBookingReminders(
       .replace("{booking_id}", b.booking_id)
       .replace("{time}", time)
       .replace("{customer}", customerName)
-      .replace("{service_type}", b.service_type || "Jobb")
+      .replace("{service_type}", b.notes?.split(' — ')[0] || "Jobb")
 
     candidates.push({
       business_id: rule.business_id,
@@ -202,7 +202,7 @@ async function findBookingReminders(
       target_type: "booking",
       customer_id: b.customer_id,
       customer_name: customerName,
-      target_label: `${b.service_type || "Bokning"} imorgon kl ${time}`,
+      target_label: `${b.notes?.split(' — ')[0] || "Bokning"} imorgon kl ${time}`,
       agent_instruction: instruction,
     })
   }
@@ -353,7 +353,7 @@ async function findProjectCompletes(
   // Bookings marked as completed recently, with no linked invoice
   const { data: bookings } = await supabase
     .from("booking")
-    .select("booking_id, customer_id, service_type")
+    .select("booking_id, customer_id, notes")
     .eq("business_id", rule.business_id)
     .eq("status", "completed")
     .limit(20)
@@ -399,7 +399,7 @@ async function findProjectCompletes(
     const customerName = customerMap.get(b.customer_id) || "Okänd kund"
     const instruction = rule.message_template
       .replace("{booking_id}", b.booking_id)
-      .replace("{service_type}", b.service_type || "Jobb")
+      .replace("{service_type}", b.notes?.split(' — ')[0] || "Jobb")
       .replace("{customer}", customerName)
 
     candidates.push({
@@ -410,7 +410,7 @@ async function findProjectCompletes(
       target_type: "project",
       customer_id: b.customer_id,
       customer_name: customerName,
-      target_label: `${b.service_type || "Projekt"} klart — ${customerName}`,
+      target_label: `${b.notes?.split(' — ')[0] || "Projekt"} klart — ${customerName}`,
       agent_instruction: instruction,
     })
   }
@@ -430,7 +430,7 @@ async function findLeadQualify(
   // Conversations without a linked lead, created within the window
   const { data: conversations } = await supabase
     .from("conversations")
-    .select("conversation_id, business_id, phone_number, customer_name, created_at")
+    .select("conversation_id, business_id, phone_number, created_at")
     .eq("business_id", rule.business_id)
     .gt("created_at", cutoff.toISOString())
     .limit(10)
@@ -471,7 +471,7 @@ async function findLeadQualify(
       target_id: conv.conversation_id,
       target_type: "conversation",
       customer_id: null,
-      customer_name: conv.customer_name || null,
+      customer_name: null,
       target_label: `Nytt samtal från ${conv.phone_number || "okänt"}`,
       agent_instruction: instruction,
     })
@@ -795,6 +795,256 @@ async function processAutomations(supabase: SupabaseClient): Promise<{
   return results
 }
 
+// ── SMS Queue Processor ──────────────────────────────────
+// Sends queued SMS (night-blocked) when send_after has passed
+
+async function processSmsQueue(
+  supabase: SupabaseClient
+): Promise<{ sms_sent: number; sms_failed: number }> {
+  const results = { sms_sent: 0, sms_failed: 0 }
+
+  const { data: queued, error } = await supabase
+    .from("sms_queue")
+    .select("*")
+    .eq("status", "queued")
+    .lte("send_after", new Date().toISOString())
+    .order("send_after", { ascending: true })
+    .limit(50)
+
+  if (error || !queued || queued.length === 0) return results
+
+  const elksUser = Deno.env.get("ELKS_API_USER")
+  const elksPassword = Deno.env.get("ELKS_API_PASSWORD")
+  if (!elksUser || !elksPassword) {
+    console.error("[SmsQueue] Missing ELKS_API_USER or ELKS_API_PASSWORD secrets")
+    return results
+  }
+
+  console.log(`[SmsQueue] Processing ${queued.length} queued SMS`)
+
+  for (const sms of queued as any[]) {
+    try {
+      const response = await fetch("https://api.46elks.com/a1/sms", {
+        method: "POST",
+        headers: {
+          Authorization: "Basic " + btoa(`${elksUser}:${elksPassword}`),
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: new URLSearchParams({
+          from: sms.sender_name,
+          to: sms.phone_to,
+          message: sms.message,
+        }),
+      })
+
+      const elksResult = await response.json()
+
+      if (response.ok) {
+        await supabase
+          .from("sms_queue")
+          .update({ status: "sent", sent_at: new Date().toISOString() })
+          .eq("queue_id", sms.queue_id)
+
+        // Log to sms_log
+        await supabase.from("sms_log").insert({
+          sms_id: "sms_" + crypto.randomUUID().replace(/-/g, "").slice(0, 12),
+          business_id: sms.business_id,
+          direction: "outbound",
+          phone_from: sms.sender_name,
+          phone_to: sms.phone_to,
+          message: sms.message,
+          status: "sent",
+          elks_id: elksResult.id,
+          created_at: new Date().toISOString(),
+        }).catch(() => {})
+
+        // Log to sms_conversation for history
+        await supabase.from("sms_conversation").insert({
+          business_id: sms.business_id,
+          phone_number: sms.phone_to,
+          role: "assistant",
+          content: sms.message,
+          created_at: new Date().toISOString(),
+        }).catch(() => {})
+
+        results.sms_sent++
+        console.log(`[SmsQueue] Sent ${sms.queue_id} → ${sms.phone_to}`)
+      } else {
+        const errMsg = elksResult.message || `HTTP ${response.status}`
+        await supabase
+          .from("sms_queue")
+          .update({ status: "failed", error_message: errMsg, sent_at: new Date().toISOString() })
+          .eq("queue_id", sms.queue_id)
+
+        results.sms_failed++
+        console.error(`[SmsQueue] Failed ${sms.queue_id}: ${errMsg}`)
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Send failed"
+      await supabase
+        .from("sms_queue")
+        .update({ status: "failed", error_message: errMsg })
+        .eq("queue_id", sms.queue_id)
+
+      results.sms_failed++
+      console.error(`[SmsQueue] Error ${sms.queue_id}:`, err)
+    }
+  }
+
+  return results
+}
+
+// ── Daily Summary (Morning Report) ──────────────────────
+
+async function processDailySummary(
+  supabase: SupabaseClient
+): Promise<{ daily_summaries_triggered: number }> {
+  const results = { daily_summaries_triggered: 0 }
+
+  // Only run between 06:00–07:00 Swedish time
+  const now = new Date()
+  const swedenHour = parseInt(
+    new Intl.DateTimeFormat("sv-SE", {
+      hour: "numeric",
+      hour12: false,
+      timeZone: "Europe/Stockholm",
+    }).format(now)
+  )
+  if (swedenHour < 6 || swedenHour >= 7) return results
+
+  const today = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Stockholm",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now) // "YYYY-MM-DD"
+
+  // Find businesses with daily_summary automation enabled
+  const { data: rules } = await supabase
+    .from("automation_rules")
+    .select("rule_id, business_id, message_template, channel")
+    .eq("rule_type", "daily_summary")
+    .eq("enabled", true)
+
+  if (!rules || rules.length === 0) return results
+
+  for (const rule of rules as any[]) {
+    const idempotencyKey = `daily_summary::${rule.business_id}::${today}`
+
+    // Check if already triggered today
+    const { data: existing } = await supabase
+      .from("automation_queue")
+      .select("queue_id")
+      .eq("target_id", idempotencyKey)
+      .eq("rule_type", "daily_summary")
+      .single()
+
+    if (existing) continue
+
+    // Get business config for contact info
+    const { data: bizConfig } = await supabase
+      .from("business_config")
+      .select("phone_number, contact_email, business_name")
+      .eq("business_id", rule.business_id)
+      .single()
+
+    if (!bizConfig) continue
+
+    const instruction =
+      `Kör morgonrapport för ${today}. ` +
+      `Använd get_daily_stats för att hämta gårdagens statistik. ` +
+      `Skicka en kort SMS-sammanfattning (max 160 tecken, nyckeltal) till ${bizConfig.phone_number || "ägarens telefonnummer"}. ` +
+      (bizConfig.contact_email
+        ? `Skicka även en utförlig rapport via email till ${bizConfig.contact_email} med ämne "Morgonrapport ${today} — ${bizConfig.business_name}".`
+        : "")
+
+    // Queue it
+    const queueId = generateId("aq")
+    await supabase.from("automation_queue").insert({
+      queue_id: queueId,
+      business_id: rule.business_id,
+      rule_id: rule.rule_id,
+      rule_type: "daily_summary",
+      target_id: idempotencyKey,
+      target_type: "report",
+      customer_id: null,
+      customer_name: null,
+      target_label: `Morgonrapport ${today}`,
+      scheduled_at: now.toISOString(),
+      status: "pending",
+      attempt_number: 1,
+      agent_instruction: instruction,
+      created_at: now.toISOString(),
+    })
+
+    // Trigger the agent
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+
+      const agentResponse = await fetch(
+        `${supabaseUrl}/functions/v1/agent`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            trigger_type: "cron",
+            business_id: rule.business_id,
+            trigger_data: {
+              cron_type: "daily_summary",
+              instruction,
+              target_id: idempotencyKey,
+              target_type: "report",
+              queue_id: queueId,
+            },
+          }),
+        }
+      )
+
+      const agentResult = await agentResponse.json()
+
+      if (agentResponse.ok && agentResult.run_id) {
+        await supabase
+          .from("automation_queue")
+          .update({
+            status: "executed",
+            executed_at: new Date().toISOString(),
+            agent_run_id: agentResult.run_id,
+          })
+          .eq("queue_id", queueId)
+
+        results.daily_summaries_triggered++
+        console.log(
+          `[DailySummary] Triggered for ${rule.business_id} → run ${agentResult.run_id}`
+        )
+      } else {
+        await supabase
+          .from("automation_queue")
+          .update({
+            status: "failed",
+            executed_at: new Date().toISOString(),
+            error_message: agentResult.error || `HTTP ${agentResponse.status}`,
+          })
+          .eq("queue_id", queueId)
+      }
+    } catch (err) {
+      console.error(`[DailySummary] Error for ${rule.business_id}:`, err)
+      await supabase
+        .from("automation_queue")
+        .update({
+          status: "failed",
+          error_message: err instanceof Error ? err.message : "Trigger failed",
+        })
+        .eq("queue_id", queueId)
+    }
+  }
+
+  return results
+}
+
 // ── Edge Function Handler ────────────────────────────────
 
 serve(async (req: Request) => {
@@ -811,16 +1061,20 @@ serve(async (req: Request) => {
 
   try {
     const results = await processAutomations(supabase)
+    const smsQueueResults = await processSmsQueue(supabase)
+    const dailySummaryResults = await processDailySummary(supabase)
     const durationMs = Date.now() - startTime
 
     console.log(
       `[Automation] Complete in ${durationMs}ms:`,
-      JSON.stringify(results)
+      JSON.stringify({ ...results, ...smsQueueResults, ...dailySummaryResults })
     )
 
     return new Response(
       JSON.stringify({
         ...results,
+        ...smsQueueResults,
+        ...dailySummaryResults,
         duration_ms: durationMs,
         night_block: isNightBlock(),
         timestamp: new Date().toISOString(),

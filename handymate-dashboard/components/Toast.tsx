@@ -68,7 +68,7 @@ function iconBg(type: ToastType): string {
     case 'error':
       return 'bg-red-100 text-red-600'
     case 'info':
-      return 'bg-blue-100 text-blue-600'
+      return 'bg-teal-100 text-sky-700'
     case 'warning':
       return 'bg-amber-100 text-amber-600'
   }

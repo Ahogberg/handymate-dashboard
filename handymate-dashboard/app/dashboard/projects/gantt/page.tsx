@@ -176,7 +176,7 @@ export default function GanttPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gantt-vy</h1>
             <p className="text-gray-500 mt-1">Visualisera projekt och bokningar på en tidslinje</p>
           </div>
-          <Link href="/dashboard/projects" className="text-sm text-blue-600 hover:text-blue-500">
+          <Link href="/dashboard/projects" className="text-sm text-sky-700 hover:text-teal-600">
             ← Tillbaka till projekt
           </Link>
         </div>
@@ -248,7 +248,7 @@ export default function GanttPage() {
                       return (
                         <div
                           key={i}
-                          className={`text-center text-[10px] py-1 border-r border-gray-50 ${isWeekend ? 'bg-gray-50/50' : ''} ${isToday ? 'bg-blue-50' : ''}`}
+                          className={`text-center text-[10px] py-1 border-r border-gray-50 ${isWeekend ? 'bg-gray-50/50' : ''} ${isToday ? 'bg-teal-50' : ''}`}
                           style={{ width: `${100 / totalDays}%` }}
                         >
                           {showLabel ? day.getDate() : ''}
@@ -277,7 +277,7 @@ export default function GanttPage() {
                       <div key={project.project_id}>
                         <div className="flex border-b border-gray-100 hover:bg-gray-50/30">
                           <div className="w-52 flex-shrink-0 px-4 py-3 border-r border-gray-200">
-                            <Link href={`/dashboard/projects/${project.project_id}`} className="text-sm font-medium text-gray-900 hover:text-blue-600 truncate block">
+                            <Link href={`/dashboard/projects/${project.project_id}`} className="text-sm font-medium text-gray-900 hover:text-sky-700 truncate block">
                               {project.name}
                             </Link>
                             <p className="text-xs text-gray-400 truncate">{project.customer?.name || ''}</p>
@@ -372,7 +372,7 @@ export default function GanttPage() {
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-gray-500">
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-3 rounded bg-gradient-to-r from-indigo-500 to-purple-500" />
+            <div className="w-6 h-3 rounded bg-gradient-to-r from-teal-600 to-teal-600" />
             Projekt
           </div>
           <div className="flex items-center gap-1.5">

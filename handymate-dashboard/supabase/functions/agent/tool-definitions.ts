@@ -79,9 +79,9 @@ export const toolDefinitions = [
         phone_number: { type: "string", description: "Nytt telefonnummer" },
         email: { type: "string", description: "Ny e-post" },
         address_line: { type: "string", description: "Ny adress" },
-        job_status: {
-          type: "string",
-          description: "Ny status (lead/active/completed/inactive)",
+        customer_rating: {
+          type: "number",
+          description: "Kundbetyg (1-5)",
         },
       },
       required: ["customer_id"],
@@ -247,7 +247,7 @@ export const toolDefinitions = [
         },
         service_type: {
           type: "string",
-          description: "Typ av tjänst (t.ex. 'Elinstallation', 'Felsökning')",
+          description: "Typ av jobb (sparas i notes)",
         },
         scheduled_start: {
           type: "string",
@@ -262,7 +262,7 @@ export const toolDefinitions = [
           description: "Anteckningar (valfritt)",
         },
       },
-      required: ["customer_id", "service_type", "scheduled_start", "scheduled_end"],
+      required: ["customer_id", "scheduled_start", "scheduled_end"],
     },
   },
   {
@@ -488,6 +488,22 @@ export const toolDefinitions = [
         limit: {
           type: "number",
           description: "Max antal resultat (default 20)",
+        },
+      },
+      required: [],
+    },
+  },
+  // ── Stats ────────────────────────────────────────────────
+  {
+    name: "get_daily_stats",
+    description:
+      "Hämta daglig statistik: samtal, SMS, leads, offerter, bokningar, tid, intäkter. Använd för morgonrapport.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        date: {
+          type: "string",
+          description: "YYYY-MM-DD (default: idag)",
         },
       },
       required: [],

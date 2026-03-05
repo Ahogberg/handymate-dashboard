@@ -401,7 +401,7 @@ export default function QuoteDetailPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+      case 'sent': return 'bg-teal-600/20 text-teal-500 border-teal-500/30'
       case 'opened': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
       case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
       case 'declined': return 'bg-red-100 text-red-600 border-red-500/30'
@@ -434,8 +434,8 @@ export default function QuoteDetailPage() {
           switch (item.item_type) {
             case 'heading':
               return (
-                <div key={item.id} className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
-                  <p className="font-semibold text-blue-800 text-sm">{item.description}</p>
+                <div key={item.id} className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
+                  <p className="font-semibold text-teal-800 text-sm">{item.description}</p>
                 </div>
               )
 
@@ -505,7 +505,7 @@ export default function QuoteDetailPage() {
         {/* Labor */}
         {items.filter((i: any) => i.type === 'labor').length > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-blue-400 mb-2">Arbete</h3>
+            <h3 className="text-sm font-medium text-teal-500 mb-2">Arbete</h3>
             <div className="space-y-2">
               {items.filter((i: any) => i.type === 'labor').map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
@@ -561,7 +561,7 @@ export default function QuoteDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -577,8 +577,8 @@ export default function QuoteDetailPage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -616,7 +616,7 @@ export default function QuoteDetailPage() {
           {quote.status === 'draft' && (
             <button
               onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
             >
               <Send className="w-4 h-4" />
               Skicka offert
@@ -646,7 +646,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createProjectFromQuote}
                 disabled={creatingProject}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderKanban className="w-4 h-4" />}
                 Skapa projekt
@@ -654,7 +654,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createInvoiceFromQuote}
                 disabled={creatingInvoice}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                 Skapa faktura
@@ -716,7 +716,7 @@ export default function QuoteDetailPage() {
             {/* Customer */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-cyan-400" />
+                <User className="w-5 h-5 text-teal-400" />
                 Kund
               </h2>
               {quote.customer ? (
@@ -751,7 +751,7 @@ export default function QuoteDetailPage() {
             {(quote.reference_person || quote.customer_reference || quote.project_address) && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-blue-400" />
+                  <ClipboardList className="w-5 h-5 text-teal-500" />
                   Referenser
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -795,7 +795,7 @@ export default function QuoteDetailPage() {
             {quote.introduction_text && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-blue-400" />
+                  <FileText className="w-5 h-5 text-teal-500" />
                   Inledning
                 </h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{quote.introduction_text}</p>
@@ -838,7 +838,7 @@ export default function QuoteDetailPage() {
             {quote.payment_plan && quote.payment_plan.length > 0 && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-violet-500" />
+                  <CreditCard className="w-5 h-5 text-teal-500" />
                   Betalningsplan
                 </h2>
                 {quote.payment_terms_text && (
@@ -896,7 +896,7 @@ export default function QuoteDetailPage() {
                   <span className="text-gray-900">{formatCurrency(quote.material_total)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-3 flex justify-between">
-                  <span className="text-gray-500">Summa</span>
+                  <span className="text-gray-500">Netto (exkl. moms)</span>
                   <span className="text-gray-900">{formatCurrency(quote.subtotal)}</span>
                 </div>
                 {quote.discount_amount > 0 && (
@@ -910,7 +910,7 @@ export default function QuoteDetailPage() {
                   <span className="text-gray-900">{formatCurrency(quote.vat_amount)}</span>
                 </div>
                 <div className="border-t border-gray-300 pt-3 flex justify-between text-lg font-semibold">
-                  <span className="text-gray-900">Totalt</span>
+                  <span className="text-gray-900">Totalt inkl. moms</span>
                   <span className="text-gray-900">{formatCurrency(quote.total)}</span>
                 </div>
 
@@ -1007,7 +1007,7 @@ export default function QuoteDetailPage() {
             {/* Timeline */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-blue-600" />
+                <Clock className="w-5 h-5 text-sky-700" />
                 Historik
               </h2>
               <div className="space-y-3 text-sm">
@@ -1017,7 +1017,7 @@ export default function QuoteDetailPage() {
                 </div>
                 {quote.sent_at && (
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <div className="w-2 h-2 bg-teal-600 rounded-full"></div>
                     <span className="text-gray-500">Skickad {formatDate(quote.sent_at)}</span>
                   </div>
                 )}
@@ -1069,7 +1069,7 @@ export default function QuoteDetailPage() {
                 onClick={() => setSendMethod('sms')}
                 className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                   sendMethod === 'sms'
-                    ? 'bg-blue-100 border-blue-500 text-gray-900'
+                    ? 'bg-teal-100 border-teal-500 text-gray-900'
                     : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -1085,7 +1085,7 @@ export default function QuoteDetailPage() {
                   onClick={() => setSendMethod('email')}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                     sendMethod === 'email'
-                      ? 'bg-blue-100 border-blue-500 text-gray-900'
+                      ? 'bg-teal-100 border-teal-500 text-gray-900'
                       : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                   }`}
                 >
@@ -1102,7 +1102,7 @@ export default function QuoteDetailPage() {
                   onClick={() => setSendMethod('both')}
                   className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
                     sendMethod === 'both'
-                      ? 'bg-blue-100 border-blue-500 text-gray-900'
+                      ? 'bg-teal-100 border-teal-500 text-gray-900'
                       : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
                   }`}
                 >
@@ -1125,7 +1125,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={sendQuote}
                 disabled={sending}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 Skicka
@@ -1148,7 +1148,7 @@ export default function QuoteDetailPage() {
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
             <div className="flex gap-3">
@@ -1161,7 +1161,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
               </button>

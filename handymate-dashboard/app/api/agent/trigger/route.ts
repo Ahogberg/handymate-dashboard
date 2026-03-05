@@ -8,9 +8,9 @@ import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
 
-// This route allows triggering the AI agent from the dashboard
-// without going through Supabase Edge Functions — useful for testing
-// and for the manual trigger use case.
+// Central AI agent endpoint — handles ALL inbound triggers:
+// - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
+// Supports both user-session auth and internal server-to-server auth.
 
 // Allow up to 60s for multi-step agent runs (Vercel Pro)
 export const maxDuration = 60
@@ -20,13 +20,28 @@ const MODEL = 'claude-sonnet-4-20250514'
 
 export async function POST(request: NextRequest) {
   try {
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+    const supabase = getServerSupabase()
     const body = await request.json()
-    const { trigger_type, trigger_data } = body
+    const { trigger_type, trigger_data, idempotency_key } = body
+
+    // ── Auth: support both user-session and internal server-to-server ──
+    const internalSecret = request.headers.get('x-internal-secret')
+    let businessId: string
+
+    if (internalSecret && internalSecret === process.env.CRON_SECRET) {
+      // Internal call from webhooks/crons — use business_id from body
+      if (!body.business_id) {
+        return NextResponse.json({ error: 'Missing business_id for internal call' }, { status: 400 })
+      }
+      businessId = body.business_id
+    } else {
+      // External call from dashboard — use cookie auth
+      const business = await getAuthenticatedBusiness(request)
+      if (!business) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      businessId = business.business_id
+    }
 
     if (!trigger_type) {
       return NextResponse.json(
@@ -35,7 +50,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = getServerSupabase()
+    // ── Idempotency check — prevent duplicate runs ──
+    if (idempotency_key) {
+      const { data: existing } = await supabase
+        .from('agent_runs')
+        .select('run_id, status, final_response, tool_calls, duration_ms')
+        .eq('idempotency_key', idempotency_key)
+        .single()
+
+      if (existing) {
+        return NextResponse.json({
+          run_id: existing.run_id,
+          duplicate: true,
+          status: existing.status,
+          final_response: existing.final_response,
+          tool_calls: existing.tool_calls,
+          duration_ms: existing.duration_ms,
+        })
+      }
+    }
     const anthropic = new Anthropic({
       apiKey: process.env.ANTHROPIC_API_KEY!,
     })
@@ -44,9 +77,9 @@ export async function POST(request: NextRequest) {
     const { data: bizConfig } = await supabase
       .from('business_config')
       .select(
-        'business_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, pricing_settings, knowledge_base, working_hours'
+        'business_id, user_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, pricing_settings, knowledge_base, working_hours'
       )
-      .eq('business_id', business.business_id)
+      .eq('business_id', businessId)
       .single()
 
     if (!bizConfig) {
@@ -75,8 +108,8 @@ export async function POST(request: NextRequest) {
     const { data: businessUser } = await supabase
       .from('business_users')
       .select('id')
-      .eq('business_id', business.business_id)
-      .eq('user_id', business.user_id)
+      .eq('business_id', businessId)
+      .eq('user_id', bizConfig.user_id)
       .eq('is_active', true)
       .single()
 
@@ -122,7 +155,7 @@ export async function POST(request: NextRequest) {
       const { data: conn } = await supabase
         .from('calendar_connection')
         .select('id, access_token, refresh_token, token_expires_at, calendar_id, account_email, gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, sync_enabled')
-        .eq('business_id', business.business_id)
+        .eq('business_id', businessId)
         .eq('provider', 'google')
         .maybeSingle()
 
@@ -237,7 +270,7 @@ export async function POST(request: NextRequest) {
           toolUse.name,
           toolUse.input as Record<string, unknown>,
           supabase,
-          business.business_id,
+          businessId,
           context
         )
 
@@ -273,7 +306,7 @@ export async function POST(request: NextRequest) {
         .from('agent_runs')
         .insert({
           run_id: runId,
-          business_id: business.business_id,
+          business_id: businessId,
           trigger_type,
           trigger_data: trigger_data || {},
           steps,
@@ -283,10 +316,11 @@ export async function POST(request: NextRequest) {
           estimated_cost: estimatedCost,
           duration_ms: durationMs,
           status: 'completed',
+          idempotency_key: idempotency_key || null,
           created_at: new Date().toISOString(),
         })
-    } catch {
-      // Non-blocking — log insert failure doesn't affect response
+    } catch (insertErr: any) {
+      console.error('[agent] Failed to insert agent_run:', insertErr?.message || insertErr)
     }
 
     return NextResponse.json({

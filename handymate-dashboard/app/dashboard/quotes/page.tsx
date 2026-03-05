@@ -61,7 +61,7 @@ export default function QuotesPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-blue-100 text-blue-400 border-blue-500/30'
+      case 'sent': return 'bg-teal-100 text-teal-500 border-teal-500/30'
       case 'opened': return 'bg-amber-100 text-amber-600 border-amber-200'
       case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'declined': return 'bg-red-100 text-red-600 border-red-200'
@@ -119,8 +119,8 @@ export default function QuotesPage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-cyan-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-7xl mx-auto">
@@ -132,7 +132,7 @@ export default function QuotesPage() {
           </div>
           <Link
             href="/dashboard/quotes/new"
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-xl font-medium text-white hover:opacity-90 transition-all"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 transition-all"
           >
             <Plus className="w-4 h-4" />
             Ny offert
@@ -147,7 +147,7 @@ export default function QuotesPage() {
           </div>
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <p className="text-gray-400 text-sm">Skickade</p>
-            <p className="text-2xl font-bold text-blue-400">{stats.sent}</p>
+            <p className="text-2xl font-bold text-teal-500">{stats.sent}</p>
           </div>
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <p className="text-gray-400 text-sm">Accepterade</p>
@@ -155,7 +155,7 @@ export default function QuotesPage() {
           </div>
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <p className="text-gray-400 text-sm">Acceptrate</p>
-            <p className="text-2xl font-bold text-blue-600">{stats.acceptRate}%</p>
+            <p className="text-2xl font-bold text-sky-700">{stats.acceptRate}%</p>
           </div>
         </div>
 
@@ -168,7 +168,7 @@ export default function QuotesPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Sök offert eller kund..."
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             />
           </div>
           <div className="flex gap-2 overflow-x-auto">
@@ -178,7 +178,7 @@ export default function QuotesPage() {
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
                   filter === f
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white'
+                    ? 'bg-teal-600 text-white'
                     : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}
               >
@@ -194,7 +194,7 @@ export default function QuotesPage() {
             <div className="text-center py-12">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-400">Inga offerter ännu</p>
-              <Link href="/dashboard/quotes/new" className="mt-4 text-blue-600 hover:text-blue-500 inline-block">
+              <Link href="/dashboard/quotes/new" className="mt-4 text-sky-700 hover:text-teal-600 inline-block">
                 Skapa din första offert →
               </Link>
             </div>

@@ -27,12 +27,12 @@ function getRoleBadge(role: string) {
     return {
       label: 'Ägare',
       className:
-        'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-500 border-blue-300',
+        'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-teal-600 border-teal-300',
     }
   if (role === 'admin')
     return {
       label: 'Admin',
-      className: 'bg-blue-100 text-blue-400 border-blue-500/30',
+      className: 'bg-teal-100 text-teal-500 border-teal-500/30',
     }
   return {
     label: 'Anställd',
@@ -98,7 +98,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
@@ -121,8 +121,8 @@ export default function ProfilePage() {
   return (
     <div className="relative p-4 sm:p-8 max-w-3xl mx-auto">
       {/* Background gradient blobs */}
-      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 bg-blue-50 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -top-16 -right-32 w-80 h-80 bg-cyan-50 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-32 -left-32 w-96 h-96 bg-teal-50 rounded-full blur-3xl" />
+      <div className="pointer-events-none absolute -top-16 -right-32 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
 
       {/* Header */}
       <div className="relative mb-8">
@@ -166,7 +166,7 @@ export default function ProfilePage() {
       {/* Edit form card */}
       <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <User className="w-5 h-5 text-blue-600" />
+          <User className="w-5 h-5 text-sky-700" />
           Redigera profil
         </h3>
 
@@ -180,7 +180,7 @@ export default function ProfilePage() {
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 outline-none transition-colors"
               placeholder="Ditt namn"
             />
           </div>
@@ -194,7 +194,7 @@ export default function ProfilePage() {
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 outline-none transition-colors"
               placeholder="070-123 45 67"
             />
           </div>
@@ -208,7 +208,7 @@ export default function ProfilePage() {
               type="text"
               value={form.avatar_url}
               onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 outline-none transition-colors"
               placeholder="https://..."
             />
           </div>
@@ -227,7 +227,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-teal-600 text-white font-medium rounded-xl hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -242,7 +242,7 @@ export default function ProfilePage() {
       {/* Info card */}
       <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <Shield className="w-5 h-5 text-blue-600" />
+          <Shield className="w-5 h-5 text-sky-700" />
           Kontoinformation
         </h3>
 
@@ -297,7 +297,7 @@ export default function ProfilePage() {
       {/* Connected Calendars */}
       <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mt-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
-          <CalendarDays className="w-5 h-5 text-blue-600" />
+          <CalendarDays className="w-5 h-5 text-sky-700" />
           Anslutna kalendrar
         </h3>
 
@@ -305,8 +305,8 @@ export default function ProfilePage() {
           {/* Google Calendar */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-100">
-                <CalendarDays className="w-5 h-5 text-blue-400" />
+              <div className="p-2 rounded-lg bg-teal-100">
+                <CalendarDays className="w-5 h-5 text-teal-500" />
               </div>
               <div>
                 <p className="font-medium text-gray-900">Google Calendar</p>
@@ -323,7 +323,7 @@ export default function ProfilePage() {
               ) : (
                 <a
                   href="/api/google/connect"
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-blue-100 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs bg-teal-100 text-teal-500 border border-teal-500/30 rounded-lg hover:bg-teal-600/30"
                 >
                   <ExternalLink className="w-3 h-3" /> Anslut
                 </a>
@@ -334,8 +334,8 @@ export default function ProfilePage() {
           {/* Outlook placeholder */}
           <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl opacity-60">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-600/20">
-                <CalendarDays className="w-5 h-5 text-blue-700" />
+              <div className="p-2 rounded-lg bg-teal-700/20">
+                <CalendarDays className="w-5 h-5 text-teal-700" />
               </div>
               <div>
                 <p className="font-medium text-gray-900">Microsoft Outlook</p>

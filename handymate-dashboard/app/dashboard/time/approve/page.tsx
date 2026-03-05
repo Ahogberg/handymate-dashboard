@@ -121,7 +121,7 @@ export default function ApprovePage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 mr-4">
+            <div className="p-3 rounded-xl bg-amber-600 mr-4">
               <ClipboardCheck className="w-6 h-6 text-white" />
             </div>
             <div>

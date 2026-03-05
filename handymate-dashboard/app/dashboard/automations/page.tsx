@@ -163,8 +163,8 @@ const categories: AutomationCategory[] = [
     id: 'ai',
     title: 'AI & Samtal',
     icon: Phone,
-    color: 'text-violet-600',
-    bgColor: 'bg-violet-50',
+    color: 'text-teal-700',
+    bgColor: 'bg-teal-50',
     cards: [
       { key: 'ai_analyze_calls', label: 'AI-analys av samtal', description: 'Analyserar transkriberade samtal med AI för att identifiera leads och kundintention' },
       { key: 'ai_create_leads', label: 'Skapa leads automatiskt', description: 'Skapar nya leads i pipeline automatiskt från analyserade samtal' },
@@ -177,8 +177,8 @@ const categories: AutomationCategory[] = [
     id: 'pipeline',
     title: 'Pipeline',
     icon: TrendingUp,
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50',
+    color: 'text-sky-700',
+    bgColor: 'bg-teal-50',
     cards: [
       { key: 'pipeline_move_on_quote_sent', label: 'Flytta vid offert skickad', description: 'Flyttar deal till "Offert skickad" när offert skickas' },
       { key: 'pipeline_move_on_quote_accepted', label: 'Flytta vid offert accepterad', description: 'Flyttar deal till "Accepterad" när kund signerar offert' },
@@ -224,8 +224,8 @@ const categories: AutomationCategory[] = [
     id: 'accounting',
     title: 'Bokföring',
     icon: FileText,
-    color: 'text-cyan-600',
-    bgColor: 'bg-cyan-50',
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-50',
     cards: [
       { key: 'fortnox_sync_invoices', label: 'Synka fakturor', description: 'Synkronisera fakturor automatiskt till Fortnox' },
       { key: 'fortnox_sync_customers', label: 'Synka kunder', description: 'Synkronisera kundregister automatiskt till Fortnox' },
@@ -496,9 +496,9 @@ export default function AutomationsPage() {
   }
 
   const triggerColors: Record<string, string> = {
-    quote_sent: 'bg-blue-50 text-blue-700',
+    quote_sent: 'bg-teal-50 text-teal-800',
     lead_created: 'bg-emerald-50 text-emerald-700',
-    job_completed: 'bg-violet-50 text-violet-700',
+    job_completed: 'bg-teal-50 text-teal-800',
     invoice_overdue: 'bg-red-50 text-red-700',
   }
 
@@ -507,7 +507,7 @@ export default function AutomationsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-sky-600" />
       </div>
     )
   }
@@ -519,7 +519,7 @@ export default function AutomationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-teal-700 rounded-xl flex items-center justify-center">
                 <Zap className="w-5 h-5 text-white" />
               </div>
               Automationer
@@ -538,7 +538,7 @@ export default function AutomationsPage() {
               <button
                 onClick={saveSettings}
                 disabled={saving}
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
+                className="px-5 py-2.5 bg-teal-700 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Spara
@@ -586,7 +586,7 @@ export default function AutomationsPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-8 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-500" />
+                <Activity className="w-4 h-4 text-sky-600" />
                 Senaste aktivitet
               </h3>
               <button onClick={() => setShowActivity(false)} className="text-gray-400 hover:text-gray-600">
@@ -614,9 +614,9 @@ export default function AutomationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          item.type === 'pipeline' ? 'bg-blue-50 text-blue-700' :
+                          item.type === 'pipeline' ? 'bg-teal-50 text-teal-800' :
                           item.type === 'sms' ? 'bg-emerald-50 text-emerald-700' :
-                          item.type === 'ai' ? 'bg-violet-50 text-violet-700' :
+                          item.type === 'ai' ? 'bg-teal-50 text-teal-800' :
                           'bg-gray-100 text-gray-600'
                         }`}>
                           {item.type === 'pipeline' ? 'Pipeline' :
@@ -713,7 +713,7 @@ export default function AutomationsPage() {
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 p-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center">
                   <Phone className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -729,9 +729,9 @@ export default function AutomationsPage() {
                   step={5}
                   value={settings.ai_confidence_threshold}
                   onChange={(e) => updateNumericSetting('ai_confidence_threshold', parseInt(e.target.value))}
-                  className="w-32 accent-violet-500"
+                  className="w-32 accent-teal-600"
                 />
-                <span className="text-sm font-bold text-violet-600 w-10 text-right">{settings.ai_confidence_threshold}%</span>
+                <span className="text-sm font-bold text-teal-700 w-10 text-right">{settings.ai_confidence_threshold}%</span>
               </div>
             </div>
           </div>
@@ -743,7 +743,7 @@ export default function AutomationsPage() {
             {/* Header with master toggle */}
             <div className="px-5 py-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center">
+                <div className="w-10 h-10 bg-amber-600 rounded-xl flex items-center justify-center">
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -905,7 +905,7 @@ export default function AutomationsPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm mb-6 overflow-hidden">
           <div className="px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-rose-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-slate-600 rounded-xl flex items-center justify-center">
                 <Mail className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -1018,7 +1018,7 @@ export default function AutomationsPage() {
                                   {seq.steps.map((step, i) => (
                                     <div key={i} className="flex items-center gap-1">
                                       <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium ${
-                                        step.channel === 'sms' ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'
+                                        step.channel === 'sms' ? 'bg-emerald-50 text-emerald-700' : 'bg-teal-50 text-teal-800'
                                       }`}>
                                         {step.channel === 'sms' ? <MessageSquare className="w-2.5 h-2.5" /> : <Mail className="w-2.5 h-2.5" />}
                                         Dag {step.delay_days}
@@ -1224,7 +1224,7 @@ export default function AutomationsPage() {
                         <div
                           className={`h-full rounded-full transition-all ${
                             activeCount === totalCount ? 'bg-emerald-500' :
-                            activeCount > 0 ? 'bg-blue-500' : 'bg-gray-300'
+                            activeCount > 0 ? 'bg-teal-500' : 'bg-gray-300'
                           }`}
                           style={{ width: `${(activeCount / totalCount) * 100}%` }}
                         />
@@ -1287,7 +1287,7 @@ export default function AutomationsPage() {
                             <button
                               onClick={() => toggleSetting(card.key)}
                               className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors flex-shrink-0 ${
-                                isActive ? 'bg-blue-500' : 'bg-gray-300'
+                                isActive ? 'bg-teal-500' : 'bg-gray-300'
                               }`}
                             >
                               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
@@ -1322,7 +1322,7 @@ export default function AutomationsPage() {
                       {category.settingsLink && (
                         <Link
                           href={category.settingsLink}
-                          className="text-sm text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                          className="text-sm text-sky-700 hover:text-teal-800 flex items-center gap-1"
                         >
                           Detaljerade inställningar <ExternalLink className="w-3.5 h-3.5" />
                         </Link>
@@ -1341,7 +1341,7 @@ export default function AutomationsPage() {
             <button
               onClick={saveSettings}
               disabled={saving}
-              className="px-5 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
+              className="px-5 py-3 bg-teal-700 text-white rounded-full text-sm font-semibold shadow-lg hover:shadow-xl transition-all flex items-center gap-2 disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Spara

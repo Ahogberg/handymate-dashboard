@@ -29,8 +29,12 @@ interface OnboardingChecklistProps {
     working_hours?: any
     logo_url?: string | null
     onboarding_dismissed?: boolean
+    google_connected?: boolean
+    services_offered?: string[]
+    default_hourly_rate?: number
   }
   callCount: number
+  customerCount?: number
   onDismiss: () => void
   onUpdate: () => void
 }
@@ -52,6 +56,7 @@ export default function OnboardingChecklist({
   businessId,
   businessConfig,
   callCount,
+  customerCount = 0,
   onDismiss,
   onUpdate,
 }: OnboardingChecklistProps) {
@@ -143,7 +148,31 @@ export default function OnboardingChecklist({
     })
   }
 
+  const servicesConfigured = (businessConfig.services_offered?.length || 0) > 0 && (businessConfig.default_hourly_rate || 0) > 0
+
   items.push(
+    {
+      id: 'services',
+      label: 'Tjänster & priser konfigurerade',
+      description: servicesConfigured ? undefined : 'Ställ in dina tjänster och timpris',
+      completed: servicesConfigured,
+      action: servicesConfigured ? undefined : {
+        type: 'link',
+        label: 'Konfigurera',
+        href: '/dashboard/settings/pricelist',
+      },
+    },
+    {
+      id: 'google',
+      label: 'Google Calendar kopplad',
+      description: businessConfig.google_connected ? undefined : 'Synka bokningar automatiskt',
+      completed: !!businessConfig.google_connected,
+      action: businessConfig.google_connected ? undefined : {
+        type: 'link',
+        label: 'Koppla',
+        href: '/dashboard/settings',
+      },
+    },
     {
       id: 'hours',
       label: 'Öppettider inställda',
@@ -156,6 +185,17 @@ export default function OnboardingChecklist({
       },
     },
     {
+      id: 'customers',
+      label: 'Importera kunder',
+      description: customerCount > 0 ? `${customerCount} kunder` : 'Importera befintliga kunder via CSV',
+      completed: customerCount > 0,
+      action: customerCount > 0 ? undefined : {
+        type: 'link',
+        label: 'Importera',
+        href: '/dashboard/customers/import',
+      },
+    },
+    {
       id: 'test_call',
       label: 'Första testsamtalet',
       description: callCount > 0 ? `${callCount} samtal mottagna` : 'Ring ditt nummer för att testa',
@@ -165,7 +205,6 @@ export default function OnboardingChecklist({
         label: 'Se instruktioner',
         href: '#test-call-instructions',
         onClick: () => {
-          // Show test call modal or instructions
           toast.info(`Ring ${businessConfig.assigned_phone_number || 'ditt tilldelade nummer'} för att testa AI-assistenten.`)
         },
       },
@@ -209,11 +248,11 @@ export default function OnboardingChecklist({
   }
 
   return (
-    <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-2xl p-5 mb-6">
+    <div className="bg-gradient-to-r from-teal-600/10 to-teal-500/10 border border-teal-500/20 rounded-2xl p-5 mb-6">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500">
+          <div className="p-2 rounded-xl bg-teal-600">
             <Sparkles className="w-5 h-5 text-gray-900" />
           </div>
           <div>
@@ -233,7 +272,7 @@ export default function OnboardingChecklist({
       {/* Progress bar */}
       <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
         <div
-          className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full transition-all duration-500"
+          className="h-full bg-teal-600 rounded-full transition-all duration-500"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -274,7 +313,7 @@ export default function OnboardingChecklist({
                 {item.action.type === 'link' && item.action.href && (
                   <Link
                     href={item.action.href}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
                   >
                     {item.action.label}
                     <ChevronRight className="w-3 h-3" />
@@ -284,7 +323,7 @@ export default function OnboardingChecklist({
                   <button
                     onClick={item.action.onClick}
                     disabled={loading === item.id || resendingEmail}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
                   >
                     {(loading === item.id || (item.id === 'email' && resendingEmail)) ? (
                       <Loader2 className="w-3 h-3 animate-spin" />
@@ -296,7 +335,7 @@ export default function OnboardingChecklist({
                 {item.action.type === 'external' && item.action.onClick && (
                   <button
                     onClick={item.action.onClick}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex-shrink-0"
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
                   >
                     {item.action.label}
                     <ExternalLink className="w-3 h-3" />
