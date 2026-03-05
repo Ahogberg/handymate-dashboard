@@ -66,7 +66,7 @@ export async function PUT(request: NextRequest) {
       'slug', 'is_published', 'hero_headline', 'hero_description',
       'about_text', 'hero_image_url', 'gallery_images', 'color_scheme',
       'service_descriptions', 'meta_title', 'meta_description',
-      'sections', 'show_chat_widget',
+      'sections', 'show_chat_widget', 'certifications',
     ]
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }

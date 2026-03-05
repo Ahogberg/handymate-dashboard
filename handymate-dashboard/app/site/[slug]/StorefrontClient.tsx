@@ -24,6 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ArrowRight,
+  Clock,
+  Award,
 } from 'lucide-react'
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ interface StorefrontData {
   service_descriptions: Record<string, string>
   sections: string[]
   show_chat_widget: boolean
+  certifications: string | null
 }
 
 interface BusinessData {
@@ -60,6 +63,7 @@ interface BusinessData {
   google_review_url: string | null
   widget_enabled: boolean
   plan: string | null
+  working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
 }
 
 interface PriceItem {
@@ -170,6 +174,20 @@ function getServiceIcon(name: string) {
   }
   return Settings2
 }
+
+// ─── Day names & helpers ─────────────────────────────────────────────
+
+const DAY_NAMES: Record<string, string> = {
+  monday: 'Måndag',
+  tuesday: 'Tisdag',
+  wednesday: 'Onsdag',
+  thursday: 'Torsdag',
+  friday: 'Fredag',
+  saturday: 'Lördag',
+  sunday: 'Söndag',
+}
+
+const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
 // ─── Scroll animation hook ───────────────────────────────────────────
 
@@ -307,6 +325,24 @@ export default function StorefrontClient({
 
   // Gallery images
   const galleryImages = storefront.gallery_images || []
+
+  // Certifications
+  const certifications = storefront.certifications
+    ? storefront.certifications.split(',').map(s => s.trim()).filter(Boolean)
+    : []
+
+  // Working hours for footer
+  const workingHoursEntries = business.working_hours
+    ? DAY_ORDER
+        .filter(day => {
+          const d = (business.working_hours as Record<string, { enabled: boolean; start: string; end: string }>)[day]
+          return d?.enabled
+        })
+        .map(day => {
+          const d = (business.working_hours as Record<string, { enabled: boolean; start: string; end: string }>)[day]
+          return { day: DAY_NAMES[day], hours: `${d.start}–${d.end}` }
+        })
+    : []
 
   return (
     <div ref={animRef} className="min-h-screen bg-white text-gray-900" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
@@ -653,6 +689,19 @@ export default function StorefrontClient({
                     <p key={i} className="text-lg text-gray-600 leading-relaxed">{paragraph}</p>
                   ))}
                 </div>
+                {certifications.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-6">
+                    {certifications.map(cert => (
+                      <span
+                        key={cert}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${c.accentBg} ${c.accentText}`}
+                      >
+                        <Award className="w-3.5 h-3.5" />
+                        {cert}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -914,19 +963,87 @@ export default function StorefrontClient({
       )}
 
       {/* ═══════════ FOOTER ═══════════ */}
-      <footer className="bg-gray-900 py-8">
+      <footer className="bg-gray-900 py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-            <span>&copy; {new Date().getFullYear()} {business.business_name}</span>
-            <a
-              href="https://handymate.se"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-gray-500 hover:text-gray-300 transition-colors"
-            >
-              Skapad med Handymate
-            </a>
-          </div>
+          {(workingHoursEntries.length > 0 || certifications.length > 0) ? (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+                {/* Column 1: Company info */}
+                <div>
+                  <h4 className="text-white font-semibold mb-3">{business.business_name}</h4>
+                  <div className="space-y-2 text-sm text-gray-400">
+                    {phone && (
+                      <a href={`tel:${phone.replace(/\s/g, '')}`} className="flex items-center gap-2 hover:text-gray-200 transition-colors">
+                        <Phone className="w-4 h-4" /> {phone}
+                      </a>
+                    )}
+                    {business.contact_email && (
+                      <a href={`mailto:${business.contact_email}`} className="flex items-center gap-2 hover:text-gray-200 transition-colors">
+                        <Mail className="w-4 h-4" /> {business.contact_email}
+                      </a>
+                    )}
+                    {business.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4" /> {business.address}
+                      </div>
+                    )}
+                    {business.service_area && (
+                      <div className="flex items-center gap-2">
+                        <Map className="w-4 h-4" /> {business.service_area}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Column 2: Working hours */}
+                {workingHoursEntries.length > 0 && (
+                  <div>
+                    <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4" /> Öppettider
+                    </h4>
+                    <div className="space-y-1.5 text-sm text-gray-400">
+                      {workingHoursEntries.map(entry => (
+                        <div key={entry.day} className="flex justify-between">
+                          <span>{entry.day}</span>
+                          <span className="text-gray-300">{entry.hours}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Column 3: Certifications */}
+                {certifications.length > 0 && (
+                  <div>
+                    <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <Award className="w-4 h-4" /> Certifieringar
+                    </h4>
+                    <div className="space-y-2 text-sm text-gray-400">
+                      {certifications.map(cert => (
+                        <div key={cert} className="flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          {cert}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="border-t border-gray-800 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+                <span>&copy; {new Date().getFullYear()} {business.business_name}</span>
+                <a href="https://handymate.se" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">
+                  Skapad med Handymate
+                </a>
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
+              <span>&copy; {new Date().getFullYear()} {business.business_name}</span>
+              <a href="https://handymate.se" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-300 transition-colors">
+                Skapad med Handymate
+              </a>
+            </div>
+          )}
         </div>
       </footer>
 

@@ -26,6 +26,7 @@ interface StorefrontData {
   meta_description: string | null
   sections: string[]
   show_chat_widget: boolean
+  certifications: string | null
 }
 
 interface BusinessData {
@@ -45,6 +46,7 @@ interface BusinessData {
   google_review_url: string | null
   widget_enabled: boolean
   plan: string | null
+  working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
 }
 
 interface PriceItem {
@@ -75,7 +77,7 @@ async function getStorefrontData(slug: string) {
 
   const { data: business } = await supabase
     .from('business_config')
-    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, plan')
+    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, plan, working_hours')
     .eq('business_id', storefront.business_id)
     .single()
 

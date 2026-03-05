@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { getImagesForBranch } from '@/lib/industry-images'
 
 function generateSlug(businessName: string): string {
   return businessName
@@ -130,6 +131,10 @@ Svara med ENBART JSON (inget annat). Ingen markdown, inga code blocks.`
       .eq('business_id', business.business_id)
       .maybeSingle()
 
+    // Auto-set hero image from industry images
+    const branchImages = getImagesForBranch(config.branch)
+    const heroImageUrl = branchImages.length > 0 ? branchImages[0].url : null
+
     const storefrontData = {
       business_id: business.business_id,
       slug,
@@ -141,6 +146,7 @@ Svara med ENBART JSON (inget annat). Ingen markdown, inga code blocks.`
       meta_title: generated.meta_title as string || config.business_name,
       meta_description: generated.meta_description as string || '',
       color_scheme: 'blue',
+      hero_image_url: heroImageUrl,
       updated_at: new Date().toISOString(),
     }
 

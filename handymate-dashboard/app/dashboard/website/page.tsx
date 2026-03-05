@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
 import UpgradePrompt from '@/components/UpgradePrompt'
+import { getImagesForBranch, type IndustryImage } from '@/lib/industry-images'
 import {
   Globe,
   Loader2,
@@ -22,6 +23,16 @@ import {
   Star,
   Image,
   Palette,
+  ChevronDown,
+  ChevronUp,
+  AlertTriangle,
+  Settings,
+  ImageIcon,
+  Type,
+  Award,
+  Search,
+  ToggleLeft,
+  X,
 } from 'lucide-react'
 
 interface Storefront {
@@ -41,32 +52,156 @@ interface Storefront {
   show_chat_widget: boolean
   page_views: number
   contact_form_submissions: number
+  certifications: string | null
   created_at: string
   updated_at: string
 }
 
+interface BusinessConfig {
+  business_name: string
+  contact_name: string
+  contact_email: string
+  phone_number: string
+  address: string
+  service_area: string
+  branch: string
+  services_offered: string[]
+  working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
+}
+
+interface WorkingDay {
+  enabled: boolean
+  start: string
+  end: string
+}
+
 const COLOR_OPTIONS = [
-  { id: 'blue', label: 'Blå', color: '#2563eb' },
-  { id: 'green', label: 'Grön', color: '#059669' },
-  { id: 'teal', label: 'Teal', color: '#0d9488' },
-  { id: 'orange', label: 'Orange', color: '#ea580c' },
-  { id: 'slate', label: 'Mörk', color: '#334155' },
+  { id: 'blue', label: 'Blå', color: '#2563eb', gradient: 'from-teal-700 via-blue-700 to-indigo-900' },
+  { id: 'green', label: 'Grön', color: '#059669', gradient: 'from-green-600 via-emerald-700 to-teal-900' },
+  { id: 'teal', label: 'Teal', color: '#0d9488', gradient: 'from-teal-600 via-teal-700 to-teal-900' },
+  { id: 'orange', label: 'Orange', color: '#ea580c', gradient: 'from-orange-500 via-orange-600 to-red-800' },
+  { id: 'slate', label: 'Mörk', color: '#334155', gradient: 'from-slate-700 via-slate-800 to-gray-900' },
 ]
 
-const SECTION_LABELS: Record<string, string> = {
-  hero: 'Hero',
-  services: 'Tjänster',
-  about: 'Om oss',
-  gallery: 'Bildgalleri',
-  reviews: 'Recensioner',
-  contact: 'Kontakt',
+const DAY_NAMES: Record<string, string> = {
+  monday: 'Mån',
+  tuesday: 'Tis',
+  wednesday: 'Ons',
+  thursday: 'Tor',
+  friday: 'Fre',
+  saturday: 'Lör',
+  sunday: 'Sön',
 }
+
+const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+
+// ─── Completeness checks ─────────────────────────────────────────
+
+interface CheckItem {
+  label: string
+  done: boolean
+  weight: number
+  fixHint?: string
+}
+
+function getCompletenessItems(
+  storefront: Storefront | null,
+  config: BusinessConfig | null,
+  editHeadline: string,
+  editDescription: string,
+  editAbout: string,
+  editHeroImageUrl: string | null,
+  editCertifications: string,
+): CheckItem[] {
+  const businessName = config?.business_name || ''
+  const isNameOk = businessName.length >= 4 && !/^test/i.test(businessName.trim())
+
+  const hasWorkingHours = config?.working_hours
+    ? Object.values(config.working_hours).some((d: WorkingDay) => d.enabled)
+    : false
+
+  return [
+    { label: 'Företagsnamn', done: isNameOk, weight: 1, fixHint: !isNameOk ? 'Ändra i Inställningar' : undefined },
+    { label: 'Rubrik', done: editHeadline.length > 3, weight: 1 },
+    { label: 'Beskrivning', done: editDescription.length > 10, weight: 1 },
+    { label: 'Telefonnummer', done: !!(config?.phone_number), weight: 1, fixHint: !config?.phone_number ? 'Lägg till i Inställningar' : undefined },
+    { label: 'E-post', done: !!(config?.contact_email), weight: 0.5, fixHint: !config?.contact_email ? 'Lägg till i Inställningar' : undefined },
+    { label: 'Serviceområde', done: !!(config?.service_area), weight: 0.5, fixHint: !config?.service_area ? 'Lägg till i Inställningar' : undefined },
+    { label: 'Öppettider', done: hasWorkingHours, weight: 0.5, fixHint: !hasWorkingHours ? 'Ställ in i Inställningar' : undefined },
+    { label: 'Hero-bild', done: !!editHeroImageUrl, weight: 1.5 },
+    { label: 'Färgschema', done: true, weight: 0.5 },
+    { label: 'Tjänster', done: (config?.services_offered?.length || 0) > 0, weight: 1, fixHint: (config?.services_offered?.length || 0) === 0 ? 'Lägg till i Inställningar' : undefined },
+    { label: 'Om oss-text', done: editAbout.length > 20, weight: 1 },
+    { label: 'Certifieringar', done: editCertifications.trim().length > 0, weight: 0.5 },
+  ]
+}
+
+function calculateCompleteness(items: CheckItem[]): number {
+  const totalWeight = items.reduce((sum, item) => sum + item.weight, 0)
+  const doneWeight = items.reduce((sum, item) => sum + (item.done ? item.weight : 0), 0)
+  return totalWeight > 0 ? Math.round((doneWeight / totalWeight) * 100) : 0
+}
+
+// ─── Collapsible section ─────────────────────────────────────────
+
+function SectionCard({
+  title,
+  completionText,
+  defaultOpen = false,
+  children,
+}: {
+  title: string
+  completionText?: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          <h3 className="font-semibold text-gray-900">{title}</h3>
+          {completionText && (
+            <span className="text-xs text-gray-400 font-normal">{completionText}</span>
+          )}
+        </div>
+        {open ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+      </button>
+      {open && <div className="px-5 pb-5 space-y-4 border-t border-gray-100 pt-4">{children}</div>}
+    </div>
+  )
+}
+
+// ─── ReadOnlyField ──────────────────────────────────────────────
+
+function ReadOnlyField({ label, value, missing }: { label: string; value?: string | null; missing?: string }) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {value ? (
+        <p className="text-sm text-gray-900 bg-gray-50 rounded-lg px-3 py-2">{value}</p>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          {missing || 'Ej angiven'}
+          <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main component ─────────────────────────────────────────────
 
 export default function WebsitePage() {
   const business = useBusiness()
   const { hasFeature } = useBusinessPlan()
   const [loading, setLoading] = useState(true)
   const [storefront, setStorefront] = useState<Storefront | null>(null)
+  const [businessConfig, setBusinessConfig] = useState<BusinessConfig | null>(null)
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'preview' | 'edit' | 'stats'>('preview')
@@ -84,6 +219,9 @@ export default function WebsitePage() {
   const [editShowWidget, setEditShowWidget] = useState(false)
   const [editSections, setEditSections] = useState<string[]>([])
   const [editPublished, setEditPublished] = useState(true)
+  const [editHeroImageUrl, setEditHeroImageUrl] = useState<string | null>(null)
+  const [editCertifications, setEditCertifications] = useState('')
+  const [customImageUrl, setCustomImageUrl] = useState('')
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     setToast({ show: true, message, type })
@@ -92,6 +230,7 @@ export default function WebsitePage() {
 
   useEffect(() => {
     fetchStorefront()
+    fetchBusinessConfig()
   }, [])
 
   async function fetchStorefront() {
@@ -111,6 +250,30 @@ export default function WebsitePage() {
     }
   }
 
+  async function fetchBusinessConfig() {
+    try {
+      const res = await fetch('/api/settings')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.config) {
+          setBusinessConfig({
+            business_name: data.config.business_name || '',
+            contact_name: data.config.contact_name || '',
+            contact_email: data.config.contact_email || '',
+            phone_number: data.config.phone_number || '',
+            address: data.config.address || '',
+            service_area: data.config.service_area || '',
+            branch: data.config.branch || '',
+            services_offered: data.config.services_offered || [],
+            working_hours: data.config.working_hours || null,
+          })
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   function populateEditForm(sf: Storefront) {
     setEditSlug(sf.slug || '')
     setEditHeadline(sf.hero_headline || '')
@@ -122,6 +285,8 @@ export default function WebsitePage() {
     setEditShowWidget(sf.show_chat_widget || false)
     setEditSections(sf.sections || ['hero', 'services', 'about', 'gallery', 'reviews', 'contact'])
     setEditPublished(sf.is_published)
+    setEditHeroImageUrl(sf.hero_image_url || null)
+    setEditCertifications(sf.certifications || '')
   }
 
   async function handleGenerate() {
@@ -164,6 +329,8 @@ export default function WebsitePage() {
           meta_description: editMetaDescription,
           show_chat_widget: editShowWidget,
           sections: editSections,
+          hero_image_url: editHeroImageUrl,
+          certifications: editCertifications,
         }),
       })
       if (res.ok) {
@@ -182,7 +349,7 @@ export default function WebsitePage() {
 
   function toggleSection(sectionId: string) {
     setEditSections(prev => {
-      if (sectionId === 'hero') return prev // Hero always visible
+      if (sectionId === 'hero') return prev
       if (prev.includes(sectionId)) {
         return prev.filter(s => s !== sectionId)
       }
@@ -192,6 +359,29 @@ export default function WebsitePage() {
 
   const siteUrl = storefront?.slug
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/site/${storefront.slug}`
+    : ''
+
+  // Completeness
+  const completenessItems = getCompletenessItems(
+    storefront, businessConfig,
+    editHeadline, editDescription, editAbout,
+    editHeroImageUrl, editCertifications,
+  )
+  const completeness = calculateCompleteness(completenessItems)
+  const missingItems = completenessItems.filter(i => !i.done)
+
+  // Industry images for picker
+  const branchImages: IndustryImage[] = getImagesForBranch(businessConfig?.branch)
+
+  // Working hours summary
+  const workingHoursSummary = businessConfig?.working_hours
+    ? DAY_ORDER
+        .filter(day => (businessConfig.working_hours as Record<string, WorkingDay>)?.[day]?.enabled)
+        .map(day => {
+          const d = (businessConfig.working_hours as Record<string, WorkingDay>)[day]
+          return `${DAY_NAMES[day]} ${d.start}-${d.end}`
+        })
+        .join(' | ')
     : ''
 
   // Feature gate check
@@ -350,24 +540,10 @@ export default function WebsitePage() {
         {/* ═══ Edit Tab ═══ */}
         {activeTab === 'edit' && (
           <div className="space-y-6">
-            {/* URL */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900">URL</h3>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400">{typeof window !== 'undefined' ? window.location.origin : ''}/site/</span>
-                <input
-                  type="text"
-                  value={editSlug}
-                  onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Innehåll</h3>
+            {/* ── Completeness indicator ── */}
+            <div className="bg-white rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-gray-900">Din hemsida är {completeness}% klar</h3>
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
@@ -377,85 +553,264 @@ export default function WebsitePage() {
                   Regenerera med AI
                 </button>
               </div>
+              {/* Progress bar */}
+              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    completeness >= 80 ? 'bg-emerald-500' : completeness >= 50 ? 'bg-teal-500' : 'bg-amber-500'
+                  }`}
+                  style={{ width: `${completeness}%` }}
+                />
+              </div>
+              {missingItems.length > 0 && (
+                <p className="text-sm text-gray-500">
+                  Saknas: {missingItems.map(i => i.label).join(' · ')}
+                </p>
+              )}
+            </div>
 
+            {/* ── Business name warning ── */}
+            {businessConfig && /^test/i.test(businessConfig.business_name.trim()) && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800">
+                    Ditt företagsnamn ser ut som ett test: &quot;{businessConfig.business_name}&quot;
+                  </p>
+                  <p className="text-sm text-amber-600 mt-1">
+                    Uppdatera det i <a href="/dashboard/settings" className="underline font-medium">Inställningar</a> innan du publicerar.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ── Card 1: Grundinfo ── */}
+            <SectionCard
+              title="Grundinfo"
+              completionText={`${completenessItems.filter((i, idx) => idx < 7 && i.done).length}/7 klara`}
+              defaultOpen={true}
+            >
+              {/* Editable: Headline */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rubrik</label>
                 <input
                   type="text"
                   value={editHeadline}
                   onChange={e => setEditHeadline(e.target.value)}
+                  placeholder="Din slagkraftiga rubrik..."
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                 />
               </div>
 
+              {/* Editable: Description */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivning</label>
                 <textarea
                   value={editDescription}
                   onChange={e => setEditDescription(e.target.value)}
                   rows={3}
+                  placeholder="Kort beskrivning av ditt företag..."
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
                 />
               </div>
 
+              {/* Read-only fields from business_config */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-gray-100">
+                <ReadOnlyField label="Företagsnamn" value={businessConfig?.business_name} missing="Ej angivet" />
+                <ReadOnlyField label="Telefonnummer" value={businessConfig?.phone_number} missing="Lägg till telefonnummer" />
+                <ReadOnlyField label="E-post" value={businessConfig?.contact_email} missing="Lägg till e-post" />
+                <ReadOnlyField label="Serviceområde" value={businessConfig?.service_area} missing="Lägg till serviceområde" />
+              </div>
+
+              {/* Working hours summary */}
+              <div className="pt-2 border-t border-gray-100">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Öppettider</label>
+                {workingHoursSummary ? (
+                  <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                    <p className="text-sm text-gray-900">{workingHoursSummary}</p>
+                    <a href="/dashboard/settings" className="text-teal-600 hover:underline text-xs font-medium">Ändra</a>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    Inga öppettider inställda
+                    <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+                  </div>
+                )}
+              </div>
+            </SectionCard>
+
+            {/* ── Card 2: Visuellt ── */}
+            <SectionCard
+              title="Visuellt"
+              completionText={`${[completenessItems[7], completenessItems[8]].filter(i => i.done).length}/2 klara`}
+            >
+              {/* Hero image picker */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hero-bild</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {branchImages.map((img) => (
+                    <button
+                      key={img.url}
+                      onClick={() => setEditHeroImageUrl(img.url)}
+                      className={`relative rounded-xl overflow-hidden aspect-video border-2 transition-all ${
+                        editHeroImageUrl === img.url ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <img src={img.url.replace('w=1920', 'w=400')} alt={img.label} className="w-full h-full object-cover" loading="lazy" />
+                      {editHeroImageUrl === img.url && (
+                        <div className="absolute inset-0 bg-teal-500/20 flex items-center justify-center">
+                          <Check className="w-8 h-8 text-white drop-shadow-lg" />
+                        </div>
+                      )}
+                      <span className="absolute bottom-1 left-1 right-1 text-xs text-white bg-black/50 rounded px-1.5 py-0.5 truncate">
+                        {img.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Custom URL */}
+                <div className="flex items-center gap-2 mt-3">
+                  <input
+                    type="url"
+                    value={customImageUrl}
+                    onChange={e => setCustomImageUrl(e.target.value)}
+                    placeholder="Eller klistra in en egen bild-URL..."
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={() => {
+                      if (customImageUrl.trim()) {
+                        setEditHeroImageUrl(customImageUrl.trim())
+                        setCustomImageUrl('')
+                      }
+                    }}
+                    disabled={!customImageUrl.trim()}
+                    className="px-3 py-2 bg-teal-600 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    Använd
+                  </button>
+                </div>
+
+                {editHeroImageUrl && (
+                  <button
+                    onClick={() => setEditHeroImageUrl(null)}
+                    className="flex items-center gap-1 text-sm text-red-600 hover:text-red-700 mt-2"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Ta bort bild
+                  </button>
+                )}
+              </div>
+
+              {/* Color scheme */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Färgschema</label>
+                <div className="grid grid-cols-5 gap-3">
+                  {COLOR_OPTIONS.map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setEditColorScheme(opt.id)}
+                      className={`relative rounded-xl overflow-hidden border-2 transition-all ${
+                        editColorScheme === opt.id ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className={`h-16 bg-gradient-to-br ${opt.gradient}`} />
+                      <div className="px-2 py-1.5 text-center">
+                        <span className="text-xs font-medium text-gray-700">{opt.label}</span>
+                      </div>
+                      {editColorScheme === opt.id && (
+                        <div className="absolute top-1 right-1">
+                          <Check className="w-4 h-4 text-white drop-shadow-lg" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* ── Card 3: Innehåll ── */}
+            <SectionCard
+              title="Innehåll"
+              completionText={`${[completenessItems[9], completenessItems[10]].filter(i => i.done).length}/2 klara`}
+            >
+              {/* Services (read-only) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tjänster</label>
+                {(businessConfig?.services_offered?.length || 0) > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {businessConfig!.services_offered.map(s => (
+                      <span key={s} className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-sm font-medium">{s}</span>
+                    ))}
+                    <a href="/dashboard/settings" className="px-3 py-1.5 border border-dashed border-gray-300 text-gray-400 rounded-lg text-sm hover:border-teal-300 hover:text-teal-600 transition-colors">
+                      + Redigera
+                    </a>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    Inga tjänster tillagda
+                    <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+                  </div>
+                )}
+              </div>
+
+              {/* About text (editable) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Om oss</label>
                 <textarea
                   value={editAbout}
                   onChange={e => setEditAbout(e.target.value)}
                   rows={6}
+                  placeholder="Beskriv ditt företag, er erfarenhet och vad som gör er unika..."
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
                 />
               </div>
-            </div>
+            </SectionCard>
 
-            {/* Design */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900">Design</h3>
-
+            {/* ── Card 4: Socialt bevis ── */}
+            <SectionCard
+              title="Socialt bevis"
+              completionText={`${completenessItems[11].done ? '1' : '0'}/1 klart`}
+            >
+              {/* Certifications */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Färgschema</label>
-                <div className="flex gap-3">
-                  {COLOR_OPTIONS.map(opt => (
-                    <button
-                      key={opt.id}
-                      onClick={() => setEditColorScheme(opt.id)}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                        editColorScheme === opt.id ? 'border-teal-400 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="w-5 h-5 rounded-full" style={{ backgroundColor: opt.color }} />
-                      <span className="text-sm">{opt.label}</span>
-                    </button>
-                  ))}
+                <label className="block text-sm font-medium text-gray-700 mb-1">Certifieringar</label>
+                <textarea
+                  value={editCertifications}
+                  onChange={e => setEditCertifications(e.target.value)}
+                  rows={2}
+                  placeholder="T.ex. Auktoriserad elektriker, F-skattsedel, Behörig elinstallatör..."
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                />
+                <p className="text-xs text-gray-400 mt-1">Separera med kommatecken. Visas som trust-badges på hemsidan.</p>
+              </div>
+
+              {/* Google Reviews status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Google Reviews</label>
+                <div className="bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-600">
+                  Recensioner hämtas automatiskt om du har Google Reviews-koppling.
                 </div>
               </div>
-            </div>
+            </SectionCard>
 
-            {/* Sections */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900">Sektioner</h3>
-              <p className="text-sm text-gray-500">Välj vilka sektioner som visas på hemsidan</p>
-              <div className="space-y-2">
-                {['hero', 'services', 'about', 'gallery', 'reviews', 'contact'].map(sectionId => (
-                  <label key={sectionId} className="flex items-center gap-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={editSections.includes(sectionId)}
-                      onChange={() => toggleSection(sectionId)}
-                      disabled={sectionId === 'hero'}
-                      className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
-                    />
-                    <span className="text-sm text-gray-700">{SECTION_LABELS[sectionId] || sectionId}</span>
-                    {sectionId === 'hero' && <span className="text-xs text-gray-400">(alltid synlig)</span>}
-                  </label>
-                ))}
+            {/* ── Card 5: URL & SEO ── */}
+            <SectionCard title="URL & SEO">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-400">{typeof window !== 'undefined' ? window.location.origin : ''}/site/</span>
+                  <input
+                    type="text"
+                    value={editSlug}
+                    onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  />
+                </div>
               </div>
-            </div>
-
-            {/* SEO */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900">SEO</h3>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">SEO-titel (max 60 tecken)</label>
                 <input
@@ -478,11 +833,10 @@ export default function WebsitePage() {
                 />
                 <p className="text-xs text-gray-400 mt-1">{editMetaDescription.length}/160</p>
               </div>
-            </div>
+            </SectionCard>
 
-            {/* Options */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h3 className="font-semibold text-gray-900">Alternativ</h3>
+            {/* ── Card 6: Alternativ ── */}
+            <SectionCard title="Alternativ">
               <label className="flex items-center gap-3">
                 <input
                   type="checkbox"
@@ -501,9 +855,31 @@ export default function WebsitePage() {
                 />
                 <span className="text-sm text-gray-700">Publicerad (synlig för besökare)</span>
               </label>
-            </div>
 
-            {/* Save */}
+              {/* Sections toggle */}
+              <div className="pt-2 border-t border-gray-100">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sektioner som visas</label>
+                <div className="space-y-2">
+                  {['hero', 'services', 'about', 'gallery', 'reviews', 'contact'].map(sectionId => (
+                    <label key={sectionId} className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={editSections.includes(sectionId)}
+                        onChange={() => toggleSection(sectionId)}
+                        disabled={sectionId === 'hero'}
+                        className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                      />
+                      <span className="text-sm text-gray-700">
+                        {({ hero: 'Hero', services: 'Tjänster', about: 'Om oss', gallery: 'Bildgalleri', reviews: 'Recensioner', contact: 'Kontakt' } as Record<string, string>)[sectionId] || sectionId}
+                      </span>
+                      {sectionId === 'hero' && <span className="text-xs text-gray-400">(alltid synlig)</span>}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
+
+            {/* Save button */}
             <div className="flex justify-end">
               <button
                 onClick={handleSave}
