@@ -26,12 +26,6 @@ import {
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Settings,
-  ImageIcon,
-  Type,
-  Award,
-  Search,
-  ToggleLeft,
   X,
 } from 'lucide-react'
 
@@ -117,7 +111,7 @@ function getCompletenessItems(
   const isNameOk = businessName.length >= 4 && !/^test/i.test(businessName.trim())
 
   const hasWorkingHours = config?.working_hours
-    ? Object.values(config.working_hours).some((d: WorkingDay) => d.enabled)
+    ? Object.values(config.working_hours).some((d: WorkingDay | null) => d?.enabled)
     : false
 
   return [
@@ -376,7 +370,7 @@ export default function WebsitePage() {
   // Working hours summary
   const workingHoursSummary = businessConfig?.working_hours
     ? DAY_ORDER
-        .filter(day => (businessConfig.working_hours as Record<string, WorkingDay>)?.[day]?.enabled)
+        .filter(day => (businessConfig.working_hours as Record<string, WorkingDay | null>)?.[day]?.enabled)
         .map(day => {
           const d = (businessConfig.working_hours as Record<string, WorkingDay>)[day]
           return `${DAY_NAMES[day]} ${d.start}-${d.end}`
