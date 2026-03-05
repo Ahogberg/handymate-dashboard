@@ -22,11 +22,13 @@ export default function DashboardLayout({
   const router = useRouter()
 
   // Redirect to onboarding if not completed
+  // step >= 7 also counts as done (old 6-step flow finalized at step 7)
+  const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 7))
   useEffect(() => {
-    if (!loading && business && !business.onboarding_completed_at && business.onboarding_step < 8) {
+    if (!loading && business && !onboardingDone) {
       router.push('/onboarding')
     }
-  }, [loading, business, router])
+  }, [loading, business, onboardingDone, router])
 
   if (loading) {
     return (
@@ -41,7 +43,7 @@ export default function DashboardLayout({
   }
 
   // Don't render dashboard while redirecting to onboarding
-  if (!business.onboarding_completed_at && business.onboarding_step < 8) {
+  if (!onboardingDone) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>

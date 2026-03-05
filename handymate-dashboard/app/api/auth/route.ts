@@ -241,6 +241,7 @@ if (action === 'login') {
           contact_email: business.contact_email,
           plan,
           onboarding_step: business.onboarding_step ?? 1,
+          onboarding_completed_at: business.onboarding_completed_at ?? null,
         }
       })
     }

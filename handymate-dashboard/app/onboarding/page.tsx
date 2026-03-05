@@ -38,6 +38,7 @@ export default function OnboardingPage() {
         setData(d)
 
         // If already completed, go to dashboard
+        // step >= 8 = new flow done, completed_at = old flow done
         if (d.onboarding_step >= 8 || d.onboarding_completed_at) {
           router.push('/dashboard')
           return
