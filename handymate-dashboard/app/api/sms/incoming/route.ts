@@ -12,20 +12,31 @@ import { createHash } from 'crypto'
  * Dedup: If the Supabase sms-webhook also fires for the same message,
  * the idempotency_key on agent_runs prevents double processing.
  */
+
+// Never cache this route
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
+  // Log immediately before any parsing so Vercel always records the hit
+  console.log('[SMS Incoming] POST received, content-type:', request.headers.get('content-type'))
+
   try {
     const supabase = getServerSupabase()
 
-    // 46elks sends form-data
-    const formData = await request.formData()
-    const from = formData.get('from') as string
-    const to = formData.get('to') as string
-    const message = formData.get('message') as string
+    // 46elks sends application/x-www-form-urlencoded.
+    // request.formData() can fail silently when Content-Type includes a
+    // charset suffix ("…; charset=UTF-8"). Parsing via URLSearchParams is
+    // reliable regardless of Content-Type variant.
+    const text = await request.text()
+    const params = new URLSearchParams(text)
+    const from = params.get('from') ?? ''
+    const to = params.get('to') ?? ''
+    const message = params.get('message') ?? ''
 
-    console.log('[SMS Incoming]', { from, to, message: message?.substring(0, 50) })
+    console.log('[SMS Incoming]', { from, to, message: message.substring(0, 50) })
 
     if (!from || !message) {
-      return NextResponse.json({ error: 'Missing data' }, { status: 400 })
+      return new NextResponse('Missing data', { status: 400 })
     }
 
     // Find business by assigned phone number
@@ -121,10 +132,11 @@ export async function POST(request: NextRequest) {
       })
 
     // Return 200 immediately — agent handles response asynchronously
-    return NextResponse.json({ success: true, agent_triggered: true })
+    // 46elks expects plain-text "OK" (or any 200), not JSON
+    return new NextResponse('OK')
 
   } catch (error: any) {
     console.error('[SMS Incoming] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return new NextResponse('Internal error', { status: 500 })
   }
 }

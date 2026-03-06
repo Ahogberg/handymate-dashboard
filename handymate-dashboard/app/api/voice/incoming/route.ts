@@ -12,14 +12,22 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.
  * 4. Vidarekoppla till forward_phone_number
  * 5. Spela in samtalet
  */
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
+  console.log('[Voice Incoming] POST received, content-type:', request.headers.get('content-type'))
+
   try {
     const supabase = getServerSupabase()
-    const formData = await request.formData()
-    const from = formData.get('from') as string
-    const to = formData.get('to') as string
-    const callId = formData.get('callid') as string
-    const direction = formData.get('direction') as string || 'inbound'
+
+    // Use URLSearchParams instead of formData() for reliable parsing of
+    // application/x-www-form-urlencoded (handles charset variants)
+    const text = await request.text()
+    const params = new URLSearchParams(text)
+    const from = params.get('from') ?? ''
+    const to = params.get('to') ?? ''
+    const callId = params.get('callid') ?? ''
+    const direction = params.get('direction') ?? 'inbound'
 
     console.log('Incoming call:', { from, to, callId, direction })
 
