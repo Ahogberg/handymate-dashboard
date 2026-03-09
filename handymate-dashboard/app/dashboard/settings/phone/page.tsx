@@ -85,6 +85,8 @@ export default function PhoneSettingsPage() {
   const [missedSmsText, setMissedSmsText] = useState(DEFAULT_MISSED_SMS)
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   useEffect(() => {
     fetchConfig()
@@ -237,6 +239,25 @@ export default function PhoneSettingsPage() {
   }
 
   // ── Save settings ─────────────────────────────────────────────────
+  async function syncWebhooks() {
+    setSyncing(true)
+    setSyncMsg(null)
+    try {
+      const res = await fetch('/api/phone/settings', { method: 'POST' })
+      if (res.ok) {
+        setSyncMsg({ text: 'Webhook-URL:er synkade med 46elks!', ok: true })
+      } else {
+        const data = await res.json()
+        setSyncMsg({ text: data.error || 'Synkfel', ok: false })
+      }
+    } catch {
+      setSyncMsg({ text: 'Nätverksfel', ok: false })
+    } finally {
+      setSyncing(false)
+      setTimeout(() => setSyncMsg(null), 5000)
+    }
+  }
+
   async function saveSettings() {
     setSaving(true)
     setSaveMsg('')
@@ -871,6 +892,30 @@ export default function PhoneSettingsPage() {
                 </button>
                 {saveMsg && <span className="text-sm text-emerald-600 font-medium">{saveMsg}</span>}
               </div>
+
+              {/* Webhook resync — shown only when a 46elks number is provisioned */}
+              {config?.elks_number_id && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs text-gray-400 mb-2">
+                    Om SMS eller röst-webhook inte fungerar kan URL:erna på 46elks vara inaktuella.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={syncWebhooks}
+                      disabled={syncing}
+                      className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+                      Synka webhook-URL:er med 46elks
+                    </button>
+                    {syncMsg && (
+                      <span className={`text-sm font-medium ${syncMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                        {syncMsg.text}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
