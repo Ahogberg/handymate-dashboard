@@ -897,7 +897,7 @@ export default function PhoneSettingsPage() {
               {config?.elks_number_id && (
                 <div className="border-t border-gray-100 pt-4">
                   <p className="text-xs text-gray-400 mb-2">
-                    Om SMS eller röst-webhook inte fungerar kan URL:erna på 46elks vara inaktuella.
+                    Webhook-URL:er synkas automatiskt dagligen. Använd denna knapp bara om SMS eller röst-webhook slutade fungera.
                   </p>
                   <div className="flex items-center gap-3">
                     <button

@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/project-health",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/sync-phone-webhooks",
+      "schedule": "0 5 * * *"
     }
   ]
 }
