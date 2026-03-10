@@ -54,6 +54,7 @@ interface BusinessData {
   bankgiro?: string
   plusgiro?: string
   swish_number?: string
+  swish_qr?: string
   bank_account_number?: string
   f_skatt_registered?: boolean
   accent_color?: string
@@ -327,23 +328,66 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   payItems.push({ label: 'Att betala', value: formatSEK(invoice.rot_rut_type ? invoice.customer_pays : invoice.total) })
   payItems.push({ label: 'OCR-nummer', value: ocrNumber })
 
-  const payBoxH = 28
+  const qrSize = 38 // mm
+  const hasSwishQR = !!business.swish_qr
+  const payBoxH = hasSwishQR ? Math.max(qrSize + 14, 28) : 28
   doc.roundedRect(margin, y, contentWidth, payBoxH, 3, 3, 'F')
 
   doc.setFontSize(7)
   doc.setTextColor(...lightGray)
   doc.text('BETALNINGSINFORMATION', margin + 8, y + 7)
 
-  const payColWidth = contentWidth / payItems.length
-  payItems.forEach((item, i) => {
-    const px = margin + 8 + i * payColWidth
+  if (hasSwishQR) {
+    // QR code on the left side
+    const qrX = margin + 8
+    const qrY = y + 10
+    doc.addImage(business.swish_qr!, 'PNG', qrX, qrY, qrSize, qrSize)
+
+    // Swish label below QR
     doc.setFontSize(7)
     doc.setTextColor(...lightGray)
-    doc.text(item.label, px, y + 14)
-    doc.setFontSize(12)
-    doc.setTextColor(...purple)
-    doc.text(item.value, px, y + 22)
-  })
+    doc.text('Swish', qrX, qrY + qrSize + 4)
+    if (business.swish_number) {
+      doc.setFontSize(8)
+      doc.setTextColor(...purple)
+      doc.text(business.swish_number, qrX, qrY + qrSize + 9)
+    }
+
+    // Text to the right of QR
+    const textX = margin + 8 + qrSize + 8
+    const textWidth = contentWidth - qrSize - 24
+    doc.setFontSize(10)
+    doc.setTextColor(255, 255, 255)
+    doc.text('Betala med Swish', textX, y + 16)
+    doc.setFontSize(8)
+    doc.setTextColor(...lightGray)
+    doc.text('Skanna QR-koden — belopp och fakturanummer', textX, y + 22, { maxWidth: textWidth })
+    doc.text('fylls i automatiskt i din Swish-app.', textX, y + 27, { maxWidth: textWidth })
+
+    // Other payment items to the right of QR
+    const otherItems = payItems.filter(p => p.label !== 'Swish')
+    const colW = textWidth / Math.max(otherItems.length, 1)
+    otherItems.forEach((item, i) => {
+      const px = textX + i * colW
+      doc.setFontSize(7)
+      doc.setTextColor(...lightGray)
+      doc.text(item.label, px, y + 35)
+      doc.setFontSize(10)
+      doc.setTextColor(...purple)
+      doc.text(item.value, px, y + 41, { maxWidth: colW - 2 })
+    })
+  } else {
+    const payColWidth = contentWidth / payItems.length
+    payItems.forEach((item, i) => {
+      const px = margin + 8 + i * payColWidth
+      doc.setFontSize(7)
+      doc.setTextColor(...lightGray)
+      doc.text(item.label, px, y + 14)
+      doc.setFontSize(12)
+      doc.setTextColor(...purple)
+      doc.text(item.value, px, y + 22)
+    })
+  }
 
   y += payBoxH + 8
 

@@ -6,6 +6,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 const RESEND_API_KEY = process.env.RESEND_API_KEY
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
 
 /**
  * Skicka SMS via 46elks
@@ -83,7 +84,7 @@ async function sendEmail(
 /**
  * Generera email HTML
  */
-function generateEmailHTML(quote: any, business: any): string {
+function generateEmailHTML(quote: any, business: any, signUrl?: string): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
   }
@@ -101,6 +102,26 @@ function generateEmailHTML(quote: any, business: any): string {
     ? `<p style="color: #059669; font-weight: 600;">Med ${quote.rot_rut_type.toUpperCase()}-avdrag betalar du endast: ${formatCurrency(customerPays)} kr</p>`
     : ''
 
+  const signBlock = signUrl
+    ? `
+      <!-- Sign CTA -->
+      <div style="text-align: center; margin: 30px 0; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
+        <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 15px;">Redo att godkänna offerten?</p>
+        <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">Klicka på knappen nedan för att granska och signera digitalt.</p>
+        <a href="${signUrl}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
+          Signera offerten
+        </a>
+        <p style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">Eller kopiera länken: ${signUrl}</p>
+      </div>`
+    : `
+      <!-- CTA -->
+      <div style="text-align: center; margin: 30px 0;">
+        <p style="color: #444; margin-bottom: 15px;">Har du frågor eller vill boka? Kontakta oss:</p>
+        <a href="tel:${business.phone_number}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Ring ${business.phone_number}
+        </a>
+      </div>`
+
   return `
 <!DOCTYPE html>
 <html>
@@ -111,7 +132,7 @@ function generateEmailHTML(quote: any, business: any): string {
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; margin: 0; padding: 20px;">
   <div style="max-width: 600px; margin: 0 auto;">
     <!-- Header -->
-    <div style="background: linear-gradient(135deg, #8b5cf6, #d946ef); padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+    <div style="background: #0d9488; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
       <h1 style="color: white; margin: 0; font-size: 28px;">${business.business_name}</h1>
       <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Offert</p>
     </div>
@@ -127,7 +148,7 @@ function generateEmailHTML(quote: any, business: any): string {
       </p>
 
       <!-- Quote Box -->
-      <div style="background: #f8f4ff; border-left: 4px solid #8b5cf6; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
+      <div style="background: #f0fdfa; border-left: 4px solid #0d9488; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
         <h2 style="margin: 0 0 10px 0; font-size: 18px; color: #1a1a1a;">
           ${quote.title || 'Offert'}
         </h2>
@@ -148,15 +169,7 @@ function generateEmailHTML(quote: any, business: any): string {
         Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>
       </p>
 
-      <!-- CTA -->
-      <div style="text-align: center; margin: 30px 0;">
-        <p style="color: #444; margin-bottom: 15px;">
-          Har du frågor eller vill boka? Kontakta oss:
-        </p>
-        <a href="tel:${business.phone_number}" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-          Ring ${business.phone_number}
-        </a>
-      </div>
+      ${signBlock}
 
       <!-- Footer -->
       <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 12px;">
@@ -214,7 +227,7 @@ export async function POST(request: NextRequest) {
     // Hämta offert med kundinfo och verifiera ägarskap
     const { data: quote } = await supabase
       .from('quotes')
-      .select('*, customer(*)')
+      .select('*, sign_token, customer(*)')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
       .single()
@@ -234,6 +247,17 @@ export async function POST(request: NextRequest) {
     const customerPays = quote.rot_rut_type ? quote.customer_pays : quote.total
     const rotText = quote.rot_rut_type ? ` (efter ${quote.rot_rut_type.toUpperCase()}: ${formatCurrency(customerPays)} kr)` : ''
 
+    // Generate/get sign_token and build signing URL
+    let signToken = quote.sign_token
+    if (!signToken) {
+      signToken = crypto.randomUUID()
+      await supabase
+        .from('quotes')
+        .update({ sign_token: signToken })
+        .eq('quote_id', quoteId)
+    }
+    const signUrl = `${APP_URL}/quote/${signToken}`
+
     let smsSent = false
     let emailSent = false
 
@@ -251,9 +275,10 @@ ${quote.title || 'Offert'}
 Totalt: ${formatCurrency(quote.total)} kr${rotText}
 Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}
 
-Frågor? Ring ${business.phone_number}
+Granska och signera här:
+${signUrl}
 
-//${business.business_name}`
+Frågor? Ring ${business.phone_number}`
 
       smsSent = await sendSMS(quote.customer.phone_number, smsMessage, business.business_name)
 
@@ -280,7 +305,7 @@ Frågor? Ring ${business.phone_number}
         // Om both och ingen email, fortsätt med bara SMS
       } else {
         const emailSubject = `Offert från ${business.business_name}: ${quote.title || 'Offert'}`
-        const emailHTML = generateEmailHTML(quote, business)
+        const emailHTML = generateEmailHTML(quote, business, signUrl)
 
         emailSent = await sendEmail(
           quote.customer.email,

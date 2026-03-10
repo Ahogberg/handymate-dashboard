@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
@@ -15,6 +15,8 @@ import {
   Hammer,
   Package,
   Wrench,
+  XCircle,
+  Clock,
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -28,17 +30,25 @@ interface QuoteItem {
   type?: 'labor' | 'material' | 'service'
 }
 
+interface BusinessInfo {
+  name: string
+  contact_name: string
+  email: string
+  phone: string
+  org_number: string
+  f_skatt: boolean
+}
+
 interface QuoteData {
   quote_id: string
-  business_name: string
   title?: string
   description?: string
   items: QuoteItem[]
   labor_total: number
   material_total: number
   subtotal: number
-  discount?: number
-  vat?: number
+  discount_amount?: number
+  vat_amount?: number
   vat_rate?: number
   total: number
   rot_rut_type?: 'rot' | 'rut' | null
@@ -49,12 +59,16 @@ interface QuoteData {
   valid_until?: string
   status: string
   signed_at?: string
-  signed_by?: string
-  customer_name?: string
-  customer_email?: string
+  signed_by_name?: string
+  customer?: {
+    name: string
+    phone_number?: string
+    email?: string
+    address_line?: string
+  }
 }
 
-// ── Currency formatter ─────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────────
 
 const formatSEK = (amount: number) =>
   new Intl.NumberFormat('sv-SE', {
@@ -63,9 +77,23 @@ const formatSEK = (amount: number) =>
     maximumFractionDigits: 0,
   }).format(amount)
 
+const DECLINE_REASONS = [
+  { value: 'too_expensive', label: 'Priset är för högt' },
+  { value: 'chose_other', label: 'Valde en annan leverantör' },
+  { value: 'no_longer_needed', label: 'Behovet finns inte längre' },
+  { value: 'other', label: 'Annat skäl' },
+]
+
 // ── Component ──────────────────────────────────────────────────────────────────
 
-type PageState = 'loading' | 'error' | 'already_signed' | 'viewing' | 'signing' | 'success'
+type PageState =
+  | 'loading'
+  | 'error'
+  | 'already_signed'
+  | 'already_declined'
+  | 'viewing'
+  | 'success'
+  | 'declined'
 
 export default function QuoteSignPage() {
   const params = useParams()
@@ -73,9 +101,15 @@ export default function QuoteSignPage() {
 
   const [state, setState] = useState<PageState>('loading')
   const [quote, setQuote] = useState<QuoteData | null>(null)
+  const [business, setBusiness] = useState<BusinessInfo | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [name, setName] = useState('')
   const [hasDrawn, setHasDrawn] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [showDeclineForm, setShowDeclineForm] = useState(false)
+  const [declineReason, setDeclineReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
 
   // Canvas refs and drawing state
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -96,17 +130,29 @@ export default function QuoteSignPage() {
           return
         }
 
-        setQuote(data)
+        const { quote: quoteData, business: businessData, alreadySigned } = data
+        setQuote(quoteData)
+        setBusiness(businessData)
 
-        if (data.customer_name) {
-          setName(data.customer_name)
+        if (quoteData.customer?.name) {
+          setName(quoteData.customer.name)
         }
 
-        if (data.status === 'accepted' || data.signed_at) {
+        if (alreadySigned) {
           setState('already_signed')
-        } else if (data.valid_until && new Date(data.valid_until) < new Date()) {
-          setErrorMessage('Offerten har gått ut och kan inte längre signeras.')
-          setState('error')
+        } else if (quoteData.status === 'declined') {
+          setState('already_declined')
+        } else if (quoteData.valid_until) {
+          const diff = Math.ceil(
+            (new Date(quoteData.valid_until).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          )
+          if (diff < 0) {
+            setErrorMessage('Offerten har gått ut och kan inte längre signeras.')
+            setState('error')
+          } else {
+            setDaysLeft(diff)
+            setState('viewing')
+          }
         } else {
           setState('viewing')
         }
@@ -135,9 +181,9 @@ export default function QuoteSignPage() {
     if (!ctx) return
 
     ctx.scale(dpr, dpr)
-    ctx.fillStyle = '#f8fafc' // slate-50
+    ctx.fillStyle = '#f8fafc'
     ctx.fillRect(0, 0, rect.width, rect.height)
-    ctx.strokeStyle = '#1e293b' // slate-800
+    ctx.strokeStyle = '#1e293b'
     ctx.lineWidth = 2.5
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
@@ -145,13 +191,11 @@ export default function QuoteSignPage() {
 
   useEffect(() => {
     if (state === 'viewing') {
-      // Small delay to let the DOM render
       const timer = setTimeout(initCanvas, 50)
       return () => clearTimeout(timer)
     }
   }, [state, initCanvas])
 
-  // Reinitialize on resize
   useEffect(() => {
     if (state !== 'viewing') return
 
@@ -182,19 +226,14 @@ export default function QuoteSignPage() {
       clientY = e.clientY
     }
 
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    }
+    return { x: clientX - rect.left, y: clientY - rect.top }
   }
 
   function startDrawing(e: React.MouseEvent | React.TouchEvent) {
     e.preventDefault()
     isDrawingRef.current = true
     const point = getCanvasPoint(e)
-    if (point) {
-      lastPointRef.current = point
-    }
+    if (point) lastPointRef.current = point
   }
 
   function draw(e: React.MouseEvent | React.TouchEvent) {
@@ -230,13 +269,13 @@ export default function QuoteSignPage() {
   // ── Submit signature ───────────────────────────────────────────────────────
 
   async function handleSubmit() {
-    if (!name.trim()) return
-    if (!hasDrawn) return
+    if (!name.trim() || !hasDrawn || !termsAccepted || submitting) return
 
     const canvas = canvasRef.current
     if (!canvas) return
 
-    setState('signing')
+    setSubmitting(true)
+    setErrorMessage('')
 
     try {
       const signatureData = canvas.toDataURL('image/png')
@@ -245,6 +284,7 @@ export default function QuoteSignPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'sign',
           name: name.trim(),
           signature_data: signatureData,
         }),
@@ -254,14 +294,43 @@ export default function QuoteSignPage() {
 
       if (!res.ok) {
         setErrorMessage(data.error || 'Kunde inte spara signaturen')
-        setState('viewing')
-        return
+      } else {
+        setState('success')
       }
-
-      setState('success')
     } catch {
       setErrorMessage('Något gick fel. Försök igen.')
-      setState('viewing')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Submit decline ─────────────────────────────────────────────────────────
+
+  async function handleDecline() {
+    if (!declineReason || submitting) return
+
+    setSubmitting(true)
+    setErrorMessage('')
+
+    try {
+      const res = await fetch(`/api/quotes/public/${token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'decline', reason: declineReason }),
+      })
+
+      if (res.ok) {
+        setState('declined')
+      } else {
+        const data = await res.json()
+        setErrorMessage(data.error || 'Kunde inte registrera avböjandet')
+        setShowDeclineForm(false)
+      }
+    } catch {
+      setErrorMessage('Något gick fel. Försök igen.')
+      setShowDeclineForm(false)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -289,6 +358,28 @@ export default function QuoteSignPage() {
     service: { label: 'Tjänster', icon: <Wrench className="w-4 h-4" /> },
   }
 
+  // ── Shared centered layout ─────────────────────────────────────────────────
+
+  function CenteredLayout({ children }: { children: React.ReactNode }) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+        </div>
+        <div className="relative w-full max-w-md mx-4">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
+              <Zap className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
+          </div>
+          {children}
+        </div>
+      </div>
+    )
+  }
+
   // ── Render: Loading ────────────────────────────────────────────────────────
 
   if (state === 'loading') {
@@ -306,35 +397,21 @@ export default function QuoteSignPage() {
 
   if (state === 'error') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative w-full max-w-md mx-4">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
+      <CenteredLayout>
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
+          <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-7 h-7 text-amber-400" />
           </div>
-
-          <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-            <div className="w-14 h-14 bg-amber-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="w-7 h-7 text-amber-400" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten kunde inte visas</h2>
-            <p className="text-gray-500 mb-6">{errorMessage}</p>
-            <a
-              href="/"
-              className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-teal-600 transition-colors"
-            >
-              Tillbaka till startsidan
-            </a>
-          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten kunde inte visas</h2>
+          <p className="text-gray-500 mb-6">{errorMessage}</p>
+          <a
+            href="/"
+            className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-teal-600 transition-colors"
+          >
+            Tillbaka till startsidan
+          </a>
         </div>
-      </div>
+      </CenteredLayout>
     )
   }
 
@@ -342,110 +419,118 @@ export default function QuoteSignPage() {
 
   if (state === 'already_signed' && quote) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative w-full max-w-md mx-4">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
+      <CenteredLayout>
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
+          <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-7 h-7 text-emerald-600" />
           </div>
-
-          <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-            <div className="w-14 h-14 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-7 h-7 text-emerald-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten är redan signerad</h2>
-            <div className="space-y-2 text-sm text-gray-500">
-              {quote.signed_by && (
-                <p>
-                  Signerad av: <span className="text-gray-900">{quote.signed_by}</span>
-                </p>
-              )}
-              {quote.signed_at && (
-                <p>
-                  Datum:{' '}
-                  <span className="text-gray-900">
-                    {new Date(quote.signed_at).toLocaleDateString('sv-SE', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </span>
-                </p>
-              )}
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten är redan signerad</h2>
+          <div className="space-y-2 text-sm text-gray-500">
+            {quote.signed_by_name && (
               <p>
-                Belopp: <span className="text-gray-900 font-semibold">{formatSEK(quote.total)}</span>
+                Signerad av: <span className="text-gray-900">{quote.signed_by_name}</span>
               </p>
-            </div>
+            )}
+            {quote.signed_at && (
+              <p>
+                Datum:{' '}
+                <span className="text-gray-900">
+                  {new Date(quote.signed_at).toLocaleDateString('sv-SE', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </p>
+            )}
+            <p>
+              Belopp:{' '}
+              <span className="text-gray-900 font-semibold">{formatSEK(quote.total)}</span>
+            </p>
           </div>
         </div>
-      </div>
+      </CenteredLayout>
     )
   }
 
-  // ── Render: Success ────────────────────────────────────────────────────────
+  // ── Render: Already declined ───────────────────────────────────────────────
+
+  if (state === 'already_declined') {
+    return (
+      <CenteredLayout>
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
+          <div className="w-14 h-14 bg-gray-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-7 h-7 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten har avböjts</h2>
+          <p className="text-gray-500 text-sm">Denna offert har redan avböjts.</p>
+        </div>
+      </CenteredLayout>
+    )
+  }
+
+  // ── Render: Success (just signed) ──────────────────────────────────────────
 
   if (state === 'success') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-        </div>
-
-        <div className="relative w-full max-w-md mx-4">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
+      <CenteredLayout>
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-10 h-10 text-emerald-600" />
           </div>
-
-          <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-            <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-10 h-10 text-emerald-600" />
+          <h2 className="text-2xl font-bold mb-2">
+            <span className="text-teal-600">Tack!</span>
+          </h2>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">Offerten är godkänd</h3>
+          <p className="text-gray-500 text-sm mb-4">
+            Din signatur har sparats.{' '}
+            {business?.name || 'Företaget'} kommer att kontakta dig med nästa steg.
+          </p>
+          {quote && (
+            <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-300/50">
+              <p className="text-gray-500 text-sm">
+                Offert: <span className="text-gray-900">{quote.title || quote.quote_id}</span>
+              </p>
+              <p className="text-gray-500 text-sm">
+                Belopp:{' '}
+                <span className="text-gray-900 font-semibold">
+                  {formatSEK(quote.customer_pays ?? quote.total)}
+                </span>
+              </p>
             </div>
-            <h2 className="text-2xl font-bold mb-2">
-              <span className="bg-teal-600 bg-clip-text text-transparent">
-                Tack!
-              </span>
-            </h2>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Offerten är godkänd</h3>
-            <p className="text-gray-500 text-sm mb-4">
-              Din signatur har sparats. Företaget kommer att kontakta dig med nästa steg.
-            </p>
-            {quote && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-xl border border-gray-300/50">
-                <p className="text-gray-500 text-sm">
-                  Offert: <span className="text-gray-900">{quote.title || quote.quote_id}</span>
-                </p>
-                <p className="text-gray-500 text-sm">
-                  Belopp:{' '}
-                  <span className="text-gray-900 font-semibold">
-                    {formatSEK(quote.customer_pays ?? quote.total)}
-                  </span>
-                </p>
-              </div>
-            )}
-          </div>
+          )}
         </div>
-      </div>
+      </CenteredLayout>
     )
   }
 
-  // ── Render: Viewing (main quote + signature form) ──────────────────────────
+  // ── Render: Declined (just now) ────────────────────────────────────────────
+
+  if (state === 'declined') {
+    return (
+      <CenteredLayout>
+        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
+          <div className="w-14 h-14 bg-gray-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <XCircle className="w-7 h-7 text-gray-400" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten har avböjts</h2>
+          <p className="text-gray-500 text-sm">
+            Vi har registrerat att du avböjer offerten.{' '}
+            {business?.name || 'Företaget'} kommer att informeras.
+          </p>
+        </div>
+      </CenteredLayout>
+    )
+  }
+
+  // ── Render: Viewing ────────────────────────────────────────────────────────
 
   if (!quote) return null
 
   const itemGroups = groupItems(quote.items || [])
+  const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
@@ -462,12 +547,26 @@ export default function QuoteSignPage() {
             <Zap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">
-            <span className="bg-teal-600 bg-clip-text text-transparent">
-              {quote.business_name}
-            </span>
+            <span className="text-teal-600">{business?.name || 'Offert'}</span>
           </h1>
           <p className="text-gray-500 mt-1 text-sm">Offert</p>
         </div>
+
+        {/* Validity countdown banner */}
+        {daysLeft !== null && daysLeft <= 7 && (
+          <div
+            className={`mb-4 p-3 rounded-xl flex items-center gap-2 text-sm font-medium ${
+              daysLeft <= 2
+                ? 'bg-red-50 border border-red-200 text-red-700'
+                : 'bg-amber-50 border border-amber-200 text-amber-700'
+            }`}
+          >
+            <Clock className="w-4 h-4 shrink-0" />
+            {daysLeft === 0
+              ? 'Sista dagen att signera!'
+              : `Offerten går ut om ${daysLeft} dag${daysLeft === 1 ? '' : 'ar'}`}
+          </div>
+        )}
 
         {/* Quote Details Card */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
@@ -533,9 +632,7 @@ export default function QuoteSignPage() {
                         {items.map((item, idx) => (
                           <tr
                             key={idx}
-                            className={
-                              idx < items.length - 1 ? 'border-b border-gray-200/50' : ''
-                            }
+                            className={idx < items.length - 1 ? 'border-b border-gray-200/50' : ''}
                           >
                             <td className="px-4 py-3 text-gray-900">
                               {item.description}
@@ -585,18 +682,18 @@ export default function QuoteSignPage() {
                   </span>
                 </div>
               )}
-              {quote.discount && quote.discount > 0 && (
+              {quote.discount_amount != null && quote.discount_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Rabatt</span>
-                  <span className="text-emerald-600">-{formatSEK(quote.discount)}</span>
+                  <span className="text-emerald-600">-{formatSEK(quote.discount_amount)}</span>
                 </div>
               )}
-              {quote.vat != null && quote.vat > 0 && (
+              {quote.vat_amount != null && quote.vat_amount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
                     Moms{quote.vat_rate ? ` (${quote.vat_rate}%)` : ''}
                   </span>
-                  <span className="text-gray-700">{formatSEK(quote.vat)}</span>
+                  <span className="text-gray-700">{formatSEK(quote.vat_amount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300">
@@ -647,7 +744,7 @@ export default function QuoteSignPage() {
         </div>
 
         {/* Signature Card */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-8">
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
               <PenTool className="w-5 h-5 text-sky-700" />
@@ -703,7 +800,7 @@ export default function QuoteSignPage() {
           </div>
 
           {/* Clear button */}
-          <div className="flex justify-end mb-6">
+          <div className="flex justify-end mb-5">
             <button
               type="button"
               onClick={clearCanvas}
@@ -713,6 +810,19 @@ export default function QuoteSignPage() {
               Rensa
             </button>
           </div>
+
+          {/* Terms checkbox */}
+          <label className="flex items-start gap-3 mb-5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-teal-600"
+            />
+            <span className="text-sm text-gray-500 leading-relaxed">
+              Jag har läst och godkänner offerten och förstår att min digitala signatur är bindande.
+            </span>
+          </label>
 
           {/* Error message */}
           {errorMessage && (
@@ -725,10 +835,10 @@ export default function QuoteSignPage() {
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={state === 'signing' || !name.trim() || !hasDrawn}
+            disabled={!canSubmit}
             className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {state === 'signing' ? (
+            {submitting && !showDeclineForm ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 Signerar...
@@ -741,26 +851,95 @@ export default function QuoteSignPage() {
             )}
           </button>
 
-          {/* Validation hints */}
-          {(!name.trim() || !hasDrawn) && (
-            <div className="mt-3 text-center">
-              <p className="text-gray-400 text-xs">
-                {!name.trim() && !hasDrawn
-                  ? 'Fyll i ditt namn och rita din signatur för att fortsätta'
-                  : !name.trim()
-                    ? 'Fyll i ditt namn för att fortsätta'
-                    : 'Rita din signatur för att fortsätta'}
-              </p>
-            </div>
+          {/* Validation hint */}
+          {!canSubmit && !submitting && (
+            <p className="mt-3 text-center text-gray-400 text-xs">
+              {!name.trim()
+                ? 'Fyll i ditt namn'
+                : !hasDrawn
+                  ? 'Rita din signatur'
+                  : 'Bekräfta att du godkänner villkoren'}{' '}
+              för att fortsätta
+            </p>
           )}
         </div>
+
+        {/* Decline section */}
+        {!showDeclineForm ? (
+          <div className="text-center mb-8">
+            <button
+              type="button"
+              onClick={() => setShowDeclineForm(true)}
+              className="text-sm text-gray-400 hover:text-gray-600 underline underline-offset-2 transition-colors"
+            >
+              Vill du avböja offerten?
+            </button>
+          </div>
+        ) : (
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                <XCircle className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Avböj offerten</h3>
+                <p className="text-gray-400 text-xs">Hjälp oss förstå varför</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 mb-5">
+              {DECLINE_REASONS.map((r) => (
+                <label
+                  key={r.value}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <input
+                    type="radio"
+                    name="decline_reason"
+                    value={r.value}
+                    checked={declineReason === r.value}
+                    onChange={() => setDeclineReason(r.value)}
+                    className="h-4 w-4 accent-gray-600"
+                  />
+                  <span className="text-sm text-gray-700">{r.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeclineForm(false)
+                  setDeclineReason('')
+                }}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-medium text-gray-700 transition-colors"
+              >
+                Avbryt
+              </button>
+              <button
+                type="button"
+                onClick={handleDecline}
+                disabled={!declineReason || submitting}
+                className="flex-1 py-3 bg-gray-800 hover:bg-gray-900 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Skickar...
+                  </>
+                ) : (
+                  'Bekräfta avböjande'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 pb-8">
           Drivs av{' '}
-          <span className="bg-teal-600 bg-clip-text text-transparent font-medium">
-            Handymate
-          </span>
+          <span className="text-teal-600 font-medium">Handymate</span>
         </p>
       </div>
     </div>

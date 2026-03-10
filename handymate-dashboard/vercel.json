@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/sync-phone-webhooks",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/gmail-lead-import",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

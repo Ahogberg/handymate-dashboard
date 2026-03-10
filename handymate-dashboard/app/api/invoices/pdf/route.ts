@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
+import { generateSwishQR } from '@/lib/swish-qr'
 
 export const dynamic = 'force-dynamic'
 
@@ -77,6 +78,13 @@ export async function GET(request: NextRequest) {
 
     // Binary PDF
     if (format === 'pdf') {
+      const payAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
+      const swishQR = await generateSwishQR(
+        businessConfig?.swish_number,
+        payAmount || invoice.total,
+        invoice.invoice_number
+      )
+
       const pdfBuffer = generateInvoicePDF(
         {
           invoice_number: invoice.invoice_number,
@@ -111,6 +119,7 @@ export async function GET(request: NextRequest) {
           bankgiro: businessConfig?.bankgiro,
           plusgiro: businessConfig?.plusgiro,
           swish_number: businessConfig?.swish_number,
+          swish_qr: swishQR || undefined,
           bank_account_number: businessConfig?.bank_account_number,
           f_skatt_registered: businessConfig?.f_skatt_registered,
           accent_color: accentColor,
@@ -126,6 +135,14 @@ export async function GET(request: NextRequest) {
         },
       })
     }
+
+    // Swish QR code for HTML view
+    const payAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
+    const swishQR = await generateSwishQR(
+      businessConfig?.swish_number,
+      payAmount || invoice.total,
+      invoice.invoice_number
+    )
 
     // ROT/RUT details
     const hasRotRut = !!invoice.rot_rut_type
@@ -288,6 +305,19 @@ export async function GET(request: NextRequest) {
 
   <div class="payment-box">
     <h3>Betalningsinformation</h3>
+    ${swishQR ? `
+    <div style="display:flex;gap:24px;align-items:flex-start;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #333;">
+      <div style="flex-shrink:0;text-align:center;">
+        <img src="${swishQR}" alt="Swish QR-kod" style="width:160px;height:160px;display:block;border-radius:8px;" />
+        <p style="color:#9ca3af;font-size:11px;margin-top:6px;">Swish ${escapeHtml(businessConfig?.swish_number || '')}</p>
+      </div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px;padding-top:8px;">
+        <p style="color:white;font-weight:600;font-size:16px;margin:0;">Betala enkelt med Swish</p>
+        <p style="color:#9ca3af;font-size:13px;margin:0;">Skanna QR-koden med din Swish-app — beloppet och fakturanumret fylls i automatiskt.</p>
+        <p style="color:${accentColor};font-size:22px;font-weight:700;margin:8px 0 0 0;">Att betala: ${formatSEK(hasRotRut ? invoice.customer_pays : invoice.total)}</p>
+      </div>
+    </div>
+    ` : ''}
     <div class="payment-grid">
       ${paymentMethods.map(pm => `
         <div class="payment-item"><label>${pm.label}</label><span>${escapeHtml(pm.value)}</span></div>

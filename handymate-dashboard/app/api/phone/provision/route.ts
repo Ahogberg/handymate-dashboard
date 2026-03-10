@@ -20,9 +20,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Permission check: kräver manage_settings
+    // Fallback: business owner (user_id match) has full permissions even without business_users row
     const currentUser = await getCurrentUser(request)
-    if (!currentUser || !hasPermission(currentUser, 'manage_settings')) {
+    if (currentUser && !hasPermission(currentUser, 'manage_settings')) {
       return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
+    // If currentUser is null, verify the caller IS the business owner via business_config.user_id
+    if (!currentUser) {
+      const supabaseCheck = getServerSupabase()
+      const { data: ownerCheck } = await supabaseCheck
+        .from('business_config')
+        .select('user_id')
+        .eq('business_id', authBusiness.business_id)
+        .single()
+      if (!ownerCheck || ownerCheck.user_id !== authBusiness.user_id) {
+        return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+      }
     }
 
     // Rate limit check (46elks API)
@@ -151,10 +164,21 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Permission check: kräver manage_settings
+    // Permission check: kräver manage_settings (with owner fallback)
     const currentUser = await getCurrentUser(request)
-    if (!currentUser || !hasPermission(currentUser, 'manage_settings')) {
+    if (currentUser && !hasPermission(currentUser, 'manage_settings')) {
       return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
+    if (!currentUser) {
+      const supabaseCheck = getServerSupabase()
+      const { data: ownerCheck } = await supabaseCheck
+        .from('business_config')
+        .select('user_id')
+        .eq('business_id', authBusiness.business_id)
+        .single()
+      if (!ownerCheck || ownerCheck.user_id !== authBusiness.user_id) {
+        return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+      }
     }
 
     // Rate limit check (46elks API)

@@ -354,6 +354,13 @@ export default function SettingsPage() {
   const [googleSyncing, setGoogleSyncing] = useState(false)
   const [googleSyncResult, setGoogleSyncResult] = useState<any>(null)
 
+  // Gmail lead import state
+  const [gmailLeadEnabled, setGmailLeadEnabled] = useState(false)
+  const [gmailLeadApprovedSenders, setGmailLeadApprovedSenders] = useState('')
+  const [gmailLeadBlockedSenders, setGmailLeadBlockedSenders] = useState('')
+  const [gmailLeadLastImport, setGmailLeadLastImport] = useState<string | null>(null)
+  const [gmailLeadSaving, setGmailLeadSaving] = useState(false)
+
   // Google Reviews state
   const [googleReviewUrl, setGoogleReviewUrl] = useState('')
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
@@ -382,10 +389,22 @@ export default function SettingsPage() {
   const [connectLoading, setConnectLoading] = useState(false)
   const [syncLoading, setSyncLoading] = useState<string | null>(null)
 
+  // Helper: get Authorization header with current Supabase session token
+  async function getAuthHeaders(): Promise<Record<string, string>> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        return { 'Authorization': `Bearer ${session.access_token}` }
+      }
+    } catch { /* ignore */ }
+    return {}
+  }
+
   useEffect(() => {
     fetchConfig()
     fetchFortnoxStatus()
     fetchGoogleStatus()
+    fetchGmailLeadSettings()
     fetchWorkTypes()
     fetchGrossistStatus()
     fetchLeadSources()
@@ -442,7 +461,8 @@ export default function SettingsPage() {
 
   async function fetchGoogleStatus() {
     try {
-      const response = await fetch('/api/google/status')
+      const authHeaders = await getAuthHeaders()
+      const response = await fetch('/api/google/status', { headers: authHeaders })
       if (response.ok) {
         const data = await response.json()
         setGoogleStatus(data)
@@ -590,9 +610,10 @@ export default function SettingsPage() {
 
     setProvisioning(true)
     try {
+      const authHeaders = await getAuthHeaders()
       const response = await fetch('/api/phone/provision', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           business_id: business.business_id,
           forward_phone_number: forwardNumber.trim()
@@ -621,9 +642,10 @@ export default function SettingsPage() {
 
     setSavingPhone(true)
     try {
+      const authHeaders = await getAuthHeaders()
       const response = await fetch('/api/phone/settings', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           business_id: business.business_id,
           forward_phone_number: config.forward_phone_number,
@@ -652,8 +674,10 @@ export default function SettingsPage() {
 
     setProvisioning(true)
     try {
+      const authHeaders = await getAuthHeaders()
       const response = await fetch(`/api/phone/provision?business_id=${business.business_id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: { ...authHeaders },
       })
 
       const result = await response.json()
@@ -798,7 +822,8 @@ export default function SettingsPage() {
 
   const handleDisconnectGoogle = async () => {
     try {
-      const res = await fetch('/api/google/disconnect', { method: 'DELETE' })
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/google/disconnect', { method: 'DELETE', headers: authHeaders })
       if (!res.ok) throw new Error()
       setGoogleStatus(null)
       showToast('Google Calendar bortkopplad', 'success')
@@ -811,12 +836,13 @@ export default function SettingsPage() {
     setGoogleSyncing(true)
     setGoogleSyncResult(null)
     try {
-      const res = await fetch('/api/google/sync', { method: 'POST' })
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/google/sync', { method: 'POST', headers: authHeaders })
       if (!res.ok) throw new Error()
       const data = await res.json()
       setGoogleSyncResult(data)
       // Refresh status
-      const statusRes = await fetch('/api/google/status')
+      const statusRes = await fetch('/api/google/status', { headers: authHeaders })
       if (statusRes.ok) setGoogleStatus(await statusRes.json())
       showToast('Kalendersynk klar!', 'success')
     } catch {
@@ -841,9 +867,10 @@ export default function SettingsPage() {
 
   const handleToggleGmailSync = async (enabled: boolean) => {
     try {
+      const authHeaders = await getAuthHeaders()
       const res = await fetch('/api/google/gmail-toggle', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({ enabled }),
       })
       if (res.ok) {
@@ -854,6 +881,46 @@ export default function SettingsPage() {
       showToast('Kunde inte ändra Gmail-inställning', 'error')
     }
   }
+
+  async function fetchGmailLeadSettings() {
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/settings/gmail-lead', { headers: authHeaders })
+      if (res.ok) {
+        const data = await res.json()
+        setGmailLeadEnabled(data.enabled)
+        setGmailLeadApprovedSenders(data.approved_senders || '')
+        setGmailLeadBlockedSenders(data.blocked_senders || '')
+        setGmailLeadLastImport(data.last_import_at)
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function handleSaveGmailLeadSettings() {
+    setGmailLeadSaving(true)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/settings/gmail-lead', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({
+          enabled: gmailLeadEnabled,
+          approved_senders: gmailLeadApprovedSenders,
+          blocked_senders: gmailLeadBlockedSenders,
+        }),
+      })
+      if (res.ok) {
+        showToast('Gmail lead-inställningar sparade', 'success')
+      } else {
+        showToast('Kunde inte spara inställningar', 'error')
+      }
+    } catch {
+      showToast('Kunde inte spara inställningar', 'error')
+    } finally {
+      setGmailLeadSaving(false)
+    }
+  }
+
 
   async function handleSaveReviewSettings() {
     setSavingReview(true)
@@ -1672,6 +1739,7 @@ export default function SettingsPage() {
                     placeholder="123 456 78 90"
                     className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
+                  <p className="text-xs text-gray-400 mt-1.5">Ditt Swish-nummer visas som QR-kod på fakturor — kunden skannar och betalar direkt.</p>
                 </div>
 
                 <div>
@@ -2474,6 +2542,84 @@ export default function SettingsPage() {
                       )}
                     </div>
                   </div>
+
+                  {/* Gmail lead import */}
+                  {googleStatus?.gmailScopeGranted && (
+                    <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Bot className="w-5 h-5 text-gray-500" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">AI Lead-import från Gmail</p>
+                            <p className="text-xs text-gray-400">Läs inkommande mail, hitta leads automatiskt</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const next = !gmailLeadEnabled
+                            setGmailLeadEnabled(next)
+                            const authHeaders = await getAuthHeaders()
+                            fetch('/api/settings/gmail-lead', {
+                              method: 'PUT',
+                              headers: { 'Content-Type': 'application/json', ...authHeaders },
+                              body: JSON.stringify({
+                                enabled: next,
+                                approved_senders: gmailLeadApprovedSenders,
+                                blocked_senders: gmailLeadBlockedSenders,
+                              }),
+                            }).then(() => showToast(next ? 'Lead-import aktiverad' : 'Lead-import inaktiverad', 'success'))
+                              .catch(() => showToast('Fel vid sparning', 'error'))
+                          }}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${gmailLeadEnabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${gmailLeadEnabled ? 'translate-x-5' : ''}`} />
+                        </button>
+                      </div>
+
+                      {gmailLeadEnabled && (
+                        <div className="space-y-2 pt-1 border-t border-gray-200">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Godkända avsändare (valfritt)
+                            </label>
+                            <input
+                              type="text"
+                              value={gmailLeadApprovedSenders}
+                              onChange={(e) => setGmailLeadApprovedSenders(e.target.value)}
+                              placeholder="t.ex. blocket.se, hemnet.se, @gmail.com"
+                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                            />
+                            <p className="text-xs text-gray-400 mt-0.5">Kommaseparerade domäner/e-poster som alltid är leads</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">
+                              Blockerade avsändare (valfritt)
+                            </label>
+                            <input
+                              type="text"
+                              value={gmailLeadBlockedSenders}
+                              onChange={(e) => setGmailLeadBlockedSenders(e.target.value)}
+                              placeholder="t.ex. noreply@, newsletter@"
+                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                            />
+                          </div>
+                          <button
+                            onClick={handleSaveGmailLeadSettings}
+                            disabled={gmailLeadSaving}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                          >
+                            {gmailLeadSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            Spara filter
+                          </button>
+                          {gmailLeadLastImport && (
+                            <p className="text-xs text-gray-400">
+                              Senaste import: {new Date(gmailLeadLastImport).toLocaleString('sv-SE')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Disconnect */}
                   <button

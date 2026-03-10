@@ -92,7 +92,8 @@ export async function GET(
 }
 
 /**
- * POST /api/quotes/public/[token] - Signera offert
+ * POST /api/quotes/public/[token] - Signera eller avböj offert
+ * action: 'sign' (default) | 'decline'
  * Ingen auth krävs
  */
 export async function POST(
@@ -103,19 +104,12 @@ export async function POST(
     const supabase = getServerSupabase()
     const token = params.token
     const body = await request.json()
-    const { name, signature_data } = body
-
-    if (!name || !signature_data) {
-      return NextResponse.json(
-        { error: 'Namn och signatur krävs' },
-        { status: 400 }
-      )
-    }
+    const { action = 'sign', name, signature_data, reason } = body
 
     // Fetch quote by sign_token
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('quote_id, status, signed_at')
+      .select('quote_id, business_id, customer_id, status, signed_at, total, customer:customer_id(name)')
       .eq('sign_token', token)
       .single()
 
@@ -126,20 +120,56 @@ export async function POST(
       )
     }
 
-    // Check if already signed
     if (quote.status === 'accepted' && quote.signed_at) {
-      return NextResponse.json(
-        { error: 'Offerten är redan signerad' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Offerten är redan signerad' }, { status: 400 })
     }
 
-    // Get client IP
-    const ip = request.headers.get('x-forwarded-for') ||
-               request.headers.get('x-real-ip') ||
-               'unknown'
+    if (quote.status === 'declined') {
+      return NextResponse.json({ error: 'Offerten är redan avböjd' }, { status: 400 })
+    }
 
-    // Update quote with signature
+    // ── Decline ───────────────────────────────────────────────────────────────
+    if (action === 'decline') {
+      if (!reason) {
+        return NextResponse.json({ error: 'Ange ett skäl för avböjandet' }, { status: 400 })
+      }
+
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update({
+          status: 'declined',
+          declined_at: new Date().toISOString(),
+          lost_reason: reason,
+        })
+        .eq('sign_token', token)
+
+      if (updateError) throw updateError
+
+      // Trigger agent automation for declined quote (non-blocking)
+      try {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: quote.business_id,
+          event: 'quote_declined',
+          customerId: quote.customer_id,
+          context: { quoteId: quote.quote_id, extraVariables: { reason } },
+        })
+      } catch { /* non-blocking */ }
+
+      console.log(`[quote/public] Declined: ${quote.quote_id}, reason: ${reason}`)
+      return NextResponse.json({ success: true })
+    }
+
+    // ── Sign ──────────────────────────────────────────────────────────────────
+    if (!name || !signature_data) {
+      return NextResponse.json({ error: 'Namn och signatur krävs' }, { status: 400 })
+    }
+
+    const ip =
+      request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
+
     const { error: updateError } = await supabase
       .from('quotes')
       .update({
@@ -156,69 +186,51 @@ export async function POST(
 
     // Pipeline: move deal to accepted on signature
     try {
-      const { data: fullQuote } = await supabase
-        .from('quotes')
-        .select('quote_id, business_id')
-        .eq('sign_token', token)
-        .single()
-
-      if (fullQuote) {
-        const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-        const settings = await getAutomationSettings(fullQuote.business_id)
-        if (settings?.auto_move_on_signature) {
-          const deal = await findDealByQuote(fullQuote.business_id, fullQuote.quote_id)
-          if (deal) {
-            await moveDeal({
-              dealId: deal.id,
-              businessId: fullQuote.business_id,
-              toStageSlug: 'accepted',
-              triggeredBy: 'system',
-            })
-          }
+      const { findDealByQuote, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+      const settings = await getAutomationSettings(quote.business_id)
+      if (settings?.auto_move_on_signature) {
+        const deal = await findDealByQuote(quote.business_id, quote.quote_id)
+        if (deal) {
+          await moveDeal({
+            dealId: deal.id,
+            businessId: quote.business_id,
+            toStageSlug: 'accepted',
+            triggeredBy: 'system',
+          })
         }
       }
     } catch (pipelineErr) {
       console.error('Pipeline trigger error (non-blocking):', pipelineErr)
     }
 
-    // Smart communication: trigger quote_signed event
+    // Smart communication + notifications (non-blocking)
     try {
-      const { data: signedQuote } = await supabase
-        .from('quotes')
-        .select('quote_id, business_id, customer_id, total, customer:customer_id(name)')
-        .eq('sign_token', token)
-        .single()
+      const { triggerEventCommunication } = await import('@/lib/smart-communication')
+      await triggerEventCommunication({
+        businessId: quote.business_id,
+        event: 'quote_signed',
+        customerId: quote.customer_id,
+        context: { quoteId: quote.quote_id },
+      })
 
-      if (signedQuote) {
-        const { triggerEventCommunication } = await import('@/lib/smart-communication')
-        await triggerEventCommunication({
-          businessId: signedQuote.business_id,
-          event: 'quote_signed',
-          customerId: signedQuote.customer_id,
-          context: { quoteId: signedQuote.quote_id },
+      try {
+        const { notifyQuoteSigned } = await import('@/lib/notifications')
+        await notifyQuoteSigned({
+          businessId: quote.business_id,
+          customerName: (quote.customer as any)?.name || 'Kund',
+          quoteId: quote.quote_id,
+          total: quote.total || 0,
         })
+      } catch { /* non-blocking */ }
 
-        // Notification: quote accepted
-        try {
-          const { notifyQuoteSigned } = await import('@/lib/notifications')
-          await notifyQuoteSigned({
-            businessId: signedQuote.business_id,
-            customerName: (signedQuote.customer as any)?.name || 'Kund',
-            quoteId: signedQuote.quote_id,
-            total: signedQuote.total || 0,
-          })
-        } catch { /* non-blocking */ }
-
-        // AI Projektledare: auto-skapa projekt
-        try {
-          const { handleProjectEvent } = await import('@/lib/project-ai-engine')
-          await handleProjectEvent({
-            type: 'quote_accepted',
-            businessId: signedQuote.business_id,
-            quoteId: signedQuote.quote_id,
-          })
-        } catch { /* non-blocking */ }
-      }
+      try {
+        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+        await handleProjectEvent({
+          type: 'quote_accepted',
+          businessId: quote.business_id,
+          quoteId: quote.quote_id,
+        })
+      } catch { /* non-blocking */ }
     } catch (commErr) {
       console.error('Communication trigger error (non-blocking):', commErr)
     }
@@ -226,7 +238,7 @@ export async function POST(
     return NextResponse.json({ success: true })
 
   } catch (error: any) {
-    console.error('Sign quote error:', error)
+    console.error('Quote public POST error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
