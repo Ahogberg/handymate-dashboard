@@ -253,7 +253,11 @@ export default function CampaignsPage() {
                           {campaign.recipient_count} mottagare
                         </div>
                         <p className="text-xs text-gray-400 mt-1">
-                          {campaign.sent_at ? `Skickad ${formatDate(campaign.sent_at)}` : `Skapad ${formatDate(campaign.created_at)}`}
+                          {campaign.sent_at
+                            ? `Skickad ${formatDate(campaign.sent_at)}`
+                            : campaign.status === 'scheduled' && campaign.scheduled_at
+                            ? `Schemalagd ${new Date(campaign.scheduled_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`
+                            : `Skapad ${formatDate(campaign.created_at)}`}
                         </p>
                       </div>
 
@@ -272,6 +276,14 @@ export default function CampaignsPage() {
                             className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
                           >
                             <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                        {campaign.status === 'scheduled' && (
+                          <button
+                            onClick={() => handleDelete(campaign.campaign_id)}
+                            className="px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-600 bg-red-50 border border-red-200 rounded-lg"
+                          >
+                            Avbryt
                           </button>
                         )}
                         {campaign.status === 'sent' && (

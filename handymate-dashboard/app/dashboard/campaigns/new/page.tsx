@@ -2,17 +2,18 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  ArrowLeft, 
-  Users, 
-  MessageSquare, 
+import {
+  ArrowLeft,
+  Users,
+  MessageSquare,
   Send,
   Loader2,
   Search,
   Check,
   Clock,
   Filter,
-  Sparkles
+  Sparkles,
+  CalendarClock
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -52,6 +53,9 @@ export default function NewCampaignPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [campaignType, setCampaignType] = useState<'broadcast' | 'interactive'>('interactive')
   const [autoReply, setAutoReply] = useState(true)
+  const [scheduleType, setScheduleType] = useState<'now' | 'later'>('now')
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [scheduledTime, setScheduledTime] = useState('09:00')
 
   useEffect(() => {
     fetchCustomers()
@@ -154,59 +158,69 @@ export default function NewCampaignPage() {
 
   const handleSend = async () => {
     if (!campaignName || !message || recipientCount === 0) return
+    if (scheduleType === 'later' && !scheduledDate) {
+      toast.error('Välj ett datum för schemaläggning')
+      return
+    }
 
     setSending(true)
-
     try {
-      // Hämta mottagare
-      const recipients = filterType === 'manual' 
+      const recipients = filterType === 'manual'
         ? customers.filter((c: Customer) => selectedCustomers.has(c.customer_id))
         : filteredCustomers
 
-      // Skapa kampanj
       const campaignId = 'camp_' + Math.random().toString(36).substr(2, 12)
-      
-const { error: campaignError } = await supabase
-  .from('sms_campaign')
-  .insert({
-    campaign_id: campaignId,
-    business_id: business.business_id,
-    name: campaignName,
-    message: message,
-    status: 'sending',
-    recipient_filter: { type: filterType },
-    recipient_count: recipients.length,
-    campaign_type: campaignType,
-    auto_reply: campaignType === 'interactive',
-  })
+      const isScheduled = scheduleType === 'later'
+      const scheduledAt = isScheduled
+        ? new Date(`${scheduledDate}T${scheduledTime}:00`).toISOString()
+        : null
+
+      const { error: campaignError } = await supabase
+        .from('sms_campaign')
+        .insert({
+          campaign_id: campaignId,
+          business_id: business.business_id,
+          name: campaignName,
+          message: message,
+          status: isScheduled ? 'scheduled' : 'sending',
+          scheduled_at: scheduledAt,
+          recipient_filter: { type: filterType },
+          recipient_count: recipients.length,
+          campaign_type: campaignType,
+          auto_reply: campaignType === 'interactive',
+        })
 
       if (campaignError) throw campaignError
 
-      // Skapa mottagare
       const recipientRows = recipients.map((c: Customer) => ({
         campaign_id: campaignId,
         customer_id: c.customer_id,
         phone_number: c.phone_number,
         status: 'pending'
       }))
+      await supabase.from('sms_campaign_recipient').insert(recipientRows)
 
-      await supabase
-        .from('sms_campaign_recipient')
-        .insert(recipientRows)
+      if (isScheduled) {
+        // Schemalagd — visa bekräftelse och gå tillbaka
+        toast.success(`Kampanj schemalagd till ${new Date(scheduledAt!).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}`)
+        router.push('/dashboard/campaigns')
+        return
+      }
 
-      // Skicka SMS via API
+      // Skicka direkt
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
       const response = await fetch('/api/campaigns/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ campaignId })
       })
 
-      if (!response.ok) {
-        throw new Error('Kunde inte skicka kampanj')
-      }
+      if (!response.ok) throw new Error('Kunde inte skicka kampanj')
 
       router.push('/dashboard/campaigns')
-
     } catch (error) {
       console.error('Error sending campaign:', error)
       toast.error('Något gick fel. Försök igen.')
@@ -214,6 +228,9 @@ const { error: campaignError } = await supabase
       setSending(false)
     }
   }
+
+  // Minsta tillåtna datum: idag
+  const minDate = new Date().toISOString().split('T')[0]
 
   const getDaysInactive = (lastBooking: string | undefined): string => {
     if (!lastBooking) return 'Aldrig bokat'
@@ -630,9 +647,71 @@ const messageSuggestions = [
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              {/* Schemaläggning */}
+              <div className="mt-6 space-y-3">
+                <p className="text-sm font-medium text-gray-700">När ska kampanjen skickas?</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => setScheduleType('now')}
+                    className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
+                      scheduleType === 'now'
+                        ? 'bg-teal-50 border-teal-300'
+                        : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <Send className={`w-5 h-5 ${scheduleType === 'now' ? 'text-sky-700' : 'text-gray-400'}`} />
+                    <div>
+                      <p className={`text-sm font-medium ${scheduleType === 'now' ? 'text-gray-900' : 'text-gray-700'}`}>Skicka nu</p>
+                      <p className="text-xs text-gray-400">Skickas direkt</p>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setScheduleType('later')}
+                    className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
+                      scheduleType === 'later'
+                        ? 'bg-teal-50 border-teal-300'
+                        : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <CalendarClock className={`w-5 h-5 ${scheduleType === 'later' ? 'text-sky-700' : 'text-gray-400'}`} />
+                    <div>
+                      <p className={`text-sm font-medium ${scheduleType === 'later' ? 'text-gray-900' : 'text-gray-700'}`}>Schemalägg</p>
+                      <p className="text-xs text-gray-400">Välj datum & tid</p>
+                    </div>
+                  </button>
+                </div>
+
+                {scheduleType === 'later' && (
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Datum</label>
+                      <input
+                        type="date"
+                        value={scheduledDate}
+                        min={minDate}
+                        onChange={(e) => setScheduledDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Tid</label>
+                      <input
+                        type="time"
+                        value={scheduledTime}
+                        onChange={(e) => setScheduledTime(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                 <p className="text-sm text-amber-600">
-                  ⚠️ När du skickar kommer {recipientCount} SMS att skickas direkt. Detta kan inte ångras.
+                  {scheduleType === 'now'
+                    ? `⚠️ ${recipientCount} SMS skickas direkt. Detta kan inte ångras.`
+                    : `📅 ${recipientCount} SMS schemaläggs. Du kan avbryta kampanjen innan den skickas.`
+                  }
                 </p>
               </div>
             </div>
@@ -647,13 +726,18 @@ const messageSuggestions = [
               </button>
               <button
                 onClick={handleSend}
-                disabled={sending}
+                disabled={sending || (scheduleType === 'later' && !scheduledDate)}
                 className="flex items-center px-8 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? (
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                    Skickar...
+                    {scheduleType === 'now' ? 'Skickar...' : 'Sparar...'}
+                  </>
+                ) : scheduleType === 'later' ? (
+                  <>
+                    <CalendarClock className="w-5 h-5 mr-2" />
+                    Schemalägg kampanj
                   </>
                 ) : (
                   <>

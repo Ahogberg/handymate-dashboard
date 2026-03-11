@@ -34,21 +34,38 @@ async function sendSMS(to: string, message: string, from: string): Promise<{ suc
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const supabase = getServerSupabase()
-    const { campaignId } = await request.json()
+    const body = await request.json()
+    const { campaignId } = body
+
+    // Accept either user auth or internal cron secret
+    const cronSecret = request.headers.get('x-cron-secret')
+    const isCronCall = cronSecret === process.env.CRON_SECRET
+
+    let businessId: string
+
+    if (isCronCall) {
+      // Cron call: look up business_id from campaign directly
+      const { data: camp } = await supabase
+        .from('sms_campaign')
+        .select('business_id')
+        .eq('campaign_id', campaignId)
+        .single()
+      if (!camp) return NextResponse.json({ error: 'Kampanj hittades inte' }, { status: 404 })
+      businessId = camp.business_id
+    } else {
+      // User call: verify ownership via auth
+      const business = await getAuthenticatedBusiness(request)
+      if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      businessId = business.business_id
+    }
 
     // Hämta kampanj och verifiera ägarskap
     const { data: campaign, error: campaignError } = await supabase
       .from('sms_campaign')
       .select('*')
       .eq('campaign_id', campaignId)
-      .eq('business_id', business.business_id)
+      .eq('business_id', businessId)
       .single()
 
     if (campaignError || !campaign) {
@@ -66,20 +83,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Inga mottagare hittades' }, { status: 404 })
     }
 
-    // Rate limit check - kontrollera att vi har tillräckligt med kvot för alla mottagare
-    const rateLimit = checkSmsRateLimit(business.business_id)
+    // Rate limit check
+    const rateLimit = checkSmsRateLimit(businessId)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }
 
-    const senderName = business.business_name || 'Handymate'
+    // Get sender name from business_config
+    const { data: biz } = await supabase
+      .from('business_config')
+      .select('business_name')
+      .eq('business_id', businessId)
+      .single()
+    const senderName = biz?.business_name || 'Handymate'
     let deliveredCount = 0
     let failedCount = 0
 
+    // Mark campaign as sending
+    await supabase
+      .from('sms_campaign')
+      .update({ status: 'sending' })
+      .eq('campaign_id', campaignId)
+
     // Skicka SMS till varje mottagare
     for (const recipient of recipients) {
-      // Kontrollera rate limit för varje SMS
-      const smsRateLimit = checkSmsRateLimit(business.business_id)
+      const smsRateLimit = checkSmsRateLimit(businessId)
       if (!smsRateLimit.allowed) {
         // Sluta skicka om rate limit nås
         await supabase
