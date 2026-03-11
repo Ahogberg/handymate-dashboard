@@ -7,13 +7,21 @@
 CREATE TABLE IF NOT EXISTS inbox_item (
   inbox_item_id TEXT PRIMARY KEY,
   business_id TEXT NOT NULL,
-  channel TEXT NOT NULL CHECK (channel IN ('sms', 'call', 'lead', 'email')),
+  channel TEXT NOT NULL,
   customer_id TEXT,
   summary TEXT,
-  status TEXT DEFAULT 'new' CHECK (status IN ('new', 'read', 'archived')),
+  status TEXT DEFAULT 'new',
   related_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add missing columns if table already existed without them
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS channel TEXT;
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS customer_id TEXT;
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS summary TEXT;
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'new';
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS related_id TEXT;
+ALTER TABLE inbox_item ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 
 CREATE INDEX IF NOT EXISTS idx_inbox_item_business ON inbox_item(business_id);
 CREATE INDEX IF NOT EXISTS idx_inbox_item_status ON inbox_item(business_id, status);
