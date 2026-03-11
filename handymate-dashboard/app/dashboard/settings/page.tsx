@@ -33,7 +33,8 @@ import {
   Package,
   CalendarDays,
   UsersRound,
-  Star
+  Star,
+  RefreshCw
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -336,6 +337,8 @@ export default function SettingsPage() {
   const [forwardNumber, setForwardNumber] = useState('')
   const [provisioning, setProvisioning] = useState(false)
   const [savingPhone, setSavingPhone] = useState(false)
+  const [syncingWebhooks, setSyncingWebhooks] = useState(false)
+  const [webhookSyncMsg, setWebhookSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   // Fortnox integration state
   const [fortnoxStatus, setFortnoxStatus] = useState<FortnoxStatus | null>(null)
@@ -664,6 +667,26 @@ export default function SettingsPage() {
       showToast(error.message || 'Något gick fel', 'error')
     } finally {
       setSavingPhone(false)
+    }
+  }
+
+  const handleSyncWebhooks = async () => {
+    setSyncingWebhooks(true)
+    setWebhookSyncMsg(null)
+    try {
+      const authHeaders = await getAuthHeaders()
+      const res = await fetch('/api/phone/settings', { method: 'POST', headers: authHeaders })
+      if (res.ok) {
+        setWebhookSyncMsg({ text: 'Webhook-URL:er synkade med 46elks!', ok: true })
+      } else {
+        const data = await res.json()
+        setWebhookSyncMsg({ text: data.error || 'Synkfel', ok: false })
+      }
+    } catch {
+      setWebhookSyncMsg({ text: 'Nätverksfel', ok: false })
+    } finally {
+      setSyncingWebhooks(false)
+      setTimeout(() => setWebhookSyncMsg(null), 5000)
     }
   }
 
@@ -1631,6 +1654,34 @@ export default function SettingsPage() {
                     )}
                     Spara telefoninställningar
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Webhook-synk — visas bara när 46elks-nummer är tilldelat */}
+            {config.assigned_phone_number && (
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <RefreshCw className="w-5 h-5 text-gray-400" />
+                  <h2 className="text-base font-semibold text-gray-900">Webhook-diagnostik</h2>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">
+                  Webhook-URL:er synkas automatiskt dagligen. Använd denna knapp bara om SMS- eller röst-webhook slutade fungera.
+                </p>
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleSyncWebhooks}
+                    disabled={syncingWebhooks}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncingWebhooks ? 'animate-spin' : ''}`} />
+                    Synka webhook-URL:er med 46elks
+                  </button>
+                  {webhookSyncMsg && (
+                    <span className={`text-sm font-medium ${webhookSyncMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {webhookSyncMsg.text}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
