@@ -3,6 +3,7 @@ import { google } from 'googleapis'
 import { getServerSupabase } from '@/lib/supabase'
 import { getGoogleAuthClient, ensureValidToken } from '@/lib/google-calendar'
 import { isLikelyLead, parseLeadFromEmail } from '@/lib/gmail-lead-detection'
+import { downloadAndSaveAttachments } from '@/lib/gmail-attachments'
 
 /**
  * Cron: GET /api/cron/gmail-lead-import
@@ -260,6 +261,32 @@ export async function GET(request: NextRequest) {
               activity_type: 'created',
               description: `Lead skapad automatiskt från Gmail-meddelande: "${subject}"`,
             })
+          }
+
+          // Download and save attachments
+          if (fullMsg.payload) {
+            try {
+              const savedAttachments = await downloadAndSaveAttachments(
+                gmail,
+                msg.id,
+                fullMsg.payload,
+                customerId,
+                leadId,
+                businessId
+              )
+              if (savedAttachments.length > 0 && leadId) {
+                const fileList = savedAttachments.map((a) => `• ${a.filename}`).join('\n')
+                await supabase.from('lead_activities').insert({
+                  lead_id: leadId,
+                  business_id: businessId,
+                  activity_type: 'note',
+                  description: `${savedAttachments.length} bilaga(r) hämtades automatiskt från Gmail:\n${fileList}`,
+                })
+              }
+            } catch (attErr) {
+              console.error(`[gmail-lead-import] Attachment error for message ${msg.id}:`, attErr)
+              // non-blocking — lead was still created
+            }
           }
 
           // Update idempotency record with lead_id
