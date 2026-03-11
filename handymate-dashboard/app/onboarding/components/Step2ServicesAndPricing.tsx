@@ -146,20 +146,28 @@ export default function Step2ServicesAndPricing({ data, onNext, onBack, onUpdate
         {/* ROT/RUT */}
         <div className="flex flex-col sm:flex-row gap-4 pt-2">
           {(ROT_BRANCHES.includes(data.branch) || rotEnabled) && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className={`w-10 h-6 rounded-full transition-colors relative ${rotEnabled ? 'bg-teal-600' : 'bg-zinc-700'}`}>
+            <button
+              type="button"
+              onClick={() => setRotEnabled(v => !v)}
+              className="flex items-center gap-3 cursor-pointer text-left"
+            >
+              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${rotEnabled ? 'bg-teal-600' : 'bg-zinc-700'}`}>
                 <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${rotEnabled ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
               <span className="text-sm text-white">ROT-avdrag (30% arbetskostnad)</span>
-            </label>
+            </button>
           )}
           {(RUT_BRANCHES.includes(data.branch) || rutEnabled) && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className={`w-10 h-6 rounded-full transition-colors relative ${rutEnabled ? 'bg-teal-600' : 'bg-zinc-700'}`}>
+            <button
+              type="button"
+              onClick={() => setRutEnabled(v => !v)}
+              className="flex items-center gap-3 cursor-pointer text-left"
+            >
+              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${rutEnabled ? 'bg-teal-600' : 'bg-zinc-700'}`}>
                 <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${rutEnabled ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
               <span className="text-sm text-white">RUT-avdrag (50% arbetskostnad)</span>
-            </label>
+            </button>
           )}
         </div>
       </div>

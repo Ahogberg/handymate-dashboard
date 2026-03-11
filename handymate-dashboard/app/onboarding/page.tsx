@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Mail } from 'lucide-react'
+import { BRANCH_HOURLY_RATE, ROT_BRANCHES, RUT_BRANCHES } from './constants'
 import StepProgress from './components/StepProgress'
 import Step1BusinessAccount from './components/Step1BusinessAccount'
 import Step2ServicesAndPricing from './components/Step2ServicesAndPricing'
@@ -21,6 +22,8 @@ export default function OnboardingPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [data, setData] = useState<OnboardingData | null>(null)
   const [isNewUser, setIsNewUser] = useState(false)
+  const [emailPending, setEmailPending] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState('')
 
   // Load onboarding data for existing (authenticated) users
   useEffect(() => {
@@ -93,48 +96,62 @@ export default function OnboardingPage() {
   }, [])
 
   // Step 1 completion (new user just registered)
-  const handleStep1Complete = useCallback(async (businessId: string, _emailPending: boolean) => {
-    // Reload data from server now that user is registered
+  const handleStep1Complete = useCallback(async (
+    businessId: string,
+    isEmailPending: boolean,
+    formData: { business_name: string; branch: string; contact_name: string; contact_email: string; phone_number: string }
+  ) => {
+    // Always build minimal data from form fields so step 2 can render regardless of API status
+    const baseData: OnboardingData = {
+      business_id: businessId,
+      business_name: formData.business_name,
+      display_name: formData.business_name,
+      contact_name: formData.contact_name,
+      contact_email: formData.contact_email,
+      phone_number: formData.phone_number,
+      branch: formData.branch,
+      service_area: '',
+      org_number: '',
+      address: '',
+      services_offered: [],
+      default_hourly_rate: BRANCH_HOURLY_RATE[formData.branch] || 450,
+      callout_fee: 0,
+      rot_enabled: ROT_BRANCHES.includes(formData.branch),
+      rut_enabled: RUT_BRANCHES.includes(formData.branch),
+      assigned_phone_number: null,
+      forward_phone_number: null,
+      call_mode: null,
+      phone_setup_type: null,
+      lead_sources: [],
+      lead_email_address: null,
+      knowledge_base: null,
+      onboarding_step: 1,
+      onboarding_data: {},
+      onboarding_completed_at: null,
+      working_hours: null,
+      industry: null,
+      google_connected: false,
+      gmail_enabled: false,
+    }
+    setData(baseData)
+    setIsNewUser(false)
+
+    // If email confirmation is required, show confirmation screen
+    if (isEmailPending) {
+      setPendingEmail(formData.contact_email)
+      setEmailPending(true)
+      return
+    }
+
+    // Try to load full data from server (may have richer data if session is set)
     try {
       const res = await fetch('/api/onboarding')
       if (res.ok) {
         const d: OnboardingData = await res.json()
         setData(d)
-        setIsNewUser(false)
       }
     } catch {
-      // Construct minimal data
-      setData({
-        business_id: businessId,
-        business_name: '',
-        display_name: '',
-        contact_name: '',
-        contact_email: '',
-        phone_number: '',
-        branch: '',
-        service_area: '',
-        org_number: '',
-        address: '',
-        services_offered: [],
-        default_hourly_rate: 0,
-        callout_fee: 0,
-        rot_enabled: false,
-        rut_enabled: false,
-        assigned_phone_number: null,
-        forward_phone_number: null,
-        call_mode: null,
-        phone_setup_type: null,
-        lead_sources: [],
-        lead_email_address: null,
-        knowledge_base: null,
-        onboarding_step: 1,
-        onboarding_data: {},
-        onboarding_completed_at: null,
-        working_hours: null,
-        industry: null,
-        google_connected: false,
-        gmail_enabled: false,
-      })
+      // Keep the baseData we already set above
     }
 
     await saveProgress(2)
@@ -146,6 +163,31 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-teal-400 animate-spin" />
+      </div>
+    )
+  }
+
+  if (emailPending) {
+    return (
+      <div className="min-h-screen bg-[#09090b] flex items-center justify-center p-4">
+        <div className="max-w-md w-full text-center space-y-6">
+          <div className="w-16 h-16 bg-teal-500/20 rounded-full flex items-center justify-center mx-auto">
+            <Mail className="w-8 h-8 text-teal-400" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Bekräfta din e-post</h1>
+            <p className="text-zinc-400">
+              Vi har skickat ett bekräftelsemail till <span className="text-white font-medium">{pendingEmail}</span>.
+              Klicka på länken i mailet för att aktivera ditt konto och fortsätta onboardingen.
+            </p>
+          </div>
+          <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 text-sm text-zinc-400">
+            Inget mail? Kolla skräppostmappen eller kontakta <a href="mailto:support@handymate.se" className="text-teal-400 hover:underline">support@handymate.se</a>.
+          </div>
+          <a href="/login" className="block w-full py-3 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-xl hover:bg-zinc-700 transition-colors">
+            Gå till inloggning
+          </a>
+        </div>
       </div>
     )
   }

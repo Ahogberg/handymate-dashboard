@@ -6,7 +6,11 @@ import { BRANCHES } from '../constants'
 import type { SignupFormData } from '../types'
 
 interface Step1Props {
-  onComplete: (businessId: string, emailPending: boolean) => void
+  onComplete: (
+    businessId: string,
+    emailPending: boolean,
+    formData: { business_name: string; branch: string; contact_name: string; contact_email: string; phone_number: string }
+  ) => void
 }
 
 export default function Step1BusinessAccount({ onComplete }: Step1Props) {
@@ -85,7 +89,13 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Något gick fel')
 
-      onComplete(result.businessId, result.emailConfirmationPending || false)
+      onComplete(result.businessId, result.emailConfirmationPending || false, {
+        business_name: form.business_name,
+        branch: form.branch,
+        contact_name: form.contact_name,
+        contact_email: form.email,
+        phone_number: cleanPhone,
+      })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Något gick fel')
     }
