@@ -40,20 +40,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Find business by assigned phone number
-    const { data: business } = await supabase
+    let business: { business_id: string; business_name: string } | null = null
+
+    const { data: directBusiness } = await supabase
       .from('business_config')
       .select('business_id, business_name')
       .eq('assigned_phone_number', to)
-      .single()
+      .maybeSingle()
 
-    if (!business) {
-      // Fallback: find via customer phone → business
+    if (directBusiness) {
+      business = directBusiness
+    } else {
+      // Fallback: find via sender's phone number → customer → business
       const { data: customerData } = await supabase
         .from('customer')
         .select('business_id')
         .eq('phone_number', from)
         .limit(1)
-        .single()
+        .maybeSingle()
 
       if (!customerData) {
         console.log('[SMS Incoming] No business found for', to)
@@ -64,16 +68,17 @@ export async function POST(request: NextRequest) {
         .from('business_config')
         .select('business_id, business_name')
         .eq('business_id', customerData.business_id)
-        .single()
+        .maybeSingle()
 
       if (!biz) {
         return NextResponse.json({ success: true, handled: false })
       }
 
-      Object.assign(business || {}, biz)
-      if (!business) {
-        return NextResponse.json({ success: true, handled: false })
-      }
+      business = biz
+    }
+
+    if (!business) {
+      return NextResponse.json({ success: true, handled: false })
     }
 
     // Store inbound message in sms_conversation
@@ -118,18 +123,6 @@ export async function POST(request: NextRequest) {
       },
       makeIdempotencyKey('sms', msgHash)
     )
-
-    // Create inbox item for dashboard overview
-    await supabase
-      .from('inbox_item')
-      .insert({
-        inbox_item_id: 'inb_' + Math.random().toString(36).substring(2, 11),
-        business_id: business.business_id,
-        channel: 'sms',
-        summary: message.substring(0, 100),
-        status: 'new',
-        created_at: new Date().toISOString(),
-      })
 
     // Return 200 immediately — agent handles response asynchronously
     // 46elks expects plain-text "OK" (or any 200), not JSON

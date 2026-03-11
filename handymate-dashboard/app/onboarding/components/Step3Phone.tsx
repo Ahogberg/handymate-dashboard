@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ArrowRight, ArrowLeft, Loader2, Phone, PhoneForwarded, Bot, Check, Copy } from 'lucide-react'
 import { CALL_MODES, FORWARDING_INSTRUCTIONS } from '../constants'
 import type { StepProps, PhoneSetupType, CallMode } from '../types'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) {
   const [phoneSetupType, setPhoneSetupType] = useState<PhoneSetupType>(
@@ -23,10 +24,15 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
     setError('')
 
     try {
+      const supabase = createClientComponentClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`
+
       const cleanPhone = '+' + forwardNumber.replace(/\D/g, '')
       const response = await fetch('/api/onboarding/phone', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           businessId: data.business_id,
           forward_phone_number: cleanPhone,

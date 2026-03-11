@@ -88,46 +88,27 @@ export async function GET(request: NextRequest) {
     }
 
     if (existing) {
-      // Update existing connection
-      const { error: err1 } = await supabase
+      // gmail_scope_granted is defined in gmail_integration.sql — always include it
+      const { error: updateErr } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, gmail_scope_granted: true, gmail_send_scope_granted: true })
+        .update({ ...coreFields, gmail_scope_granted: true })
         .eq('id', existing.id)
 
-      if (err1) {
-        // Retry without gmail_scope_granted if column doesn't exist
-        console.error('Update with gmail_scope failed:', err1.message)
-        const { error: err2 } = await supabase
-          .from('calendar_connection')
-          .update(coreFields)
-          .eq('id', existing.id)
-
-        if (err2) return errorRedirect('Kunde inte uppdatera anslutningen: ' + err2.message)
-      }
+      if (updateErr) return errorRedirect('Kunde inte uppdatera anslutningen: ' + updateErr.message)
     } else {
-      // Insert new connection
       const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-      const insertData = {
-        id,
-        business_id: state.business_id,
-        business_user_id: state.user_id,
-        provider: 'google',
-        ...coreFields,
-      }
-
-      const { error: err1 } = await supabase
+      const { error: insertErr } = await supabase
         .from('calendar_connection')
-        .insert({ ...insertData, gmail_scope_granted: true, gmail_send_scope_granted: true })
+        .insert({
+          id,
+          business_id: state.business_id,
+          business_user_id: state.user_id,
+          provider: 'google',
+          ...coreFields,
+          gmail_scope_granted: true,
+        })
 
-      if (err1) {
-        // Retry without gmail_scope_granted if column doesn't exist
-        console.error('Insert with gmail_scope failed:', err1.message)
-        const { error: err2 } = await supabase
-          .from('calendar_connection')
-          .insert(insertData)
-
-        if (err2) return errorRedirect('Kunde inte spara anslutningen: ' + err2.message)
-      }
+      if (insertErr) return errorRedirect('Kunde inte spara anslutningen: ' + insertErr.message)
     }
 
     return NextResponse.redirect(
