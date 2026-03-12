@@ -1,12 +1,40 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, X, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
+import { useState, Component, type ReactNode } from 'react'
+import { Plus, X, ArrowRight, ArrowLeft, Loader2, AlertTriangle } from 'lucide-react'
 import { BRANCH_SERVICES, BRANCH_HOURLY_RATE, ROT_BRANCHES, RUT_BRANCHES } from '../constants'
 import type { StepProps } from '../types'
 
-export default function Step2ServicesAndPricing({ data, onNext, onBack, onUpdate, saving }: StepProps) {
-  const [selectedServices, setSelectedServices] = useState<string[]>(data.services_offered || [])
+class Step2ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props)
+    this.state = { error: null }
+  }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  componentDidCatch(error: Error, info: { componentStack: string }) {
+    console.error('[Step2] Runtime error:', error.message, info.componentStack)
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center space-y-3">
+          <AlertTriangle className="w-8 h-8 text-red-400 mx-auto" />
+          <p className="text-red-400 font-medium">Steg 2 kraschade</p>
+          <p className="text-zinc-400 text-sm font-mono">{this.state.error.message}</p>
+          <button onClick={() => this.setState({ error: null })} className="px-4 py-2 bg-zinc-800 text-white rounded-lg text-sm hover:bg-zinc-700">
+            Försök igen
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
+function Step2Content({ data, onNext, onBack, onUpdate, saving }: StepProps) {
+  const [selectedServices, setSelectedServices] = useState<string[]>(
+    Array.isArray(data.services_offered) ? data.services_offered : []
+  )
   const [customService, setCustomService] = useState('')
   const [hourlyRate, setHourlyRate] = useState(data.default_hourly_rate || BRANCH_HOURLY_RATE[data.branch] || 450)
   const [calloutFee, setCalloutFee] = useState(data.callout_fee || 0)
@@ -217,5 +245,13 @@ export default function Step2ServicesAndPricing({ data, onNext, onBack, onUpdate
         </button>
       </div>
     </div>
+  )
+}
+
+export default function Step2ServicesAndPricing(props: StepProps) {
+  return (
+    <Step2ErrorBoundary>
+      <Step2Content {...props} />
+    </Step2ErrorBoundary>
   )
 }

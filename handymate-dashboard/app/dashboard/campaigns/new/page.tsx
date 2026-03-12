@@ -52,6 +52,8 @@ export default function NewCampaignPage() {
   const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
   const [searchTerm, setSearchTerm] = useState('')
   const [campaignType, setCampaignType] = useState<'broadcast' | 'interactive'>('interactive')
+  const [purposeType, setPurposeType] = useState<'none' | 'reactivation' | 'seasonal' | 'follow_up'>('none')
+  const [generatingText, setGeneratingText] = useState(false)
   const [autoReply, setAutoReply] = useState(true)
   const [scheduleType, setScheduleType] = useState<'now' | 'later'>('now')
   const [scheduledDate, setScheduledDate] = useState('')
@@ -507,7 +509,58 @@ const messageSuggestions = [
 
     <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Meddelande</h2>
-      
+
+      {/* Kampanjsyfte + AI-generering */}
+      <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <p className="text-sm font-medium text-gray-700 mb-3">Kampanjsyfte (valfritt)</p>
+        <div className="flex gap-2 flex-wrap mb-3">
+          {[
+            { id: 'none', label: 'Välj syfte...' },
+            { id: 'reactivation', label: '🔁 Reaktivering' },
+            { id: 'seasonal', label: '🌿 Säsong' },
+            { id: 'follow_up', label: '✅ Uppföljning' },
+          ].map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setPurposeType(opt.id as typeof purposeType)}
+              className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
+                purposeType === opt.id
+                  ? 'bg-teal-50 border-teal-400 text-teal-700 font-medium'
+                  : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+        {purposeType !== 'none' && (
+          <button
+            onClick={async () => {
+              setGeneratingText(true)
+              try {
+                const res = await fetch('/api/campaigns/generate-text', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ type: purposeType }),
+                })
+                if (res.ok) {
+                  const { text } = await res.json()
+                  setMessage(text)
+                }
+              } catch { /* silent */ }
+              setGeneratingText(false)
+            }}
+            disabled={generatingText}
+            className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+          >
+            {generatingText
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Genererar...</>
+              : <><Sparkles className="w-4 h-4" /> Generera AI-text</>
+            }
+          </button>
+        )}
+      </div>
+
       {/* Förslag */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <Sparkles className="w-4 h-4 text-sky-700" />

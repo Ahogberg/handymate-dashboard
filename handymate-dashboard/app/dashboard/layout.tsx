@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Jobbkompisen from '@/components/Jobbkompisen'
 import WelcomeModal from '@/components/WelcomeModal'
 import FeedbackWidget from '@/components/FeedbackWidget'
+import PWAInstallBanner from '@/components/PWAInstallBanner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { useAuth } from '@/lib/useAuth'
@@ -65,6 +66,7 @@ export default function DashboardLayout({
                 <Jobbkompisen />
                 <WelcomeModal businessName={business.business_name} />
                 <FeedbackWidget />
+                <PWAInstallBanner />
               </div>
             </ToastProvider>
           </ErrorBoundary>

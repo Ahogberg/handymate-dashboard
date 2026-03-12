@@ -278,4 +278,68 @@ export const toolDefinitions = [
       required: [],
     },
   },
+  // Approval flow
+  {
+    name: "create_approval_request",
+    description: "Skapa en godkännandebegäran. Välj rätt risk_level: 'low' = utförs direkt utan notis (skapa kund, anteckning, logga aktivitet), 'medium' = utförs direkt och loggas i dashboard (boka tid, skicka SMS-påminnelse), 'high' = väntar på hantverkarens godkännande + push-notis (skicka offert, faktura, avboka).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        approval_type: {
+          type: "string",
+          description: "Typ av åtgärd: send_sms, send_quote, send_invoice, create_booking, other",
+        },
+        title: {
+          type: "string",
+          description: "Kort beskrivning, ex: 'Skicka offert till Kalle Anka'",
+        },
+        description: {
+          type: "string",
+          description: "Längre förklaring av vad som händer",
+        },
+        payload: {
+          type: "object",
+          description: "Data för åtgärden, ex: { to: '+46701234567', message: '...', quote_id: '...' }",
+        },
+        risk_level: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Risknivå: low = auto-utför tyst, medium = auto-utför + logga, high = kräver godkännande",
+        },
+      },
+      required: ["approval_type", "title", "payload"],
+    },
+  },
+  {
+    name: "check_pending_approvals",
+    description: "Lista väntande godkännandebegäranden för det här företaget.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  // Business preferences
+  {
+    name: "update_business_preference",
+    description: "Spara en preferens du lärt dig om hur hantverkaren jobbar. Sparas permanent och injiceras i framtida systemprompter.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        key: {
+          type: "string",
+          description: "Preferensnyckel, ex: pricing_margin_default, min_job_value_sek, scheduling_preferred_hours, geography_max_km",
+        },
+        value: {
+          type: "string",
+          description: "Värdet som text, ex: '20%', '10000', '07-17', '30'",
+        },
+        reason: {
+          type: "string",
+          description: "Varför du sparar denna preferens",
+        },
+      },
+      required: ["key", "value"],
+    },
+  },
 ] as const

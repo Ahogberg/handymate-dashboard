@@ -1,4 +1,4 @@
-import { Building2, Briefcase, Phone, Link2, Users, Zap, CheckCircle2 } from 'lucide-react'
+import { Building2, Briefcase, Phone, Link2, Users, Zap, CheckCircle2, Settings, Smartphone } from 'lucide-react'
 
 // ─── Steps ──────────────────────────────────────────────────────────
 
@@ -10,6 +10,8 @@ export const STEPS = [
   { id: 5, label: 'Leads', icon: Users },
   { id: 6, label: 'Automat.', icon: Zap },
   { id: 7, label: 'Klart!', icon: CheckCircle2 },
+  { id: 8, label: 'Jobbstil', icon: Settings },
+  { id: 9, label: 'Installera', icon: Smartphone },
 ]
 
 // ─── Branches ───────────────────────────────────────────────────────

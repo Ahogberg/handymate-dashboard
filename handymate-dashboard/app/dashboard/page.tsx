@@ -22,7 +22,11 @@ import {
   Zap,
   Mail,
   Globe,
-  X
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  Lightbulb,
+  ChevronDown as ChevronDownIcon,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -105,11 +109,35 @@ export default function DashboardPage() {
     response_distribution: Record<string, number>
     win_rate_by_speed: Record<string, number>
   } | null>(null)
+  const [insights, setInsights] = useState<Array<{
+    id: string; insight_type: string; title: string; description: string; priority: string; feedback: string | null
+  }>>([])
+  const [insightsExpanded, setInsightsExpanded] = useState(false)
 
   useEffect(() => {
     fetchData()
     fetchSpeedToLead()
+    fetchInsights()
   }, [business.business_id])
+
+  async function fetchInsights() {
+    try {
+      const res = await fetch('/api/insights')
+      if (res.ok) {
+        const { insights: data } = await res.json()
+        setInsights(data || [])
+      }
+    } catch { /* silent */ }
+  }
+
+  async function submitInsightFeedback(id: string, feedback: 'helpful' | 'not_helpful') {
+    setInsights(prev => prev.map(i => i.id === id ? { ...i, feedback } : i))
+    await fetch('/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, feedback }),
+    })
+  }
 
   async function fetchData() {
     const today = new Date()
@@ -1071,6 +1099,69 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* AI-insikter */}
+        {insights.length > 0 && (
+          <div className="mt-4 sm:mt-6 bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-amber-500" />
+                Handymates rekommendationer
+              </h2>
+              {insights.length > 3 && (
+                <button
+                  onClick={() => setInsightsExpanded(!insightsExpanded)}
+                  className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700"
+                >
+                  {insightsExpanded ? 'Visa färre' : `Visa alla ${insights.length}`}
+                  <ChevronDownIcon className={`w-4 h-4 transition-transform ${insightsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {(insightsExpanded ? insights : insights.slice(0, 3)).map(insight => {
+                const EMOJI: Record<string, string> = {
+                  revenue_forecast: '💰', churn_risk: '⚠️', upsell_opportunity: '📈',
+                  seasonal_tip: '🗓️', booking_gap: '📅', follow_up: '🔔', workload_warning: '⚡',
+                }
+                const emoji = EMOJI[insight.insight_type] || '💡'
+                const priorityColor = insight.priority === 'high' ? 'border-l-red-400' : insight.priority === 'medium' ? 'border-l-amber-400' : 'border-l-gray-300'
+                return (
+                  <div key={insight.id} className={`flex items-start gap-3 p-3 bg-gray-50 rounded-xl border-l-4 ${priorityColor}`}>
+                    <span className="text-xl flex-shrink-0 mt-0.5">{emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">{insight.title}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">{insight.description}</p>
+                    </div>
+                    {!insight.feedback && (
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => submitInsightFeedback(insight.id, 'helpful')}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-green-600 hover:bg-green-50 transition-all"
+                          title="Bra insikt"
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => submitInsightFeedback(insight.id, 'not_helpful')}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                          title="Inte relevant"
+                        >
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    {insight.feedback && (
+                      <span className="text-xs text-gray-400 flex-shrink-0">
+                        {insight.feedback === 'helpful' ? '👍' : '👎'}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Full-width: Bokningar senaste 7 dagarna */}
         {stats?.bookings_per_day && stats.bookings_per_day.length > 0 && (

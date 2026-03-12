@@ -22,6 +22,7 @@ import {
   Lock,
   Globe,
   Bot,
+  ClipboardCheck,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -58,7 +59,7 @@ interface NavChild {
 }
 
 type NavItem =
-  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean; featureGate?: string }
+  | { type: 'link'; key: string; label: string; icon: any; href: string; exact?: boolean; paths?: string[]; hasBadge?: boolean; hasApprovalBadge?: boolean; featureGate?: string }
   | { type: 'group'; key: string; label: string; icon: any; children: NavChild[] }
 
 const NAV: NavItem[] = [
@@ -70,6 +71,7 @@ const NAV: NavItem[] = [
     ],
   },
   { type: 'link', key: 'calls', label: 'Samtal', icon: Phone, href: '/dashboard/calls', paths: ['/dashboard/calls', '/dashboard/inbox', '/dashboard/assistant', '/dashboard/recordings'], hasBadge: true },
+  { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
   {
     type: 'group', key: 'customers', label: 'Kunder', icon: Users,
     children: [
@@ -123,6 +125,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const business = useBusiness()
   const plan: PlanType = business.plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
+  const [approvalCount, setApprovalCount] = useState(0)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -310,6 +313,46 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     }
   }, [businessId])
 
+  // ── Pending approvals count ─────────────────────────────────────────
+  useEffect(() => {
+    if (!businessId) return
+
+    fetchApprovalCount()
+
+    const channel = supabase
+      .channel('approval_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pending_approvals',
+          filter: `business_id=eq.${businessId}`
+        },
+        () => { fetchApprovalCount() }
+      )
+      .subscribe()
+
+    const interval = setInterval(fetchApprovalCount, 30000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(interval)
+    }
+  }, [businessId])
+
+  async function fetchApprovalCount() {
+    if (!businessId) return
+    try {
+      const { count } = await supabase
+        .from('pending_approvals')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .eq('status', 'pending')
+      setApprovalCount(count || 0)
+    } catch { /* silent */ }
+  }
+
   async function fetchPendingCount() {
     if (!businessId) return
 
@@ -448,6 +491,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                 ) : item.hasBadge && pendingCount > 0 ? (
                   <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-teal-600 text-white rounded-full animate-pulse">
                     {pendingCount > 99 ? '99+' : pendingCount}
+                  </span>
+                ) : item.hasApprovalBadge && approvalCount > 0 ? (
+                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-orange-500 text-white rounded-full animate-pulse">
+                    {approvalCount > 99 ? '99+' : approvalCount}
                   </span>
                 ) : null}
               </Link>

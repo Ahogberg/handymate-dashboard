@@ -20,6 +20,8 @@ interface BusinessContext {
   google_calendar_email?: string
   gmail_connected?: boolean
   gmail_send_enabled?: boolean
+  // Learned preferences
+  preferences?: Record<string, string>
 }
 
 const BRANCH_NAMES: Record<string, string> = {
@@ -60,6 +62,13 @@ export function buildSystemPrompt(
     : 'Mån-Fre 07:00–17:00'
 
   const triggerInstructions = getTriggerInstructions(triggerType, triggerData)
+
+  const prefsBlock = business.preferences && Object.keys(business.preferences).length > 0
+    ? '\n\n## Inlärda preferenser\n' +
+      Object.entries(business.preferences)
+        .map(([k, v]) => `- ${k}: ${v}`)
+        .join('\n')
+    : ''
 
   return `Du är en AI-assistent för ${business.business_name}, ett ${branchLabel.toLowerCase()}företag i ${business.service_area || 'Sverige'}.
 
@@ -104,7 +113,7 @@ ${triggerInstructions}
 - Kontrollera kalender innan bokning (check_calendar)
 - Skicka aldrig SMS nattetid
 - Max 10 verktygsanrop per körning
-${buildGoogleSection(business)}
+${buildGoogleSection(business)}${prefsBlock}
 Dagens datum: ${new Date().toISOString().split('T')[0]}`
 }
 

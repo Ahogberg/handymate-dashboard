@@ -85,6 +85,12 @@ export async function executeTool(
         return await searchLeads(supabase, businessId, input)
       case 'get_daily_stats':
         return await getDailyStats(supabase, businessId, input)
+      case 'create_approval_request':
+        return await createApprovalRequest(supabase, businessId, input)
+      case 'check_pending_approvals':
+        return await checkPendingApprovals(supabase, businessId)
+      case 'update_business_preference':
+        return await updateBusinessPreference(supabase, businessId, input)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -965,5 +971,230 @@ async function getDailyStats(
         runs_today: agentRuns.count || 0,
       },
     },
+  }
+}
+
+// ── Approval Flow ────────────────────────────────────────────
+
+async function createApprovalRequest(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const { approval_type, title, description, payload } = params
+  const risk_level = (params.risk_level as string) || 'high'
+
+  if (!approval_type || !title || !payload) {
+    return { success: false, error: 'approval_type, title och payload krävs' }
+  }
+
+  const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+
+  // ── LOW risk: execute immediately, no notification, audit trail only ──
+  if (risk_level === 'low') {
+    const execResult = await executeApprovalPayloadInternal(appUrl, businessId, {
+      approval_type: approval_type as string,
+      payload: payload as Record<string, unknown>,
+    })
+
+    await supabase.from('pending_approvals').insert({
+      id,
+      business_id: businessId,
+      approval_type,
+      title,
+      description: description || null,
+      payload,
+      status: 'auto_approved',
+      risk_level: 'low',
+      resolved_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+
+    return {
+      success: true,
+      data: {
+        message: `Åtgärd utförd direkt: "${title}".`,
+        approval_id: id,
+        execution: execResult,
+      },
+    }
+  }
+
+  // ── MEDIUM risk: execute immediately + log to dashboard ──
+  if (risk_level === 'medium') {
+    const execResult = await executeApprovalPayloadInternal(appUrl, businessId, {
+      approval_type: approval_type as string,
+      payload: payload as Record<string, unknown>,
+    })
+
+    await supabase.from('pending_approvals').insert({
+      id,
+      business_id: businessId,
+      approval_type,
+      title,
+      description: description || null,
+      payload,
+      status: 'auto_approved',
+      risk_level: 'medium',
+      resolved_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+
+    return {
+      success: true,
+      data: {
+        message: `Åtgärd utförd automatiskt och loggad: "${title}".`,
+        approval_id: id,
+        execution: execResult,
+      },
+    }
+  }
+
+  // ── HIGH risk (default): create pending, send push, await human ──
+  const { error } = await supabase
+    .from('pending_approvals')
+    .insert({
+      id,
+      business_id: businessId,
+      approval_type,
+      title,
+      description: description || null,
+      payload,
+      status: 'pending',
+      risk_level: 'high',
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    })
+
+  if (error) return { success: false, error: error.message }
+
+  // Send push notification (fire-and-forget)
+  fetch(`${appUrl}/api/push/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      business_id: businessId,
+      title: 'Nytt att godkänna',
+      body: title,
+      url: '/dashboard/approvals',
+    }),
+  }).catch(() => {})
+
+  return {
+    success: true,
+    data: {
+      message: `Godkännandebegäran skapad: "${title}". Hantverkaren måste godkänna i dashboard.`,
+      approval_id: id,
+    },
+  }
+}
+
+/**
+ * Execute an approval payload inline (used for low/medium risk auto-approvals).
+ * Mirrors the switch in app/api/approvals/[id]/route.ts.
+ */
+async function executeApprovalPayloadInternal(
+  appUrl: string,
+  businessId: string,
+  approval: { approval_type: string; payload: Record<string, unknown> }
+): Promise<Record<string, unknown>> {
+  const { approval_type, payload } = approval
+  try {
+    switch (approval_type) {
+      case 'send_sms': {
+        const res = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: businessId, to: payload.to, message: payload.message }),
+        })
+        return { action: 'send_sms', ok: res.ok }
+      }
+      case 'send_quote': {
+        if (!payload.quote_id) return { action: 'send_quote', skipped: 'no quote_id' }
+        const res = await fetch(`${appUrl}/api/quotes/${payload.quote_id}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: businessId }),
+        })
+        return { action: 'send_quote', ok: res.ok }
+      }
+      case 'send_invoice': {
+        if (!payload.invoice_id) return { action: 'send_invoice', skipped: 'no invoice_id' }
+        const res = await fetch(`${appUrl}/api/invoices/${payload.invoice_id}/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: businessId }),
+        })
+        return { action: 'send_invoice', ok: res.ok }
+      }
+      case 'create_booking': {
+        const res = await fetch(`${appUrl}/api/bookings`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, business_id: businessId }),
+        })
+        return { action: 'create_booking', ok: res.ok }
+      }
+      default:
+        return { action: approval_type, skipped: 'no handler', payload }
+    }
+  } catch (err: any) {
+    return { action: approval_type, error: err.message }
+  }
+}
+
+async function checkPendingApprovals(
+  supabase: SupabaseClient,
+  businessId: string
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('pending_approvals')
+    .select('id, approval_type, title, description, created_at, expires_at')
+    .eq('business_id', businessId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error) return { success: false, error: error.message }
+
+  return {
+    success: true,
+    data: {
+      pending_count: data?.length || 0,
+      approvals: data || [],
+    },
+  }
+}
+
+// ── Business Preferences ─────────────────────────────────────
+
+async function updateBusinessPreference(
+  supabase: SupabaseClient,
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const { key, value } = params
+  if (!key || !value) {
+    return { success: false, error: 'key och value krävs' }
+  }
+
+  const { error } = await supabase
+    .from('business_preferences')
+    .upsert(
+      {
+        business_id: businessId,
+        key: String(key),
+        value: String(value),
+        source: 'agent',
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'business_id,key' }
+    )
+
+  if (error) return { success: false, error: error.message }
+
+  return {
+    success: true,
+    data: { message: `Preferens sparad: ${key} = ${value}` },
   }
 }

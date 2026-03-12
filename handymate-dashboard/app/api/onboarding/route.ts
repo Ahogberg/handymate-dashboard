@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const { data, error } = await supabase
       .from('business_config')
-      .select('business_id, business_name, contact_name, contact_email, phone_number, branch, service_area, org_number, address, services_offered, default_hourly_rate, callout_fee, rot_enabled, rut_enabled, knowledge_base, assigned_phone_number, forward_phone_number, call_mode, phone_setup_type, lead_sources, lead_email_address, onboarding_step, onboarding_data, onboarding_completed_at, working_hours, industry')
+      .select('business_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, org_number, address, services_offered, default_hourly_rate, callout_fee, rot_enabled, rut_enabled, knowledge_base, assigned_phone_number, forward_phone_number, call_mode, phone_setup_type, lead_sources, lead_email_address, onboarding_step, onboarding_data, onboarding_completed_at, working_hours, industry')
       .eq('business_id', business.business_id)
       .single()
 
@@ -72,7 +72,7 @@ export async function PUT(request: NextRequest) {
     // Build update object
     const updates: Record<string, unknown> = {}
 
-    if (typeof step === 'number' && step >= 1 && step <= 8) {
+    if (typeof step === 'number' && step >= 1 && step <= 10) {
       updates.onboarding_step = step
     }
 

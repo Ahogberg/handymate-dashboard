@@ -1,0 +1,37 @@
+{
+  "name": "Handymate",
+  "short_name": "Handymate",
+  "description": "AI-assistent för hantverkare",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#0F766E",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Godkännanden",
+      "url": "/dashboard/approvals",
+      "description": "Se väntande godkännanden"
+    },
+    {
+      "name": "Ny offert",
+      "url": "/dashboard/quotes/new",
+      "description": "Skapa ny offert"
+    }
+  ]
+}

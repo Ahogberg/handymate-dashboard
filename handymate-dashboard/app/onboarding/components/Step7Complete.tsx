@@ -7,9 +7,10 @@ import type { OnboardingData } from '../types'
 
 interface Step7Props {
   data: OnboardingData
+  onNext?: () => void
 }
 
-export default function Step7Complete({ data }: Step7Props) {
+export default function Step7Complete({ data, onNext }: Step7Props) {
   const router = useRouter()
   const [finalizing, setFinalizing] = useState(false)
   const [done, setDone] = useState(false)
@@ -77,10 +78,10 @@ export default function Step7Complete({ data }: Step7Props) {
         </div>
 
         <button
-          onClick={() => router.push('/dashboard')}
+          onClick={() => onNext ? onNext() : router.push('/dashboard')}
           className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium hover:opacity-90 text-lg"
         >
-          Gå till Dashboard
+          {onNext ? 'Nästa: Hur du jobbar →' : 'Gå till Dashboard'}
         </button>
       </div>
     )

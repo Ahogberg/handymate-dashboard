@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
+import { getBusinessPreferences } from '@/lib/business-preferences'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -188,6 +189,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Fetch learned preferences
+    const preferences = await getBusinessPreferences(businessId)
+
     const systemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
@@ -195,6 +199,7 @@ export async function POST(request: NextRequest) {
         google_calendar_email: googleConnection?.account_email || undefined,
         gmail_connected: !!googleConnection?.gmail_scope_granted && !!googleConnection?.gmail_sync_enabled,
         gmail_send_enabled: !!googleConnection?.gmail_send_scope_granted && !!googleConnection?.gmail_sync_enabled,
+        preferences,
       },
       trigger_type,
       trigger_data

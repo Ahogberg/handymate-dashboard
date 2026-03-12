@@ -1222,6 +1222,7 @@ export default function SettingsPage() {
       tabs: [
         { id: 'integrations', label: 'Integrationer', icon: Link2 },
         { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
+        { id: 'preferences', label: 'Preferenser', icon: Star },
       ],
     },
   ]
@@ -3496,11 +3497,211 @@ export default function SettingsPage() {
 
               <SMSUsageWidget businessId={business.business_id} plan={currentPlan} />
             </div>
+
+            {/* Referral */}
+            <ReferralWidget businessId={business.business_id} />
           </div>
+        )}
+
+        {/* Preferences Tab */}
+        {activeTab === 'preferences' && (
+          <PreferencesTab businessId={business.business_id} />
         )}
       </div>
     </div>
     </PermissionGate>
+  )
+}
+
+function PreferencesTab({ businessId }: { businessId: string }) {
+  const [prefs, setPrefs] = useState<Array<{ id: string; key: string; value: string; source: string; updated_at: string }>>([])
+  const [loading, setLoading] = useState(true)
+  const [newKey, setNewKey] = useState('')
+  const [newValue, setNewValue] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' })
+
+  useEffect(() => { fetchPrefs() }, [businessId])
+
+  async function fetchPrefs() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/preferences')
+      if (res.ok) {
+        const { preferences } = await res.json()
+        setPrefs(preferences || [])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleAdd() {
+    if (!newKey.trim() || !newValue.trim()) return
+    setSaving(true)
+    const res = await fetch('/api/preferences', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: newKey.trim(), value: newValue.trim() }),
+    })
+    if (res.ok) {
+      setNewKey('')
+      setNewValue('')
+      await fetchPrefs()
+      setToast({ show: true, message: 'Preferens sparad', type: 'success' })
+      setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+    }
+    setSaving(false)
+  }
+
+  async function handleDelete(key: string) {
+    await fetch('/api/preferences', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key }),
+    })
+    await fetchPrefs()
+  }
+
+  const SOURCE_LABEL: Record<string, string> = {
+    agent: 'AI-agenten',
+    user: 'Du',
+    onboarding: 'Onboarding',
+  }
+
+  return (
+    <div className="space-y-6">
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
+      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="p-2 rounded-lg bg-teal-100">
+            <Star className="w-5 h-5 text-teal-600" />
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">AI-preferenser</h2>
+        </div>
+        <p className="text-sm text-gray-500 mb-6">
+          Inlärda preferenser som AI-agenten använder för att anpassa sitt beteende. Agenten kan lägga till preferenser
+          automatiskt när den lär sig hur du jobbar, och du kan redigera dem här.
+        </p>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+          </div>
+        ) : prefs.length === 0 ? (
+          <div className="text-center py-8 text-gray-400">
+            <Star className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">Inga preferenser inlärda ännu.</p>
+            <p className="text-xs mt-1">AI-agenten lär sig om dig allt eftersom, eller så kan du lägga till manuellt nedan.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 mb-6">
+            {prefs.map(pref => (
+              <div key={pref.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-mono text-gray-700 font-medium">{pref.key}</span>
+                    <span className="text-xs text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">
+                      {SOURCE_LABEL[pref.source] || pref.source}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-900 mt-0.5">{pref.value}</p>
+                </div>
+                <button
+                  onClick={() => handleDelete(pref.key)}
+                  className="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add new preference */}
+        <div className="border-t border-gray-200 pt-4">
+          <p className="text-sm font-medium text-gray-700 mb-3">Lägg till preferens</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Nyckel, ex: min_job_value_sek"
+              value={newKey}
+              onChange={e => setNewKey(e.target.value)}
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+            />
+            <input
+              type="text"
+              placeholder="Värde, ex: 5000"
+              value={newValue}
+              onChange={e => setNewValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={saving || !newKey.trim() || !newValue.trim()}
+              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center gap-1"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              Lägg till
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ReferralWidget({ businessId }: { businessId: string }) {
+  const [data, setData] = useState<{ code: string; referral_url: string; referral_count: number } | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    fetch('/api/referral')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => d && setData(d))
+      .catch(() => {})
+  }, [businessId])
+
+  async function copyUrl() {
+    if (!data) return
+    await navigator.clipboard.writeText(data.referral_url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (!data) return null
+
+  return (
+    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-2">Tipsa en kollega 🎁</h2>
+      <p className="text-sm text-gray-500 mb-4">
+        Dela din referralslänk — vi belönar dig med 1 månads gratis när din kontakt tecknar en prenumeration.
+        Du har {data.referral_count} godkända tips hittills.
+      </p>
+      <div className="flex gap-2">
+        <input
+          readOnly
+          value={data.referral_url}
+          className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-300 rounded-lg text-gray-700 select-all"
+          onClick={e => (e.target as HTMLInputElement).select()}
+        />
+        <button
+          onClick={copyUrl}
+          className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-all"
+        >
+          {copied ? 'Kopierat!' : 'Kopiera'}
+        </button>
+      </div>
+      <p className="text-xs text-gray-400 mt-2">Din kod: <span className="font-mono font-semibold">{data.code}</span></p>
+    </div>
   )
 }
 

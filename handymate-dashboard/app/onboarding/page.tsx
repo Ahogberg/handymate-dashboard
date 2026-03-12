@@ -12,6 +12,8 @@ import Step4Connections from './components/Step4Connections'
 import Step5LeadSources from './components/Step5LeadSources'
 import Step6Automations from './components/Step6Automations'
 import Step7Complete from './components/Step7Complete'
+import Step8WorkStyle from './components/Step8WorkStyle'
+import Step9InstallApp from './components/Step9InstallApp'
 import OnboardingChatbot from './components/OnboardingChatbot'
 import type { OnboardingData } from './types'
 
@@ -41,15 +43,15 @@ export default function OnboardingPage() {
         setData(d)
 
         // If already completed, go to dashboard
-        // step >= 8 = new flow done, completed_at = old flow done
-        if (d.onboarding_step >= 8 || d.onboarding_completed_at) {
+        // step >= 10 = new flow done, completed_at = old flow done
+        if (d.onboarding_step >= 10 || d.onboarding_completed_at) {
           router.push('/dashboard')
           return
         }
 
         // Resume at step 2+ (step 1 is only for new users)
         if (d.onboarding_step > 1) {
-          setCurrentStep(Math.min(d.onboarding_step, 7))
+          setCurrentStep(Math.min(d.onboarding_step, 9))
         } else {
           setCurrentStep(2) // Skip step 1, already registered
         }
@@ -77,7 +79,7 @@ export default function OnboardingPage() {
   }, [])
 
   const goNext = useCallback(async () => {
-    const nextStep = Math.min(currentStep + 1, 7)
+    const nextStep = Math.min(currentStep + 1, 9)
     setSaving(true)
     await saveProgress(nextStep)
     setCurrentStep(nextStep)
@@ -125,7 +127,7 @@ export default function OnboardingPage() {
       lead_sources: [],
       lead_email_address: null,
       knowledge_base: null,
-      onboarding_step: 1,
+      onboarding_step: 2,
       onboarding_data: {},
       onboarding_completed_at: null,
       working_hours: null,
@@ -133,8 +135,13 @@ export default function OnboardingPage() {
       google_connected: false,
       gmail_enabled: false,
     }
+
+    // Set data + advance to step 2 SYNCHRONOUSLY before any await
+    // This prevents the blank screen between step 1 and step 2
     setData(baseData)
     setIsNewUser(false)
+    setCurrentStep(2)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
 
     // If email confirmation is required, show confirmation screen
     if (isEmailPending) {
@@ -143,20 +150,12 @@ export default function OnboardingPage() {
       return
     }
 
-    // Try to load full data from server (may have richer data if session is set)
-    try {
-      const res = await fetch('/api/onboarding')
-      if (res.ok) {
-        const d: OnboardingData = await res.json()
-        setData(d)
-      }
-    } catch {
-      // Keep the baseData we already set above
-    }
-
-    await saveProgress(2)
-    setCurrentStep(2)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    // Background: try to load richer data from server + save progress
+    saveProgress(2).catch(() => {})
+    fetch('/api/onboarding')
+      .then(res => res.ok ? res.json() : null)
+      .then(d => { if (d) setData(d) })
+      .catch(() => {})
   }, [saveProgress])
 
   if (loading) {
@@ -242,7 +241,15 @@ export default function OnboardingPage() {
         )}
 
         {currentStep === 7 && data && (
-          <Step7Complete data={data} />
+          <Step7Complete data={data} onNext={goNext} />
+        )}
+
+        {currentStep === 8 && data && (
+          <Step8WorkStyle businessId={data.business_id} onNext={goNext} />
+        )}
+
+        {currentStep === 9 && (
+          <Step9InstallApp onBack={goBack} />
         )}
       </div>
 
