@@ -43,7 +43,7 @@
     },
     {
       "path": "/api/cron/expire-approvals",
-      "schedule": "0 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/generate-insights",
