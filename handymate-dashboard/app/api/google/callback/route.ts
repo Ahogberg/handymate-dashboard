@@ -4,7 +4,7 @@ import { getGoogleTokens, getCalendarList } from '@/lib/google-calendar'
 
 export const dynamic = 'force-dynamic'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 function errorRedirect(message: string) {
   return NextResponse.redirect(

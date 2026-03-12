@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
         .eq('business_id', business.business_id)
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
     // Count successful referrals
     const { count: referralCount } = await supabase

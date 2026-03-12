@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Send push notification (fire and forget)
     try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
       fetch(`${appUrl}/api/push/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

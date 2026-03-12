@@ -6,7 +6,7 @@ import {
   getFortnoxCompanyInfo
 } from '@/lib/fortnox'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
  * GET /api/fortnox/callback

@@ -989,7 +989,7 @@ async function createApprovalRequest(
   }
 
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
   // ── LOW risk: execute immediately, no notification, audit trail only ──
   if (risk_level === 'low') {

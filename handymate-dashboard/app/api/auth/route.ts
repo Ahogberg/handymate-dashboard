@@ -252,7 +252,7 @@ if (action === 'login') {
       const { email } = data
 
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'}/auth/callback?next=/reset-password`
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/auth/callback?next=/reset-password`
       })
 
       if (error) {

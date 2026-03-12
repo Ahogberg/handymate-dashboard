@@ -141,7 +141,7 @@ Generera 3-4 konkreta, actionbara affärsinsikter. Returnera ENDAST ett JSON-arr
           })
           const pushBody = `Handymates rekommendationer:\n${lines.join('\n')}`
 
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
           await fetch(`${appUrl}/api/push/send`, {
             method: 'POST',
             headers: {

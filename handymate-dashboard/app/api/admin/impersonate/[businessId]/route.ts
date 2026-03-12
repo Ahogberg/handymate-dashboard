@@ -41,7 +41,7 @@ export async function POST(
       type: 'magiclink',
       email: '', // Will be filled from user_id
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'}/dashboard?impersonating=true`
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/dashboard?impersonating=true`
       }
     })
 

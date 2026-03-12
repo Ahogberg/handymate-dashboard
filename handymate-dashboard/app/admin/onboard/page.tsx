@@ -232,7 +232,7 @@ export default function AdminOnboardPage() {
 Välkommen till Handymate! Här är dina inloggningsuppgifter:
 
 🔐 INLOGGNING
-Webbadress: https://handymate-dashboard.vercel.app
+Webbadress: https://app.handymate.se
 E-post: ${createResult.email}
 Lösenord: ${createResult.password}
 

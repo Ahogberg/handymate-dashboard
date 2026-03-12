@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
       type: 'magiclink',
       email: userData.user.email,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'}/dashboard`
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/dashboard`
       }
     })
 

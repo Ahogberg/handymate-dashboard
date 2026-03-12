@@ -81,7 +81,7 @@ async function executeApprovalPayload(
   approval: { approval_type: string; payload: Record<string, unknown>; business_id: string },
   businessId: string
 ): Promise<Record<string, unknown>> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
 
   try {

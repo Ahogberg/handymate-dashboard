@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     } catch (agentErr) {
       console.error('[Transcribe] Agent trigger failed, falling back to analyze:', agentErr)
       // Fallback: use legacy standalone analysis
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
       fetch(`${appUrl}/api/voice/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

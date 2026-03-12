@@ -4,7 +4,7 @@ import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 async function updateElksWebhooks(elksNumberId: string) {
   const res = await fetch(`https://api.46elks.com/a1/numbers/${elksNumberId}`, {

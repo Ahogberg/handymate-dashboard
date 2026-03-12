@@ -6,7 +6,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 const RESEND_API_KEY = process.env.RESEND_API_KEY
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate-dashboard.vercel.app'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
  * Skicka SMS via 46elks

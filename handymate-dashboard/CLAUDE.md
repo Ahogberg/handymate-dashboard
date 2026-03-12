@@ -120,7 +120,7 @@ Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid
 - **Backend**: Supabase (PostgreSQL + Auth + Realtime)
 - **AI**: Anthropic Claude (Haiku för enkel klassificering, Sonnet för agent)
 - **Telefoni/SMS**: 46elks
-- **Deploy**: Vercel — handymate-dashboard.vercel.app
+- **Deploy**: Vercel — app.handymate.se
 - **Sidebar**: `components/Sidebar.tsx` med `NavItem[]` array
 
 ---
