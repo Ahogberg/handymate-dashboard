@@ -1,160 +1,148 @@
-# Handymate - AI-plattform för svenska hantverkare
+# CLAUDE.md — Handymate Project Instructions
 
-## Vad är Handymate?
-SaaS-plattform som ger hantverkare en AI-assistent som hanterar samtal, bokningar, offerter, fakturor och materialbeställningar. Tänk "AI-driven sekreterare + CRM + affärssystem" för småföretag inom bygg/installation.
+Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid dessa regler.
 
-## Tech Stack
-- **Frontend:** Next.js 14, React 18, TypeScript, Tailwind CSS
-- **Backend:** Next.js API routes
-- **Databas:** Supabase (PostgreSQL)
-- **AI:** Anthropic Claude (samtalsanalys, offertgenerering, röstkommando), OpenAI Whisper (transkribering)
-- **Telefoni:** 46elks (SMS, samtalsinspelning, vidarekoppling)
-- **Voice Agent:** Vapi (AI-röstassistent, väntar på SIP-koppling)
-- **Hosting:** Vercel
-- **Email:** Resend API
+## Workflow Orchestration
 
-## Design System
-- Dark theme: bg-[#09090b], zinc-900/50 cards
-- Gradient: violet-500 → fuchsia-500 (knappar, accenter)
-- Border: border-zinc-800
-- Glassmorphism: backdrop-blur-xl
-- Icons: lucide-react
-- Mobile-first responsiv design
+### 1. Plan Node Default
 
-## Databasstruktur (Supabase)
-Alla tabeller använder TEXT som ID-typ (inte UUID).
+- Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- Write plan to tasks/todo.md with checkable items before starting
+- If something goes sideways, STOP and re-plan immediately — don't keep pushing
+- Use plan mode for verification steps, not just building
+- Write detailed specs upfront to reduce ambiguity
 
-### Huvudtabeller:
-- **business_config** - Företagsinställningar, auth (user_id → auth.users)
-  - Kolumner: business_id, user_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, assigned_phone_number, forward_phone_number, call_recording_enabled, pricing_settings (JSONB), knowledge_base (JSONB)
+### 2. Subagent Strategy
 
-- **customer** - Kunder
-  - Kolumner: customer_id, business_id, name, phone_number, email, address_line, customer_rating, job_status
+- Use subagents liberally to keep main context window clean
+- Offload research, exploration, and parallel analysis to subagents
+- For complex problems, throw more compute at it via subagents
+- One task per subagent for focused execution
 
-- **booking** - Bokningar
-  - Kolumner: booking_id, business_id, customer_id, service_type, booking_date, booking_time, status
+### 3. Self-Improvement Loop
 
-- **quotes** - Offerter
-  - Kolumner: quote_id, business_id, customer_id, status (draft/sent/opened/accepted/declined/expired), items (JSONB), labor_total, material_total, total, rot_rut_type, rot_rut_deduction, customer_pays, valid_until
+- After ANY correction from the user: update tasks/lessons.md with the pattern
+- Write rules for yourself that prevent the same mistake
+- Ruthlessly iterate on these lessons until mistake rate drops
+- Review tasks/lessons.md at the start of each session
 
-- **invoice** - Fakturor
-  - Kolumner: invoice_id, business_id, customer_id, quote_id, invoice_number, status (draft/sent/paid/overdue/cancelled), items (JSONB), total, rot_rut_type, due_date
+### 4. Verification Before Done
 
-- **time_entry** - Tidrapportering
-  - Kolumner: time_entry_id, business_id, booking_id, customer_id, work_date, start_time, end_time, duration_minutes, hourly_rate, is_billable
+- Never mark a task complete without proving it works
+- Run `npx tsc --noEmit` — noll TypeScript-fel
+- Run `npx next build` — ren build
+- Ask yourself: "Would a staff engineer approve this?"
+- Demonstrate correctness before marking done
 
-- **call_recording** - Samtalsinspelningar
-  - Kolumner: recording_id, business_id, customer_id, phone_from, phone_to, direction, duration_seconds, recording_url, transcript, transcript_summary, sentiment, extracted_data (JSONB)
+### 5. Demand Elegance (Balanced)
 
-- **ai_suggestion** - AI-förslag från samtalsanalys
-  - Kolumner: suggestion_id, business_id, recording_id, customer_id, suggestion_type (booking/follow_up/quote/reminder/sms/callback/reschedule/other), title, description, priority, status (pending/approved/rejected/completed), suggested_data (JSONB), source_text
+- For non-trivial changes: pause and ask "is there a more elegant way?"
+- If a fix feels hacky: "Knowing everything I know now, implement the elegant solution"
+- Skip this for simple, obvious fixes — don't over-engineer
+- Challenge your own work before presenting it
 
-- **supplier** - Grossister/leverantörer
-  - Kolumner: supplier_id, business_id, name, customer_number
+### 6. Autonomous Bug Fixing
 
-- **supplier_product** - Produkter från grossister
-  - Kolumner: product_id, supplier_id, business_id, sku, name, category, unit, purchase_price, sell_price, markup_percent
+- When given a bug report: just fix it. Don't ask for hand-holding
+- Point at logs, errors, failing tests — then resolve them
+- Zero context switching required from the user
+- Go fix failing issues without being told how
 
-- **material_order** - Materialbeställningar
-  - Kolumner: order_id, business_id, supplier_id, quote_id, items (JSONB), total, status (draft/pending/ordered/delivered)
+---
 
-- **price_list** - Prislista per företag
-  - Kolumner: id, business_id, category (labor/material/service), name, unit, unit_price
+## Task Management
 
-- **customer_activity** - Kundaktivitet/tidslinje
-  - Kolumner: activity_id, customer_id, business_id, activity_type, title, description, created_by
+1. **Plan First**: Write plan to tasks/todo.md with checkable items
+2. **Verify Plan**: Check in before starting implementation
+3. **Track Progress**: Mark items complete as you go
+4. **Explain Changes**: High-level summary at each step
+5. **Document Results**: Add review section to tasks/todo.md
+6. **Capture Lessons**: Update tasks/lessons.md after any correction
 
-- **sms_log** - SMS-logg
+---
 
-## Auth
-- Supabase Auth (auth.users) kopplat till business_config via user_id
-- Login/Register via /api/auth route
-- Signup i flera steg: Företagsinfo → Konto
+## Core Principles
 
-## Mappstruktur
-```
-handymate-dashboard/
-├── app/
-│   ├── dashboard/
-│   │   ├── page.tsx (Dashboard med statistik)
-│   │   ├── inbox/ (AI Inbox + Inspelningar)
-│   │   ├── calendar/ (Bokningar + Tidrapport)
-│   │   ├── customers/ (CRM + Kampanjer)
-│   │   ├── quotes/ (Offerter)
-│   │   │   ├── new/ (Ny offert med AI)
-│   │   │   └── [id]/ (Offertdetalj)
-│   │   ├── invoices/ (Fakturor)
-│   │   ├── orders/ (Materialbeställningar)
-│   │   ├── assistant/ (Röstkommando)
-│   │   └── settings/ (Inställningar)
-│   │       ├── knowledge/ (Kunskapsbas)
-│   │       └── pricelist/ (Leverantörer/prislista)
-│   ├── api/
-│   │   ├── auth/ (Login, Register, Logout)
-│   │   ├── voice/ (Incoming, Consent, Recording webhooks)
-│   │   ├── sms/ (Send, Incoming, AI-response)
-│   │   ├── quotes/ (Generate, PDF, Send)
-│   │   ├── invoices/ (CRUD, PDF, Send)
-│   │   ├── orders/ (Materialbeställningar)
-│   │   ├── suppliers/ (CRUD, Import)
-│   │   ├── suggestions/ (Approve)
-│   │   ├── assistant/ (Voice command)
-│   │   ├── phone/ (Provision, Settings)
-│   │   └── dashboard/ (Stats)
-│   ├── login/
-│   ├── signup/
-│   └── layout.tsx
-├── components/
-│   ├── Sidebar.tsx
-│   └── MobileNav.tsx
-├── lib/
-│   ├── supabase.ts
-│   └── BusinessContext.tsx
-└── sql/
-    └── new_tables.sql
-```
+- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
+- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
+- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
 
-## Kärnflöden
+---
 
-### Samtalsflöde:
-Kund ringer → 46elks → /api/voice/incoming → Vidarekoppla till hantverkare + Spela in → Samtal avslutas → /api/voice/recording → Whisper transkriberar → Claude analyserar → AI-förslag skapas → Visas i Inbox → Hantverkare godkänner → Action utförs
+## Handymate-specifikt — Kritiska regler
 
-### Offertflöde:
-AI eller manuell → Skapa offert med material + arbete → ROT/RUT-beräkning → Generera PDF → Skicka via SMS/Email → Kund accepterar → Skapa bokning + Beställ material
+### Databas
 
-### Fakturaflöde:
-Tidrapport eller offert → Konvertera till faktura → PDF med bankinfo → Skicka → Spåra betalning
+- `businesses` i spec/dokumentation = `business_config` i faktiska databasen — alltid
+- `business_users` tabellen finns och används för användarrelationer
+- SQL-migrationer körs manuellt i Supabase SQL Editor — skapa alltid en `.sql`-fil i `sql/`-mappen, kör aldrig migrationer programmatiskt
+- Namnge migrationsfiler: `sql/v2_<feature>.sql`, ex. `sql/v2_pending_approvals.sql`
+- Kontrollera alltid att tabeller och kolumner faktiskt finns innan du skriver queries mot dem
 
-## Miljövariabler
-- NEXT_PUBLIC_SUPABASE_URL
-- NEXT_PUBLIC_SUPABASE_ANON_KEY
-- SUPABASE_SERVICE_ROLE_KEY
-- ANTHROPIC_API_KEY
-- OPENAI_API_KEY
-- ELKS_API_USER
-- ELKS_API_PASSWORD
-- RESEND_API_KEY
-- NEXT_PUBLIC_APP_URL
-- VAPI_ASSISTANT_ID (för framtida voice agent)
+### Auth & Middleware
 
-## Kodkonventioner
-- Alla ID:n är TEXT (inte UUID)
-- Tabellnamn: snake_case singular (customer, booking, invoice)
-- API routes: /api/[resurs]/[action]
-- Komponenter: PascalCase
-- Supabase import: import { supabase } from '@/lib/supabase'
-- Business context: import { useBusiness } from '@/lib/BusinessContext'
-- Svenska i UI-texter, engelska i kod
+- Middleware har ingen auth-blockering — auth sker per route via `getAuthenticatedBusiness()`
+- Alla nya API-rutter måste anropa `getAuthenticatedBusiness()` — hoppa aldrig över detta
+- Inget middleware-undantag behövs för nya routes
 
-## Prissättning
-- Starter: 2 495 kr/mån (100 samtal, 1 användare)
-- Professional: 5 995 kr/mån (400 samtal, 5 användare)
-- Business: 11 995 kr/mån (Obegränsat samtal, obegränsade användare)
+### Agent-systemet
 
-## Pågående/Planerat
-- Voice agent via Vapi (väntar på 46elks SIP-whitelisting)
-- Fortnox-integration (bokföring)
-- Realtids API till grossister (Ahlsell, Elektroskandia)
-- Kundportal
-- Google Reviews automation
-- Push-notiser
+- 22 befintliga agent-tools i `lib/tool-definitions.ts` + `lib/tool-router.ts`
+- Agent system prompt: `app/api/agent/trigger/system-prompt.ts`
+- Nya tools läggs till i båda filerna — definitions + router case
+- Kontrollera alltid befintliga tools innan du skapar nya för att undvika dubbletter
+
+### UI & språk
+
+- All UI-text på svenska — inga engelska termer synliga för slutanvändaren
+- Inga tekniska termer som "agent run", "webhook", "token", "payload" i UI
+- Svenska termer: "Godkänn" (approve), "Avvisa" (reject), "Inställningar" (settings), "Kunder" (customers), "Jobb" (projects/jobs)
+- Tema: ljust, teal (`#0F766E`) som primärfärg — aldrig mörkt tema eller lila/fuchsia
+- Komponenter skall vara mobiloptimerade — hantverkare använder telefon på bygget
+
+### PWA & Push
+
+- `theme_color` i manifest.json: `#0F766E` — inte mörkt
+- `background_color`: `#ffffff`
+- Push-notis skall alltid triggas när en ny high-risk pending_approval skapas
+- iOS kräver PWA-installation innan push fungerar — visa alltid iOS-specifik instruktion
+
+### Onboarding
+
+- Onboarding har 10 steg (completed = steg 10) efter V2
+- Befintliga kunder med `onboarding_step >= 8` skall migreras till 10
+- Steg 8: preferensinsamling (5 frågor med knappalternativ, alla frivilliga)
+- Steg 9: PWA-installation guide
+
+### Tech stack
+
+- **Frontend**: Next.js 14 (App Router), Tailwind CSS
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime)
+- **AI**: Anthropic Claude (Haiku för enkel klassificering, Sonnet för agent)
+- **Telefoni/SMS**: 46elks
+- **Deploy**: Vercel — handymate-dashboard.vercel.app
+- **Sidebar**: `components/Sidebar.tsx` med `NavItem[]` array
+
+---
+
+## Verifiering — acceptanskrav innan modul markeras klar
+
+- `npx tsc --noEmit` — noll fel
+- `npx next build` — ren build
+- Alla nya Supabase-queries testade mot faktisk databas
+- Nya API-rutter returnerar korrekt svar (inte 401/500)
+- UI renderar utan tomma sidor eller kraschade komponenter
+
+---
+
+## Kända fallgropar (lessons learned)
+
+- **Unicode-escapes**: Spara alltid filer med UTF-8. Använd riktiga svenska tecken (å, ä, ö) — aldrig `\u00e5`, `\u00e4`, `\u00f6` i JSX/TSX
+- **Onboarding steg-index**: Kontrollera alltid att switch-case eller array-index för onboarding-steg mappar till rätt komponent efter ändringar i antalet steg
+- **Middleware-antaganden**: Läs `middleware.ts` innan du antar att något behöver undantas — auth sker per route här, inte i middleware
+- **Tomma sidor utan fel**: Beror nästan alltid på (1) undefined data som mappas, (2) misslyckad DB-query som swäljs tyst, eller (3) fel steg-index. Börja alltid med att kontrollera dessa tre.
+- **Supabase Realtime cleanup**: Unsubscribe alltid i `useEffect` cleanup-funktion för att undvika subscription-läckor
+- **Stripe webhooks**: Webhook-signaturen måste valideras med raw body — använd aldrig JSON-parsed body för signaturvalidering
+- **Vercel cron**: Hobby-planen tillåter max en körning per dag (`0 X * * *`). Uttryck som `*/15 * * * *` eller `0 * * * *` blockerar hela deployen — validera alltid cron-schema mot Hobby-plangränser innan commit
+- **React state race conditions**: När flera `setState`-anrop beror på varandra, kalla dem alltid synkront i samma render (innan första `await`) — aldrig efter en await om de ska renderas tillsammans
+- **Vercel deploy-blockering**: Om auto-deploy slutar fungera, kontrollera alltid `vercel.json` för ogiltiga cron-uttryck som tyst blockerar deployment-pipelinen
