@@ -22,26 +22,33 @@ if (action === 'register') {
   }
   const { email, password, businessName, displayName, contactName, phone, branch, serviceArea } = data
 
-  // 1. Skapa auth user
-  const { data: authData, error: authError } = await supabase.auth.signUp({
+  // 1. Skapa auth user via admin API (skippar e-postverifiering)
+  const supabaseAdmin = getServerSupabase()
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
     email,
     password,
-    options: {
-      data: {
-        business_name: businessName,
-        contact_name: contactName
-      }
-    }
+    email_confirm: true,
+    user_metadata: {
+      business_name: businessName,
+      contact_name: contactName,
+    },
   })
 
   if (authError) {
     console.error('Auth error:', authError)
+    // Kolla om användaren redan finns
+    if (authError.message?.includes('already') || authError.message?.includes('exists')) {
+      return NextResponse.json({ error: 'En användare med denna e-post finns redan. Försök logga in istället.' }, { status: 400 })
+    }
     return NextResponse.json({ error: authError.message }, { status: 400 })
   }
 
   if (!authData.user) {
     return NextResponse.json({ error: 'Kunde inte skapa användare' }, { status: 400 })
   }
+
+  // Logga in användaren direkt så att session skapas
+  await supabase.auth.signInWithPassword({ email, password })
 
   // 2. Skapa business_config
   const businessId = 'biz_' + Math.random().toString(36).substr(2, 12)
@@ -60,7 +67,6 @@ if (action === 'register') {
   // Get branch-specific knowledge base defaults
   const knowledgeBase = getKnowledgeForBranch(branch)
 
-  const supabaseAdmin = getServerSupabase()
   const { error: businessError } = await supabaseAdmin
     .from('business_config')
     .insert({
@@ -83,7 +89,7 @@ if (action === 'register') {
 
   if (businessError) {
     console.error('Business error:', businessError)
-    await getServerSupabase().auth.admin.deleteUser(authData.user.id)
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
     return NextResponse.json({ error: 'Kunde inte skapa företag' }, { status: 500 })
   }
 
@@ -108,16 +114,11 @@ if (action === 'register') {
   // 4. Seeding deferred to onboarding finalize (POST /api/onboarding)
   // automation_rules, lead_scoring_rules, pipeline_stages, etc. are all seeded there
 
-  // Kontrollera om email confirmation behövs
-  const emailConfirmationPending = !authData.session
-
   return NextResponse.json({
     success: true,
-    message: emailConfirmationPending
-      ? 'Konto skapat! Kolla din e-post för att verifiera kontot.'
-      : 'Konto skapat!',
+    message: 'Konto skapat!',
     businessId,
-    emailConfirmationPending
+    emailConfirmationPending: false,
   })
 }
 
