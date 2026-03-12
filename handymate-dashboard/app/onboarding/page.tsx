@@ -33,13 +33,14 @@ export default function OnboardingPage() {
       try {
         const res = await fetch('/api/onboarding')
         if (!res.ok) {
-          // Not authenticated = new user, start at step 1
+          console.log('[Onboarding] API returned', res.status, '— treating as new user')
           setIsNewUser(true)
           setLoading(false)
           return
         }
 
         const d: OnboardingData = await res.json()
+        console.log('[Onboarding] Loaded data, step:', d.onboarding_step, 'branch:', d.branch, 'business_id:', d.business_id)
         setData(d)
 
         // If already completed, go to dashboard
@@ -55,7 +56,8 @@ export default function OnboardingPage() {
         } else {
           setCurrentStep(2) // Skip step 1, already registered
         }
-      } catch {
+      } catch (err) {
+        console.error('[Onboarding] Load error:', err)
         setIsNewUser(true)
       } finally {
         setLoading(false)
@@ -250,6 +252,43 @@ export default function OnboardingPage() {
 
         {currentStep === 9 && (
           <Step9InstallApp onBack={goBack} />
+        )}
+
+        {/* Fallback: om inget steg renderas (data saknas), visa felmeddelande */}
+        {currentStep >= 2 && currentStep <= 6 && !stepProps && (
+          <div className="text-center py-16 space-y-4">
+            <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
+            <p className="text-zinc-400">Laddar steg {currentStep}...</p>
+            <button
+              onClick={() => {
+                setLoading(true)
+                fetch('/api/onboarding')
+                  .then(res => res.ok ? res.json() : null)
+                  .then(d => {
+                    if (d) {
+                      setData(d)
+                    } else {
+                      setIsNewUser(true)
+                      setCurrentStep(1)
+                    }
+                  })
+                  .catch(() => {
+                    setIsNewUser(true)
+                    setCurrentStep(1)
+                  })
+                  .finally(() => setLoading(false))
+              }}
+              className="px-4 py-2 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded-lg hover:bg-zinc-700 text-sm"
+            >
+              Ladda om
+            </button>
+          </div>
+        )}
+        {currentStep >= 7 && currentStep <= 8 && !data && (
+          <div className="text-center py-16 space-y-4">
+            <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
+            <p className="text-zinc-400">Laddar steg {currentStep}...</p>
+          </div>
         )}
       </div>
 
