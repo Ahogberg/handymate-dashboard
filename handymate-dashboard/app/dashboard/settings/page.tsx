@@ -1659,6 +1659,11 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Samtalsläge */}
+            {config.assigned_phone_number && (
+              <CallHandlingModeSection businessId={business.business_id} />
+            )}
+
             {/* Webhook-synk — visas bara när 46elks-nummer är tilldelat */}
             {config.assigned_phone_number && (
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
@@ -3701,6 +3706,89 @@ function ReferralWidget({ businessId }: { businessId: string }) {
         </button>
       </div>
       <p className="text-xs text-gray-400 mt-2">Din kod: <span className="font-mono font-semibold">{data.code}</span></p>
+    </div>
+  )
+}
+
+function CallHandlingModeSection({ businessId }: { businessId: string }) {
+  const [mode, setMode] = useState('agent_with_transfer')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const modes = [
+    {
+      value: 'agent_always',
+      label: 'Agenten svarar alltid',
+      description: 'Agenten hanterar alla samtal, du behöver aldrig svara telefon',
+    },
+    {
+      value: 'agent_with_transfer',
+      label: 'Agenten filtrerar, du tar vid vid behov',
+      description: 'Agenten svarar, men kan koppla till dig om kunden vill prata direkt',
+    },
+    {
+      value: 'human_work_hours',
+      label: 'Du svarar under arbetstid, agenten tar kvällar och helger',
+      description: 'Under arbetstid ringer din telefon direkt — agenten täcker resten',
+    },
+  ]
+
+  useEffect(() => {
+    fetch('/api/automation/settings')
+      .then(r => r.json())
+      .then(data => {
+        setMode(data?.call_handling_mode || 'agent_with_transfer')
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const handleSave = async (newMode: string) => {
+    setMode(newMode)
+    setSaving(true)
+    try {
+      await fetch('/api/automation/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ call_handling_mode: newMode }),
+      })
+    } catch { /* ignore */ }
+    setSaving(false)
+  }
+
+  if (loading) return null
+
+  return (
+    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <PhoneCall className="w-5 h-5 text-teal-600" />
+        <h2 className="text-lg font-semibold text-gray-900">Samtalsläge</h2>
+      </div>
+      <p className="text-sm text-gray-400 mb-4">Hur vill du hantera inkommande samtal?</p>
+      <div className="space-y-2">
+        {modes.map(m => (
+          <button
+            key={m.value}
+            onClick={() => handleSave(m.value)}
+            disabled={saving}
+            className={`w-full p-4 rounded-xl border text-left transition-all ${
+              mode === m.value
+                ? 'bg-teal-50 border-teal-300'
+                : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                mode === m.value ? 'border-teal-600' : 'border-gray-300'
+              }`}>
+                {mode === m.value && <div className="w-2 h-2 rounded-full bg-teal-600" />}
+              </div>
+              <p className={`text-sm font-medium ${mode === m.value ? 'text-teal-700' : 'text-gray-900'}`}>{m.label}</p>
+            </div>
+            <p className="text-xs text-gray-400 mt-1 ml-6">{m.description}</p>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }

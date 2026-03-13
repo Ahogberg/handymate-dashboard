@@ -5,14 +5,31 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
  * Webhook för inkommande samtal från 46elks
- * Flöde:
- * 1. Ta emot "to" (numret som ringdes)
- * 2. Slå upp business_config baserat på assigned_phone_number
- * 3. Spela consent-meddelande om call_recording_enabled
- * 4. Vidarekoppla till forward_phone_number
- * 5. Spela in samtalet
+ * Flöde baserat på call_handling_mode:
+ *
+ * agent_always: Agenten svarar, tar meddelande (ingen transfer)
+ * agent_with_transfer: Agenten svarar, kan koppla till personal_phone (default)
+ * human_work_hours: Under arbetstid → ring personal_phone direkt, utanför → agenten
  */
 export const dynamic = 'force-dynamic'
+
+function isWithinWorkHours(workStart: string, workEnd: string, workDays: string[]): boolean {
+  const now = new Date()
+  // Konvertera till svensk tid (CET/CEST)
+  const swedenTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Stockholm' }))
+  const dayMap: Record<number, string> = { 0: 'sun', 1: 'mon', 2: 'tue', 3: 'wed', 4: 'thu', 5: 'fri', 6: 'sat' }
+  const dayKey = dayMap[swedenTime.getDay()]
+
+  if (!workDays.includes(dayKey)) return false
+
+  const [startH, startM] = workStart.split(':').map(Number)
+  const [endH, endM] = workEnd.split(':').map(Number)
+  const currentMinutes = swedenTime.getHours() * 60 + swedenTime.getMinutes()
+  const startMinutes = startH * 60 + startM
+  const endMinutes = endH * 60 + endM
+
+  return currentMinutes >= startMinutes && currentMinutes <= endMinutes
+}
 
 export async function POST(request: NextRequest) {
   console.log('[Voice Incoming] POST received, content-type:', request.headers.get('content-type'))
@@ -20,8 +37,6 @@ export async function POST(request: NextRequest) {
   try {
     const supabase = getServerSupabase()
 
-    // Use URLSearchParams instead of formData() for reliable parsing of
-    // application/x-www-form-urlencoded (handles charset variants)
     const text = await request.text()
     const params = new URLSearchParams(text)
     const from = params.get('from') ?? ''
@@ -39,6 +54,7 @@ export async function POST(request: NextRequest) {
         business_name,
         assigned_phone_number,
         forward_phone_number,
+        personal_phone,
         call_recording_enabled,
         call_recording_consent_message
       `)
@@ -47,29 +63,18 @@ export async function POST(request: NextRequest) {
 
     if (businessError || !business) {
       console.error('No business found for number:', to)
-      // Lägg på om vi inte hittar ett företag
       return NextResponse.json({ "hangup": "no_business_found" })
     }
 
-    if (!business.forward_phone_number) {
-      console.error('No forward number configured for business:', business.business_id)
-      // Notify about missed call
-      try {
-        const { notifyMissedCall } = await import('@/lib/notifications')
-        await notifyMissedCall({
-          businessId: business.business_id,
-          phoneNumber: from,
-        })
-      } catch { /* non-blocking */ }
-      // V3 Automation Engine: fire call_missed event
-      try {
-        const { fireEvent } = await import('@/lib/automation-engine')
-        await fireEvent(supabase, 'call_missed', business.business_id, {
-          phone: from, call_id: callId,
-        })
-      } catch { /* non-blocking */ }
-      return NextResponse.json({ "hangup": "no_forward_number" })
-    }
+    // Hämta call_handling_mode från automation_settings
+    const { data: autoSettings } = await supabase
+      .from('v3_automation_settings')
+      .select('call_handling_mode, work_start, work_end, work_days')
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
+    const callHandlingMode = autoSettings?.call_handling_mode || 'agent_with_transfer'
+    const transferPhone = business.personal_phone || business.forward_phone_number
 
     // Hitta eller skapa kund baserat på telefonnummer (from)
     let customerId: string | null = null
@@ -82,8 +87,8 @@ export async function POST(request: NextRequest) {
 
     customerId = customer?.customer_id || null
 
-    // Logga samtalet i databasen (call_recording)
-    const { data: callRecord } = await supabase
+    // Logga samtalet i databasen
+    await supabase
       .from('call_recording')
       .insert({
         business_id: business.business_id,
@@ -108,21 +113,81 @@ export async function POST(request: NextRequest) {
       } catch { /* non-blocking */ }
     }
 
-    // Bygg svaret till 46elks
-    const response: any = {}
+    // ── Routing baserat på call_handling_mode ──
 
-    // Om inspelning är aktiverad
-    if (business.call_recording_enabled) {
-      // Spela consent-meddelande först, sedan koppla vidare
-      response.ivr = `${APP_URL}/api/voice/consent?business_id=${business.business_id}`
-    } else {
-      // Koppla direkt utan inspelning
-      response.connect = business.forward_phone_number
-      response.callerid = to // Visa företagets nummer
+    // Mode: human_work_hours — ring hantverkaren direkt under arbetstid
+    if (callHandlingMode === 'human_work_hours' && transferPhone) {
+      const workStart = autoSettings?.work_start || '07:00'
+      const workEnd = autoSettings?.work_end || '17:00'
+      const workDays = autoSettings?.work_days || ['mon', 'tue', 'wed', 'thu', 'fri']
+
+      if (isWithinWorkHours(workStart, workEnd, workDays)) {
+        console.log('[Voice] human_work_hours: within hours, connecting to', transferPhone)
+
+        // Fire event
+        try {
+          const { fireEvent } = await import('@/lib/automation-engine')
+          await fireEvent(supabase, 'call_transferred', business.business_id, {
+            to: transferPhone, from, call_id: callId, mode: 'human_work_hours',
+          })
+        } catch { /* non-blocking */ }
+
+        return NextResponse.json({
+          connect: transferPhone,
+          callerid: to,
+          timeout: 20,
+          whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+        })
+      }
+      // Utanför arbetstid → fall through till agent-hantering nedan
     }
 
-    console.log('Voice response:', response)
-    return NextResponse.json(response)
+    // Mode: agent_with_transfer — agenten svarar, kan koppla vidare
+    // Mode: agent_always — agenten svarar, tar meddelande
+    // Mode: human_work_hours utanför arbetstid → agenten tar över
+
+    if (!transferPhone || callHandlingMode === 'agent_always') {
+      // Inget personal_phone eller agent_always: agent tar meddelande
+      console.log('[Voice] No transfer phone or agent_always mode — agent handles call')
+
+      try {
+        const { notifyMissedCall } = await import('@/lib/notifications')
+        await notifyMissedCall({
+          businessId: business.business_id,
+          phoneNumber: from,
+        })
+      } catch { /* non-blocking */ }
+
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'call_missed', business.business_id, {
+          phone: from, call_id: callId,
+        })
+      } catch { /* non-blocking */ }
+
+      // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)
+      return NextResponse.json({
+        play: `${APP_URL}/api/voice/greeting?business_id=${business.business_id}`,
+        whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+      })
+    }
+
+    // agent_with_transfer: consent + connect med timeout
+    console.log('[Voice] agent_with_transfer: connecting to', transferPhone)
+
+    if (business.call_recording_enabled) {
+      return NextResponse.json({
+        ivr: `${APP_URL}/api/voice/consent?business_id=${business.business_id}`,
+      })
+    }
+
+    // Connect direkt med timeout — om ingen svarar, ta meddelande
+    return NextResponse.json({
+      connect: transferPhone,
+      callerid: to,
+      timeout: 20,
+      whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+    })
 
   } catch (error) {
     console.error('Voice webhook error:', error)

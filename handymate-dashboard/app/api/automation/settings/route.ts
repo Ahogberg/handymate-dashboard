@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
       lead_response_target_minutes: 30,
       quote_followup_days: 5,
       invoice_reminder_days: 7,
+      call_handling_mode: 'agent_with_transfer',
     })
   }
 

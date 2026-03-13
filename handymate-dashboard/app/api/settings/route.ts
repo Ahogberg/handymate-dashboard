@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest) {
       'phone_number', 'branch', 'service_area', 'working_hours',
       'call_mode', 'forward_phone_number', 'call_recording_enabled',
       'pricing_settings', 'knowledge_base', 'accent_color',
-      'default_quote_terms', 'logo_url'
+      'default_quote_terms', 'logo_url', 'personal_phone'
     ]
 
     const updates: Record<string, any> = {}

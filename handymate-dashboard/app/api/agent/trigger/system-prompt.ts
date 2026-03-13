@@ -34,6 +34,9 @@ interface BusinessContext {
     require_approval_create_booking: boolean
     lead_response_target_minutes: number
   } | null
+  // V4 Phone transfer
+  personal_phone?: string | null
+  call_handling_mode?: string | null
   // V4 Pipeline context — injiceras per aktiv konversation om lead finns
   leadPipelineContext?: {
     lead_id: string
@@ -132,6 +135,14 @@ ${business.leadPipelineContext ? `
 - Lead ID: ${business.leadPipelineContext.lead_id}
 - Pipeline-steg: **${business.leadPipelineContext.pipeline_stage_label}** (${business.leadPipelineContext.pipeline_stage_key})
 - Anpassa ditt beteende efter var kunden befinner sig i tratten. T.ex. om steget är "Offert skickad" handlar kontakten troligen om att diskutera offerten.` : ''}
+
+## Vidarekoppling
+${business.personal_phone
+  ? `- Hantverkarens privata nummer finns konfigurerat
+- Du KAN koppla vidare kunden om de uttryckligen ber att prata med en person
+- Samtalsläge: ${business.call_handling_mode || 'agent_with_transfer'}`
+  : `- Inget privat nummer konfigurerat — försök ALDRIG koppla vidare
+- Ta alltid meddelande och meddela att hantverkaren återkommer`}
 
 ## Regler
 - Sök alltid kund innan du skapar ny (search_customers)

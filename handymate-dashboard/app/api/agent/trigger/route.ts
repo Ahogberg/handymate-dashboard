@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     const { data: bizConfig } = await supabase
       .from('business_config')
       .select(
-        'business_id, user_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, pricing_settings, knowledge_base, working_hours'
+        'business_id, user_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, personal_phone, pricing_settings, knowledge_base, working_hours'
       )
       .eq('business_id', businessId)
       .single()
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     // Fetch V3 automation settings
     const { data: v3Settings } = await supabase
       .from('v3_automation_settings')
-      .select('work_start, work_end, work_days, night_mode_enabled, min_job_value_sek, require_approval_send_quote, require_approval_send_invoice, require_approval_create_booking, lead_response_target_minutes')
+      .select('work_start, work_end, work_days, night_mode_enabled, min_job_value_sek, require_approval_send_quote, require_approval_send_invoice, require_approval_create_booking, lead_response_target_minutes, call_handling_mode')
       .eq('business_id', businessId)
       .maybeSingle()
 
@@ -234,6 +234,7 @@ export async function POST(request: NextRequest) {
         gmail_send_enabled: !!googleConnection?.gmail_send_scope_granted && !!googleConnection?.gmail_sync_enabled,
         preferences,
         automationSettings: v3Settings || null,
+        call_handling_mode: v3Settings?.call_handling_mode || 'agent_with_transfer',
         leadPipelineContext,
       },
       trigger_type,
