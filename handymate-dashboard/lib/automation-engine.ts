@@ -822,12 +822,14 @@ export async function fireEvent(
 ): Promise<void> {
   try {
     // Fetch matching event rules
-    const { data: rules } = await supabase
+    const { data: rules, error: rulesErr } = await supabase
       .from('v3_automation_rules')
       .select('*')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .eq('trigger_type', 'event')
+
+    console.log(`[fireEvent] ${eventName} for ${businessId}: ${rules?.length ?? 0} event rules found${rulesErr ? `, error: ${rulesErr.message}` : ''}`)
 
     if (!rules || rules.length === 0) return
 
@@ -837,10 +839,13 @@ export async function fireEvent(
       return configEvent === eventName
     })
 
+    console.log(`[fireEvent] ${eventName}: ${matchingRules.length} matching rules`)
+
     // Execute matching rules
     for (const rule of matchingRules) {
       try {
-        await executeRule(supabase, rule.id, payload)
+        const result = await executeRule(supabase, rule.id, payload)
+        console.log(`[fireEvent] Rule ${rule.name} result:`, result.status)
       } catch (err) {
         console.error(`[automation-engine] Event rule ${rule.name} failed:`, err)
       }
