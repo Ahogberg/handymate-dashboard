@@ -144,20 +144,22 @@ async function logExecution(
     approvalId?: string
   }
 ): Promise<void> {
-  await supabase.from('v3_automation_logs').insert({
-    business_id: params.businessId,
-    rule_id: params.ruleId,
-    rule_name: params.ruleName,
-    trigger_type: params.triggerType,
-    action_type: params.actionType,
-    status: params.status,
-    context: params.context || {},
-    result: params.result || {},
-    error_message: params.errorMessage || null,
-    approval_id: params.approvalId || null,
-  }).catch((err: unknown) => {
+  try {
+    await supabase.from('v3_automation_logs').insert({
+      business_id: params.businessId,
+      rule_id: params.ruleId,
+      rule_name: params.ruleName,
+      trigger_type: params.triggerType,
+      action_type: params.actionType,
+      status: params.status,
+      context: params.context || {},
+      result: params.result || {},
+      error_message: params.errorMessage || null,
+      approval_id: params.approvalId || null,
+    })
+  } catch (err: unknown) {
     console.error('[automation-engine] Failed to log execution:', err)
-  })
+  }
 }
 
 async function updateRuleStats(
@@ -456,14 +458,15 @@ async function handleScheduleFollowup(
 
   const description = (config.description as string) || 'Uppföljning schemalagd'
 
-  await supabase.from('inbox_item').insert({
+  const { error: insertErr } = await supabase.from('inbox_item').insert({
     business_id: businessId,
     type: 'followup',
     title: description,
     description: `Automatisk uppföljning från regel. Kontext: ${JSON.stringify(context).substring(0, 500)}`,
     priority: 'medium',
     scheduled_at: followupDate.toISOString(),
-  }).catch(() => {})
+  })
+  if (insertErr) console.error('[automation-engine] Failed to create followup:', insertErr.message)
 
   return { success: true, data: { followup_date: followupDate.toISOString(), description } }
 }
@@ -822,14 +825,12 @@ export async function fireEvent(
 ): Promise<void> {
   try {
     // Fetch matching event rules
-    const { data: rules, error: rulesErr } = await supabase
+    const { data: rules } = await supabase
       .from('v3_automation_rules')
       .select('*')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .eq('trigger_type', 'event')
-
-    console.log(`[fireEvent] ${eventName} for ${businessId}: ${rules?.length ?? 0} event rules found${rulesErr ? `, error: ${rulesErr.message}` : ''}`)
 
     if (!rules || rules.length === 0) return
 
@@ -839,13 +840,10 @@ export async function fireEvent(
       return configEvent === eventName
     })
 
-    console.log(`[fireEvent] ${eventName}: ${matchingRules.length} matching rules`)
-
     // Execute matching rules
     for (const rule of matchingRules) {
       try {
-        const result = await executeRule(supabase, rule.id, payload)
-        console.log(`[fireEvent] Rule ${rule.name} result:`, result.status)
+        await executeRule(supabase, rule.id, payload)
       } catch (err) {
         console.error(`[automation-engine] Event rule ${rule.name} failed:`, err)
       }
