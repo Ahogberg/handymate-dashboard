@@ -2,14 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  ArrowLeft,
-  Loader2,
-  Timer,
-  FileText,
-  Save,
-  Send
-} from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -86,7 +79,6 @@ export default function NewInvoicePage() {
   }, [business.business_id])
 
   async function fetchData() {
-    // Fetch customers, time entries, and business config in parallel
     const [customersRes, timeRes, configRes] = await Promise.all([
       supabase
         .from('customer')
@@ -115,12 +107,10 @@ export default function NewInvoicePage() {
       setNextNumber(configRes.data.next_invoice_number || 1)
     }
 
-    // Pre-populate from quote
     if (fromQuoteId) {
       await loadFromQuote(fromQuoteId)
     }
 
-    // Pre-populate from time entries for customer
     if (fromTimeEntriesCustomer) {
       setCustomerId(fromTimeEntriesCustomer)
     }
@@ -148,7 +138,6 @@ export default function NewInvoicePage() {
     }
   }
 
-  // When customer changes, load their ROT/RUT info
   useEffect(() => {
     if (customerId) {
       const customer = customers.find(c => c.customer_id === customerId)
@@ -197,7 +186,6 @@ export default function NewInvoicePage() {
         })
       }
 
-      // Set customer if not set
       if (!customerId && entry.customer_id) {
         setCustomerId(entry.customer_id)
       }
@@ -220,7 +208,6 @@ export default function NewInvoicePage() {
     }
 
     setCreating(true)
-    const totals = calculateInvoiceTotals(items, 0, vatRate)
 
     try {
       const response = await fetch('/api/invoices', {
@@ -256,33 +243,33 @@ export default function NewInvoicePage() {
   }
 
   const totals = calculateInvoiceTotals(items, 0, vatRate)
-  const previewNumber = `${invoicePrefix}-${new Date().getFullYear()}-${String(nextNumber).padStart(3, '0')}`
-  const previewOCR = generateOCR(String(nextNumber))
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-[#0F766E] animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
-      </div>
-
-      {/* Time Entry Modal */}
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
+      {/* Time Entry Selection Modal */}
       {showTimeEntries && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Välj tidrapporter</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-4">
+          <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-8 py-7 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-5">
+              <span className="text-[16px] font-medium text-[#1E293B]">Välj tidrapporter</span>
+              <button
+                onClick={() => { setShowTimeEntries(false); setSelectedTimeEntries([]) }}
+                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-[#1E293B] flex items-center justify-center text-[16px]"
+              >
+                ×
+              </button>
+            </div>
 
-            {timeEntries.length === 0 ? (
-              <p className="text-gray-400 py-8 text-center">Inga ofakturerade tidrapporter</p>
+            {timeEntries.filter(te => !customerId || te.customer_id === customerId).length === 0 ? (
+              <p className="text-[#94A3B8] py-8 text-center text-[13px]">Inga ofakturerade tidrapporter</p>
             ) : (
               <div className="space-y-2">
                 {timeEntries
@@ -296,10 +283,10 @@ export default function NewInvoicePage() {
                     return (
                       <label
                         key={entryId}
-                        className={`flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
+                        className={`flex items-center gap-4 p-4 rounded-lg border-thin cursor-pointer transition-all ${
                           selectedTimeEntries.includes(entryId)
-                            ? 'bg-teal-50 border-teal-300'
-                            : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                            ? 'bg-[#F0FDFA] border-[#0F766E]'
+                            : 'bg-[#F8FAFC] border-[#E2E8F0] hover:border-[#CBD5E1]'
                         }`}
                       >
                         <input
@@ -312,18 +299,18 @@ export default function NewInvoicePage() {
                               setSelectedTimeEntries(selectedTimeEntries.filter(id => id !== entryId))
                             }
                           }}
-                          className="w-5 h-5 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
+                          className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]"
                         />
                         <div className="flex-1">
-                          <p className="text-gray-900 font-medium">
-                            {new Date(entry.work_date).toLocaleDateString('sv-SE')} - {hours.toFixed(1)}h
+                          <p className="text-[13px] font-medium text-[#1E293B]">
+                            {new Date(entry.work_date).toLocaleDateString('sv-SE')} — {hours.toFixed(1)}h
                           </p>
-                          <p className="text-sm text-gray-500">
-                            {entry.customer?.name || 'Ingen kund'} - {entry.description || 'Ingen beskrivning'}
+                          <p className="text-[12px] text-[#94A3B8]">
+                            {entry.customer?.name || 'Ingen kund'} — {entry.description || 'Ingen beskrivning'}
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-gray-900 font-medium">{totalCost.toLocaleString('sv-SE')} kr</p>
+                          <p className="text-[13px] font-medium text-[#1E293B]">{totalCost.toLocaleString('sv-SE')} kr</p>
                         </div>
                       </label>
                     )
@@ -331,17 +318,17 @@ export default function NewInvoicePage() {
               </div>
             )}
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex gap-2 mt-6 pt-5 border-t border-thin border-[#E2E8F0]">
               <button
                 onClick={() => { setShowTimeEntries(false); setSelectedTimeEntries([]) }}
-                className="px-4 py-2 text-gray-500 hover:text-gray-900"
+                className="px-4 py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer"
               >
                 Avbryt
               </button>
               <button
                 onClick={addTimeEntriesToInvoice}
                 disabled={selectedTimeEntries.length === 0}
-                className="px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex-1 py-2.5 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
               >
                 Lägg till ({selectedTimeEntries.length})
               </button>
@@ -350,52 +337,30 @@ export default function NewInvoicePage() {
         </div>
       )}
 
-      <div className="relative max-w-6xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/invoices" className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-              <ArrowLeft className="w-5 h-5" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Link href="/dashboard/invoices" className="text-[13px] text-[#64748B] hover:text-[#1E293B] transition-colors">
+              ← Fakturor
             </Link>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Ny faktura</h1>
-              <p className="text-sm text-gray-500">
-                Förhandsgranskning: {previewNumber} | OCR: {previewOCR}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowTimeEntries(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-200"
-            >
-              <Timer className="w-4 h-4" />
-              Från tidrapport
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={creating || items.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              Skapa faktura
-            </button>
+            <span className="text-[18px] font-medium text-[#1E293B] ml-3">Ny faktura</span>
           </div>
         </div>
 
-        {/* Layout: editor + sidebar */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Left: Main editor */}
-          <div className="flex-1 min-w-0 space-y-6">
-            {/* Customer & basic settings */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+          {/* Main Content */}
+          <div className="flex flex-col gap-4">
+            {/* Kund och datum */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Kund och datum</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Kund</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
                   <select
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map(c => (
@@ -404,102 +369,154 @@ export default function NewInvoicePage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Betalningsvillkor</label>
-                  <select
-                    value={dueDays}
-                    onChange={(e) => setDueDays(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  >
-                    <option value={10}>10 dagar</option>
-                    <option value={15}>15 dagar</option>
-                    <option value={20}>20 dagar</option>
-                    <option value={30}>30 dagar</option>
-                    <option value={45}>45 dagar</option>
-                    <option value={60}>60 dagar</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Fakturadatum</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Fakturadatum</label>
                   <input
                     type="date"
                     value={invoiceDate}
                     onChange={(e) => setInvoiceDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-400 mb-1">Momssats</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Betalningsvillkor</label>
                   <select
-                    value={vatRate}
-                    onChange={(e) => setVatRate(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    value={dueDays}
+                    onChange={(e) => setDueDays(Number(e.target.value))}
+                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   >
-                    <option value={25}>25%</option>
-                    <option value={12}>12%</option>
-                    <option value={6}>6%</option>
-                    <option value={0}>0% (momsfri)</option>
+                    <option value={14}>14 dagar</option>
+                    <option value={30}>30 dagar</option>
+                    <option value={60}>60 dagar</option>
+                    <option value={0}>Förskott</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Vår referens</label>
-                  <input
-                    type="text"
-                    value={ourReference}
-                    onChange={(e) => setOurReference(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-1">Er referens</label>
-                  <input
-                    type="text"
-                    value={yourReference}
-                    onChange={(e) => setYourReference(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-              </div>
-
-              {/* ROT/RUT */}
-              <div className="mt-4">
-                <label className="block text-xs text-gray-400 mb-1">ROT/RUT-avdrag</label>
-                <select
-                  value={rotRutType}
-                  onChange={(e) => setRotRutType(e.target.value)}
-                  className="w-full max-w-xs px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                >
-                  <option value="">Inget avdrag</option>
-                  <option value="rot">ROT-avdrag (30%)</option>
-                  <option value="rut">RUT-avdrag (50%)</option>
-                </select>
               </div>
             </div>
 
-            {/* Line items */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            {/* Importera rader */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Importera rader</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {fromQuoteId ? (
+                  <div className="px-4 py-3 border-thin border-[#0F766E] rounded-lg bg-[#F0FDFA] text-left">
+                    <div className="text-[13px] font-medium text-[#1E293B]">Importerad från offert</div>
+                    <div className="text-[12px] text-[#94A3B8]">Rader hämtade automatiskt</div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => router.push('/dashboard/quotes')}
+                    className="px-4 py-4 border-thin border-[#E2E8F0] rounded-lg bg-[#F8FAFC] cursor-pointer text-left hover:border-[#0F766E] hover:bg-[#F0FDFA] transition-colors"
+                  >
+                    <div className="text-[13px] font-medium text-[#1E293B]">Från offert</div>
+                    <div className="text-[12px] text-[#94A3B8]">Hämta rader från godkänd offert</div>
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowTimeEntries(true)}
+                  className="px-4 py-4 border-thin border-[#E2E8F0] rounded-lg bg-[#F8FAFC] cursor-pointer text-left hover:border-[#0F766E] hover:bg-[#F0FDFA] transition-colors"
+                >
+                  <div className="text-[13px] font-medium text-[#1E293B]">Från tidrapport</div>
+                  <div className="text-[12px] text-[#94A3B8]">Fakturera rapporterade timmar</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Fakturarader */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
               <LineItemEditor
                 items={items}
                 onChange={handleItemsChange}
                 rotRutType={rotRutType || undefined}
               />
             </div>
+
+            {/* ROT-avdrag */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-[13px] text-[#1E293B]">ROT-avdrag</span>
+                  {!rotRutType && (
+                    <div className="text-[12px] text-[#94A3B8] mt-1">Slå på för att aktivera ROT-beräkning</div>
+                  )}
+                </div>
+                <div
+                  className={`w-9 h-5 rounded-full relative cursor-pointer transition-colors ${rotRutType ? 'bg-[#0F766E]' : 'bg-[#CBD5E1]'}`}
+                  onClick={() => setRotRutType(rotRutType ? '' : 'rot')}
+                >
+                  <div className={`absolute w-3.5 h-3.5 bg-white rounded-full top-[3px] transition-all ${rotRutType ? 'left-[19px]' : 'left-[3px]'}`} />
+                </div>
+              </div>
+              {rotRutType && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] text-[#64748B] mb-1">Typ</label>
+                    <select
+                      value={rotRutType}
+                      onChange={(e) => setRotRutType(e.target.value)}
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                    >
+                      <option value="rot">ROT-avdrag (30%)</option>
+                      <option value="rut">RUT-avdrag (50%)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[12px] text-[#64748B] mb-1">Personnummer</label>
+                    <input
+                      type="text"
+                      value={personalNumber}
+                      onChange={(e) => setPersonalNumber(e.target.value)}
+                      placeholder="YYYYMMDD-XXXX"
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                    />
+                  </div>
+                  {rotRutType === 'rot' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-[12px] text-[#64748B] mb-1">Fastighetsbeteckning</label>
+                      <input
+                        type="text"
+                        value={propertyDesignation}
+                        onChange={(e) => setPropertyDesignation(e.target.value)}
+                        placeholder="T.ex. Stockholm Söder 1:23"
+                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                      />
+                    </div>
+                  )}
+                  <p className="text-[12px] text-[#0F766E] sm:col-span-2">
+                    {rotRutType === 'rot'
+                      ? 'Kunden betalar 70% — Skatteverket betalar resterande 30% direkt till dig.'
+                      : 'Kunden betalar 50% — Skatteverket betalar resterande 50% direkt till dig.'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right: Sidebar */}
-          <div className="lg:w-80 flex-shrink-0">
-            <div className="lg:sticky lg:top-8">
-              <InvoiceSummary
-                totals={totals}
-                vatRate={vatRate}
-                rotRutType={rotRutType || undefined}
-                personalNumber={personalNumber}
-                propertyDesignation={propertyDesignation}
-                onFieldChange={handleFieldChange}
-              />
-            </div>
+          {/* Sidebar */}
+          <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+            <InvoiceSummary
+              totals={totals}
+              vatRate={vatRate}
+              rotRutType={rotRutType || undefined}
+              personalNumber={personalNumber}
+              propertyDesignation={propertyDesignation}
+              onFieldChange={handleFieldChange}
+            />
+
+            <button
+              onClick={handleCreate}
+              disabled={creating || items.length === 0}
+              className="w-full py-3 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
+            >
+              {creating ? 'Skapar...' : 'Skapa faktura'}
+            </button>
+            <button
+              className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
+              onClick={() => {
+                toast.info('Utkast sparas automatiskt')
+              }}
+            >
+              Spara utkast
+            </button>
           </div>
         </div>
       </div>

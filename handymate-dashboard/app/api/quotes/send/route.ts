@@ -378,6 +378,20 @@ Frågor? Ring ${business.phone_number}`
       console.error('Communication trigger error (non-blocking):', commErr)
     }
 
+    // V4 Automation Engine: fire quote_sent event (pipeline stage move)
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'quote_sent', business.business_id, {
+        quote_id: quoteId,
+        customer_id: quote.customer_id,
+        customer_name: quote.customer?.name,
+        total: quote.total,
+        title: quote.title,
+      })
+    } catch (eventErr) {
+      console.error('fireEvent quote_sent error (non-blocking):', eventErr)
+    }
+
     // Bygg svar
     const sentMethods = []
     if (smsSent) sentMethods.push('SMS')

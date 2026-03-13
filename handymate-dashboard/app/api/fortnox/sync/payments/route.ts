@@ -70,9 +70,9 @@ export async function POST(request: NextRequest) {
           // V3 Automation Engine: fire payment_received event
           try {
             const { fireEvent } = await import('@/lib/automation-engine')
-            fireEvent(adminSupabase, 'payment_received', businessId, {
+            await fireEvent(adminSupabase, 'payment_received', businessId, {
               invoice_id: invoice.invoice_id, customer_id: invoice.customer_id,
-            }).catch(() => {})
+            })
           } catch { /* non-blocking */ }
 
           results.updated++

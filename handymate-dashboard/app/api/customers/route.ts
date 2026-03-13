@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getNextCustomerNumber } from '@/lib/numbering'
 
 /**
  * GET - Lista alla kunder för ett företag
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
+    const customerNumber = await getNextCustomerNumber(supabase, business.business_id)
 
     const insertData: Record<string, any> = {
       customer_id: customerId,
@@ -68,6 +70,7 @@ export async function POST(request: NextRequest) {
       phone_number: phone_number || null,
       email: email || null,
       address_line: address_line || null,
+      customer_number: customerNumber,
       created_at: new Date().toISOString(),
     }
 

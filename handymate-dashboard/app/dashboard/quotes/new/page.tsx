@@ -5,31 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Sparkles,
-  Plus,
-  Trash2,
-  Send,
-  Save,
-  FileText,
-  User,
-  Calculator,
   Loader2,
-  Search,
-  Bookmark,
   ChevronDown,
-  ChevronUp,
-  GripVertical,
-  ArrowUp,
-  ArrowDown,
-  Type,
-  Minus,
-  Hash,
-  AlignLeft,
-  Settings2,
-  CreditCard,
-  ClipboardList,
-  MapPin,
-  Eye,
-  EyeOff,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -105,21 +82,6 @@ const UNIT_OPTIONS = [
   { value: 'pauschal', label: 'pauschal' },
 ]
 
-const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
-  item: 'bg-gray-50',
-  heading: 'bg-teal-50 font-bold',
-  text: 'bg-gray-50 italic',
-  subtotal: 'bg-gray-100 font-medium',
-  discount: 'bg-red-50',
-}
-
-const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string }> = {
-  item: { label: 'Post', cls: 'bg-teal-100 text-teal-700' },
-  heading: { label: 'Rubrik', cls: 'bg-indigo-100 text-indigo-700' },
-  text: { label: 'Text', cls: 'bg-gray-200 text-gray-600' },
-  subtotal: { label: 'Delsumma', cls: 'bg-gray-300 text-gray-700' },
-  discount: { label: 'Rabatt', cls: 'bg-red-100 text-red-700' },
-}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1039,95 +1001,60 @@ export default function NewQuotePage() {
   // Full Form (step: 'form')
   // ═══════════════════════════════════════════════════════════════════════════
 
-  return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
-      </div>
+  // State for advanced row type dropdown
+  const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
-      <div className="relative max-w-5xl mx-auto">
+  return (
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
+      <div className="max-w-6xl mx-auto">
         {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className="flex items-center gap-3 mb-6 flex-wrap">
-          <Link
-            href="/dashboard/quotes"
-            className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
-              Ny offert
-              {aiGenerated && (
-                <span className="ml-2 text-xs font-normal px-2 py-0.5 bg-teal-100 text-sky-700 rounded-full">
-                  AI-genererad
-                </span>
-              )}
-            </h1>
-          </div>
-          {items.length > 0 && (
-            <button
-              onClick={() => {
-                setTemplateName(title)
-                setShowSaveTemplateModal(true)
-              }}
-              className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-gray-900 hover:bg-gray-200 text-sm"
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center">
+            <Link
+              href="/dashboard/quotes"
+              className="text-[13px] text-[#64748B] hover:text-[#1E293B] transition-colors"
             >
-              <Bookmark className="w-4 h-4" />
-              <span className="hidden sm:inline">Spara mall</span>
-            </button>
-          )}
-          <button
-            onClick={() => saveQuote(false)}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-            <span className="hidden sm:inline">Spara utkast</span>
-          </button>
-          <button
-            onClick={() => saveQuote(true)}
-            disabled={saving || !selectedCustomer}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            <Send className="w-4 h-4" />
-            <span className="hidden sm:inline">Skicka</span>
-          </button>
+              ← Offerter
+            </Link>
+            <span className="text-[18px] font-medium text-[#1E293B] ml-3">Ny offert</span>
+            {aiGenerated && (
+              <span className="ml-2.5 text-[11px] bg-[#CCFBF1] text-[#0F766E] px-2.5 py-0.5 rounded-full">
+                AI-genererad
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* Main Content (col-span-2) */}
+          {/* Main Content */}
           {/* ══════════════════════════════════════════════════════════ */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* ── Customer & Basic Info ──────────────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-teal-600" />
-                Kundinformation
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="flex flex-col gap-4">
+            {/* ── Kund ──────────────────────────────────────────────── */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Kund</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Kund *</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map((c) => (
                       <option key={c.customer_id} value={c.customer_id}>
-                        {c.name} - {c.phone_number}
+                        {c.name} — {c.phone_number}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Giltighetstid</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Giltighetstid</label>
                   <select
                     value={validDays}
                     onChange={(e) => setValidDays(parseInt(e.target.value))}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value={14}>14 dagar</option>
                     <option value={30}>30 dagar</option>
@@ -1135,271 +1062,236 @@ export default function NewQuotePage() {
                     <option value={90}>90 dagar</option>
                   </select>
                 </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm text-gray-500 mb-1">Titel</label>
-                  <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="T.ex. Elinstallation kök"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm text-gray-500 mb-1">Beskrivning</label>
-                  <textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Beskriv arbetet som ska utföras..."
-                    rows={2}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                  />
-                </div>
+              </div>
+              <div className="mb-3">
+                <label className="block text-[12px] text-[#64748B] mb-1">Titel</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="T.ex. Elinstallation kök"
+                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                />
+              </div>
+              <div>
+                <label className="block text-[12px] text-[#64748B] mb-1">
+                  Beskrivning <span className="text-[11px] text-[#CBD5E1]">(valfri)</span>
+                </label>
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Kort beskrivning av jobbet..."
+                  rows={2}
+                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none"
+                />
               </div>
             </div>
 
-            {/* ── Reference Fields ───────────────────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-teal-600" />
-                Referenser
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Er referens</label>
-                  <input
-                    type="text"
-                    value={referencePerson}
-                    onChange={(e) => setReferencePerson(e.target.value)}
-                    placeholder="Namn"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Kundens referens</label>
-                  <input
-                    type="text"
-                    value={customerReference}
-                    onChange={(e) => setCustomerReference(e.target.value)}
-                    placeholder="Referensnummer"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Arbetsplatsadress</label>
-                  <input
-                    type="text"
-                    value={projectAddress}
-                    onChange={(e) => setProjectAddress(e.target.value)}
-                    placeholder="Adress"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* ── Offertrader ────────────────────────────────────────── */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Offertrader</div>
 
-            {/* ── Standard Texts (collapsible) ──────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setShowStandardTexts(!showStandardTexts)}
-                className="w-full flex items-center justify-between p-4 sm:p-6 text-left"
-              >
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <AlignLeft className="w-5 h-5 text-emerald-600" />
-                  Standardtexter
-                </h2>
-                {showStandardTexts ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
-              </button>
-              {showStandardTexts && (
-                <div className="px-4 sm:px-6 pb-4 sm:pb-6 space-y-4 border-t border-gray-100 pt-4">
-                  {/* Introduction */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">Inledningstext</label>
-                      <StandardTextPicker
-                        texts={textsByType.introduction}
-                        onSelect={setIntroductionText}
-                      />
-                    </div>
-                    <textarea
-                      value={introductionText}
-                      onChange={(e) => setIntroductionText(e.target.value)}
-                      placeholder="Hälsningsfras och inledning..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                    />
-                  </div>
-                  {/* Conclusion */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">Avslutningstext</label>
-                      <StandardTextPicker
-                        texts={textsByType.conclusion}
-                        onSelect={setConclusionText}
-                      />
-                    </div>
-                    <textarea
-                      value={conclusionText}
-                      onChange={(e) => setConclusionText(e.target.value)}
-                      placeholder="Avslutande text..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                    />
-                  </div>
-                  {/* Not included */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">Ej inkluderat</label>
-                      <StandardTextPicker
-                        texts={textsByType.not_included}
-                        onSelect={setNotIncluded}
-                      />
-                    </div>
-                    <textarea
-                      value={notIncluded}
-                      onChange={(e) => setNotIncluded(e.target.value)}
-                      placeholder="Vad ingår inte..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                    />
-                  </div>
-                  {/* ÄTA terms */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">ÄTA-villkor</label>
-                      <StandardTextPicker
-                        texts={textsByType.ata_terms}
-                        onSelect={setAtaTerms}
-                      />
-                    </div>
-                    <textarea
-                      value={ataTerms}
-                      onChange={(e) => setAtaTerms(e.target.value)}
-                      placeholder="Ändrings- och tilläggsarbeten..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                    />
-                  </div>
-                  {/* Payment terms */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm text-gray-500">Betalningsvillkor</label>
-                      <StandardTextPicker
-                        texts={textsByType.payment_terms}
-                        onSelect={setPaymentTermsText}
-                      />
-                    </div>
-                    <textarea
-                      value={paymentTermsText}
-                      onChange={(e) => setPaymentTermsText(e.target.value)}
-                      placeholder="Betalningsvillkor..."
-                      rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                    />
-                  </div>
+              {/* Table header (desktop) */}
+              {items.length > 0 && (
+                <div className="hidden md:grid md:grid-cols-[1fr_72px_88px_96px_32px] gap-2 pb-2 border-b border-thin border-[#E2E8F0] mb-1">
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1]">Beskrivning</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Antal</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Enhet</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Pris/enhet</span>
+                  <span />
                 </div>
               )}
-            </div>
-
-            {/* ── Item Editor ────────────────────────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-amber-600" />
-                  Offertrader
-                </h2>
-              </div>
-
-              {/* Add buttons */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                <button
-                  onClick={() => addItem('item')}
-                  className="px-3 py-1.5 bg-teal-100 border border-teal-200 rounded-lg text-teal-700 text-sm hover:bg-teal-200 flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Post
-                </button>
-                <button
-                  onClick={() => addItem('heading')}
-                  className="px-3 py-1.5 bg-indigo-100 border border-indigo-200 rounded-lg text-indigo-700 text-sm hover:bg-indigo-200 flex items-center gap-1"
-                >
-                  <Type className="w-3.5 h-3.5" /> Rubrik
-                </button>
-                <button
-                  onClick={() => addItem('text')}
-                  className="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm hover:bg-gray-200 flex items-center gap-1"
-                >
-                  <AlignLeft className="w-3.5 h-3.5" /> Fritext
-                </button>
-                <button
-                  onClick={() => addItem('subtotal')}
-                  className="px-3 py-1.5 bg-gray-200 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-300 flex items-center gap-1"
-                >
-                  <Hash className="w-3.5 h-3.5" /> Delsumma
-                </button>
-                <button
-                  onClick={() => addItem('discount')}
-                  className="px-3 py-1.5 bg-red-100 border border-red-200 rounded-lg text-red-700 text-sm hover:bg-red-200 flex items-center gap-1"
-                >
-                  <Minus className="w-3.5 h-3.5" /> Rabatt
-                </button>
-                <button
-                  onClick={() => setShowGrossistSearch(true)}
-                  className="px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-emerald-700 text-sm hover:bg-emerald-200 flex items-center gap-1"
-                >
-                  <Search className="w-3.5 h-3.5" /> Sök grossist
-                </button>
-              </div>
 
               {items.length === 0 ? (
-                <div className="text-center py-8 text-gray-400">
-                  <FileText className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                  <p>Inga rader ännu. Lägg till poster ovan.</p>
+                <div className="text-center py-8 text-[#CBD5E1] text-[13px]">
+                  <p>Inga rader ännu. Lägg till poster nedan.</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {/* Table header (desktop) */}
-                  <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_60px_40px] gap-2 px-3 py-1 text-xs text-gray-400 font-medium">
-                    <span />
-                    <span>Typ</span>
-                    <span>Beskrivning</span>
-                    <span className="text-center">Antal</span>
-                    <span className="text-center">Enhet</span>
-                    <span className="text-right">Pris</span>
-                    <span className="text-right">Summa</span>
-                    <span className="text-center">ROT/RUT</span>
-                    <span />
-                  </div>
+                <div>
+                  {items.map((item, index) => {
+                    const isEditable = item.item_type === 'item' || item.item_type === 'discount'
+                    const showTotal = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'subtotal'
+                    const displayTotal = item.item_type === 'subtotal' ? (recalculated[index]?.total ?? item.total) : item.total
 
-                  {items.map((item, index) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      total={items.length}
-                      recalculatedTotal={recalculated[index]?.total ?? item.total}
-                      onUpdate={updateItem}
-                      onRemove={removeItem}
-                      onMove={moveItem}
-                    />
-                  ))}
+                    return (
+                      <div key={item.id}>
+                        {/* Desktop row */}
+                        <div className="hidden md:grid md:grid-cols-[1fr_72px_88px_96px_32px] gap-2 items-center py-2 border-b border-thin border-[#F1F5F9]">
+                          <input
+                            type="text"
+                            value={item.description}
+                            onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                            placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
+                            className="w-full px-2.5 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                          />
+                          {isEditable ? (
+                            <input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
+                              min={0}
+                              step="any"
+                            />
+                          ) : (
+                            <span />
+                          )}
+                          {isEditable ? (
+                            <select
+                              value={item.unit}
+                              onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
+                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                            >
+                              {UNIT_OPTIONS.map((u) => (
+                                <option key={u.value} value={u.value}>{u.label}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span />
+                          )}
+                          {isEditable ? (
+                            <input
+                              type="number"
+                              value={item.unit_price}
+                              onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
+                              min={0}
+                              step="any"
+                            />
+                          ) : showTotal ? (
+                            <span className="text-[13px] text-[#1E293B] text-right">{formatCurrency(displayTotal)}</span>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px]"
+                          >
+                            ×
+                          </button>
+                        </div>
+
+                        {/* Mobile row */}
+                        <div className="md:hidden py-3 border-b border-thin border-[#F1F5F9] space-y-2">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              value={item.description}
+                              onChange={(e) => updateItem(item.id, 'description', e.target.value)}
+                              placeholder="Beskrivning"
+                              className="flex-1 px-2.5 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                            />
+                            <button
+                              onClick={() => removeItem(item.id)}
+                              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px] shrink-0"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          {isEditable && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={item.quantity}
+                                onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+                                className="w-16 px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-center focus:outline-none focus:border-[#0F766E]"
+                                min={0}
+                                step="any"
+                              />
+                              <select
+                                value={item.unit}
+                                onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
+                                className="w-20 px-1 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                              >
+                                {UNIT_OPTIONS.map((u) => (
+                                  <option key={u.value} value={u.value}>{u.label}</option>
+                                ))}
+                              </select>
+                              <input
+                                type="number"
+                                value={item.unit_price}
+                                onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+                                className="w-24 px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
+                                min={0}
+                                step="any"
+                              />
+                              <span className="text-[13px] text-[#1E293B] font-medium flex-1 text-right whitespace-nowrap">
+                                {formatCurrency(displayTotal)}
+                              </span>
+                            </div>
+                          )}
+                          {isEditable && (
+                            <div className="flex items-center gap-3 text-[12px]">
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_rot_eligible}
+                                  onChange={(e) => updateItem(item.id, 'is_rot_eligible', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0F766E] focus:ring-[#0F766E]"
+                                />
+                                <span className="text-[#64748B]">ROT</span>
+                              </label>
+                              <label className="flex items-center gap-1 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_rut_eligible}
+                                  onChange={(e) => updateItem(item.id, 'is_rut_eligible', e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0F766E] focus:ring-[#0F766E]"
+                                />
+                                <span className="text-[#64748B]">RUT</span>
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
+
+              {/* Add row button */}
+              <div className="flex items-center gap-4 pt-2.5">
+                <button
+                  onClick={() => addItem('item')}
+                  className="flex items-center gap-2 text-[13px] text-[#0F766E] bg-transparent border-none cursor-pointer"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#0F766E" strokeWidth="1"/><path d="M8 5v6M5 8h6" stroke="#0F766E" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  Lägg till rad
+                </button>
+
+                {/* Advanced types dropdown */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowAdvancedTypes(!showAdvancedTypes)}
+                    className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
+                  >
+                    Fler alternativ ▾
+                  </button>
+                  {showAdvancedTypes && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowAdvancedTypes(false)} />
+                      <div className="absolute left-0 top-6 z-20 bg-white border-thin border-[#E2E8F0] rounded-lg shadow-lg w-44 overflow-hidden">
+                        <button onClick={() => { addItem('heading'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Rubrik</button>
+                        <button onClick={() => { addItem('text'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Fritext</button>
+                        <button onClick={() => { addItem('subtotal'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Delsumma</button>
+                        <button onClick={() => { addItem('discount'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Rabatt</button>
+                        <button onClick={() => { setShowGrossistSearch(true); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Sök grossist</button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
 
               {/* Quick add from price list */}
               {priceList.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <p className="text-sm text-gray-400 mb-2">Snabbval från prislista:</p>
+                <div className="mt-4 pt-4 border-t border-thin border-[#E2E8F0]">
+                  <p className="text-[12px] text-[#CBD5E1] mb-2">Snabbval från prislista:</p>
                   <div className="flex flex-wrap gap-2">
                     {priceList.slice(0, 8).map((item) => (
                       <button
                         key={item.id}
                         onClick={() => addFromPriceList(item)}
-                        className="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-200 hover:text-gray-900"
+                        className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#64748B] text-[12px] hover:border-[#0F766E] hover:text-[#0F766E] bg-transparent transition-colors"
                       >
                         {item.name}
                       </button>
@@ -1409,129 +1301,213 @@ export default function NewQuotePage() {
               )}
             </div>
 
-            {/* ── Payment Plan (collapsible) ──────────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+            {/* ── ROT-avdrag ────────────────────────────────────────── */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
+              <div
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => {
+                  // Toggle ROT: if any items are ROT-eligible, turn all off; otherwise turn labor items on
+                  if (hasRotItems) {
+                    setItems(prev => prev.map(item => ({ ...item, is_rot_eligible: false })))
+                  } else {
+                    setItems(prev => prev.map(item => ({
+                      ...item,
+                      is_rot_eligible: item.item_type === 'item' && item.unit === 'tim',
+                    })))
+                  }
+                }}
+              >
+                <span className="text-[13px] text-[#1E293B]">ROT-avdrag</span>
+                <div className={`w-9 h-5 rounded-full relative transition-colors ${hasRotItems ? 'bg-[#0F766E]' : 'bg-[#CBD5E1]'}`}>
+                  <div className={`absolute w-3.5 h-3.5 bg-white rounded-full top-[3px] transition-all ${hasRotItems ? 'left-[19px]' : 'left-[3px]'}`} />
+                </div>
+              </div>
+              {hasRotItems && (
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] text-[#64748B] mb-1">Personnummer</label>
+                    <input
+                      type="text"
+                      value={personnummer}
+                      onChange={(e) => setPersonnummer(e.target.value)}
+                      placeholder="YYYYMMDD-XXXX"
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[12px] text-[#64748B] mb-1">Fastighetsbeteckning</label>
+                    <input
+                      type="text"
+                      value={fastighetsbeteckning}
+                      onChange={(e) => setFastighetsbeteckning(e.target.value)}
+                      placeholder="T.ex. Stockholm Söder 1:23"
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                    />
+                  </div>
+                  <p className="text-[12px] text-[#0F766E] sm:col-span-2">
+                    Kunden betalar 70% — Skatteverket betalar resterande 30% direkt till dig.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Collapsible sections ─────────────────────────────── */}
+
+            {/* References */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
+              <button
+                type="button"
+                onClick={() => setShowStandardTexts(!showStandardTexts)}
+                className="w-full flex items-center justify-between px-7 py-4 text-left"
+              >
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Referenser och texter</span>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showStandardTexts ? 'rotate-180' : ''}`} />
+              </button>
+              {showStandardTexts && (
+                <div className="px-7 pb-6 space-y-4">
+                  {/* Reference fields */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[12px] text-[#64748B] mb-1">Er referens</label>
+                      <input
+                        type="text"
+                        value={referencePerson}
+                        onChange={(e) => setReferencePerson(e.target.value)}
+                        placeholder="Namn"
+                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] text-[#64748B] mb-1">Kundens referens</label>
+                      <input
+                        type="text"
+                        value={customerReference}
+                        onChange={(e) => setCustomerReference(e.target.value)}
+                        placeholder="Referensnummer"
+                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[12px] text-[#64748B] mb-1">Arbetsplatsadress</label>
+                      <input
+                        type="text"
+                        value={projectAddress}
+                        onChange={(e) => setProjectAddress(e.target.value)}
+                        placeholder="Adress"
+                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Standard texts */}
+                  <div className="border-t border-thin border-[#E2E8F0] pt-4 space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[12px] text-[#64748B]">Inledningstext</label>
+                        <StandardTextPicker texts={textsByType.introduction} onSelect={setIntroductionText} />
+                      </div>
+                      <textarea value={introductionText} onChange={(e) => setIntroductionText(e.target.value)} placeholder="Hälsningsfras och inledning..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[12px] text-[#64748B]">Avslutningstext</label>
+                        <StandardTextPicker texts={textsByType.conclusion} onSelect={setConclusionText} />
+                      </div>
+                      <textarea value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} placeholder="Avslutande text..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[12px] text-[#64748B]">Ej inkluderat</label>
+                        <StandardTextPicker texts={textsByType.not_included} onSelect={setNotIncluded} />
+                      </div>
+                      <textarea value={notIncluded} onChange={(e) => setNotIncluded(e.target.value)} placeholder="Vad ingår inte..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[12px] text-[#64748B]">ÄTA-villkor</label>
+                        <StandardTextPicker texts={textsByType.ata_terms} onSelect={setAtaTerms} />
+                      </div>
+                      <textarea value={ataTerms} onChange={(e) => setAtaTerms(e.target.value)} placeholder="Ändrings- och tilläggsarbeten..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[12px] text-[#64748B]">Betalningsvillkor</label>
+                        <StandardTextPicker texts={textsByType.payment_terms} onSelect={setPaymentTermsText} />
+                      </div>
+                      <textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} placeholder="Betalningsvillkor..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Payment Plan */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
               <button
                 type="button"
                 onClick={() => setShowPaymentPlan(!showPaymentPlan)}
-                className="w-full flex items-center justify-between p-4 sm:p-6 text-left"
+                className="w-full flex items-center justify-between px-7 py-4 text-left"
               >
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-sky-700" />
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">
                   Betalningsplan
-                  {paymentPlan.length > 0 && (
-                    <span className="text-xs font-normal text-gray-400">
-                      ({paymentPlan.length} delbetalning{paymentPlan.length > 1 ? 'ar' : ''})
-                    </span>
-                  )}
-                </h2>
-                {showPaymentPlan ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
+                  {paymentPlan.length > 0 && ` (${paymentPlan.length})`}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showPaymentPlan ? 'rotate-180' : ''}`} />
               </button>
               {showPaymentPlan && (
-                <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 pt-4">
+                <div className="px-7 pb-6">
                   {paymentPlan.length === 0 ? (
-                    <p className="text-sm text-gray-400 mb-3">
-                      Ingen betalningsplan. Lägg till delbetalningar nedan.
-                    </p>
+                    <p className="text-[12px] text-[#94A3B8] mb-3">Ingen betalningsplan. Lägg till delbetalningar nedan.</p>
                   ) : (
                     <div className="space-y-3 mb-4">
                       {calculatedPaymentPlan.map((entry, idx) => (
-                        <div
-                          key={idx}
-                          className="grid grid-cols-1 sm:grid-cols-[1fr_80px_100px_1fr_40px] gap-2 items-center bg-gray-50 rounded-lg p-3"
-                        >
-                          <input
-                            type="text"
-                            value={entry.label}
-                            onChange={(e) =>
-                              updatePaymentPlanEntry(idx, 'label', e.target.value)
-                            }
-                            placeholder="T.ex. Vid start"
-                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                          />
+                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_80px_100px_1fr_32px] gap-2 items-center bg-[#F8FAFC] rounded-lg p-3">
+                          <input type="text" value={entry.label} onChange={(e) => updatePaymentPlanEntry(idx, 'label', e.target.value)} placeholder="T.ex. Vid start" className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] bg-white focus:outline-none focus:border-[#0F766E]" />
                           <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              value={entry.percent}
-                              onChange={(e) =>
-                                updatePaymentPlanEntry(
-                                  idx,
-                                  'percent',
-                                  parseFloat(e.target.value) || 0
-                                )
-                              }
-                              className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                            />
-                            <span className="text-gray-400 text-sm">%</span>
+                            <input type="number" value={entry.percent} onChange={(e) => updatePaymentPlanEntry(idx, 'percent', parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] text-right bg-white focus:outline-none focus:border-[#0F766E]" />
+                            <span className="text-[#94A3B8] text-[13px]">%</span>
                           </div>
-                          <span className="text-sm text-gray-700 font-medium text-right">
-                            {formatCurrency(entry.amount)}
-                          </span>
-                          <input
-                            type="text"
-                            value={entry.due_description}
-                            onChange={(e) =>
-                              updatePaymentPlanEntry(idx, 'due_description', e.target.value)
-                            }
-                            placeholder="Förfallodatum/villkor"
-                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                          />
-                          <button
-                            onClick={() => removePaymentPlanEntry(idx)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 justify-self-center"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <span className="text-[13px] text-[#1E293B] font-medium text-right">{formatCurrency(entry.amount)}</span>
+                          <input type="text" value={entry.due_description} onChange={(e) => updatePaymentPlanEntry(idx, 'due_description', e.target.value)} placeholder="Förfallodatum/villkor" className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] bg-white focus:outline-none focus:border-[#0F766E]" />
+                          <button onClick={() => removePaymentPlanEntry(idx)} className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px]">×</button>
                         </div>
                       ))}
                       {!paymentPlanValid && (
-                        <p className="text-xs text-red-600">
-                          Procentsatserna summerar till{' '}
-                          {paymentPlan.reduce((s, e) => s + e.percent, 0).toFixed(0)}% (ska vara
-                          100%)
+                        <p className="text-[12px] text-red-500">
+                          Procentsatserna summerar till {paymentPlan.reduce((s, e) => s + e.percent, 0).toFixed(0)}% (ska vara 100%)
                         </p>
                       )}
                     </div>
                   )}
                   <button
                     onClick={addPaymentPlanEntry}
-                    className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm hover:bg-gray-200"
+                    className="flex items-center gap-2 text-[13px] text-[#0F766E] bg-transparent border-none cursor-pointer"
                   >
-                    <Plus className="w-4 h-4" /> Lägg till delbetalning
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#0F766E" strokeWidth="1"/><path d="M8 5v6M5 8h6" stroke="#0F766E" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                    Lägg till delbetalning
                   </button>
                 </div>
               )}
             </div>
 
-            {/* ── Display Settings (collapsible) ─────────────────────── */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+            {/* Display Settings */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
               <button
                 type="button"
                 onClick={() => setShowDisplaySettings(!showDisplaySettings)}
-                className="w-full flex items-center justify-between p-4 sm:p-6 text-left"
+                className="w-full flex items-center justify-between px-7 py-4 text-left"
               >
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-gray-500" />
-                  Visningsinställningar
-                </h2>
-                {showDisplaySettings ? (
-                  <ChevronUp className="w-5 h-5 text-gray-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                )}
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Visningsinställningar</span>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} />
               </button>
               {showDisplaySettings && (
-                <div className="px-4 sm:px-6 pb-4 sm:pb-6 border-t border-gray-100 pt-4 space-y-4">
+                <div className="px-7 pb-6 space-y-4">
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Detaljnivå</label>
+                    <label className="block text-[12px] text-[#64748B] mb-1">Detaljnivå</label>
                     <select
                       value={detailLevel}
                       onChange={(e) => setDetailLevel(e.target.value as DetailLevel)}
-                      className="w-full sm:w-64 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full sm:w-64 px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                     >
                       <option value="detailed">Detaljerad (alla rader)</option>
                       <option value="subtotals_only">Endast delsummor</option>
@@ -1540,36 +1516,12 @@ export default function NewQuotePage() {
                   </div>
                   <div className="flex flex-wrap gap-6">
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showUnitPrices}
-                        onChange={(e) => setShowUnitPrices(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
-                      />
-                      <span className="text-sm text-gray-700 flex items-center gap-1">
-                        {showUnitPrices ? (
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        ) : (
-                          <EyeOff className="w-4 h-4 text-gray-400" />
-                        )}
-                        Visa à-priser
-                      </span>
+                      <input type="checkbox" checked={showUnitPrices} onChange={(e) => setShowUnitPrices(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
+                      <span className="text-[13px] text-[#64748B]">Visa à-priser</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showQuantities}
-                        onChange={(e) => setShowQuantities(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
-                      />
-                      <span className="text-sm text-gray-700 flex items-center gap-1">
-                        {showQuantities ? (
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        ) : (
-                          <EyeOff className="w-4 h-4 text-gray-400" />
-                        )}
-                        Visa antal
-                      </span>
+                      <input type="checkbox" checked={showQuantities} onChange={(e) => setShowQuantities(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
+                      <span className="text-[13px] text-[#64748B]">Visa antal</span>
                     </label>
                   </div>
                 </div>
@@ -1578,169 +1530,113 @@ export default function NewQuotePage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* Sidebar (col-span-1) */}
+          {/* Sidebar */}
           {/* ══════════════════════════════════════════════════════════ */}
-          <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6 lg:sticky lg:top-4">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Calculator className="w-5 h-5 text-sky-700" />
-                Summering
-              </h2>
+          <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering</div>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Arbete</span>
-                  <span className="text-gray-900">{formatCurrency(totals.laborTotal)}</span>
+              <div className="space-y-1">
+                <div className="flex justify-between py-[5px] text-[13px]">
+                  <span className="text-[#64748B]">Arbete</span>
+                  <span className="text-[#64748B]">{formatCurrency(totals.laborTotal)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Material</span>
-                  <span className="text-gray-900">{formatCurrency(totals.materialTotal)}</span>
+                <div className="flex justify-between py-[5px] text-[13px]">
+                  <span className="text-[#64748B]">Material</span>
+                  <span className="text-[#64748B]">{formatCurrency(totals.materialTotal)}</span>
                 </div>
                 {totals.serviceTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Tjänster</span>
-                    <span className="text-gray-900">{formatCurrency(totals.serviceTotal)}</span>
+                  <div className="flex justify-between py-[5px] text-[13px]">
+                    <span className="text-[#64748B]">Tjänster</span>
+                    <span className="text-[#64748B]">{formatCurrency(totals.serviceTotal)}</span>
                   </div>
                 )}
-
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Summa</span>
-                    <span className="text-gray-900">{formatCurrency(totals.subtotal)}</span>
-                  </div>
+                <div className="flex justify-between py-[5px] text-[13px]">
+                  <span className="text-[#64748B]">Moms {vatRate}%</span>
+                  <span className="text-[#64748B]">{formatCurrency(totals.vat)}</span>
                 </div>
 
                 {/* Discount */}
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Rabatt</span>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      value={discountPercent}
-                      onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
-                      className="w-16 px-2 py-1 bg-gray-100 border border-gray-300 rounded text-gray-900 text-sm text-right"
-                      min={0}
-                      max={100}
-                    />
-                    <span className="text-gray-400">%</span>
-                  </div>
-                </div>
-                {totals.discountAmount > 0 && (
-                  <div className="flex justify-between text-emerald-600">
-                    <span>Rabatt</span>
-                    <span>-{formatCurrency(totals.discountAmount)}</span>
+                {discountPercent > 0 && totals.discountAmount > 0 && (
+                  <div className="flex justify-between py-[5px] text-[13px]">
+                    <span className="text-[#64748B]">Rabatt {discountPercent}%</span>
+                    <span className="text-[#64748B]">−{formatCurrency(totals.discountAmount)}</span>
                   </div>
                 )}
 
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Moms ({vatRate}%)</span>
-                  <span className="text-gray-900">{formatCurrency(totals.vat)}</span>
-                </div>
-
-                <div className="border-t border-gray-200 pt-3">
-                  <div className="flex justify-between text-lg font-semibold">
-                    <span className="text-gray-900">Totalt</span>
-                    <span className="text-gray-900">{formatCurrency(totals.total)}</span>
-                  </div>
-                </div>
-
-                {/* ── ROT/RUT breakdown ──────────────────────────────── */}
-                {(hasRotItems || hasRutItems) && (
-                  <div className="border-t border-gray-200 pt-3 space-y-3">
-                    {hasRotItems && totals.rotWorkCost > 0 && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-emerald-700">ROT-berättigat arbete</span>
-                          <span className="text-gray-900">
-                            {formatCurrency(totals.rotWorkCost)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-emerald-700">ROT-avdrag (30%)</span>
-                          <span className="text-emerald-600">
-                            -{formatCurrency(totals.rotDeduction)}
-                          </span>
-                        </div>
-                        <div className="border-t border-emerald-200 pt-2">
-                          <div className="flex justify-between font-semibold text-sm">
-                            <span className="text-gray-900">Kund betalar</span>
-                            <span className="text-emerald-600">
-                              {formatCurrency(totals.rotCustomerPays)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {hasRutItems && totals.rutWorkCost > 0 && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-emerald-700">RUT-berättigat arbete</span>
-                          <span className="text-gray-900">
-                            {formatCurrency(totals.rutWorkCost)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-emerald-700">RUT-avdrag (50%)</span>
-                          <span className="text-emerald-600">
-                            -{formatCurrency(totals.rutDeduction)}
-                          </span>
-                        </div>
-                        <div className="border-t border-emerald-200 pt-2">
-                          <div className="flex justify-between font-semibold text-sm">
-                            <span className="text-gray-900">Kund betalar</span>
-                            <span className="text-emerald-600">
-                              {formatCurrency(totals.rutCustomerPays)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Personnummer / fastighetsbeteckning */}
-                    <div className="space-y-3 mt-2">
-                      <div>
-                        <label className="block text-xs text-gray-500 mb-1">
-                          Personnummer *
-                        </label>
-                        <input
-                          type="text"
-                          value={personnummer}
-                          onChange={(e) => setPersonnummer(e.target.value)}
-                          placeholder="YYYYMMDD-XXXX"
-                          className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                        />
-                      </div>
-                      {hasRotItems && (
-                        <div>
-                          <label className="block text-xs text-gray-500 mb-1">
-                            Fastighetsbeteckning *
-                          </label>
-                          <input
-                            type="text"
-                            value={fastighetsbeteckning}
-                            onChange={(e) => setFastighetsbeteckning(e.target.value)}
-                            placeholder="T.ex. Stockholm Söder 1:23"
-                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                          />
-                        </div>
-                      )}
-                      {!personnummer && (
-                        <p className="text-xs text-amber-600">
-                          Personnummer krävs för{' '}
-                          {hasRotItems && hasRutItems
-                            ? 'ROT/RUT'
-                            : hasRotItems
-                              ? 'ROT'
-                              : 'RUT'}
-                          -avdrag
-                        </p>
-                      )}
-                    </div>
+                {/* ROT line */}
+                {hasRotItems && totals.rotDeduction > 0 && (
+                  <div className="flex justify-between py-[5px] text-[13px] text-[#0F766E]">
+                    <span>ROT-avdrag 30%</span>
+                    <span>−{formatCurrency(totals.rotDeduction)}</span>
                   </div>
                 )}
+
+                {/* RUT line */}
+                {hasRutItems && totals.rutDeduction > 0 && (
+                  <div className="flex justify-between py-[5px] text-[13px] text-[#0F766E]">
+                    <span>RUT-avdrag 50%</span>
+                    <span>−{formatCurrency(totals.rutDeduction)}</span>
+                  </div>
+                )}
+
+                {/* Total */}
+                <div className="flex justify-between border-t border-thin border-[#E2E8F0] mt-2 pt-3 text-[15px] font-medium text-[#1E293B]">
+                  <span>Totalt</span>
+                  <span>{formatCurrency(totals.total)}</span>
+                </div>
+              </div>
+
+              {/* Kund betalar box */}
+              {(hasRotItems || hasRutItems) && (totals.rotDeduction > 0 || totals.rutDeduction > 0) && (
+                <div className="bg-[#CCFBF1] rounded-lg px-4 py-3.5 mt-3 flex justify-between items-center">
+                  <span className="text-[12px] text-[#0F766E]">Kund betalar</span>
+                  <span className="text-[20px] font-medium text-[#0F766E]">
+                    {formatCurrency(hasRotItems ? totals.rotCustomerPays : totals.rutCustomerPays)}
+                  </span>
+                </div>
+              )}
+
+              {/* Discount input (small) */}
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-thin border-[#E2E8F0]">
+                <span className="text-[12px] text-[#94A3B8]">Rabatt</span>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    value={discountPercent}
+                    onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
+                    className="w-14 px-2 py-1 border-thin border-[#E2E8F0] rounded text-[#1E293B] text-[13px] text-right bg-white focus:outline-none focus:border-[#0F766E]"
+                    min={0}
+                    max={100}
+                  />
+                  <span className="text-[#94A3B8] text-[13px]">%</span>
+                </div>
               </div>
             </div>
+
+            {/* Action buttons */}
+            <button
+              onClick={() => saveQuote(true)}
+              disabled={saving || !selectedCustomer}
+              className="w-full py-3 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
+            >
+              {saving ? 'Sparar...' : 'Skicka offert'}
+            </button>
+            <button
+              onClick={() => saveQuote(false)}
+              disabled={saving}
+              className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC] disabled:opacity-50"
+            >
+              Spara utkast
+            </button>
+            {items.length > 0 && (
+              <button
+                onClick={() => { setTemplateName(title); setShowSaveTemplateModal(true) }}
+                className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
+              >
+                Spara som mall
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1758,42 +1654,38 @@ export default function NewQuotePage() {
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
           onClick={() => setShowSaveTemplateModal(false)}
         >
           <div
-            className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6"
+            className="bg-white border-thin border-[#E2E8F0] rounded-xl w-full max-w-md px-8 py-7"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Spara som mall</h3>
-            <div className="mb-4">
-              <label className="block text-sm text-gray-500 mb-1">Mallnamn</label>
+            <h3 className="text-[16px] font-medium text-[#1E293B] mb-5">Spara som mall</h3>
+            <div className="mb-5">
+              <label className="block text-[12px] text-[#64748B] mb-1">Mallnamn</label>
               <input
                 type="text"
                 value={templateName}
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
               />
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-2">
               <button
                 onClick={() => setShowSaveTemplateModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                className="px-4 py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer"
               >
                 Avbryt
               </button>
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 py-2.5 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
               >
-                {savingTemplate ? (
-                  <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                ) : (
-                  'Spara'
-                )}
+                {savingTemplate ? 'Sparar...' : 'Spara'}
               </button>
             </div>
           </div>
@@ -1803,283 +1695,3 @@ export default function NewQuotePage() {
   )
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// ItemRow – extracted for readability
-// ═══════════════════════════════════════════════════════════════════════════════
-
-function ItemRow({
-  item,
-  index,
-  total: itemCount,
-  recalculatedTotal,
-  onUpdate,
-  onRemove,
-  onMove,
-}: {
-  item: QuoteItem
-  index: number
-  total: number
-  recalculatedTotal: number
-  onUpdate: (id: string, field: keyof QuoteItem, value: any) => void
-  onRemove: (id: string) => void
-  onMove: (index: number, direction: 'up' | 'down') => void
-}) {
-  const badge = ITEM_TYPE_BADGE[item.item_type]
-  const rowStyle = ITEM_TYPE_STYLES[item.item_type]
-  const isEditable = item.item_type === 'item' || item.item_type === 'discount'
-  const showTotal = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'subtotal'
-  const displayTotal =
-    item.item_type === 'subtotal' ? recalculatedTotal : item.item_type === 'discount' ? item.total : item.total
-
-  return (
-    <div className={`rounded-xl p-3 ${rowStyle} border border-gray-200`}>
-      {/* ── Mobile layout ──────────────────────────────────────── */}
-      <div className="md:hidden space-y-2">
-        <div className="flex items-center gap-2">
-          <div className="flex flex-col gap-0.5">
-            <button
-              onClick={() => onMove(index, 'up')}
-              disabled={index === 0}
-              className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-            >
-              <ArrowUp className="w-3 h-3" />
-            </button>
-            <button
-              onClick={() => onMove(index, 'down')}
-              disabled={index === itemCount - 1}
-              className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-            >
-              <ArrowDown className="w-3 h-3" />
-            </button>
-          </div>
-          <span className={`px-2 py-0.5 text-[10px] rounded font-medium ${badge.cls}`}>
-            {badge.label}
-          </span>
-          <input
-            type="text"
-            value={item.description}
-            onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
-            placeholder={
-              item.item_type === 'heading'
-                ? 'Rubriktext'
-                : item.item_type === 'text'
-                  ? 'Fritext...'
-                  : 'Beskrivning'
-            }
-            className={`flex-1 px-3 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 min-w-0 ${
-              item.item_type === 'heading' ? 'font-bold' : ''
-            } ${item.item_type === 'text' ? 'italic' : ''}`}
-          />
-          <button
-            onClick={() => onRemove(item.id)}
-            className="p-1.5 text-gray-400 hover:text-red-600"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-        {isEditable && (
-          <div className="flex items-center gap-2 pl-8">
-            <input
-              type="number"
-              value={item.quantity}
-              onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-              className="w-16 px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              min={0}
-              step="any"
-            />
-            <select
-              value={item.unit}
-              onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-              className="w-20 px-1 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            >
-              {UNIT_OPTIONS.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              value={item.unit_price}
-              onChange={(e) =>
-                onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)
-              }
-              className="w-24 px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              min={0}
-              step="any"
-            />
-            <span className="text-gray-900 font-medium text-sm flex-1 text-right whitespace-nowrap">
-              {formatCurrency(displayTotal)}
-            </span>
-          </div>
-        )}
-        {isEditable && (
-          <div className="flex items-center gap-3 pl-8 text-xs">
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.is_rot_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rot_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-gray-600">ROT</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.is_rut_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rut_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-gray-600">RUT</span>
-            </label>
-          </div>
-        )}
-        {showTotal && !isEditable && (
-          <div className="flex justify-end pr-8">
-            <span className="text-gray-900 font-medium text-sm">
-              {formatCurrency(displayTotal)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* ── Desktop layout ─────────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_60px_40px] gap-2 items-center">
-        {/* Move arrows */}
-        <div className="flex flex-col gap-0.5 items-center">
-          <button
-            onClick={() => onMove(index, 'up')}
-            disabled={index === 0}
-            className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-          >
-            <ArrowUp className="w-3 h-3" />
-          </button>
-          <button
-            onClick={() => onMove(index, 'down')}
-            disabled={index === itemCount - 1}
-            className="p-0.5 text-gray-400 hover:text-gray-700 disabled:opacity-30"
-          >
-            <ArrowDown className="w-3 h-3" />
-          </button>
-        </div>
-
-        {/* Type badge */}
-        <span className={`px-2 py-0.5 text-[10px] rounded font-medium text-center ${badge.cls}`}>
-          {badge.label}
-        </span>
-
-        {/* Description */}
-        <input
-          type="text"
-          value={item.description}
-          onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
-          placeholder={
-            item.item_type === 'heading'
-              ? 'Rubriktext'
-              : item.item_type === 'text'
-                ? 'Fritext...'
-                : item.item_type === 'subtotal'
-                  ? 'Delsumma'
-                  : 'Beskrivning'
-          }
-          className={`w-full px-3 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${
-            item.item_type === 'heading' ? 'font-bold' : ''
-          } ${item.item_type === 'text' ? 'italic' : ''}`}
-        />
-
-        {/* Quantity */}
-        {isEditable ? (
-          <input
-            type="number"
-            value={item.quantity}
-            onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-            className="w-full px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            min={0}
-            step="any"
-          />
-        ) : (
-          <span />
-        )}
-
-        {/* Unit */}
-        {isEditable ? (
-          <select
-            value={item.unit}
-            onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-            className="w-full px-1 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-          >
-            {UNIT_OPTIONS.map((u) => (
-              <option key={u.value} value={u.value}>
-                {u.label}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <span />
-        )}
-
-        {/* Unit price */}
-        {isEditable ? (
-          <input
-            type="number"
-            value={item.unit_price}
-            onChange={(e) =>
-              onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)
-            }
-            className="w-full px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            min={0}
-            step="any"
-          />
-        ) : (
-          <span />
-        )}
-
-        {/* Total */}
-        <span className="text-gray-900 font-medium text-sm text-right whitespace-nowrap">
-          {showTotal ? formatCurrency(displayTotal) : ''}
-        </span>
-
-        {/* ROT/RUT checkboxes */}
-        {isEditable ? (
-          <div className="flex items-center gap-1 justify-center">
-            <label
-              className="cursor-pointer"
-              title="ROT-berättigat"
-            >
-              <input
-                type="checkbox"
-                checked={item.is_rot_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rot_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="sr-only">ROT</span>
-            </label>
-            <label
-              className="cursor-pointer"
-              title="RUT-berättigat"
-            >
-              <input
-                type="checkbox"
-                checked={item.is_rut_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rut_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="sr-only">RUT</span>
-            </label>
-          </div>
-        ) : (
-          <span />
-        )}
-
-        {/* Delete */}
-        <button
-          onClick={() => onRemove(item.id)}
-          className="p-1.5 text-gray-400 hover:text-red-600 justify-self-center"
-        >
-          <Trash2 className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  )
-}

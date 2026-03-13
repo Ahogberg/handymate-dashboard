@@ -36,11 +36,11 @@ export async function GET(request: NextRequest) {
     query,
     supabase
       .from('leads')
-      .select('status, estimated_value, score, created_at, converted_at')
+      .select('status, pipeline_stage_key, estimated_value, score, created_at, converted_at')
       .eq('business_id', businessId),
   ])
 
-  // Calculate pipeline stats
+  // Calculate pipeline stats — use pipeline_stage_key (V4) with status fallback
   const allLeads = statsRes.data || []
   const statusCounts: Record<string, number> = {}
   const statusValues: Record<string, number> = {}
@@ -50,9 +50,10 @@ export async function GET(request: NextRequest) {
   let conversionCount = 0
 
   for (const l of allLeads) {
-    statusCounts[l.status] = (statusCounts[l.status] || 0) + 1
-    statusValues[l.status] = (statusValues[l.status] || 0) + (l.estimated_value || 0)
-    if (l.status === 'won') {
+    const stageKey = l.pipeline_stage_key || l.status || 'new_lead'
+    statusCounts[stageKey] = (statusCounts[stageKey] || 0) + 1
+    statusValues[stageKey] = (statusValues[stageKey] || 0) + (l.estimated_value || 0)
+    if (stageKey === 'completed' || l.status === 'won') {
       wonCount++
       if (l.converted_at && l.created_at) {
         totalConversionTime += new Date(l.converted_at).getTime() - new Date(l.created_at).getTime()
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     : 0
 
   const totalPipelineValue = Object.entries(statusValues)
-    .filter(([s]) => !['won', 'lost'].includes(s))
+    .filter(([s]) => !['completed', 'lost', 'won'].includes(s))
     .reduce((sum, [, v]) => sum + v, 0)
 
   return NextResponse.json({
@@ -97,7 +98,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Missing lead_id' }, { status: 400 })
   }
 
-  const allowedFields = ['status', 'notes', 'urgency', 'assigned_to', 'lost_reason', 'customer_id']
+  const allowedFields = ['status', 'pipeline_stage_key', 'notes', 'urgency', 'assigned_to', 'lost_reason', 'customer_id']
   const safeUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
   for (const key of allowedFields) {
     if (key in updates) {

@@ -45,6 +45,7 @@ interface Customer {
   apartment_count?: number | null
   personal_number?: string | null
   property_designation?: string | null
+  customer_number?: string | null
 }
 
 interface CustomerTag {
@@ -863,7 +864,7 @@ export default function CustomersPage() {
                             <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
                           )}
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-400">Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
+                        <p className="text-xs sm:text-sm text-gray-400">{customer.customer_number && <span className="text-gray-500 font-medium">{customer.customer_number} · </span>}Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
                       </div>
                     </div>
                     <div className="flex space-x-1">

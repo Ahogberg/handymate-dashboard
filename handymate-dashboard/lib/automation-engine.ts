@@ -342,6 +342,46 @@ async function handleUpdateStatus(
   config: Record<string, unknown>,
   context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  const stageKey = config.stage_key as string | undefined
+
+  // V4 Pipeline: om stage_key finns, flytta lead i pipeline_stages
+  if (stageKey) {
+    const leadId = (context.lead_id as string) || (context.entity_id as string)
+    if (!leadId) {
+      return { success: false, error: 'lead_id saknas i kontext för pipeline-flytt' }
+    }
+
+    try {
+      const { moveLeadToStage } = await import('@/lib/pipeline-stages')
+      const result = await moveLeadToStage({
+        businessId,
+        leadId,
+        toStageKey: stageKey,
+        triggeredBy: 'automation',
+      })
+
+      if (!result.moved) {
+        return { success: false, error: result.reason || 'Pipeline-flytt misslyckades' }
+      }
+
+      // Logga övergången i automation_logs context
+      return {
+        success: true,
+        data: {
+          entity: 'lead',
+          entity_id: leadId,
+          from_stage: result.from_stage,
+          to_stage: result.to_stage,
+          pipeline_move: true,
+        },
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Pipeline-flytt kraschade'
+      return { success: false, error: msg }
+    }
+  }
+
+  // Fallback: vanlig status-uppdatering (legacy)
   const entity = (config.entity as string) || (context.entity as string)
   const entityId = (context.entity_id as string) || (config.entity_id as string)
   const newStatus = (config.new_status as string) || ''

@@ -60,6 +60,7 @@ interface Customer {
   visit_address?: string
   reference?: string
   apartment_count?: number
+  customer_number?: string
 }
 
 interface CustomerDocument {
@@ -486,7 +487,7 @@ export default function CustomerDetailPage() {
                 <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
               )}
             </div>
-            <p className="text-sm text-gray-500">Kund sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
+            <p className="text-sm text-gray-500">{customer.customer_number && <span className="font-medium text-gray-600">{customer.customer_number} · </span>}Kund sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
           </div>
           <button
             onClick={startEditing}

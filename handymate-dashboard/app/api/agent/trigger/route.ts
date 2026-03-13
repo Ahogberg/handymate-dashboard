@@ -199,6 +199,32 @@ export async function POST(request: NextRequest) {
       .eq('business_id', businessId)
       .maybeSingle()
 
+    // V4: Look up pipeline context if a lead_id is in trigger_data
+    let leadPipelineContext: { lead_id: string; pipeline_stage_key: string; pipeline_stage_label: string } | null = null
+    if (trigger_data?.lead_id) {
+      try {
+        const { data: lead } = await supabase
+          .from('leads')
+          .select('lead_id, pipeline_stage_key')
+          .eq('lead_id', trigger_data.lead_id as string)
+          .eq('business_id', businessId)
+          .maybeSingle()
+        if (lead?.pipeline_stage_key) {
+          const { data: stage } = await supabase
+            .from('pipeline_stages')
+            .select('label')
+            .eq('business_id', businessId)
+            .eq('key', lead.pipeline_stage_key)
+            .maybeSingle()
+          leadPipelineContext = {
+            lead_id: lead.lead_id,
+            pipeline_stage_key: lead.pipeline_stage_key,
+            pipeline_stage_label: stage?.label || lead.pipeline_stage_key,
+          }
+        }
+      } catch { /* non-blocking */ }
+    }
+
     const systemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
@@ -208,6 +234,7 @@ export async function POST(request: NextRequest) {
         gmail_send_enabled: !!googleConnection?.gmail_send_scope_granted && !!googleConnection?.gmail_sync_enabled,
         preferences,
         automationSettings: v3Settings || null,
+        leadPipelineContext,
       },
       trigger_type,
       trigger_data

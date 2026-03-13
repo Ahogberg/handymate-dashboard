@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getNextCustomerNumber } from '@/lib/numbering'
 
 /**
  * POST /api/customers/import
@@ -75,6 +76,7 @@ export async function POST(request: NextRequest) {
 
         // Create new customer
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
+        const customerNumber = await getNextCustomerNumber(supabase, auth.business_id)
         const { error } = await supabase
           .from('customer')
           .insert({
@@ -84,6 +86,7 @@ export async function POST(request: NextRequest) {
             phone_number: phone || null,
             email: email || null,
             address_line: address || null,
+            customer_number: customerNumber,
           })
 
         if (error) {

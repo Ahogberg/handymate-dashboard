@@ -2,32 +2,22 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import {
-  Clock,
-  Plus,
-  Calendar,
-  User,
-  Trash2,
-  Edit2,
-  X,
-  Check,
   Loader2,
-  DollarSign,
   ChevronLeft,
   ChevronRight,
-  List,
-  LayoutGrid,
-  FileText,
-  Filter,
-  CheckSquare,
+  Edit2,
+  Trash2,
+  Check,
+  X,
   MapPin,
   Download,
-  Users
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
 import TimerWidget from '@/components/time/TimerWidget'
+import TimeEntryModal from '@/components/time/TimeEntryModal'
 import TravelSection from '@/components/time/TravelSection'
 import {
   format,
@@ -607,614 +597,283 @@ export default function TimePage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-sky-700" />
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#0F766E]" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
-      </div>
-
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border-thin text-[13px] ${
+          toast.type === 'success' ? 'bg-[#CCFBF1] border-[#0F766E] text-[#0F766E]' : 'bg-red-50 border-red-300 text-red-600'
         }`}>
           {toast.message}
         </div>
       )}
 
       {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingEntry ? 'Redigera tidpost' : 'Registrera tid'}
-              </h3>
-              <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-900">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <TimeEntryModal
+        show={showModal}
+        onClose={() => setShowModal(false)}
+        editing={!!editingEntry}
+        formData={formData}
+        setFormData={setFormData}
+        customers={customers}
+        bookings={bookings}
+        projects={projects}
+        workTypes={workTypes}
+        teamMembers={teamMembers}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        formPersonId={formPersonId}
+        setFormPersonId={setFormPersonId}
+        currentUserId={currentUser?.id}
+        saving={saving}
+        onSave={handleSave}
+        onBookingChange={handleBookingChange}
+        onWorkTypeChange={handleWorkTypeChange}
+      />
 
-            <div className="space-y-4">
-              {/* Registrera för (admin/owner only) */}
-              {isOwnerOrAdmin && teamMembers.length > 1 && (
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Registrera för</label>
-                  <select
-                    value={formPersonId}
-                    onChange={e => setFormPersonId(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  >
-                    {teamMembers.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}{m.id === currentUser?.id ? ' (dig)' : ''}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+        <div>
+          <h1 className="text-[18px] font-medium text-[#1E293B]">Tidrapportering</h1>
+          <p className="text-[13px] text-[#94A3B8] mt-[2px]">Logga och hantera arbetstid</p>
+        </div>
 
-              {/* Arbetstyp (kategori) */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Arbetstyp</label>
-                <div className="flex gap-1.5">
-                  {[
-                    { value: 'work', label: 'Arbete', icon: '🔨' },
-                    { value: 'travel', label: 'Restid', icon: '🚗' },
-                    { value: 'material_pickup', label: 'Material', icon: '📦' },
-                    { value: 'meeting', label: 'Möte', icon: '👥' },
-                    { value: 'admin', label: 'Admin', icon: '📋' },
-                  ].map(cat => (
-                    <button key={cat.value}
-                      onClick={() => setFormData({ ...formData, work_category: cat.value, is_billable: cat.value === 'work' })}
-                      className={`flex-1 py-2.5 text-xs rounded-xl border text-center transition-colors ${
-                        formData.work_category === cat.value
-                          ? 'bg-teal-50 border-teal-300 text-teal-700 font-medium'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
-                      }`}>
-                      <span className="text-lg block">{cat.icon}</span>
-                      <span className="block mt-0.5">{cat.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Person filter for admin/owner */}
+          {isOwnerOrAdmin && teamMembers.length > 1 && (
+            <select
+              value={filterPerson}
+              onChange={e => setFilterPerson(e.target.value)}
+              className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]"
+            >
+              <option value="">Alla i teamet</option>
+              {teamMembers.map(m => (
+                <option key={m.id} value={m.id}>{m.name}</option>
+              ))}
+            </select>
+          )}
 
-              {/* Datum + Start/Slut */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Datum</label>
-                  <input
-                    type="date"
-                    value={formData.work_date}
-                    onChange={e => setFormData({ ...formData, work_date: e.target.value })}
-                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Start</label>
-                  <input
-                    type="time"
-                    value={formData.start_time}
-                    onChange={e => {
-                      const st = e.target.value
-                      setFormData(prev => {
-                        const updated = { ...prev, start_time: st }
-                        if (st && prev.end_time) {
-                          const [sh, sm] = st.split(':').map(Number)
-                          const [eh, em] = prev.end_time.split(':').map(Number)
-                          const diff = (eh * 60 + em) - (sh * 60 + sm)
-                          if (diff > 0) {
-                            updated.duration_hours = Math.floor(diff / 60)
-                            updated.duration_minutes = diff % 60
-                          }
-                        }
-                        return updated
-                      })
-                    }}
-                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Slut</label>
-                  <input
-                    type="time"
-                    value={formData.end_time}
-                    onChange={e => {
-                      const et = e.target.value
-                      setFormData(prev => {
-                        const updated = { ...prev, end_time: et }
-                        if (prev.start_time && et) {
-                          const [sh, sm] = prev.start_time.split(':').map(Number)
-                          const [eh, em] = et.split(':').map(Number)
-                          const diff = (eh * 60 + em) - (sh * 60 + sm)
-                          if (diff > 0) {
-                            updated.duration_hours = Math.floor(diff / 60)
-                            updated.duration_minutes = diff % 60
-                          }
-                        }
-                        return updated
-                      })
-                    }}
-                    className="w-full px-3 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 text-sm"
-                  />
-                </div>
-              </div>
+          <Link href="/dashboard/time/weekly"
+            className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]">
+            Veckorapport
+          </Link>
 
-              {/* Duration */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Tid (eller ange manuellt)</label>
-                <div className="flex gap-3">
-                  <div className="flex-1 relative">
-                    <input type="number" min="0" value={formData.duration_hours}
-                      onChange={e => setFormData({ ...formData, duration_hours: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">tim</span>
-                  </div>
-                  <div className="flex-1 relative">
-                    <input type="number" min="0" max="59" value={formData.duration_minutes}
-                      onChange={e => setFormData({ ...formData, duration_minutes: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">min</span>
-                  </div>
-                </div>
-                {/* Quick presets */}
-                <div className="flex gap-2 mt-2">
-                  {[60, 120, 240, 480].map(mins => (
-                    <button key={mins} onClick={() => setFormData({ ...formData, duration_hours: Math.floor(mins / 60), duration_minutes: mins % 60 })}
-                      className="px-3 py-1 text-xs bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900 hover:border-teal-300">
-                      {mins / 60}h
-                    </button>
-                  ))}
-                </div>
-              </div>
+          <a
+            href={`/api/time-entry/report?startDate=${format(weekStart, 'yyyy-MM-dd')}&endDate=${format(weekEnd, 'yyyy-MM-dd')}&format=csv&groupBy=day`}
+            className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]"
+          >
+            CSV
+          </a>
 
-              {/* Rast */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Rast/lunch (min)</label>
-                <div className="flex gap-2 items-center">
-                  <div className="flex-1 relative">
-                    <input type="number" min="0" max="180" value={formData.break_minutes}
-                      onChange={e => setFormData({ ...formData, break_minutes: parseInt(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">min</span>
-                  </div>
-                  <div className="flex gap-1">
-                    {[0, 30, 45, 60].map(mins => (
-                      <button key={mins} onClick={() => setFormData({ ...formData, break_minutes: mins })}
-                        className={`px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
-                          formData.break_minutes === mins
-                            ? 'bg-teal-100 border-teal-300 text-sky-700'
-                            : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
-                        }`}>
-                        {mins === 0 ? 'Ingen' : `${mins}m`}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+          <Link href="/dashboard/time/payroll"
+            className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]">
+            Löneunderlag
+          </Link>
 
-              {/* Beräkningssammanfattning */}
-              {(() => {
-                const gross = formData.duration_hours * 60 + formData.duration_minutes
-                const net = Math.max(0, gross - formData.break_minutes)
-                const overtime = Math.max(0, net - 8 * 60)
-                const rate = formData.hourly_rate ? parseFloat(formData.hourly_rate) : 0
-                const amount = (net / 60) * rate
-                if (gross <= 0) return null
-                return (
-                  <div className="bg-teal-50 border border-teal-200 rounded-xl p-3">
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <p className="text-xs text-gray-500">Total tid</p>
-                        <p className="text-sm font-bold text-gray-900">{Math.floor(gross / 60)}h {gross % 60}m</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">Debiterad</p>
-                        <p className="text-sm font-bold text-gray-900">{Math.floor(net / 60)}h {net % 60}m</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500">{rate > 0 ? 'Summa' : 'Övertid'}</p>
-                        <p className={`text-sm font-bold ${overtime > 0 ? 'text-orange-600' : 'text-gray-900'}`}>
-                          {rate > 0 ? `${Math.round(amount).toLocaleString('sv-SE')} kr` : overtime > 0 ? `${Math.floor(overtime / 60)}h ${overtime % 60}m` : '–'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })()}
+          <button onClick={() => openAddModal()}
+            className="px-4 py-[8px] bg-[#0F766E] text-white border-none rounded-lg text-[13px] font-medium cursor-pointer hover:bg-[#0F766E]/90">
+            + Lägg till
+          </button>
+        </div>
+      </div>
 
-              {/* Kund */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Kund</label>
-                <select value={formData.customer_id}
-                  onChange={e => setFormData({ ...formData, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
-                  <option value="">Välj kund...</option>
-                  {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
-                </select>
-              </div>
+      {/* Stämpelklocka — inline card */}
+      <TimerWidget onCheckInOut={handleTimerCheckInOut} />
 
-              {/* Bokning */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Bokning</label>
-                <select value={formData.booking_id}
-                  onChange={e => handleBookingChange(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
-                  <option value="">Välj bokning...</option>
-                  {bookings.map(b => (
-                    <option key={b.booking_id} value={b.booking_id}>
-                      {b.customer?.name || 'Okänd'} - {b.notes?.substring(0, 30) || 'Ingen beskrivning'}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      {/* Metrics — gray cards, no icons */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
+          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Vecka totalt</div>
+          <div className="text-[20px] font-medium text-[#1E293B]">{fmtDuration(stats.totalMinutesWeek)}</div>
+        </div>
+        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
+          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Fakturerbart</div>
+          <div className="text-[20px] font-medium text-[#0F766E]">{fmtDuration(stats.billableMinutesWeek)}</div>
+        </div>
+        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
+          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Ofakturerat</div>
+          <div className="text-[20px] font-medium text-[#1E293B]">{Math.round(stats.uninvoicedRevenue).toLocaleString('sv-SE')} kr</div>
+        </div>
+        <div className="bg-[#F1F5F9] rounded-lg px-4 py-[14px]">
+          <div className="text-[10px] tracking-[0.08em] uppercase text-[#94A3B8] mb-[6px]">Månad totalt</div>
+          <div className="text-[20px] font-medium text-[#1E293B]">{fmtDuration(stats.totalMinutesMonth)}</div>
+        </div>
+      </div>
 
-              {/* Projekt */}
-              {projects.length > 0 && (
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Projekt</label>
-                  <select value={formData.project_id}
-                    onChange={e => setFormData({ ...formData, project_id: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
-                    <option value="">Inget projekt</option>
-                    {projects.map(p => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {/* Arbetstyp */}
-              {workTypes.length > 0 && (
-                <div>
-                  <label className="block text-sm text-gray-500 mb-2">Arbetstyp</label>
-                  <select value={formData.work_type_id}
-                    onChange={e => handleWorkTypeChange(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
-                    <option value="">Normal</option>
-                    {workTypes.map(wt => (
-                      <option key={wt.work_type_id} value={wt.work_type_id}>
-                        {wt.name} ({wt.multiplier}x)
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {/* Beskrivning */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Beskrivning</label>
-                <textarea value={formData.description}
-                  onChange={e => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Vad har du gjort?" rows={3}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none" />
-              </div>
-
-              {/* Timpris */}
-              <div>
-                <label className="block text-sm text-gray-500 mb-2">Timpris</label>
-                <div className="relative">
-                  <input type="number" min="0" value={formData.hourly_rate}
-                    onChange={e => setFormData({ ...formData, hourly_rate: e.target.value })}
-                    placeholder="Standard"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">kr/tim</span>
-                </div>
-              </div>
-
-              {/* Fakturerbar */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-gray-900">Fakturerbar tid</span>
-                <button type="button" onClick={() => setFormData({ ...formData, is_billable: !formData.is_billable })}
-                  className={`w-12 h-6 rounded-full transition-all ${formData.is_billable ? 'bg-teal-600' : 'bg-gray-200'}`}>
-                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${formData.is_billable ? 'translate-x-6' : 'translate-x-0.5'}`} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">Avbryt</button>
-              <button onClick={handleSave} disabled={saving}
-                className="flex items-center px-6 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50">
-                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                {editingEntry ? 'Spara' : 'Registrera'}
-              </button>
-            </div>
+      {/* Övertidsindikator */}
+      {weekOvertime && weekOvertime.total_overtime_minutes > 0 && (
+        <div className="bg-orange-50 border-thin border-orange-200 rounded-lg px-4 py-3 mb-6 flex items-center justify-between">
+          <div>
+            <span className="text-[13px] font-medium text-orange-700">Övertid vecka {weekOvertime.week_number}</span>
+            <span className="text-[12px] text-orange-600 ml-2">
+              {weekOvertime.daily_overtime_minutes > 0 && `Daglig: ${formatMinutes(weekOvertime.daily_overtime_minutes)}`}
+              {weekOvertime.daily_overtime_minutes > 0 && weekOvertime.weekly_overtime_minutes > 0 && ' · '}
+              {weekOvertime.weekly_overtime_minutes > 0 && `Vecko: ${formatMinutes(weekOvertime.weekly_overtime_minutes)}`}
+            </span>
           </div>
+          <span className="text-[16px] font-medium text-orange-700">{formatMinutes(weekOvertime.total_overtime_minutes)}</span>
         </div>
       )}
 
-      <div className="relative">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
-          <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-teal-600 mr-4">
-              <Clock className="w-6 h-6 text-gray-900" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Tidrapportering</h1>
-              <p className="text-gray-500 text-sm">Logga och hantera arbetstid</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Person filter for admin/owner */}
-            {isOwnerOrAdmin && teamMembers.length > 1 && (
-              <select
-                value={filterPerson}
-                onChange={e => setFilterPerson(e.target.value)}
-                className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              >
-                <option value="">Alla i teamet</option>
-                {teamMembers.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            )}
-
-            <Link href="/dashboard/time/weekly"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-teal-300 text-sm">
-              <Users className="w-4 h-4" />
-              <span className="hidden sm:inline">Veckorapport</span>
-            </Link>
-
-            <Link href="/dashboard/time/projects"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-teal-300 text-sm">
-              <LayoutGrid className="w-4 h-4" />
-              <span className="hidden sm:inline">Projekt</span>
-            </Link>
-
-            <Link href="/dashboard/time/payroll"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-teal-300 text-sm">
-              <DollarSign className="w-4 h-4" />
-              <span className="hidden sm:inline">Löneunderlag</span>
-            </Link>
-
-            <Link href="/dashboard/time/approve"
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-700 hover:border-teal-300 text-sm">
-              <CheckSquare className="w-4 h-4" />
-              <span className="hidden sm:inline">Godkänn</span>
-            </Link>
-
-            <button onClick={() => openAddModal()}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90">
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Lägg till</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile quick presets */}
-        <div className="sm:hidden flex gap-2 mb-4">
-          {[{ label: '1h', mins: 60 }, { label: '2h', mins: 120 }, { label: '4h', mins: 240 }, { label: '8h', mins: 480 }].map(p => (
-            <button key={p.label} onClick={() => quickAdd(p.mins)}
-              className="flex-1 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 font-medium text-center hover:border-teal-300">
-              + {p.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-teal-600"><Clock className="w-4 h-4 text-gray-900" /></div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.totalMinutesWeek)}</p>
-            <p className="text-xs text-gray-400">Total tid vecka</p>
-          </div>
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-emerald-600"><DollarSign className="w-4 h-4 text-gray-900" /></div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.billableMinutesWeek)}</p>
-            <p className="text-xs text-gray-400">Fakturerbar vecka</p>
-          </div>
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-amber-600"><FileText className="w-4 h-4 text-gray-900" /></div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.uninvoicedMinutes)}</p>
-            <p className="text-xs text-gray-400">Ofakturerat ({Math.round(stats.uninvoicedRevenue).toLocaleString('sv-SE')} kr)</p>
-          </div>
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <div className="p-2 rounded-lg bg-teal-600"><Calendar className="w-4 h-4 text-gray-900" /></div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{fmtDuration(stats.totalMinutesMonth)}</p>
-            <p className="text-xs text-gray-400">Total tid månad</p>
-          </div>
-        </div>
-
-        {/* Övertidsindikator */}
-        {weekOvertime && weekOvertime.total_overtime_minutes > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-orange-100">
-                  <Clock className="w-4 h-4 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-orange-700">Övertid vecka {weekOvertime.week_number}</p>
-                  <p className="text-xs text-orange-600">
-                    {weekOvertime.daily_overtime_minutes > 0 && `Daglig: ${formatMinutes(weekOvertime.daily_overtime_minutes)}`}
-                    {weekOvertime.daily_overtime_minutes > 0 && weekOvertime.weekly_overtime_minutes > 0 && ' · '}
-                    {weekOvertime.weekly_overtime_minutes > 0 && `Vecko: ${formatMinutes(weekOvertime.weekly_overtime_minutes)}`}
-                  </p>
-                </div>
-              </div>
-              <p className="text-lg font-bold text-orange-700">{formatMinutes(weekOvertime.total_overtime_minutes)}</p>
-            </div>
-          </div>
-        )}
-
-        {/* View Toggle + Week Nav */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div className="hidden sm:flex bg-white border border-gray-200 rounded-xl p-1">
-            <button onClick={() => setViewMode('week')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'week' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-white'}`}>
-              <LayoutGrid className="w-4 h-4" /> Vecka
-            </button>
-            <button onClick={() => setViewMode('list')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${viewMode === 'list' ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-white'}`}>
-              <List className="w-4 h-4" /> Lista
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
+      {/* Week nav */}
+      <div className="flex items-center justify-between mb-[14px]">
+        <div className="flex items-center">
+          <div className="flex gap-1 mr-[10px]">
             <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-              className="p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900">
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button onClick={() => setCurrentWeek(new Date())}
-              className="px-4 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm font-medium hover:border-teal-300 min-w-[180px] text-center">
-              V{weekNumber} &middot; {format(weekStart, 'd MMM', { locale: sv })} – {format(weekEnd, 'd MMM', { locale: sv })}
+              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#64748B] flex items-center justify-center cursor-pointer hover:text-[#1E293B]">
+              <ChevronLeft className="w-[14px] h-[14px]" />
             </button>
             <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-              className="p-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-500 hover:text-gray-900">
-              <ChevronRight className="w-4 h-4" />
+              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#64748B] flex items-center justify-center cursor-pointer hover:text-[#1E293B]">
+              <ChevronRight className="w-[14px] h-[14px]" />
             </button>
-
-            <div className="ml-2 border-l border-gray-300 pl-2 flex items-center gap-1">
-              <a
-                href={`/api/time-entry/report?startDate=${format(weekStart, 'yyyy-MM-dd')}&endDate=${format(weekEnd, 'yyyy-MM-dd')}&format=csv&groupBy=day`}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs text-gray-500 hover:text-gray-900 hover:border-teal-300"
-                title="Exportera vecka som CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                CSV
-              </a>
-              <a
-                href={`/api/time-entry/report?startDate=${format(startOfMonth(currentWeek), 'yyyy-MM-dd')}&endDate=${format(endOfMonth(currentWeek), 'yyyy-MM-dd')}&format=csv&groupBy=day`}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-xs text-gray-500 hover:text-gray-900 hover:border-teal-300"
-                title="Exportera månad som CSV"
-              >
-                <Download className="w-3.5 h-3.5" />
-                Månad
-              </a>
-            </div>
           </div>
+          <button onClick={() => setCurrentWeek(new Date())}
+            className="text-[14px] font-medium text-[#1E293B] bg-transparent border-none cursor-pointer hover:text-[#0F766E]">
+            V{weekNumber} · {format(weekStart, 'd MMMM', { locale: sv })} – {format(weekEnd, 'd MMMM', { locale: sv })}
+          </button>
         </div>
+        <div className="flex gap-1">
+          <button onClick={() => setViewMode('week')}
+            className={`px-3 py-[5px] text-[12px] rounded-full border-thin cursor-pointer ${
+              viewMode === 'week' ? 'bg-[#F1F5F9] text-[#1E293B] border-[#E2E8F0]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'
+            }`}>
+            Vecka
+          </button>
+          <button onClick={() => setViewMode('list')}
+            className={`px-3 py-[5px] text-[12px] rounded-full border-thin cursor-pointer ${
+              viewMode === 'list' ? 'bg-[#F1F5F9] text-[#1E293B] border-[#E2E8F0]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'
+            }`}>
+            Lista
+          </button>
+        </div>
+      </div>
 
-        {/* WEEK GRID VIEW (desktop only) */}
-        {viewMode === 'week' && (
-          <div className="hidden sm:block bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden mb-6">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase w-40">Kund</th>
-                    {weekDates.map((date, i) => {
-                      const isToday = isSameDay(date, new Date())
-                      return (
-                        <th key={i} className={`px-3 py-3 text-center text-xs font-medium uppercase min-w-[80px] ${isToday ? 'text-sky-700' : 'text-gray-400'}`}>
-                          <div>{format(date, 'EEE', { locale: sv })}</div>
-                          <div className={`text-lg font-bold ${isToday ? 'text-sky-700' : 'text-gray-700'}`}>{format(date, 'd')}</div>
-                        </th>
-                      )
-                    })}
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Summa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200/50">
-                  {weekGrid.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="p-12 text-center">
-                        <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                        <p className="text-gray-500">Inga tidposter denna vecka</p>
-                        <p className="text-gray-400 text-sm mt-1">Klicka på en cell eller &quot;Lägg till&quot; för att registrera tid</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    weekGrid.map(row => (
-                      <tr key={row.customerId} className="hover:bg-gray-100/20">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                            <span className="text-sm text-gray-900 truncate">{row.label}</span>
-                          </div>
-                        </td>
-                        {row.days.map((day, i) => {
-                          const isToday = isSameDay(day.date, new Date())
-                          return (
-                            <td key={i}
-                              onClick={() => day.entries.length > 0 ? openEditModal(day.entries[0]) : openAddModal(day.dayKey, row.customerId !== 'none' ? row.customerId : undefined)}
-                              className={`px-2 py-3 text-center cursor-pointer transition-colors hover:bg-teal-50 ${isToday ? 'bg-teal-600/5' : ''}`}>
-                              {day.totalMinutes > 0 ? (
-                                <div className="flex flex-col items-center gap-1">
-                                  <span className="text-sm font-medium text-gray-900">{fmtDuration(day.totalMinutes)}</span>
-                                  {day.entries.length > 1 && (
-                                    <span className="text-xs text-gray-400">{day.entries.length} poster</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-gray-300 text-sm">–</span>
-                              )}
-                            </td>
-                          )
-                        })}
-                        <td className="px-4 py-3 text-center">
-                          <span className="text-sm font-bold text-gray-900">{fmtDuration(row.totalMinutes)}</span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {weekGrid.length > 0 && (
-                  <tfoot>
-                    <tr className="border-t border-gray-300 bg-gray-100/30">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-500">Summa</td>
-                      {columnTotals.map((total, i) => (
-                        <td key={i} className="px-3 py-3 text-center text-sm font-medium text-gray-700">
-                          {total > 0 ? fmtDuration(total) : '–'}
-                        </td>
-                      ))}
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-sm font-bold text-sky-700">{fmtDuration(grandTotal)}</span>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+      {/* WEEK GRID VIEW */}
+      {viewMode === 'week' && (
+        <div className="bg-white border-thin border-[#E2E8F0] rounded-xl overflow-hidden mb-6">
+          {/* Grid header */}
+          <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-b border-thin border-[#E2E8F0]">
+            <div className="px-4 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-left">Kund</div>
+            {weekDates.map((date, i) => {
+              const isToday = isSameDay(date, new Date())
+              return (
+                <div key={i} className={`px-2 py-[10px] text-[10px] tracking-[0.07em] uppercase text-center ${isToday ? 'text-[#0F766E]' : 'text-[#CBD5E1]'}`}>
+                  {format(date, 'EEE', { locale: sv }).toUpperCase()} {format(date, 'd')}
+                </div>
+              )
+            })}
+            <div className="px-2 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-center">Summa</div>
           </div>
-        )}
 
-        {/* LIST VIEW */}
-        <div className={`${viewMode === 'week' ? 'sm:hidden' : ''} bg-white shadow-sm rounded-2xl border border-gray-200`}>
+          {/* Grid rows */}
+          {weekGrid.length === 0 ? (
+            <div className="py-12 text-center text-[13px] text-[#94A3B8]">
+              <p>Inga tidposter denna vecka</p>
+              <p className="text-[12px] text-[#CBD5E1] mt-1">Klicka på en cell eller &quot;Lägg till&quot; för att registrera tid</p>
+            </div>
+          ) : (
+            <>
+              {weekGrid.map(row => (
+                <div key={row.customerId} className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-b border-thin border-[#E2E8F0] last:border-b-0 min-h-[50px] items-center">
+                  <div className="px-4 text-[13px] font-medium text-[#1E293B] min-h-[50px] flex items-center">{row.label}</div>
+                  {row.days.map((day, i) => {
+                    const isToday = isSameDay(day.date, new Date())
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => day.entries.length > 0 ? openEditModal(day.entries[0]) : openAddModal(day.dayKey, row.customerId !== 'none' ? row.customerId : undefined)}
+                        className={`px-2 min-h-[50px] flex items-center justify-center cursor-pointer text-[13px] hover:bg-[#F8FAFC] ${isToday ? 'bg-[#F0FDFA]' : ''}`}
+                      >
+                        {day.totalMinutes > 0 ? (
+                          <span className="bg-[#CCFBF1] text-[#0F766E] text-[12px] font-medium px-[10px] py-[3px] rounded-full">
+                            {fmtDuration(day.totalMinutes)}
+                          </span>
+                        ) : (
+                          <span className="text-[#CBD5E1] text-[18px] hover:text-[#0F766E]">+</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                  <div className="px-2 min-h-[50px] flex items-center justify-center text-[13px] font-medium text-[#1E293B]">
+                    {fmtDuration(row.totalMinutes)}
+                  </div>
+                </div>
+              ))}
+
+              {/* Add new customer/project row */}
+              <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] min-h-[50px] items-center">
+                <div
+                  onClick={() => openAddModal()}
+                  className="px-4 text-[12px] text-[#CBD5E1] min-h-[50px] flex items-center cursor-pointer hover:text-[#0F766E]"
+                >
+                  + Ny kund / projekt
+                </div>
+                {weekDates.map((_, i) => (
+                  <div key={i} onClick={() => openAddModal(format(weekDates[i], 'yyyy-MM-dd'))}
+                    className="min-h-[50px] flex items-center justify-center cursor-pointer text-[#CBD5E1] text-[18px] hover:text-[#0F766E] hover:bg-[#F0FDFA]">
+                    +
+                  </div>
+                ))}
+                <div className="min-h-[50px] flex items-center justify-center text-[13px] text-[#CBD5E1]">—</div>
+              </div>
+            </>
+          )}
+
+          {/* Column totals footer */}
+          {weekGrid.length > 0 && (
+            <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-t border-thin border-[#E2E8F0] bg-[#F8FAFC]">
+              <div className="px-4 py-[10px] text-[13px] font-medium text-[#64748B]">Summa</div>
+              {columnTotals.map((total, i) => (
+                <div key={i} className="px-2 py-[10px] text-center text-[13px] font-medium text-[#1E293B]">
+                  {total > 0 ? fmtDuration(total) : '–'}
+                </div>
+              ))}
+              <div className="px-2 py-[10px] text-center text-[13px] font-medium text-[#0F766E]">
+                {fmtDuration(grandTotal)}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* LIST VIEW */}
+      {(viewMode === 'list' || viewMode === 'week') && (
+        <div className={`${viewMode === 'week' ? 'sm:hidden' : ''} bg-white border-thin border-[#E2E8F0] rounded-xl`}>
           {/* Filters header */}
-          <div className="p-4 border-b border-gray-200">
+          <div className="px-4 py-3 border-b border-thin border-[#E2E8F0]">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-900">
-                Tidposter <span className="text-gray-400 font-normal ml-1">({filteredEntries.length})</span>
-              </h2>
+              <span className="text-[13px] font-medium text-[#1E293B]">
+                Tidposter <span className="text-[#94A3B8] font-normal ml-1">({filteredEntries.length})</span>
+              </span>
               <div className="flex items-center gap-2">
                 {selectedIds.size > 0 && (
                   <>
                     <button onClick={() => handleBulkApproval('approve')} disabled={approvingIds}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-green-100 border border-green-200 rounded-lg text-xs text-green-600 hover:bg-green-500/20 disabled:opacity-50">
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#CCFBF1] border-thin border-[#0F766E] rounded-lg text-[12px] text-[#0F766E] disabled:opacity-50">
                       {approvingIds ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                       Godkänn ({selectedIds.size})
                     </button>
                     <button onClick={() => handleBulkApproval('reject')} disabled={approvingIds}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600 hover:bg-red-500/20 disabled:opacity-50">
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border-thin border-red-200 rounded-lg text-[12px] text-red-600 disabled:opacity-50">
                       <X className="w-3 h-3" />
                       Avslå
                     </button>
                     <button onClick={handleBulkMarkInvoiced} disabled={bulkLoading}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 border border-emerald-200 rounded-lg text-xs text-emerald-600 hover:bg-emerald-500/30 disabled:opacity-50">
-                      {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckSquare className="w-3 h-3" />}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#CCFBF1] border-thin border-[#0F766E] rounded-lg text-[12px] text-[#0F766E] disabled:opacity-50">
+                      {bulkLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                       Fakturera ({selectedIds.size})
                     </button>
                   </>
                 )}
                 <button onClick={() => setShowFilters(!showFilters)}
-                  className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-teal-100 text-sky-700' : 'bg-gray-100 text-gray-500 hover:text-gray-900'}`}>
-                  <Filter className="w-4 h-4" />
+                  className={`px-3 py-[5px] text-[12px] border-thin rounded-lg cursor-pointer ${showFilters ? 'bg-[#CCFBF1] text-[#0F766E] border-[#0F766E]' : 'bg-transparent text-[#64748B] border-[#E2E8F0]'}`}>
+                  Filter
                 </button>
               </div>
             </div>
@@ -1222,23 +881,23 @@ export default function TimePage() {
             {showFilters && (
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mt-3">
                 <select value={filterCustomer} onChange={e => setFilterCustomer(e.target.value)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
+                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
                   <option value="">Alla kunder</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
                 </select>
                 <select value={filterWorkType} onChange={e => setFilterWorkType(e.target.value)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
+                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
                   <option value="">Alla arbetstyper</option>
                   {workTypes.map(wt => <option key={wt.work_type_id} value={wt.work_type_id}>{wt.name}</option>)}
                 </select>
                 <select value={filterInvoiced} onChange={e => setFilterInvoiced(e.target.value as any)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
+                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
                   <option value="all">Alla</option>
                   <option value="no">Ej fakturerade</option>
                   <option value="yes">Fakturerade</option>
                 </select>
                 <select value={filterApproval} onChange={e => setFilterApproval(e.target.value as any)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50">
+                  className="px-3 py-[7px] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] bg-white focus:outline-none focus:border-[#0F766E]">
                   <option value="all">Alla status</option>
                   <option value="pending">Väntar godkännande</option>
                   <option value="approved">Godkända</option>
@@ -1249,156 +908,130 @@ export default function TimePage() {
           </div>
 
           {/* List items */}
-          <div className="divide-y divide-gray-200">
+          <div>
             {filteredEntries.length === 0 ? (
-              <div className="p-8 text-center">
-                <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 text-sm">Inga tidposter denna vecka</p>
+              <div className="py-8 text-center text-[13px] text-[#94A3B8]">
+                Inga tidposter denna vecka
               </div>
             ) : (
               <>
                 {viewMode === 'list' && filteredEntries.some(e => !e.invoiced) && (
-                  <div className="px-4 py-2 bg-gray-100/30">
-                    <button onClick={selectAll} className="flex items-center gap-2 text-xs text-gray-400 hover:text-gray-900">
-                      <div className={`w-4 h-4 rounded border ${selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 ? 'bg-teal-600 border-teal-500' : 'border-gray-300'} flex items-center justify-center`}>
-                        {selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 && <Check className="w-3 h-3 text-gray-900" />}
+                  <div className="px-4 py-2 border-b border-thin border-[#E2E8F0]">
+                    <button onClick={selectAll} className="flex items-center gap-2 text-[12px] text-[#94A3B8] hover:text-[#1E293B]">
+                      <div className={`w-4 h-4 rounded border-thin ${selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 ? 'bg-[#0F766E] border-[#0F766E]' : 'border-[#E2E8F0]'} flex items-center justify-center`}>
+                        {selectedIds.size === filteredEntries.filter(e => !e.invoiced).length && selectedIds.size > 0 && <Check className="w-3 h-3 text-white" />}
                       </div>
                       Välj alla ej fakturerade
                     </button>
                   </div>
                 )}
 
-                {filteredEntries.map(entry => (
-                  <div key={entry.time_entry_id} className="p-4 hover:bg-gray-100/30 transition-all">
-                    <div className="flex items-start gap-3">
-                      {viewMode === 'list' && !entry.invoiced && (
-                        <button onClick={() => toggleSelect(entry.time_entry_id)} className="mt-1 flex-shrink-0">
-                          <div className={`w-5 h-5 rounded border ${selectedIds.has(entry.time_entry_id) ? 'bg-teal-600 border-teal-500' : 'border-gray-300 hover:border-gray-400'} flex items-center justify-center`}>
-                            {selectedIds.has(entry.time_entry_id) && <Check className="w-3 h-3 text-gray-900" />}
-                          </div>
-                        </button>
-                      )}
+                {filteredEntries.map(entry => {
+                  const catLabel = ({ work: 'Arbete', travel: 'Restid', material_pickup: 'Material', meeting: 'Möte', admin: 'Admin' } as Record<string, string>)[(entry as any).work_category] || 'Arbete'
+                  return (
+                    <div key={entry.time_entry_id} className="px-4 py-3 border-b border-thin border-[#F1F5F9] last:border-b-0 hover:bg-[#F8FAFC]">
+                      <div className="flex items-start gap-3">
+                        {viewMode === 'list' && !entry.invoiced && (
+                          <button onClick={() => toggleSelect(entry.time_entry_id)} className="mt-1 flex-shrink-0">
+                            <div className={`w-4 h-4 rounded border-thin ${selectedIds.has(entry.time_entry_id) ? 'bg-[#0F766E] border-[#0F766E]' : 'border-[#E2E8F0] hover:border-[#94A3B8]'} flex items-center justify-center`}>
+                              {selectedIds.has(entry.time_entry_id) && <Check className="w-3 h-3 text-white" />}
+                            </div>
+                          </button>
+                        )}
 
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                        entry.invoiced ? 'bg-emerald-50 border-emerald-500/20'
-                        : entry.is_billable ? 'bg-gradient-to-br from-teal-600/20 to-teal-500/20 border-teal-300'
-                        : 'bg-gray-50 border-gray-300'
-                      }`}>
-                        <span className="text-lg">
-                          {({ work: '🔨', travel: '🚗', material_pickup: '📦', meeting: '👥', admin: '📋' } as Record<string, string>)[(entry as any).work_category] || '🔨'}
-                        </span>
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-gray-900">
-                            {fmtDuration(entry.duration_minutes)}
-                            {(entry.break_minutes || 0) > 0 && (
-                              <span className="text-xs text-gray-400 font-normal ml-1">(rast {entry.break_minutes}m)</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[13px] font-medium text-[#1E293B]">
+                              {fmtDuration(entry.duration_minutes)}
+                            </span>
+                            <span className="text-[11px] text-[#94A3B8]">{catLabel}</span>
+                            {entry.work_type && (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
+                                {entry.work_type.name}
+                              </span>
                             )}
-                          </span>
-                          {entry.work_type && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-teal-50 text-sky-700 border border-teal-500/20">
-                              {entry.work_type.name}
-                            </span>
+                            {entry.invoiced ? (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
+                                Fakturerad
+                              </span>
+                            ) : entry.is_billable ? (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-amber-50 text-amber-600">
+                                Ofakturerad
+                              </span>
+                            ) : null}
+                            {entry.approval_status === 'pending' && (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-yellow-50 text-yellow-600">
+                                Väntar
+                              </span>
+                            )}
+                            {entry.approval_status === 'approved' && (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-[#CCFBF1] text-[#0F766E]">
+                                Godkänd
+                              </span>
+                            )}
+                            {entry.approval_status === 'rejected' && (
+                              <span className="px-2 py-0.5 text-[11px] rounded-full bg-red-50 text-red-600" title={entry.rejection_reason || ''}>
+                                Avslagen
+                              </span>
+                            )}
+                          </div>
+                          {entry.description && (
+                            <p className="text-[12px] text-[#64748B] mt-1 truncate">{entry.description}</p>
                           )}
-                          {entry.invoiced ? (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-50 text-emerald-600 border border-emerald-500/20">
-                              Fakturerad
-                            </span>
-                          ) : entry.is_billable ? (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-amber-50 text-amber-600 border border-amber-500/20">
-                              Ofakturerad
-                            </span>
-                          ) : null}
-                          {entry.approval_status === 'pending' && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-50 text-yellow-600 border border-yellow-500/20">
-                              Väntar godkännande
-                            </span>
-                          )}
-                          {entry.approval_status === 'approved' && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-green-50 text-green-600 border border-green-500/20">
-                              Godkänd
-                            </span>
-                          )}
-                          {entry.approval_status === 'rejected' && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-red-50 text-red-600 border border-red-500/20" title={entry.rejection_reason || ''}>
-                              Avslagen
-                            </span>
-                          )}
+                          <div className="flex items-center gap-3 mt-1 text-[11px] text-[#94A3B8] flex-wrap">
+                            <span>{format(parseISO(entry.work_date), 'EEE d MMM', { locale: sv })}</span>
+                            {isOwnerOrAdmin && entry.business_user && (
+                              <span className="flex items-center gap-1">
+                                <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: entry.business_user.color }} />
+                                {entry.business_user.name}
+                              </span>
+                            )}
+                            {entry.customer && <span>{entry.customer.name}</span>}
+                            {(entry as any).start_latitude && (
+                              <a
+                                href={`https://www.google.com/maps?q=${(entry as any).start_latitude},${(entry as any).start_longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-[#0F766E] hover:underline"
+                                title={entry.start_address || 'Visa på karta'}
+                                onClick={e => e.stopPropagation()}
+                              >
+                                <MapPin className="w-3 h-3" />
+                                GPS
+                              </a>
+                            )}
+                            {entry.hourly_rate && <span>{entry.hourly_rate} kr/tim</span>}
+                          </div>
                         </div>
-                        {entry.description && (
-                          <p className="text-sm text-gray-500 mt-1 truncate">{entry.description}</p>
-                        )}
-                        <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            {format(parseISO(entry.work_date), 'EEE d MMM', { locale: sv })}
-                          </span>
-                          {isOwnerOrAdmin && entry.business_user && (
-                            <span className="flex items-center gap-1">
-                              <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: entry.business_user.color }} />
-                              {entry.business_user.name}
-                            </span>
-                          )}
-                          {entry.customer && (
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {entry.customer.name}
-                            </span>
-                          )}
-                          {(entry as any).start_latitude && (
-                            <a
-                              href={`https://www.google.com/maps?q=${(entry as any).start_latitude},${(entry as any).start_longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-teal-600 hover:text-sky-700"
-                              title={entry.start_address || 'Visa på karta'}
-                              onClick={e => e.stopPropagation()}
-                            >
-                              <MapPin className="w-3 h-3" />
-                              GPS
-                            </a>
-                          )}
-                          {entry.hourly_rate && (
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              {entry.hourly_rate} kr/tim
-                            </span>
-                          )}
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {!entry.invoiced && (
-                          <>
-                            <button onClick={() => openEditModal(entry)}
-                              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
-                              <Edit2 className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDelete(entry.time_entry_id)}
-                              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {!entry.invoiced && (
+                            <>
+                              <button onClick={() => openEditModal(entry)}
+                                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-[#1E293B] flex items-center justify-center">
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button onClick={() => handleDelete(entry.time_entry_id)}
+                                className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#94A3B8] hover:text-red-500 flex items-center justify-center">
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </>
             )}
           </div>
         </div>
+      )}
 
-        {/* Reseersättning & traktamente */}
-        <div className="mt-6">
-          <TravelSection currentWeek={currentWeek} />
-        </div>
+      {/* Reseersättning & traktamente */}
+      <div className="mt-6">
+        <TravelSection currentWeek={currentWeek} />
       </div>
-
-      {/* Floating timer widget – mobilanpassad, en hand */}
-      <TimerWidget onCheckInOut={handleTimerCheckInOut} />
     </div>
   )
 }

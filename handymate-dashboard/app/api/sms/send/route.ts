@@ -43,6 +43,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.message || 'SMS failed' }, { status: 500 })
     }
 
+    // V4 Automation Engine: fire 'contacted' event (outgoing SMS = kontaktad)
+    try {
+      const { getServerSupabase } = await import('@/lib/supabase')
+      const { fireEvent } = await import('@/lib/automation-engine')
+      const supabase = getServerSupabase()
+      await fireEvent(supabase, 'contacted', business.business_id, {
+        phone: to,
+        method: 'sms',
+      })
+    } catch (eventErr) {
+      console.error('fireEvent contacted error (non-blocking):', eventErr)
+    }
+
     return NextResponse.json({ success: true, id: result.id })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })

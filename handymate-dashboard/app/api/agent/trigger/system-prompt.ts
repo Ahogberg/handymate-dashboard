@@ -34,6 +34,12 @@ interface BusinessContext {
     require_approval_create_booking: boolean
     lead_response_target_minutes: number
   } | null
+  // V4 Pipeline context — injiceras per aktiv konversation om lead finns
+  leadPipelineContext?: {
+    lead_id: string
+    pipeline_stage_key: string
+    pipeline_stage_label: string
+  } | null
 }
 
 const BRANCH_NAMES: Record<string, string> = {
@@ -120,6 +126,12 @@ ${triggerInstructions}
 - Heta leads (urgency high/emergency) kräver omedelbar åtgärd
 - Vid lead_nurture: referera till kundens SPECIFIKA förfrågan
 - Vid hot lead: betona brådskan, inkludera jobbtyp och kontaktinfo
+- Pipeline-steg: Ny lead → Kontaktad → Offert skickad → Offert öppnad → Aktivt jobb → Fakturerad → Avslutad | Förlorad
+${business.leadPipelineContext ? `
+### Aktuell lead i pipeline
+- Lead ID: ${business.leadPipelineContext.lead_id}
+- Pipeline-steg: **${business.leadPipelineContext.pipeline_stage_label}** (${business.leadPipelineContext.pipeline_stage_key})
+- Anpassa ditt beteende efter var kunden befinner sig i tratten. T.ex. om steget är "Offert skickad" handlar kontakten troligen om att diskutera offerten.` : ''}
 
 ## Regler
 - Sök alltid kund innan du skapar ny (search_customers)

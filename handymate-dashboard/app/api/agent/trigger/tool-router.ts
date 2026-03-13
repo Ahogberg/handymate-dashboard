@@ -793,10 +793,10 @@ async function qualifyLead(
   // V3 Automation Engine: fire lead_created event
   try {
     const { fireEvent } = await import('@/lib/automation-engine')
-    fireEvent(supabase, 'lead_created', businessId, {
+    await fireEvent(supabase, 'lead_created', businessId, {
       lead_id: leadId, customer_name: contactName, phone, job_type: jobType,
       urgency, estimated_value: estimatedValue, source,
-    }).catch(() => {})
+    })
   } catch { /* non-blocking */ }
 
   return { success: true, data: { lead_id: leadId, project_number: projectNumber, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad ${projectNumber} (score ${score})` } }

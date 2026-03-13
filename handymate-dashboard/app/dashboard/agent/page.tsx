@@ -126,6 +126,7 @@ interface Lead {
   email: string | null
   source: string
   status: string
+  pipeline_stage_key: string | null
   score: number
   score_reasons: Array<{ rule: string; points: number; matched: boolean }>
   estimated_value: number | null
@@ -137,6 +138,15 @@ interface Lead {
   updated_at: string
   converted_at: string | null
   lost_reason: string | null
+}
+
+interface LeadPipelineStageUI {
+  id: string
+  key: string
+  label: string
+  sort_order: number
+  is_system: boolean
+  color: string
 }
 
 interface PipelineStats {
@@ -702,15 +712,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
 }
 
 // ── Pipeline Constants ─────────────────────────────────────────────
-
-const PIPELINE_COLUMNS: Array<{ status: string; label: string; color: string; bg: string }> = [
-  { status: 'new', label: 'Nya', color: 'text-sky-700', bg: 'bg-teal-500' },
-  { status: 'contacted', label: 'Kontaktade', color: 'text-teal-600', bg: 'bg-teal-600' },
-  { status: 'qualified', label: 'Kvalificerade', color: 'text-teal-700', bg: 'bg-teal-500' },
-  { status: 'quote_sent', label: 'Offert skickad', color: 'text-amber-600', bg: 'bg-amber-500' },
-  { status: 'won', label: 'Vunna', color: 'text-emerald-600', bg: 'bg-emerald-500' },
-  { status: 'lost', label: 'Förlorade', color: 'text-gray-500', bg: 'bg-gray-400' },
-]
+// Columns are now fetched dynamically from /api/leads/pipeline-stages
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   low: { label: 'Låg', color: 'text-gray-500', bg: 'bg-gray-100' },
@@ -765,21 +767,21 @@ function LeadCard({ lead, onClick }: { lead: Lead; onClick: () => void }) {
 
 // ── Lead Detail Panel ─────────────────────────────────────────────
 
-function LeadDetail({ lead, onClose, onStatusChange }: {
-  lead: Lead; onClose: () => void; onStatusChange: (leadId: string, status: string, lostReason?: string) => void
+function LeadDetail({ lead, onClose, onStatusChange, pipelineStages }: {
+  lead: Lead; onClose: () => void; onStatusChange: (leadId: string, stageKey: string, lostReason?: string) => void; pipelineStages: LeadPipelineStageUI[]
 }) {
   const urgency = URGENCY_CONFIG[lead.urgency] || URGENCY_CONFIG.medium
   const scoreColor = lead.score < 30 ? 'from-red-500 to-red-600' : lead.score < 60 ? 'from-amber-500 to-amber-600' : 'from-emerald-500 to-emerald-600'
   const [showLostInput, setShowLostInput] = useState(false)
   const [lostReason, setLostReason] = useState('')
 
-  const nextStatuses: Record<string, string[]> = {
-    new: ['contacted', 'lost'],
-    contacted: ['qualified', 'lost'],
-    qualified: ['quote_sent', 'lost'],
-    quote_sent: ['won', 'lost'],
-  }
-  const available = nextStatuses[lead.status] || []
+  // Dynamic next stages: show all stages with higher sort_order + lost
+  const currentKey = lead.pipeline_stage_key || lead.status || 'new_lead'
+  const currentStage = pipelineStages.find(s => s.key === currentKey)
+  const currentOrder = currentStage?.sort_order ?? 0
+  const available = pipelineStages
+    .filter(s => s.key !== 'lost' && s.sort_order > currentOrder)
+    .map(s => s.key)
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -879,16 +881,17 @@ function LeadDetail({ lead, onClose, onStatusChange }: {
         <div className="px-5 py-4 space-y-2">
           <p className="text-xs font-bold text-gray-900 mb-2">Flytta lead</p>
           <div className="flex gap-2 flex-wrap">
-            {available.filter(s => s !== 'lost').map(status => {
-              const col = PIPELINE_COLUMNS.find(c => c.status === status)
+            {available.filter(s => s !== 'lost').map(stageKey => {
+              const stage = pipelineStages.find(s => s.key === stageKey)
               return (
                 <button
-                  key={status}
-                  onClick={() => onStatusChange(lead.lead_id, status)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium text-white ${col?.bg || 'bg-gray-500'} hover:opacity-90 transition-all flex items-center gap-1`}
+                  key={stageKey}
+                  onClick={() => onStatusChange(lead.lead_id, stageKey)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-teal-600 hover:opacity-90 transition-all flex items-center gap-1"
+                  style={{ backgroundColor: stage?.color || '#0F766E' }}
                 >
                   <ArrowRight className="w-3 h-3" />
-                  {col?.label || status}
+                  {stage?.label || stageKey}
                 </button>
               )
             })}
@@ -921,7 +924,7 @@ function LeadDetail({ lead, onClose, onStatusChange }: {
       )}
 
       {/* Lost reason */}
-      {lead.status === 'lost' && lead.lost_reason && (
+      {(lead.pipeline_stage_key === 'lost' || lead.status === 'lost') && lead.lost_reason && (
         <div className="px-5 py-3 bg-red-50 border-t border-red-100">
           <p className="text-xs text-red-600">
             <span className="font-semibold">Förlorad:</span> {lead.lost_reason}
@@ -937,10 +940,22 @@ function LeadDetail({ lead, onClose, onStatusChange }: {
 function PipelineTab({ businessId }: { businessId: string }) {
   const [leads, setLeads] = useState<Lead[]>([])
   const [stats, setPipelineStats] = useState<PipelineStats | null>(null)
+  const [pipelineStages, setPipelineStages] = useState<LeadPipelineStageUI[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
   const [filterUrgency, setFilterUrgency] = useState<string>('all')
   const [filterScore, setFilterScore] = useState<string>('all')
+
+  const fetchStages = useCallback(async () => {
+    try {
+      const res = await fetch('/api/leads/pipeline-stages')
+      if (!res.ok) return
+      const data = await res.json()
+      setPipelineStages(data.stages || [])
+    } catch {
+      // ignore
+    }
+  }, [])
 
   const fetchLeads = useCallback(async () => {
     try {
@@ -956,23 +971,23 @@ function PipelineTab({ businessId }: { businessId: string }) {
 
   useEffect(() => {
     setLoading(true)
-    fetchLeads().finally(() => setLoading(false))
-  }, [fetchLeads])
+    Promise.all([fetchStages(), fetchLeads()]).finally(() => setLoading(false))
+  }, [fetchStages, fetchLeads])
 
-  async function handleStatusChange(leadId: string, status: string, lostReason?: string) {
+  async function handleStatusChange(leadId: string, stageKey: string, lostReason?: string) {
     // Optimistic update
     setLeads(prev => prev.map(l =>
-      l.lead_id === leadId ? { ...l, status, lost_reason: lostReason || l.lost_reason, updated_at: new Date().toISOString() } : l
+      l.lead_id === leadId ? { ...l, pipeline_stage_key: stageKey, status: stageKey, lost_reason: lostReason || l.lost_reason, updated_at: new Date().toISOString() } : l
     ))
     if (selectedLead?.lead_id === leadId) {
-      setSelectedLead(prev => prev ? { ...prev, status, lost_reason: lostReason || prev.lost_reason } : null)
+      setSelectedLead(prev => prev ? { ...prev, pipeline_stage_key: stageKey, status: stageKey, lost_reason: lostReason || prev.lost_reason } : null)
     }
 
     try {
       await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: leadId, status, lost_reason: lostReason }),
+        body: JSON.stringify({ lead_id: leadId, pipeline_stage_key: stageKey, status: stageKey, lost_reason: lostReason }),
       })
       await fetchLeads() // Refresh stats
     } catch {
@@ -989,10 +1004,10 @@ function PipelineTab({ businessId }: { businessId: string }) {
     return true
   })
 
-  // Group by status
-  const leadsByStatus: Record<string, Lead[]> = {}
-  for (const col of PIPELINE_COLUMNS) {
-    leadsByStatus[col.status] = filteredLeads.filter(l => l.status === col.status)
+  // Group by pipeline_stage_key (V4 dynamic columns)
+  const leadsByStage: Record<string, Lead[]> = {}
+  for (const stage of pipelineStages) {
+    leadsByStage[stage.key] = filteredLeads.filter(l => (l.pipeline_stage_key || l.status || 'new_lead') === stage.key)
   }
 
   if (loading) {
@@ -1003,8 +1018,8 @@ function PipelineTab({ businessId }: { businessId: string }) {
             <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 h-20 animate-pulse" />
           ))}
         </div>
-        <div className="grid grid-cols-6 gap-3">
-          {[1, 2, 3, 4, 5, 6].map(i => (
+        <div className="grid grid-cols-8 gap-3">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
             <div key={i} className="bg-gray-50 rounded-xl border border-gray-200 h-64 animate-pulse" />
           ))}
         </div>
@@ -1100,18 +1115,18 @@ function PipelineTab({ businessId }: { businessId: string }) {
         {/* Kanban Board */}
         <div className={`flex-1 overflow-x-auto ${selectedLead ? 'max-w-[calc(100%-380px)]' : ''}`}>
           <div className="flex gap-3 min-w-[900px]">
-            {PIPELINE_COLUMNS.map(col => {
-              const colLeads = leadsByStatus[col.status] || []
-              const count = stats?.status_counts?.[col.status] || colLeads.length
-              const value = stats?.status_values?.[col.status] || 0
+            {pipelineStages.map(stage => {
+              const colLeads = leadsByStage[stage.key] || []
+              const count = stats?.status_counts?.[stage.key] || colLeads.length
+              const value = stats?.status_values?.[stage.key] || 0
 
               return (
-                <div key={col.status} className="flex-1 min-w-[150px]">
+                <div key={stage.key} className="flex-1 min-w-[150px]">
                   {/* Column header */}
                   <div className="flex items-center justify-between mb-3 px-1">
                     <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${col.bg}`} />
-                      <span className={`text-xs font-bold ${col.color}`}>{col.label}</span>
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                      <span className="text-xs font-bold text-gray-700">{stage.label}</span>
                       <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full font-medium">
                         {count}
                       </span>
@@ -1152,6 +1167,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
               lead={selectedLead}
               onClose={() => setSelectedLead(null)}
               onStatusChange={handleStatusChange}
+              pipelineStages={pipelineStages}
             />
           </div>
         )}
