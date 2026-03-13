@@ -270,28 +270,36 @@ async function handleRunAgent(
   const instruction = (config.instruction as string) || ''
 
   try {
-    const res = await fetch(`${APP_URL}/api/agent/trigger`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Internal-Secret': CRON_SECRET,
+    // V6: Delegera till Orchestrator istället för HTTP POST till /api/agent/trigger
+    const { orchestrate } = await import('@/lib/agent/orchestrator')
+
+    const result = await orchestrate({
+      businessId,
+      triggerType: 'automation_rule',
+      triggerData: {
+        instruction,
+        rule_name: ruleName,
+        ...context,
       },
-      body: JSON.stringify({
-        business_id: businessId,
-        trigger_type: 'automation_rule',
-        trigger_data: {
-          instruction,
-          rule_name: ruleName,
-          ...context,
-        },
-        idempotency_key: `rule-${ruleName}-${new Date().toISOString().slice(0, 10)}`,
-      }),
+      ruleName,
+      idempotencyKey: `rule-${ruleName}-${new Date().toISOString().slice(0, 10)}`,
     })
-    const result = await res.json().catch(() => ({}))
-    if (!res.ok) return { success: false, error: result.error || `Agent HTTP ${res.status}` }
-    return { success: true, data: { run_id: result.run_id, steps: result.steps } }
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Orchestrator failed' }
+    }
+
+    return {
+      success: true,
+      data: {
+        run_id: result.runId,
+        steps: result.steps,
+        agent_type: result.agentType,
+        escalated: result.escalated,
+      },
+    }
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Agent trigger failed'
+    const msg = err instanceof Error ? err.message : 'Orchestrator failed'
     return { success: false, error: msg }
   }
 }
