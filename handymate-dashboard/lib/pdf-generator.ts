@@ -67,22 +67,21 @@ function formatSEK(amount: number | null | undefined): string {
   return amount.toLocaleString('sv-SE') + ' kr'
 }
 
+// Design tokens (matches document-html.ts)
+const ACCENT_RGB = [15, 118, 110] as const   // #0F766E
+const TEXT_PRIMARY = [30, 41, 59] as const    // #1E293B
+const TEXT_SECONDARY = [148, 163, 184] as const // #94A3B8
+const TEXT_MUTED = [100, 116, 139] as const   // #64748B
+const LABEL_COLOR = [203, 213, 225] as const  // #CBD5E1
+const BORDER_COLOR = [226, 232, 240] as const // #E2E8F0
+const SEPARATOR = [241, 245, 249] as const    // #F1F5F9
+
 export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData): Buffer {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
   const contentWidth = pageWidth - margin * 2
   let y = margin
-
-  // Parse accent color
-  const accentHex = business.accent_color || '#7c3aed'
-  const r = parseInt(accentHex.slice(1, 3), 16)
-  const g = parseInt(accentHex.slice(3, 5), 16)
-  const b = parseInt(accentHex.slice(5, 7), 16)
-  const purple = [r, g, b] as const
-  const darkText = [26, 26, 26] as const
-  const grayText = [102, 102, 102] as const
-  const lightGray = [153, 153, 153] as const
 
   // Determine title
   const invoiceType = invoice.invoice_type || 'standard'
@@ -91,123 +90,123 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
   else if (invoiceType === 'reminder') title = 'PÅMINNELSE'
   else if (invoiceType === 'partial') title = 'DELFAKTURA'
 
-  // Header: company name + title
-  doc.setFontSize(22)
-  doc.setTextColor(...purple)
-  doc.text(business.business_name || 'Företag', margin, y + 8)
+  // ── Header ──
+  // Company name (left) — weight 500 equivalent
+  doc.setFontSize(16)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(business.business_name || 'Företag', margin, y + 6)
 
-  doc.setFontSize(10)
-  doc.setTextColor(...grayText)
-  const companyInfo = [
+  // Contact info below company name
+  doc.setFontSize(9)
+  doc.setTextColor(...TEXT_SECONDARY)
+  const companyLines = [
+    [business.contact_phone, business.contact_email].filter(Boolean).join(' · '),
     business.address || '',
-    `${business.contact_email || ''} | ${business.contact_phone || ''}`,
-    `Org.nr: ${business.org_number || 'Ej angivet'}`
   ].filter(Boolean)
-  companyInfo.forEach((line, i) => {
-    doc.text(line, margin, y + 15 + i * 4.5)
+  companyLines.forEach((line, i) => {
+    doc.text(line, margin, y + 12 + i * 4)
   })
 
-  // Invoice title
-  doc.setFontSize(28)
-  doc.setTextColor(...darkText)
-  doc.text(title, pageWidth - margin, y + 8, { align: 'right' })
+  // Document type label (right, uppercase, teal)
+  doc.setFontSize(8)
+  doc.setTextColor(...ACCENT_RGB)
+  doc.text(title, pageWidth - margin, y + 3, { align: 'right' })
 
-  doc.setFontSize(12)
-  doc.setTextColor(...purple)
-  doc.text(`#${invoice.invoice_number}`, pageWidth - margin, y + 16, { align: 'right' })
+  // Document number (right, larger)
+  doc.setFontSize(18)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(invoice.invoice_number, pageWidth - margin, y + 11, { align: 'right' })
 
   if (invoice.is_credit_note && invoice.credit_reason) {
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(220, 38, 38)
-    doc.text(`Anledning: ${invoice.credit_reason}`, pageWidth - margin, y + 22, { align: 'right' })
+    doc.text(`Anledning: ${invoice.credit_reason}`, pageWidth - margin, y + 17, { align: 'right' })
   }
 
-  // Purple divider
-  y += 35
-  doc.setDrawColor(...purple)
-  doc.setLineWidth(0.5)
+  // ── Teal line ──
+  y += 24
+  doc.setDrawColor(...ACCENT_RGB)
+  doc.setLineWidth(0.15)
   doc.line(margin, y, pageWidth - margin, y)
   y += 10
 
-  // Parties: sender + receiver
-  doc.setFontSize(8)
-  doc.setTextColor(...lightGray)
-  doc.text('AVSÄNDARE', margin, y)
-  doc.text('MOTTAGARE', margin + contentWidth / 2 + 10, y)
-  y += 5
+  // ── Meta row (3 columns) ──
+  const colW = contentWidth / 3
 
-  // Sender
+  // Column 1: Faktureras till
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('FAKTURERAS TILL', margin, y)
   doc.setFontSize(10)
-  doc.setTextColor(...darkText)
-  doc.text(business.business_name || '', margin, y)
+  doc.setTextColor(...TEXT_PRIMARY)
+  let my = y + 5
+  doc.text(invoice.customer?.name || 'Kund', margin, my)
   doc.setFontSize(9)
-  doc.setTextColor(...grayText)
-  if (business.address) { y += 4; doc.text(business.address, margin, y) }
-  if (business.contact_email) { y += 4; doc.text(business.contact_email, margin, y) }
+  if (invoice.customer?.address_line) { my += 4; doc.text(invoice.customer.address_line, margin, my) }
+  if (invoice.customer?.phone_number) { my += 4; doc.text(invoice.customer.phone_number, margin, my) }
 
-  // Receiver
-  let ry = y - (business.address ? 8 : 4)
-  const rx = margin + contentWidth / 2 + 10
+  // Column 2: Dates
+  const dateX = margin + colW
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('FAKTURADATUM', dateX, y)
   doc.setFontSize(10)
-  doc.setTextColor(...darkText)
-  doc.text(invoice.customer?.name || 'Kund', rx, ry)
-  doc.setFontSize(9)
-  doc.setTextColor(...grayText)
-  if (invoice.customer?.address_line) { ry += 4; doc.text(invoice.customer.address_line, rx, ry) }
-  if (invoice.customer?.email) { ry += 4; doc.text(invoice.customer.email, rx, ry) }
-  if (invoice.customer?.phone_number) { ry += 4; doc.text(invoice.customer.phone_number, rx, ry) }
-  if (invoice.personnummer) { ry += 4; doc.text(`Personnr: ${invoice.personnummer}`, rx, ry) }
-  if (invoice.fastighetsbeteckning) { ry += 4; doc.text(`Fastighet: ${invoice.fastighetsbeteckning}`, rx, ry) }
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(new Date(invoice.invoice_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' }), dateX, y + 5)
 
-  y = Math.max(y, ry) + 8
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('FÖRFALLODATUM', dateX, y + 13)
+  doc.setFontSize(10)
+  doc.setTextColor(...ACCENT_RGB) // Teal highlight
+  doc.text(new Date(invoice.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' }), dateX, y + 18)
 
-  // Meta box
+  // Column 3: References
+  const refX = margin + colW * 2
   const ocrNumber = invoice.ocr_number || generateOCR(invoice.invoice_number || '')
-  const boxY = y
-  doc.setFillColor(248, 245, 255)
-  doc.roundedRect(margin, boxY, contentWidth, 22, 3, 3, 'F')
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('OCR-NUMMER', refX, y)
+  doc.setFontSize(10)
+  doc.setTextColor(...TEXT_PRIMARY)
+  doc.text(ocrNumber, refX, y + 5)
 
-  const metaLabels = ['FAKTURADATUM', 'FÖRFALLODATUM', 'OCR-NUMMER']
-  const metaValues = [
-    new Date(invoice.invoice_date).toLocaleDateString('sv-SE'),
-    new Date(invoice.due_date).toLocaleDateString('sv-SE'),
-    ocrNumber,
-  ]
-
-  if (invoice.our_reference) { metaLabels.push('VÅR REF'); metaValues.push(invoice.our_reference) }
-  if (invoice.your_reference) { metaLabels.push('ER REF'); metaValues.push(invoice.your_reference) }
-
-  const colWidth = contentWidth / metaLabels.length
-  metaLabels.forEach((label, i) => {
-    const x = margin + 6 + i * colWidth
+  if (invoice.our_reference) {
     doc.setFontSize(7)
-    doc.setTextColor(...lightGray)
-    doc.text(label, x, boxY + 8)
-    doc.setFontSize(10)
-    doc.setTextColor(...darkText)
-    doc.text(metaValues[i], x, boxY + 16)
-  })
-
-  y = boxY + 28
-
-  // ROT/RUT notice
-  if (invoice.rot_rut_type) {
-    doc.setFillColor(212, 237, 218)
-    doc.roundedRect(margin, y, contentWidth, 18, 2, 2, 'F')
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text('VÅR REFERENS', refX, y + 13)
     doc.setFontSize(9)
-    doc.setTextColor(6, 95, 70)
-    doc.text(
-      `${invoice.rot_rut_type.toUpperCase()}-avdrag tillämpas. Avdraget på ${formatSEK(invoice.rot_rut_deduction)} begärs hos Skatteverket. Du betalar ${formatSEK(invoice.customer_pays)}.`,
-      margin + 5, y + 7,
-      { maxWidth: contentWidth - 10 }
-    )
-    if (invoice.fastighetsbeteckning) {
-      doc.text(`Fastighet: ${invoice.fastighetsbeteckning}`, margin + 5, y + 13)
-    }
-    y += 22
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(invoice.our_reference, refX, y + 18)
   }
 
-  // Items table – filter to displayable rows
+  y += 28
+
+  // ── ROT/RUT notice (subtle) ──
+  if (invoice.rot_rut_type) {
+    doc.setFontSize(9)
+    doc.setTextColor(...ACCENT_RGB)
+    doc.text(
+      `${invoice.rot_rut_type.toUpperCase()}-avdrag: ${formatSEK(invoice.rot_rut_deduction)} begärs hos Skatteverket. Att betala: ${formatSEK(invoice.customer_pays)}.`,
+      margin, y,
+      { maxWidth: contentWidth }
+    )
+    if (invoice.personnummer) {
+      y += 5
+      doc.setFontSize(8)
+      doc.setTextColor(...TEXT_MUTED)
+      doc.text(`Personnummer: ${invoice.personnummer}${invoice.fastighetsbeteckning ? ` · Fastighet: ${invoice.fastighetsbeteckning}` : ''}`, margin, y)
+    }
+    y += 8
+  }
+
+  // ── Section title ──
+  doc.setFontSize(7)
+  doc.setTextColor(...LABEL_COLOR)
+  doc.text('SPECIFIKATION', margin, y)
+  y += 4
+
+  // ── Items table ──
   const displayItems = invoice.items || []
   const tableBody: any[][] = []
 
@@ -215,22 +214,22 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
     const itemType = item.item_type || 'item'
 
     if (itemType === 'heading') {
-      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }])
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'bold', textColor: TEXT_PRIMARY } }])
     } else if (itemType === 'text') {
-      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'italic', textColor: [102, 102, 102] } }])
+      tableBody.push([{ content: item.description, colSpan: 5, styles: { fontStyle: 'italic', textColor: [...TEXT_SECONDARY] } }])
     } else if (itemType === 'subtotal') {
       tableBody.push([
         { content: '', colSpan: 3 },
-        { content: item.description, styles: { fontStyle: 'bold', fillColor: [254, 243, 199] } },
-        { content: formatSEK(item.total), styles: { fontStyle: 'bold', halign: 'right', fillColor: [254, 243, 199] } }
+        { content: item.description || 'Delsumma', styles: { fontStyle: 'bold' } },
+        { content: formatSEK(item.total), styles: { fontStyle: 'bold', halign: 'right' as const } },
       ])
     } else if (itemType === 'discount') {
       tableBody.push([
-        item.description,
-        String(item.quantity),
-        item.unit,
-        formatSEK(Math.abs(item.unit_price)),
-        `-${formatSEK(Math.abs(item.total))}`,
+        { content: item.description, styles: { textColor: [...ACCENT_RGB] } },
+        { content: String(item.quantity), styles: { textColor: [...ACCENT_RGB] } },
+        { content: item.unit, styles: { textColor: [...ACCENT_RGB] } },
+        { content: formatSEK(Math.abs(item.unit_price)), styles: { textColor: [...ACCENT_RGB] } },
+        { content: `-${formatSEK(Math.abs(item.total))}`, styles: { textColor: [...ACCENT_RGB], halign: 'right' as const } },
       ])
     } else {
       tableBody.push([
@@ -245,174 +244,148 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
 
   autoTable(doc, {
     startY: y,
-    head: [['Beskrivning', 'Antal', 'Enhet', 'à-pris', 'Summa']],
+    head: [['Beskrivning', 'Antal', 'Enhet', 'Pris/enhet', 'Summa']],
     body: tableBody,
     theme: 'plain',
     margin: { left: margin, right: margin },
     headStyles: {
-      fillColor: [r, g, b],
-      textColor: [255, 255, 255],
-      fontSize: 8,
-      fontStyle: 'bold',
-      cellPadding: 4,
+      fillColor: [255, 255, 255],
+      textColor: [...LABEL_COLOR],
+      fontSize: 7,
+      fontStyle: 'normal',
+      cellPadding: { top: 2, bottom: 4, left: 0, right: 0 },
     },
     bodyStyles: {
       fontSize: 9,
-      textColor: [26, 26, 26],
-      cellPadding: 4,
-    },
-    alternateRowStyles: {
-      fillColor: [250, 250, 250],
+      textColor: [...TEXT_PRIMARY],
+      cellPadding: { top: 3, bottom: 3, left: 0, right: 0 },
+      lineColor: [...SEPARATOR],
+      lineWidth: { bottom: 0.2 },
     },
     columnStyles: {
       0: { cellWidth: 'auto' },
-      1: { halign: 'right', cellWidth: 20 },
-      2: { halign: 'right', cellWidth: 20 },
-      3: { halign: 'right', cellWidth: 30 },
-      4: { halign: 'right', cellWidth: 30 },
+      1: { halign: 'right', cellWidth: 18 },
+      2: { halign: 'right', cellWidth: 18 },
+      3: { halign: 'right', cellWidth: 28 },
+      4: { halign: 'right', cellWidth: 28 },
+    },
+    didParseCell: (data: any) => {
+      // No border on the last row
+      if (data.row.index === tableBody.length - 1 && data.section === 'body') {
+        data.cell.styles.lineWidth = { bottom: 0 }
+      }
     },
   })
 
-  y = (doc as any).lastAutoTable.finalY + 10
+  y = (doc as any).lastAutoTable.finalY + 8
 
-  // Totals box
-  const totalsX = pageWidth - margin - 80
-  const totalsWidth = 80
-  const totalsHeight = invoice.rot_rut_type ? 58 : 38
+  // ── Totals (right-aligned) ──
+  const totalsW = 65
+  const totalsX = pageWidth - margin - totalsW
 
-  doc.setFillColor(248, 245, 255)
-  doc.roundedRect(totalsX, y, totalsWidth, totalsHeight, 3, 3, 'F')
+  const drawTotalRow = (label: string, value: string, options?: { teal?: boolean; bold?: boolean; topLine?: boolean }) => {
+    if (options?.topLine) {
+      doc.setDrawColor(...BORDER_COLOR)
+      doc.setLineWidth(0.15)
+      doc.line(totalsX, y - 1, totalsX + totalsW, y - 1)
+      y += 3
+    }
+    doc.setFontSize(options?.bold ? 11 : 9)
+    const color = options?.teal ? ACCENT_RGB : options?.bold ? TEXT_PRIMARY : TEXT_MUTED
+    doc.setTextColor(color[0], color[1], color[2])
+    doc.text(label, totalsX, y)
+    doc.text(value, totalsX + totalsW, y, { align: 'right' })
+    y += options?.bold ? 7 : 5
+  }
 
-  let ty = y + 8
-  doc.setFontSize(9)
-  doc.setTextColor(...grayText)
-  doc.text('Delsumma', totalsX + 5, ty)
-  doc.text(formatSEK(invoice.subtotal), totalsX + totalsWidth - 5, ty, { align: 'right' })
-  ty += 6
-  doc.text(`Moms (${invoice.vat_rate}%)`, totalsX + 5, ty)
-  doc.text(formatSEK(invoice.vat_amount), totalsX + totalsWidth - 5, ty, { align: 'right' })
-  ty += 2
-  doc.setDrawColor(...purple)
-  doc.setLineWidth(0.4)
-  doc.line(totalsX + 5, ty, totalsX + totalsWidth - 5, ty)
-  ty += 6
-  doc.setFontSize(13)
-  doc.setTextColor(...purple)
-  doc.text('Totalt', totalsX + 5, ty)
-  doc.text(formatSEK(invoice.total), totalsX + totalsWidth - 5, ty, { align: 'right' })
+  drawTotalRow('Netto exkl. moms', formatSEK(invoice.subtotal))
+  drawTotalRow(`Moms ${invoice.vat_rate}%`, formatSEK(invoice.vat_amount))
 
   if (invoice.rot_rut_type) {
-    ty += 7
-    doc.setFontSize(9)
-    doc.setTextColor(5, 150, 105)
-    doc.text(`${invoice.rot_rut_type.toUpperCase()}-avdrag`, totalsX + 5, ty)
-    doc.text(`-${formatSEK(invoice.rot_rut_deduction)}`, totalsX + totalsWidth - 5, ty, { align: 'right' })
-    ty += 7
-    doc.setFillColor(212, 237, 218)
-    doc.roundedRect(totalsX, ty - 5, totalsWidth, 12, 0, 0, 'F')
-    doc.setFontSize(11)
-    doc.setTextColor(26, 26, 26)
-    doc.text('Att betala', totalsX + 5, ty + 2)
-    doc.text(formatSEK(invoice.customer_pays), totalsX + totalsWidth - 5, ty + 2, { align: 'right' })
+    drawTotalRow(`${invoice.rot_rut_type.toUpperCase()}-avdrag`, `-${formatSEK(invoice.rot_rut_deduction)}`, { teal: true })
   }
 
-  y += totalsHeight + 10
-
-  // Payment info box
-  doc.setFillColor(26, 26, 26)
-
-  const payItems: { label: string; value: string }[] = []
-  if (business.bankgiro) payItems.push({ label: 'Bankgiro', value: business.bankgiro })
-  if (business.plusgiro) payItems.push({ label: 'Plusgiro', value: business.plusgiro })
-  if (business.swish_number) payItems.push({ label: 'Swish', value: business.swish_number })
-  payItems.push({ label: 'Att betala', value: formatSEK(invoice.rot_rut_type ? invoice.customer_pays : invoice.total) })
-  payItems.push({ label: 'OCR-nummer', value: ocrNumber })
-
-  const qrSize = 38 // mm
-  const hasSwishQR = !!business.swish_qr
-  const payBoxH = hasSwishQR ? Math.max(qrSize + 14, 28) : 28
-  doc.roundedRect(margin, y, contentWidth, payBoxH, 3, 3, 'F')
-
-  doc.setFontSize(7)
-  doc.setTextColor(...lightGray)
-  doc.text('BETALNINGSINFORMATION', margin + 8, y + 7)
-
-  if (hasSwishQR) {
-    // QR code on the left side
-    const qrX = margin + 8
-    const qrY = y + 10
-    doc.addImage(business.swish_qr!, 'PNG', qrX, qrY, qrSize, qrSize)
-
-    // Swish label below QR
-    doc.setFontSize(7)
-    doc.setTextColor(...lightGray)
-    doc.text('Swish', qrX, qrY + qrSize + 4)
-    if (business.swish_number) {
-      doc.setFontSize(8)
-      doc.setTextColor(...purple)
-      doc.text(business.swish_number, qrX, qrY + qrSize + 9)
-    }
-
-    // Text to the right of QR
-    const textX = margin + 8 + qrSize + 8
-    const textWidth = contentWidth - qrSize - 24
-    doc.setFontSize(10)
-    doc.setTextColor(255, 255, 255)
-    doc.text('Betala med Swish', textX, y + 16)
-    doc.setFontSize(8)
-    doc.setTextColor(...lightGray)
-    doc.text('Skanna QR-koden — belopp och fakturanummer', textX, y + 22, { maxWidth: textWidth })
-    doc.text('fylls i automatiskt i din Swish-app.', textX, y + 27, { maxWidth: textWidth })
-
-    // Other payment items to the right of QR
-    const otherItems = payItems.filter(p => p.label !== 'Swish')
-    const colW = textWidth / Math.max(otherItems.length, 1)
-    otherItems.forEach((item, i) => {
-      const px = textX + i * colW
-      doc.setFontSize(7)
-      doc.setTextColor(...lightGray)
-      doc.text(item.label, px, y + 35)
-      doc.setFontSize(10)
-      doc.setTextColor(...purple)
-      doc.text(item.value, px, y + 41, { maxWidth: colW - 2 })
-    })
-  } else {
-    const payColWidth = contentWidth / payItems.length
-    payItems.forEach((item, i) => {
-      const px = margin + 8 + i * payColWidth
-      doc.setFontSize(7)
-      doc.setTextColor(...lightGray)
-      doc.text(item.label, px, y + 14)
-      doc.setFontSize(12)
-      doc.setTextColor(...purple)
-      doc.text(item.value, px, y + 22)
-    })
-  }
-
-  y += payBoxH + 8
-
-  // Footer
-  doc.setDrawColor(230, 230, 230)
-  doc.setLineWidth(0.2)
-  doc.line(margin, y, pageWidth - margin, y)
-  y += 6
-  doc.setFontSize(8)
-  doc.setTextColor(...lightGray)
-  const footerParts = [
-    business.business_name || '',
-    `Org.nr: ${business.org_number || ''}`,
-    business.contact_email || '',
-    business.f_skatt_registered ? 'Godkänd för F-skatt' : '',
-  ].filter(Boolean)
-  doc.text(footerParts.join(' | '), pageWidth / 2, y, { align: 'center' })
-
-  if (business.penalty_interest) {
-    y += 4
-    doc.text(`Dröjsmålsränta: ${business.penalty_interest}%`, pageWidth / 2, y, { align: 'center' })
-  }
+  drawTotalRow('Att betala', formatSEK(invoice.rot_rut_type ? invoice.customer_pays : invoice.total), { bold: true, topLine: true })
 
   y += 4
-  doc.text(business.invoice_footer_text || 'Tack för att du anlitar oss!', pageWidth / 2, y, { align: 'center' })
+
+  // ── Swish / Payment info ──
+  if (business.swish_qr) {
+    // Light gray background row
+    doc.setFillColor(...SEPARATOR)
+    doc.roundedRect(margin, y, contentWidth, 24, 3, 3, 'F')
+
+    // QR code
+    doc.addImage(business.swish_qr, 'PNG', margin + 5, y + 3, 18, 18)
+
+    // Swish info
+    const infoX = margin + 28
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text('BETALA MED SWISH', infoX, y + 7)
+    doc.setFontSize(10)
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(business.swish_number || '', infoX, y + 13)
+    doc.setFontSize(8)
+    doc.setTextColor(...TEXT_SECONDARY)
+    doc.text(`Märk betalning: ${invoice.invoice_number}`, infoX, y + 18)
+
+    // Amount (right)
+    const finalAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
+    doc.setFontSize(16)
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(formatSEK(finalAmount), pageWidth - margin - 5, y + 11, { align: 'right' })
+    doc.setFontSize(8)
+    doc.setTextColor(...TEXT_SECONDARY)
+    doc.text(`förfaller ${new Date(invoice.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}`, pageWidth - margin - 5, y + 17, { align: 'right' })
+
+    y += 30
+  } else if (business.bankgiro || business.plusgiro) {
+    doc.setFillColor(...SEPARATOR)
+    doc.roundedRect(margin, y, contentWidth, 18, 3, 3, 'F')
+
+    const payLabel = business.bankgiro ? 'Bankgiro' : 'Plusgiro'
+    const payNum = business.bankgiro || business.plusgiro || ''
+
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text(payLabel.toUpperCase(), margin + 5, y + 6)
+    doc.setFontSize(10)
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(payNum, margin + 5, y + 12)
+
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text('OCR', margin + 50, y + 6)
+    doc.setFontSize(10)
+    doc.setTextColor(...TEXT_PRIMARY)
+    doc.text(ocrNumber, margin + 50, y + 12)
+
+    y += 24
+  }
+
+  // ── Footer (3 columns) ──
+  doc.setDrawColor(...BORDER_COLOR)
+  doc.setLineWidth(0.15)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += 6
+
+  const footerCols = [
+    { label: 'BANKGIRO', value: business.bankgiro || '—' },
+    { label: 'ORG.NR', value: business.org_number || '' },
+    { label: 'F-SKATTSEDEL', value: business.f_skatt_registered ? 'Godkänd' : '—' },
+  ]
+
+  const fColW = contentWidth / footerCols.length
+  footerCols.forEach((col, i) => {
+    const fx = margin + i * fColW
+    doc.setFontSize(7)
+    doc.setTextColor(...LABEL_COLOR)
+    doc.text(col.label, fx, y)
+    doc.setFontSize(9)
+    doc.setTextColor(...TEXT_MUTED)
+    doc.text(col.value, fx, y + 5)
+  })
 
   // Return as Buffer
   const arrayBuffer = doc.output('arraybuffer')

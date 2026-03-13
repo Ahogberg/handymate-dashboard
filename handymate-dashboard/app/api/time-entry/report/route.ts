@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateWeeklyOvertime, formatMinutes } from '@/lib/overtime'
+import {
+  escapeHtml,
+  formatCurrency,
+  formatDateShort,
+  buildContactLine,
+  renderDocumentHeader,
+  renderTealLine,
+  renderFooterGrid,
+  wrapInPage,
+} from '@/lib/document-html'
 
 /**
  * GET /api/time-entry/report - Generera tidsrapport
- * Query: startDate, endDate, format (json|csv), groupBy (day|week|customer|project)
+ * Query: startDate, endDate, format (json|csv|html), groupBy (day|week|customer|project)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -74,12 +84,13 @@ export async function GET(request: NextRequest) {
           key = entry.project_id || 'no-project'
           label = entry.project_id || 'Inget projekt'
           break
-        case 'week':
+        case 'week': {
           const d = new Date(entry.work_date)
           const weekNum = getISOWeek(d)
           key = `${d.getFullYear()}-W${weekNum}`
           label = `Vecka ${weekNum}, ${d.getFullYear()}`
           break
+        }
         default: // day
           key = entry.work_date
           label = entry.work_date
@@ -121,7 +132,22 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    // CSV export
+    // ── HTML export ──
+    if (exportFormat === 'html') {
+      const { data: config } = await supabase
+        .from('business_config')
+        .select('business_name, contact_name, phone_number, contact_email, org_number, f_skatt_registered, website')
+        .eq('business_id', business.business_id)
+        .single()
+
+      const html = generateTimeReportHTML(rows as any[], summary, overtimeResult, config, business, startDate, endDate)
+
+      return new NextResponse(html, {
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      })
+    }
+
+    // ── CSV export ──
     if (exportFormat === 'csv') {
       const BOM = '\uFEFF'
       const csvHeader = 'Datum;Kund;Arbetstyp;Person;Beskrivning;Tid (min);Rast (min);Timpris;Summa;Fakturerbar;Godkänd\n'
@@ -169,9 +195,10 @@ export async function GET(request: NextRequest) {
       groups: groupedData,
       overtime: overtimeResult,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Time report error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }
 
@@ -181,4 +208,191 @@ function getISOWeek(date: Date): number {
   d.setUTCDate(d.getUTCDate() + 4 - dayNum)
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1))
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+// ── HTML generation ────────────────────────────────────────────
+
+function generateTimeReportHTML(
+  entries: any[],
+  summary: any,
+  overtimeResult: any,
+  config: any,
+  business: any,
+  startDate: string,
+  endDate: string,
+): string {
+  // Determine week label
+  const startD = new Date(startDate)
+  const weekNum = getISOWeek(startD)
+  const year = startD.getFullYear()
+  const docNumber = `Vecka ${weekNum}, ${year}`
+
+  const contactLine = buildContactLine(
+    config?.contact_name || business?.contact_name,
+    config?.phone_number || business?.phone_number,
+    config?.contact_email || business?.contact_email,
+  )
+
+  const header = renderDocumentHeader(
+    config?.business_name || business?.business_name || 'Företag',
+    contactLine,
+    'Tidrapport',
+    docNumber,
+  )
+
+  // ── Meta row ──
+  // Find most common customer/project
+  const customerCounts = new Map<string, { name: string; count: number }>()
+  for (const e of entries) {
+    const cName = e.customer?.name || 'Inget projekt'
+    const existing = customerCounts.get(cName) || { name: cName, count: 0 }
+    existing.count++
+    customerCounts.set(cName, existing)
+  }
+  const topCustomer = Array.from(customerCounts.values()).sort((a, b) => b.count - a.count)[0]
+
+  const formatPeriodDate = (d: string) => {
+    const date = new Date(d)
+    return `${date.getDate()} ${['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'][date.getMonth()]} ${date.getFullYear()}`
+  }
+
+  const metaRow = `
+  <div class="meta-row meta-row-2">
+    <div class="meta-block">
+      <div class="label">Projekt</div>
+      <div class="value">
+        ${escapeHtml(topCustomer?.name || 'Diverse')}
+        ${entries[0]?.project_id ? `<div style="font-size:12px;color:#94A3B8;">${escapeHtml(entries[0].project_id)}</div>` : ''}
+      </div>
+    </div>
+    <div class="meta-block">
+      <div class="label">Period</div>
+      <div class="value">${formatPeriodDate(startDate)} – ${formatPeriodDate(endDate)}</div>
+    </div>
+  </div>`
+
+  // ── Group entries by person ──
+  const byPerson: Record<string, { name: string; entries: any[] }> = {}
+
+  for (const e of entries) {
+    const personId = e.business_user_id || 'unknown'
+    const personName = e.business_user?.name || config?.contact_name || business?.contact_name || 'Anställd'
+    if (!byPerson[personId]) byPerson[personId] = { name: personName, entries: [] }
+    byPerson[personId].entries.push(e)
+  }
+
+  // Standard work hours per day (in minutes)
+  const stdDayMinutes = 8 * 60
+
+  let personBlocksHtml = ''
+
+  for (const person of Object.values(byPerson)) {
+    const totalMinutes = person.entries.reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0)
+    const totalHours = Math.round(totalMinutes / 60 * 10) / 10
+
+    // Group entries by date
+    const byDate = new Map<string, any[]>()
+    for (const e of person.entries) {
+      const existing = byDate.get(e.work_date) || []
+      existing.push(e)
+      byDate.set(e.work_date, existing)
+    }
+
+    const dayRows = Array.from(byDate.entries()).map(([date, dayEntries]) => {
+      const dayTotal = dayEntries.reduce((s: number, e: any) => s + (e.duration_minutes || 0), 0)
+      const dayHours = Math.round(dayTotal / 60 * 10) / 10
+      const overtime = Math.max(0, dayTotal - stdDayMinutes)
+      const overtimeHours = overtime > 0 ? Math.round(overtime / 60 * 10) / 10 : 0
+      const regularHours = overtime > 0 ? Math.round((dayTotal - overtime) / 60 * 10) / 10 : dayHours
+      const descriptions = dayEntries.map((e: any) => e.description || '').filter(Boolean).join(', ')
+
+      return `<tr>
+        <td class="date">${formatDateShort(date)}</td>
+        <td>${escapeHtml(descriptions) || '—'}</td>
+        <td class="r">${regularHours}</td>
+        <td class="${overtimeHours > 0 ? 'r' : 'ot'}">${overtimeHours > 0 ? overtimeHours : '—'}</td>
+      </tr>`
+    }).join('\n')
+
+    personBlocksHtml += `
+    <div class="person-block">
+      <div class="person-header">
+        <span class="person-name">${escapeHtml(person.name)}</span>
+        <span class="person-total">${totalHours} tim totalt</span>
+      </div>
+      <table class="time">
+        <thead><tr>
+          <th style="width:22%">Datum</th>
+          <th style="width:50%">Beskrivning</th>
+          <th class="r" style="width:14%">Tim</th>
+          <th class="r" style="width:14%">Övertid</th>
+        </tr></thead>
+        <tbody>${dayRows}</tbody>
+      </table>
+    </div>`
+  }
+
+  // ── Summary row ──
+  const totalHours = Math.round(summary.total_minutes / 60 * 10) / 10
+  const overtimeHours = Math.round(summary.overtime.total_minutes / 60 * 10) / 10
+  const regularHours = Math.round((summary.total_minutes - summary.overtime.total_minutes) / 60 * 10) / 10
+
+  const summaryRowHtml = `
+  <div class="summary-row">
+    <div class="summary-cell">
+      <div class="label">Ordinarie tid</div>
+      <div class="val">${regularHours} tim</div>
+    </div>
+    <div class="summary-cell">
+      <div class="label">Övertid</div>
+      <div class="val">${overtimeHours} tim</div>
+    </div>
+    <div class="summary-cell">
+      <div class="label">Totalt</div>
+      <div class="val teal">${totalHours} tim</div>
+    </div>
+    <div class="summary-cell">
+      <div class="label">Fakturerbart</div>
+      <div class="val">${formatCurrency(summary.total_revenue)}</div>
+    </div>
+  </div>`
+
+  // ── Footer ──
+  const today = new Date().toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+  const signerName = config?.contact_name || business?.contact_name || ''
+
+  const footerHtml = renderFooterGrid([
+    {
+      label: 'Signerat av',
+      value: [escapeHtml(signerName), today].filter(Boolean).join('<br>'),
+    },
+    {
+      label: 'Org.nr',
+      value: [
+        escapeHtml(config?.org_number || ''),
+        config?.f_skatt_registered ? 'Godkänd för F-skatt' : '',
+      ].filter(Boolean).join('<br>'),
+    },
+    {
+      label: 'Export',
+      value: 'PDF &nbsp;&middot;&nbsp; Fortnox-sync',
+    },
+  ])
+
+  // ── Assemble ──
+  const bodyHtml = [
+    header,
+    renderTealLine(),
+    metaRow,
+    '<div class="section-title">Tidredovisning</div>',
+    personBlocksHtml,
+    summaryRowHtml,
+    footerHtml,
+  ].join('\n')
+
+  return wrapInPage(
+    `Tidrapport ${docNumber} — ${escapeHtml(config?.business_name || business?.business_name || '')}`,
+    '',
+    bodyHtml,
+  )
 }
