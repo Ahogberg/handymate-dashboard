@@ -22,6 +22,18 @@ interface BusinessContext {
   gmail_send_enabled?: boolean
   // Learned preferences
   preferences?: Record<string, string>
+  // V3 Automation settings
+  automationSettings?: {
+    work_start: string
+    work_end: string
+    work_days: string[]
+    night_mode_enabled: boolean
+    min_job_value_sek: number
+    require_approval_send_quote: boolean
+    require_approval_send_invoice: boolean
+    require_approval_create_booking: boolean
+    lead_response_target_minutes: number
+  } | null
 }
 
 const BRANCH_NAMES: Record<string, string> = {
@@ -89,6 +101,7 @@ ${servicesBlock}
 ${hoursBlock}
 
 ## Affärsregler
+${buildAutomationBlock(business.automationSettings)}
 ### ROT-avdrag
 - 30% av arbetskostnaden, max 50 000 kr/år
 ### RUT-avdrag
@@ -115,6 +128,23 @@ ${triggerInstructions}
 - Max 10 verktygsanrop per körning
 ${buildGoogleSection(business)}${prefsBlock}
 Dagens datum: ${new Date().toISOString().split('T')[0]}`
+}
+
+function buildAutomationBlock(settings: BusinessContext['automationSettings']): string {
+  if (!settings) return ''
+  const dayMap: Record<string, string> = {
+    mon: 'Mån', tue: 'Tis', wed: 'Ons', thu: 'Tor', fri: 'Fre', sat: 'Lör', sun: 'Sön',
+  }
+  const days = (settings.work_days || []).map(d => dayMap[d] || d).join(', ')
+  return `### Automationsinställningar
+- Arbetstider: ${settings.work_start}–${settings.work_end}, ${days}
+- Nattspärr: ${settings.night_mode_enabled ? 'PÅ' : 'AV'}
+- Minsta jobbvärde: ${settings.min_job_value_sek} kr
+- Skicka offert: ${settings.require_approval_send_quote ? 'kräver godkännande' : 'auto'}
+- Skicka faktura: ${settings.require_approval_send_invoice ? 'kräver godkännande' : 'auto'}
+- Boka tid: ${settings.require_approval_create_booking ? 'kräver godkännande' : 'auto'}
+- Lead-svarstid: max ${settings.lead_response_target_minutes} minuter
+`
 }
 
 function buildGoogleSection(business: BusinessContext): string {

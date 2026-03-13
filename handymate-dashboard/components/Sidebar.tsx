@@ -56,6 +56,7 @@ interface NavChild {
   href: string
   exact?: boolean
   featureGate?: string
+  dotKey?: string
 }
 
 type NavItem =
@@ -108,7 +109,7 @@ const NAV: NavItem[] = [
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
       { label: 'Prenumeration', href: '/dashboard/billing' },
       { label: 'Team', href: '/dashboard/settings?tab=team' },
-      { label: 'Automationer', href: '/dashboard/automations' },
+      { label: 'Automationer', href: '/dashboard/automations', dotKey: 'automation_failed' },
       { label: 'Offertmallar', href: '/dashboard/settings/quote-templates', featureGate: 'quote_templates' },
       { label: 'Standardtexter', href: '/dashboard/settings/quote-texts', featureGate: 'quote_templates' },
       { label: 'Lager & Material', href: '/dashboard/orders' },
@@ -131,6 +132,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifCount, setNotifCount] = useState(0)
+  const [automationFailed, setAutomationFailed] = useState(false)
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [notifLoading, setNotifLoading] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
@@ -351,6 +353,18 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         .eq('status', 'pending')
       setApprovalCount(count || 0)
     } catch { /* silent */ }
+
+    // Check for failed automation rules in last 24h
+    try {
+      const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+      const { count: failedCount } = await supabase
+        .from('v3_automation_logs')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', businessId)
+        .eq('status', 'failed')
+        .gte('created_at', yesterday)
+      setAutomationFailed((failedCount || 0) > 0)
+    } catch { /* table may not exist yet */ }
   }
 
   async function fetchPendingCount() {
@@ -528,6 +542,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                         <span className="flex items-center gap-2">
                           {child.label}
                           {childLocked && <Lock className="w-3 h-3 text-teal-300/40" />}
+                          {child.dotKey === 'automation_failed' && automationFailed && (
+                            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
+                          )}
                         </span>
                       </Link>
                     )

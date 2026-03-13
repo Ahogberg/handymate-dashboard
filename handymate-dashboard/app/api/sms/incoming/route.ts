@@ -92,6 +92,14 @@ export async function POST(request: NextRequest) {
         created_at: new Date().toISOString(),
       })
 
+    // V3 Automation Engine: fire sms_received event
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      fireEvent(supabase, 'sms_received', business.business_id, {
+        phone: from, message, customer_name: null,
+      }).catch(() => {})
+    } catch { /* non-blocking */ }
+
     // Build conversation history for agent context
     const { data: history } = await supabase
       .from('sms_conversation')

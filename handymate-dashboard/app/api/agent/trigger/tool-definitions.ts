@@ -342,4 +342,40 @@ export const toolDefinitions = [
       required: ["key", "value"],
     },
   },
+  // V3 Automation Engine tools
+  {
+    name: "get_automation_settings",
+    description: "Hämta automationsinställningar (arbetstider, nattspärr, godkännandekrav, responstider).",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "log_automation_action",
+    description: "Logga en automationsåtgärd i aktivitetsloggen.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        rule_name: {
+          type: "string",
+          description: "Namn på regeln eller åtgärden",
+        },
+        action_type: {
+          type: "string",
+          description: "Typ av åtgärd: send_sms, send_email, create_approval, update_status, run_agent, notify_owner",
+        },
+        status: {
+          type: "string",
+          description: "Resultat: success, failed, skipped",
+        },
+        details: {
+          type: "string",
+          description: "Beskrivning av vad som gjordes",
+        },
+      },
+      required: ["rule_name", "action_type", "status"],
+    },
+  },
 ] as const

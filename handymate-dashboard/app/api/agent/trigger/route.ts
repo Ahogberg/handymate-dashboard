@@ -192,6 +192,13 @@ export async function POST(request: NextRequest) {
     // Fetch learned preferences
     const preferences = await getBusinessPreferences(businessId)
 
+    // Fetch V3 automation settings
+    const { data: v3Settings } = await supabase
+      .from('v3_automation_settings')
+      .select('work_start, work_end, work_days, night_mode_enabled, min_job_value_sek, require_approval_send_quote, require_approval_send_invoice, require_approval_create_booking, lead_response_target_minutes')
+      .eq('business_id', businessId)
+      .maybeSingle()
+
     const systemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
@@ -200,6 +207,7 @@ export async function POST(request: NextRequest) {
         gmail_connected: !!googleConnection?.gmail_scope_granted && !!googleConnection?.gmail_sync_enabled,
         gmail_send_enabled: !!googleConnection?.gmail_send_scope_granted && !!googleConnection?.gmail_sync_enabled,
         preferences,
+        automationSettings: v3Settings || null,
       },
       trigger_type,
       trigger_data

@@ -346,6 +346,15 @@ export async function POST(request: NextRequest) {
         .in('id', project_material_ids)
     }
 
+    // V3 Automation Engine: fire invoice_created event
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      fireEvent(supabase, 'invoice_created', business_id, {
+        invoice_id: invoice.invoice_id, customer_id, total: invoice.total,
+        due_date: invoice.due_date,
+      }).catch(() => {})
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({
       invoice,
       ...(rotRutWarning ? { rot_rut_warning: rotRutWarning } : {}),

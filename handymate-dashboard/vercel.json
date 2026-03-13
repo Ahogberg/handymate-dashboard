@@ -46,8 +46,8 @@
       "schedule": "0 2 * * *"
     },
     {
-      "path": "/api/cron/generate-insights",
-      "schedule": "0 6 * * 0"
+      "path": "/api/cron/evaluate-thresholds",
+      "schedule": "0 4 * * *"
     }
   ]
 }

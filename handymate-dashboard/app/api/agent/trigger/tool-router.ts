@@ -4,6 +4,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
 import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
+import { getNextCustomerNumber, getNextProjectNumber } from '@/lib/numbering'
 
 interface ToolResult {
   success: boolean
@@ -91,6 +92,10 @@ export async function executeTool(
         return await checkPendingApprovals(supabase, businessId)
       case 'update_business_preference':
         return await updateBusinessPreference(supabase, businessId, input)
+      case 'get_automation_settings':
+        return await getAutomationSettings(supabase, businessId)
+      case 'log_automation_action':
+        return await logAutomationAction(supabase, businessId, input)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -156,6 +161,7 @@ async function createCustomer(
   }
 
   const customerId = generateId('cust')
+  const customerNumber = await getNextCustomerNumber(supabase, businessId)
   const { error } = await supabase.from('customer').insert({
     customer_id: customerId,
     business_id: businessId,
@@ -163,11 +169,12 @@ async function createCustomer(
     phone_number: params.phone_number,
     email: params.email || null,
     address_line: params.address_line || null,
+    customer_number: customerNumber,
     created_at: new Date().toISOString(),
   })
 
   if (error) return { success: false, error: error.message }
-  return { success: true, data: { customer_id: customerId, message: `Kund "${params.name}" skapad` } }
+  return { success: true, data: { customer_id: customerId, customer_number: customerNumber, message: `Kund "${params.name}" skapad (${customerNumber})` } }
 }
 
 async function updateCustomer(
@@ -767,22 +774,32 @@ async function qualifyLead(
   }
 
   const leadId = generateId('lead')
+  const projectNumber = await getNextProjectNumber(supabase, businessId)
   const { error } = await supabase.from('leads').insert({
     lead_id: leadId, business_id: businessId, phone, name: contactName || null,
     source, status: 'new', score, score_reasons: scoreReasons.filter(r => r.matched),
     estimated_value: estimatedValue, job_type: jobType, urgency,
-    conversation_id: conversationId, created_at: now, updated_at: now,
+    conversation_id: conversationId, project_number: projectNumber, created_at: now, updated_at: now,
   })
 
   if (error) return { success: false, error: error.message }
 
   await supabase.from('lead_activities').insert({
     activity_id: generateId('la'), lead_id: leadId, business_id: businessId,
-    activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'}, score ${score}`,
+    activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'} (${projectNumber}), score ${score}`,
     created_at: now,
   }).catch(() => {})
 
-  return { success: true, data: { lead_id: leadId, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad (score ${score})` } }
+  // V3 Automation Engine: fire lead_created event
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    fireEvent(supabase, 'lead_created', businessId, {
+      lead_id: leadId, customer_name: contactName, phone, job_type: jobType,
+      urgency, estimated_value: estimatedValue, source,
+    }).catch(() => {})
+  } catch { /* non-blocking */ }
+
+  return { success: true, data: { lead_id: leadId, project_number: projectNumber, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad ${projectNumber} (score ${score})` } }
 }
 
 async function updateLeadStatus(
@@ -1197,4 +1214,66 @@ async function updateBusinessPreference(
     success: true,
     data: { message: `Preferens sparad: ${key} = ${value}` },
   }
+}
+
+// ── V3 Automation Engine ────────────────────────────────
+
+async function getAutomationSettings(
+  supabase: SupabaseClient, businessId: string
+): Promise<ToolResult> {
+  const { data, error } = await supabase
+    .from('v3_automation_settings')
+    .select('*')
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (error) return { success: false, error: error.message }
+
+  if (!data) {
+    return {
+      success: true,
+      data: {
+        message: 'Standardinställningar (inga anpassade inställningar sparade)',
+        work_days: ['mon', 'tue', 'wed', 'thu', 'fri'],
+        work_start: '07:00',
+        work_end: '17:00',
+        night_mode_enabled: true,
+        min_job_value_sek: 0,
+        require_approval_send_quote: true,
+        require_approval_send_invoice: true,
+        require_approval_send_sms: false,
+        require_approval_create_booking: false,
+        lead_response_target_minutes: 30,
+        quote_followup_days: 5,
+        invoice_reminder_days: 7,
+      },
+    }
+  }
+
+  return { success: true, data }
+}
+
+async function logAutomationAction(
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+): Promise<ToolResult> {
+  const { rule_name, action_type, status, details } = params
+
+  if (!rule_name || !action_type || !status) {
+    return { success: false, error: 'rule_name, action_type och status krävs' }
+  }
+
+  const { error } = await supabase.from('v3_automation_logs').insert({
+    business_id: businessId,
+    rule_id: null,
+    rule_name: String(rule_name),
+    trigger_type: 'manual',
+    action_type: String(action_type),
+    status: String(status),
+    context: { details: details || null, source: 'agent' },
+    result: {},
+  })
+
+  if (error) return { success: false, error: error.message }
+
+  return { success: true, data: { message: `Åtgärd loggad: ${rule_name} (${status})` } }
 }

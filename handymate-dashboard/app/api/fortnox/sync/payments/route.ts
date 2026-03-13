@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     // Get all sent/overdue invoices that have been synced to Fortnox
     const { data: invoices, error: fetchError } = await adminSupabase
       .from('invoice')
-      .select('invoice_id, fortnox_document_number, status')
+      .select('invoice_id, fortnox_document_number, status, customer_id')
       .eq('business_id', businessId)
       .in('status', ['sent', 'overdue'])
       .not('fortnox_document_number', 'is', null)
@@ -66,6 +66,14 @@ export async function POST(request: NextRequest) {
               payment_method: 'fortnox'
             })
             .eq('invoice_id', invoice.invoice_id)
+
+          // V3 Automation Engine: fire payment_received event
+          try {
+            const { fireEvent } = await import('@/lib/automation-engine')
+            fireEvent(adminSupabase, 'payment_received', businessId, {
+              invoice_id: invoice.invoice_id, customer_id: invoice.customer_id,
+            }).catch(() => {})
+          } catch { /* non-blocking */ }
 
           results.updated++
         } else if (fortnoxInvoice.Cancelled) {
