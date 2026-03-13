@@ -64,9 +64,9 @@ export async function POST(request: NextRequest) {
       // V3 Automation Engine: fire call_missed event
       try {
         const { fireEvent } = await import('@/lib/automation-engine')
-        fireEvent(supabase, 'call_missed', business.business_id, {
+        await fireEvent(supabase, 'call_missed', business.business_id, {
           phone: from, call_id: callId,
-        }).catch(() => {})
+        })
       } catch { /* non-blocking */ }
       return NextResponse.json({ "hangup": "no_forward_number" })
     }

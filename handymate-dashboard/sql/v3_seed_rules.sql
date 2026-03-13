@@ -60,7 +60,13 @@ BEGIN
     (p_business_id, 'Reaktivering 6 månader', 'Skickar reaktiverings-SMS till kunder utan aktivitet i 6 månader', true, false,
      'threshold', '{"entity": "customer", "field": "months_since_last_job", "operator": ">=", "value": 6}',
      'create_approval', '{"title": "Reaktivera inaktiv kund", "description": "Kunden har inte haft jobb på 6+ månader. Godkänn för att skicka reaktiverings-SMS."}',
-     true, true, true)
+     true, true, true),
+
+    -- 10. Inkommande SMS — notifiera
+    (p_business_id, 'Inkommande SMS — notifiera', 'Loggar och notifierar ägaren när ett SMS tas emot', true, true,
+     'event', '{"event_name": "sms_received"}',
+     'notify_owner', '{"title": "Nytt SMS från {{phone}}", "message": "{{message}}"}',
+     false, true, true)
 
   ON CONFLICT DO NOTHING;
 END;
