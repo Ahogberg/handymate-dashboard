@@ -37,6 +37,16 @@ interface BusinessContext {
   // V4 Phone transfer
   personal_phone?: string | null
   call_handling_mode?: string | null
+  // V5 Agent context — tolkad företagsstatus (genererat nattligen)
+  agentContext?: {
+    generated_at: string
+    business_health: string
+    open_leads_count: number
+    overdue_invoices_count: number
+    pending_approvals_count: number
+    key_insights: Array<{ type: string; message: string; action_needed: boolean }>
+    recommended_priorities: Array<{ priority: number; description: string; lead_id?: string }>
+  } | null
   // V4 Pipeline context — injiceras per aktiv konversation om lead finns
   leadPipelineContext?: {
     lead_id: string
@@ -84,6 +94,8 @@ export function buildSystemPrompt(
 
   const triggerInstructions = getTriggerInstructions(triggerType, triggerData)
 
+  const contextBlock = buildAgentContextBlock(business.agentContext)
+
   const prefsBlock = business.preferences && Object.keys(business.preferences).length > 0
     ? '\n\n## Inlärda preferenser\n' +
       Object.entries(business.preferences)
@@ -108,7 +120,7 @@ ${servicesBlock}
 
 ## Arbetstider
 ${hoursBlock}
-
+${contextBlock}
 ## Affärsregler
 ${buildAutomationBlock(business.automationSettings)}
 ### ROT-avdrag
@@ -226,4 +238,30 @@ ${triggerData?.instruction || '(Ingen instruktion)'}`
     default:
       return `### ${triggerType}\n${JSON.stringify(triggerData || {})}`
   }
+}
+
+function buildAgentContextBlock(ctx: BusinessContext['agentContext']): string {
+  if (!ctx) return ''
+
+  const healthEmoji = ctx.business_health === 'critical' ? 'KRITISKT'
+    : ctx.business_health === 'attention' ? 'KRÄVER UPPMÄRKSAMHET'
+    : 'STABILT'
+
+  const insights = ctx.key_insights
+    .map(i => `- ${i.message}${i.action_needed ? ' ⚡' : ''}`)
+    .join('\n')
+
+  const priorities = ctx.recommended_priorities
+    .map(p => `${p.priority}. ${p.description}`)
+    .join('\n')
+
+  return `
+## Företagets nuläge (genererat ${ctx.generated_at.split('T')[0]})
+- Hälsa: **${healthEmoji}**
+- Öppna leads: ${ctx.open_leads_count}
+- Förfallna fakturor: ${ctx.overdue_invoices_count}
+- Väntande godkännanden: ${ctx.pending_approvals_count}
+${insights ? `\n### Insikter\n${insights}` : ''}
+${priorities ? `\n### Prioriteringar\n${priorities}` : ''}
+`
 }

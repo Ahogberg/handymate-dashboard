@@ -225,6 +225,17 @@ export async function POST(request: NextRequest) {
       } catch { /* non-blocking */ }
     }
 
+    // V5: Fetch agent_context (nattlig analys)
+    let agentContext: any = null
+    try {
+      const { data: ctx } = await supabase
+        .from('agent_context')
+        .select('generated_at, business_health, open_leads_count, overdue_invoices_count, pending_approvals_count, key_insights, recommended_priorities')
+        .eq('business_id', businessId)
+        .maybeSingle()
+      agentContext = ctx
+    } catch { /* non-blocking — tabellen kanske inte finns ännu */ }
+
     const systemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
@@ -235,6 +246,7 @@ export async function POST(request: NextRequest) {
         preferences,
         automationSettings: v3Settings || null,
         call_handling_mode: v3Settings?.call_handling_mode || 'agent_with_transfer',
+        agentContext,
         leadPipelineContext,
       },
       trigger_type,
