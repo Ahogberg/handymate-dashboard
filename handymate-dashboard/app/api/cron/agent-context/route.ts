@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { generateAgentContext } from '@/lib/agent/context-engine'
+import { generateAgentContext, updateBusinessPreferences } from '@/lib/agent/context-engine'
 import { sendMorningReport } from '@/lib/agent/morning-report'
 
 export const maxDuration = 60
@@ -43,6 +43,7 @@ async function runAgentContext() {
     business_id: string
     context: { success: boolean; tokens_used?: number; error?: string }
     report: { success: boolean; error?: string }
+    preferences: { success: boolean; error?: string }
   }> = []
 
   for (const biz of businesses) {
@@ -55,14 +56,23 @@ async function runAgentContext() {
       reportResult = await sendMorningReport(biz.business_id)
     }
 
+    // Uppdatera inlärda preferenser
+    let preferencesResult: { success: boolean; error?: string } = { success: false, error: 'Skipped' }
+    try {
+      preferencesResult = await updateBusinessPreferences(biz.business_id)
+    } catch (err: any) {
+      preferencesResult = { success: false, error: err.message }
+    }
+
     results.push({
       business_id: biz.business_id,
       context: contextResult,
       report: reportResult,
+      preferences: preferencesResult,
     })
 
     console.log(
-      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}`
+      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, prefs=${preferencesResult.success}`
     )
   }
 

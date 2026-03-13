@@ -236,6 +236,17 @@ export async function POST(request: NextRequest) {
       agentContext = ctx
     } catch { /* non-blocking — tabellen kanske inte finns ännu */ }
 
+    // V5: Fetch learned preferences
+    let learnedPreferences: any = null
+    try {
+      const { data: prefs } = await supabase
+        .from('business_preferences')
+        .select('communication_tone, pricing_tendency, lead_response_style, preferred_sms_length, custom_preferences')
+        .eq('business_id', businessId)
+        .maybeSingle()
+      learnedPreferences = prefs
+    } catch { /* non-blocking */ }
+
     const systemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
@@ -247,6 +258,7 @@ export async function POST(request: NextRequest) {
         automationSettings: v3Settings || null,
         call_handling_mode: v3Settings?.call_handling_mode || 'agent_with_transfer',
         agentContext,
+        learnedPreferences,
         leadPipelineContext,
       },
       trigger_type,

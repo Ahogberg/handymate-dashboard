@@ -9,6 +9,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
 
 const MODEL = 'claude-sonnet-4-20250514'
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001'
 
 interface AgentContextResult {
   business_health: 'strong' | 'attention' | 'critical'
@@ -204,6 +205,109 @@ Om det inte finns data att analysera, returnera health "strong" med tom insights
     return { success: true, tokens_used: tokensUsed }
   } catch (err: any) {
     console.error('[ContextEngine] Error:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+/**
+ * Nattlig preferensanalys — analyserar learning_events och
+ * upserar tolkade preferenser till business_preferences.
+ */
+export async function updateBusinessPreferences(businessId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  const supabase = getServerSupabase()
+
+  try {
+    // Hämta senaste 50 learning_events
+    const { data: events, error: fetchError } = await supabase
+      .from('learning_events')
+      .select('*')
+      .eq('business_id', businessId)
+      .order('created_at', { ascending: false })
+      .limit(50)
+
+    if (fetchError) {
+      console.error('[Preferences] Fetch error:', fetchError)
+      return { success: false, error: fetchError.message }
+    }
+
+    if (!events || events.length < 3) {
+      // Otillräcklig data för att dra slutsatser
+      return { success: true }
+    }
+
+    // Skicka till Claude Haiku för analys
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY!,
+    })
+
+    const response = await anthropic.messages.create({
+      model: HAIKU_MODEL,
+      max_tokens: 512,
+      system: `Analysera dessa inlärningshändelser och identifiera mönster i hur hantverkaren vill att agenten ska agera.
+Returnera ENDAST giltig JSON utan markdown:
+{
+  "communication_tone": "formal"|"casual"|"brief"|null,
+  "pricing_tendency": "premium"|"competitive"|"flexible"|null,
+  "lead_response_style": "immediate"|"considered"|"selective"|null,
+  "preferred_sms_length": "short"|"medium"|"detailed"|null,
+  "custom_preferences": [{ "key": string, "value": string, "confidence": number }]
+}
+Basera svaret enbart på faktiska mönster. Om otillräcklig data — returnera null för det fältet.`,
+      messages: [
+        {
+          role: 'user',
+          content: `Analysera dessa ${events.length} inlärningshändelser:\n${JSON.stringify(events, null, 2)}`,
+        },
+      ],
+    })
+
+    const textContent = response.content.find(b => b.type === 'text')
+    if (!textContent || textContent.type !== 'text') {
+      return { success: false, error: 'No text response from Claude' }
+    }
+
+    let preferences: {
+      communication_tone: string | null
+      pricing_tendency: string | null
+      lead_response_style: string | null
+      preferred_sms_length: string | null
+      custom_preferences: Array<{ key: string; value: string; confidence: number }> | null
+    }
+
+    try {
+      preferences = JSON.parse(textContent.text)
+    } catch {
+      console.error('[Preferences] Failed to parse Claude response:', textContent.text)
+      return { success: false, error: 'Invalid JSON from Claude' }
+    }
+
+    // Upserta till business_preferences
+    const { error: upsertError } = await supabase
+      .from('business_preferences')
+      .upsert(
+        {
+          business_id: businessId,
+          updated_at: new Date().toISOString(),
+          communication_tone: preferences.communication_tone,
+          pricing_tendency: preferences.pricing_tendency,
+          lead_response_style: preferences.lead_response_style,
+          preferred_sms_length: preferences.preferred_sms_length,
+          custom_preferences: preferences.custom_preferences,
+        },
+        { onConflict: 'business_id' }
+      )
+
+    if (upsertError) {
+      console.error('[Preferences] Upsert error:', upsertError)
+      return { success: false, error: upsertError.message }
+    }
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Preferences] Error:', err)
     return { success: false, error: err.message }
   }
 }

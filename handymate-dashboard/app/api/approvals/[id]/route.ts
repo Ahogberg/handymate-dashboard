@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { recordLearningEvent } from '@/lib/agent/learning-engine'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,10 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { action } = await request.json()
-    if (!action || !['approve', 'reject'].includes(action)) {
-      return NextResponse.json({ error: 'action must be approve or reject' }, { status: 400 })
+    const body = await request.json()
+    const { action, edited_payload, reject_reason } = body
+    if (!action || !['approve', 'reject', 'edit'].includes(action)) {
+      return NextResponse.json({ error: 'action must be approve, reject or edit' }, { status: 400 })
     }
 
     const supabase = getServerSupabase()
@@ -44,22 +46,70 @@ export async function POST(
       return NextResponse.json({ error: `Approval already ${approval.status}` }, { status: 409 })
     }
 
+    // For edit action: merge edited_payload into original payload
+    const finalPayload = action === 'edit'
+      ? { ...approval.payload, ...edited_payload }
+      : approval.payload
+
     // Update status
+    const newStatus = action === 'reject' ? 'rejected' : 'approved'
+    const updateData: Record<string, unknown> = {
+      status: newStatus,
+      resolved_at: new Date().toISOString(),
+      resolved_by: business.business_id,
+    }
+    if (action === 'edit') {
+      updateData.payload = finalPayload
+    }
+
     const { error: updateError } = await supabase
       .from('pending_approvals')
-      .update({
-        status: action === 'approve' ? 'approved' : 'rejected',
-        resolved_at: new Date().toISOString(),
-        resolved_by: business.business_id,
-      })
+      .update(updateData)
       .eq('id', params.id)
 
     if (updateError) throw updateError
 
-    // If approved, execute the payload action
+    // Record learning event (non-blocking)
+    try {
+      const agentSuggestion = approval.payload as Record<string, unknown>
+
+      if (action === 'approve') {
+        await recordLearningEvent(
+          business.business_id,
+          'approval_accepted',
+          params.id,
+          'approval',
+          agentSuggestion,
+          null
+        )
+      } else if (action === 'edit') {
+        await recordLearningEvent(
+          business.business_id,
+          'approval_edited',
+          params.id,
+          'approval',
+          agentSuggestion,
+          edited_payload || {}
+        )
+      } else if (action === 'reject') {
+        await recordLearningEvent(
+          business.business_id,
+          'approval_rejected',
+          params.id,
+          'approval',
+          agentSuggestion,
+          reject_reason ? { reason: reject_reason } : null
+        )
+      }
+    } catch {
+      // Non-blocking — learning event failure should not break approval flow
+    }
+
+    // If approved or edited, execute the payload action
     let executionResult: Record<string, unknown> | null = null
-    if (action === 'approve') {
-      executionResult = await executeApprovalPayload(approval, business.business_id)
+    if (action === 'approve' || action === 'edit') {
+      const approvalWithPayload = { ...approval, payload: finalPayload }
+      executionResult = await executeApprovalPayload(approvalWithPayload, business.business_id)
     }
 
     return NextResponse.json({

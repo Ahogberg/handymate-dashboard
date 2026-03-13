@@ -47,6 +47,14 @@ interface BusinessContext {
     key_insights: Array<{ type: string; message: string; action_needed: boolean }>
     recommended_priorities: Array<{ priority: number; description: string; lead_id?: string }>
   } | null
+  // V5 Learned preferences — per-företags-inlärning
+  learnedPreferences?: {
+    communication_tone: string | null
+    pricing_tendency: string | null
+    lead_response_style: string | null
+    preferred_sms_length: string | null
+    custom_preferences: Array<{ key: string; value: string; confidence: number }> | null
+  } | null
   // V4 Pipeline context — injiceras per aktiv konversation om lead finns
   leadPipelineContext?: {
     lead_id: string
@@ -95,6 +103,7 @@ export function buildSystemPrompt(
   const triggerInstructions = getTriggerInstructions(triggerType, triggerData)
 
   const contextBlock = buildAgentContextBlock(business.agentContext)
+  const learnedPrefsBlock = buildLearnedPreferencesBlock(business.learnedPreferences)
 
   const prefsBlock = business.preferences && Object.keys(business.preferences).length > 0
     ? '\n\n## Inlärda preferenser\n' +
@@ -161,7 +170,7 @@ ${business.personal_phone
 - Kontrollera kalender innan bokning (check_calendar)
 - Skicka aldrig SMS nattetid
 - Max 10 verktygsanrop per körning
-${buildGoogleSection(business)}${prefsBlock}
+${buildGoogleSection(business)}${prefsBlock}${learnedPrefsBlock}
 Dagens datum: ${new Date().toISOString().split('T')[0]}`
 }
 
@@ -238,6 +247,27 @@ ${triggerData?.instruction || '(Ingen instruktion)'}`
     default:
       return `### ${triggerType}\n${JSON.stringify(triggerData || {})}`
   }
+}
+
+function buildLearnedPreferencesBlock(prefs: BusinessContext['learnedPreferences']): string {
+  if (!prefs) return ''
+
+  const lines: string[] = []
+  if (prefs.communication_tone) lines.push(`Kommunikationston: ${prefs.communication_tone}`)
+  if (prefs.preferred_sms_length) lines.push(`SMS-längd: ${prefs.preferred_sms_length}`)
+  if (prefs.pricing_tendency) lines.push(`Prissättningstendans: ${prefs.pricing_tendency}`)
+  if (prefs.lead_response_style) lines.push(`Lead-hantering: ${prefs.lead_response_style}`)
+  if (prefs.custom_preferences?.length) {
+    for (const p of prefs.custom_preferences) {
+      if (p.confidence >= 0.5) {
+        lines.push(`${p.key}: ${p.value}`)
+      }
+    }
+  }
+
+  if (lines.length === 0) return ''
+
+  return `\n\n## Inlärda preferenser för detta företag\n${lines.map(l => `- ${l}`).join('\n')}`
 }
 
 function buildAgentContextBlock(ctx: BusinessContext['agentContext']): string {
