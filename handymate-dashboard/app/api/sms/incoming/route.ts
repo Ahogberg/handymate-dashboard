@@ -94,11 +94,15 @@ export async function POST(request: NextRequest) {
 
     // V3 Automation Engine: fire sms_received event
     try {
+      console.log(`[SMS Incoming] Firing sms_received event for business ${business.business_id}`)
       const { fireEvent } = await import('@/lib/automation-engine')
       await fireEvent(supabase, 'sms_received', business.business_id, {
         phone: from, message, customer_name: null,
       })
-    } catch { /* non-blocking */ }
+      console.log(`[SMS Incoming] fireEvent completed`)
+    } catch (fireErr) {
+      console.error(`[SMS Incoming] fireEvent error:`, fireErr)
+    }
 
     // Build conversation history for agent context
     const { data: history } = await supabase
