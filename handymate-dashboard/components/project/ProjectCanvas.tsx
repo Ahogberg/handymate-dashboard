@@ -24,10 +24,16 @@ const COLORS = ['#1a1a1a', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#8b5cf6'
 const STROKE_WIDTHS = [2, 4, 8, 16]
 
 interface Props {
-  projectId: string
+  projectId?: string
+  entityType?: string
+  entityId?: string
+  title?: string
 }
 
-export default function ProjectCanvas({ projectId }: Props) {
+export default function ProjectCanvas({ projectId, entityType, entityId, title }: Props) {
+  // Backward compat: projectId maps to entity_type=project
+  const resolvedType = entityType || 'project'
+  const resolvedId = entityId || projectId || ''
   const canvasContainerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fabricRef = useRef<any>(null)
@@ -138,7 +144,7 @@ export default function ProjectCanvas({ projectId }: Props) {
 
   const loadCanvas = async (canvas: any) => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/canvas`)
+      const res = await fetch(`/api/canvas?entityType=${resolvedType}&entityId=${resolvedId}`)
       if (!res.ok) throw new Error()
       const data = await res.json()
       const canvasData = data.canvas?.canvas_data
@@ -164,7 +170,7 @@ export default function ProjectCanvas({ projectId }: Props) {
     setSaving(true)
     try {
       const canvasData = canvas.toJSON()
-      await fetch(`/api/projects/${projectId}/canvas`, {
+      await fetch(`/api/canvas?entityType=${resolvedType}&entityId=${resolvedId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ canvas_data: canvasData }),
@@ -175,7 +181,7 @@ export default function ProjectCanvas({ projectId }: Props) {
       savingRef.current = false
       setSaving(false)
     }
-  }, [projectId])
+  }, [resolvedType, resolvedId])
 
   const handleUndo = () => {
     const canvas = fabricRef.current

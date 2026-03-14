@@ -22,16 +22,24 @@ export async function PATCH(request: NextRequest) {
   }
 
   const body = await request.json()
-  const { stage_id, label } = body
+  const { stage_id, label, creates_project } = body
 
-  if (!stage_id || !label) {
-    return NextResponse.json({ error: 'Missing stage_id or label' }, { status: 400 })
+  if (!stage_id) {
+    return NextResponse.json({ error: 'Missing stage_id' }, { status: 400 })
+  }
+
+  const updates: Record<string, unknown> = {}
+  if (label !== undefined) updates.label = label
+  if (creates_project !== undefined) updates.creates_project = creates_project
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
   }
 
   const supabase = getServerSupabase()
   const { data, error } = await supabase
     .from('pipeline_stages')
-    .update({ label })
+    .update(updates)
     .eq('id', stage_id)
     .eq('business_id', business.business_id)
     .select()

@@ -3839,6 +3839,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
     show_ai_activity: true,
   })
   const [stages, setStages] = useState<Array<{ id: string; name: string; slug: string; color: string; sort_order: number; is_won: boolean; is_lost: boolean }>>([])
+  const [leadStages, setLeadStages] = useState<Array<{ id: string; key: string; label: string; color: string; sort_order: number; creates_project: boolean }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: string }>({ show: false, message: '', type: 'success' })
@@ -3849,9 +3850,10 @@ function PipelineSettings({ businessId }: { businessId: string }) {
 
   async function fetchSettings() {
     try {
-      const [settingsRes, stagesRes] = await Promise.all([
+      const [settingsRes, stagesRes, leadStagesRes] = await Promise.all([
         fetch('/api/pipeline/settings'),
         fetch('/api/pipeline/stages'),
+        fetch('/api/leads/pipeline-stages'),
       ])
       if (settingsRes.ok) {
         const data = await settingsRes.json()
@@ -3860,6 +3862,10 @@ function PipelineSettings({ businessId }: { businessId: string }) {
       if (stagesRes.ok) {
         const data = await stagesRes.json()
         setStages(data.stages || [])
+      }
+      if (leadStagesRes.ok) {
+        const data = await leadStagesRes.json()
+        setLeadStages(data.stages || [])
       }
     } catch { /* ignore */ }
     setLoading(false)
@@ -4031,6 +4037,46 @@ function PipelineSettings({ businessId }: { businessId: string }) {
           ))}
         </div>
       </div>
+
+      {/* Lead Pipeline — Automatiskt projekt */}
+      {leadStages.length > 0 && (
+        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Automatiskt projekt</h2>
+          <p className="text-sm text-gray-400 mb-4">Välj vilka lead-steg som automatiskt skapar ett projekt</p>
+
+          <div className="space-y-2">
+            {leadStages.filter(s => s.key !== 'lost').map((stage) => (
+              <label key={stage.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-all">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
+                <span className="text-gray-900 text-sm flex-1">{stage.label}</span>
+                <div
+                  className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
+                    stage.creates_project ? 'bg-teal-600' : 'bg-gray-200'
+                  }`}
+                  onClick={async (e) => {
+                    e.preventDefault()
+                    const newValue = !stage.creates_project
+                    setLeadStages(prev => prev.map(s => s.id === stage.id ? { ...s, creates_project: newValue } : s))
+                    try {
+                      await fetch('/api/leads/pipeline-stages', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ stage_id: stage.id, creates_project: newValue }),
+                      })
+                    } catch {
+                      setLeadStages(prev => prev.map(s => s.id === stage.id ? { ...s, creates_project: !newValue } : s))
+                    }
+                  }}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${
+                    stage.creates_project ? 'left-5' : 'left-1'
+                  }`} />
+                </div>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

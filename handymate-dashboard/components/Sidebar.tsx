@@ -92,6 +92,7 @@ const NAV: NavItem[] = [
       { label: 'Tidrapportering', href: '/dashboard/time' },
       { label: 'Ersättningar', href: '/dashboard/time/allowances' },
       { label: 'Fordon', href: '/dashboard/vehicles' },
+      { label: 'Skissblock', href: '/dashboard/planning/canvas' },
     ],
   },
 ]

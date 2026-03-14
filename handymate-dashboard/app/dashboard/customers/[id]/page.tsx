@@ -336,36 +336,23 @@ export default function CustomerDetailPage() {
         continue // Skip files > 10MB
       }
 
-      const fileExt = file.name.split('.').pop()
-      const filePath = `${business.business_id}/${customerId}/${Date.now()}_${file.name}`
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', uploadCategory)
 
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('customer-documents')
-        .upload(filePath, file)
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        continue
-      }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('customer-documents')
-        .getPublicUrl(filePath)
-
-      // Save document metadata
-      await fetch(`/api/customers/${customerId}/documents`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          file_name: file.name,
-          file_url: urlData.publicUrl,
-          file_type: file.type,
-          file_size: file.size,
-          category: uploadCategory,
+        const res = await fetch(`/api/customers/${customerId}/documents/upload`, {
+          method: 'POST',
+          body: formData,
         })
-      })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          console.error('Upload error:', err)
+        }
+      } catch (err) {
+        console.error('Upload error:', err)
+      }
     }
 
     setUploading(false)

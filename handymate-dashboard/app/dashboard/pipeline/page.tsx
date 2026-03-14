@@ -44,12 +44,23 @@ import {
   Target,
   Lightbulb,
   Zap,
-  BarChart3
+  BarChart3,
+  Pencil,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
+
+const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
+  loading: () => (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+    </div>
+  ),
+  ssr: false,
+})
 
 // ---------------------------------------------------------------------------
 // Types
@@ -314,7 +325,7 @@ export default function PipelinePage() {
   const [editingValue, setEditingValue] = useState(false)
   const [editValueInput, setEditValueInput] = useState('')
   const [editingPriority, setEditingPriority] = useState(false)
-  const [dealTab, setDealTab] = useState<'general' | 'tasks' | 'documents' | 'messages'>('general')
+  const [dealTab, setDealTab] = useState<'general' | 'tasks' | 'documents' | 'messages' | 'canvas'>('general')
 
   // Loss reason modal
   const [showLossModal, setShowLossModal] = useState(false)
@@ -461,36 +472,18 @@ export default function PipelinePage() {
       }
 
       try {
-        const filePath = `${business.business_id}/${selectedDeal.customer_id}/${Date.now()}_${file.name}`
-        const { error: uploadError } = await supabase.storage
-          .from('customer-documents')
-          .upload(filePath, file)
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', dealUploadCategory)
 
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError)
-          failCount++
-          continue
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('customer-documents')
-          .getPublicUrl(filePath)
-
-        const res = await fetch(`/api/customers/${selectedDeal.customer_id}/documents`, {
+        const res = await fetch(`/api/customers/${selectedDeal.customer_id}/documents/upload`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            file_name: file.name,
-            file_url: urlData.publicUrl,
-            file_type: file.type,
-            file_size: file.size,
-            category: dealUploadCategory,
-          })
+          body: formData,
         })
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}))
-          console.error('Document metadata save failed:', errData)
+          console.error('Document upload failed:', errData)
           failCount++
           continue
         }
@@ -1516,6 +1509,7 @@ export default function PipelinePage() {
                     { key: 'tasks' as const, label: 'Uppgifter', icon: CheckSquare, count: dealTasks.filter(t => t.status !== 'done').length },
                     { key: 'documents' as const, label: 'Dokument', icon: FileIcon, count: dealDocuments.length },
                     { key: 'messages' as const, label: 'Anteckningar', icon: MessageSquare, count: dealNotes.length + dealEmailThreads.length },
+                    { key: 'canvas' as const, label: 'Rityta', icon: Pencil },
                   ]).map(tab => (
                     <button
                       key={tab.key}
@@ -2207,6 +2201,17 @@ export default function PipelinePage() {
                         <p className="text-xs mt-1">Skriv en anteckning ovan</p>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* TAB: Rityta */}
+                {dealTab === 'canvas' && selectedDeal && (
+                  <div className="h-[500px]">
+                    <ProjectCanvas
+                      entityType="lead"
+                      entityId={selectedDeal.id}
+                      title={`Skiss — ${selectedDeal.title}`}
+                    />
                   </div>
                 )}
               </div>

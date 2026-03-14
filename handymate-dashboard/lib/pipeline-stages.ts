@@ -15,19 +15,20 @@ export interface LeadPipelineStage {
   sort_order: number
   is_system: boolean
   color: string
+  creates_project: boolean
   created_at: string
 }
 
 /** Default 8 systemsteg — seedad via SQL, fallback här */
 export const DEFAULT_LEAD_STAGES: Omit<LeadPipelineStage, 'id' | 'business_id' | 'created_at'>[] = [
-  { key: 'new_lead',      label: 'Ny lead',          sort_order: 1,  is_system: true, color: '#8B5CF6' },
-  { key: 'contacted',     label: 'Kontaktad',        sort_order: 2,  is_system: true, color: '#3B82F6' },
-  { key: 'quote_sent',    label: 'Offert skickad',   sort_order: 3,  is_system: true, color: '#F59E0B' },
-  { key: 'quote_opened',  label: 'Offert öppnad',    sort_order: 4,  is_system: true, color: '#F97316' },
-  { key: 'active_job',    label: 'Aktivt jobb',      sort_order: 5,  is_system: true, color: '#0F766E' },
-  { key: 'invoiced',      label: 'Fakturerad',       sort_order: 6,  is_system: true, color: '#6366F1' },
-  { key: 'completed',     label: 'Avslutad',         sort_order: 7,  is_system: true, color: '#22C55E' },
-  { key: 'lost',          label: 'Förlorad',         sort_order: 99, is_system: true, color: '#EF4444' },
+  { key: 'new_lead',      label: 'Ny lead',          sort_order: 1,  is_system: true, color: '#8B5CF6', creates_project: false },
+  { key: 'contacted',     label: 'Kontaktad',        sort_order: 2,  is_system: true, color: '#3B82F6', creates_project: false },
+  { key: 'quote_sent',    label: 'Offert skickad',   sort_order: 3,  is_system: true, color: '#F59E0B', creates_project: false },
+  { key: 'quote_opened',  label: 'Offert öppnad',    sort_order: 4,  is_system: true, color: '#F97316', creates_project: false },
+  { key: 'active_job',    label: 'Aktivt jobb',      sort_order: 5,  is_system: true, color: '#0F766E', creates_project: true },
+  { key: 'invoiced',      label: 'Fakturerad',       sort_order: 6,  is_system: true, color: '#6366F1', creates_project: false },
+  { key: 'completed',     label: 'Avslutad',         sort_order: 7,  is_system: true, color: '#22C55E', creates_project: false },
+  { key: 'lost',          label: 'Förlorad',         sort_order: 99, is_system: true, color: '#EF4444', creates_project: false },
 ]
 
 /**
@@ -133,6 +134,31 @@ export async function moveLeadToStage(params: {
     .eq('business_id', params.businessId)
 
   if (error) return { moved: false, reason: error.message }
+
+  // Fire pipeline_stage_changed event for automation rules
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    const { getServerSupabase: getSupa } = await import('@/lib/supabase')
+    const supa = getSupa()
+    await fireEvent(supa, 'pipeline_stage_changed', params.businessId, {
+      lead_id: params.leadId,
+      from_stage: currentKey,
+      to_stage: params.toStageKey,
+      triggered_by: params.triggeredBy,
+    })
+  } catch (err) {
+    console.error('[moveLeadToStage] fireEvent failed:', err)
+  }
+
+  // Auto-create project if target stage has creates_project=true
+  if (toStage && toStage.creates_project) {
+    try {
+      const { createProjectFromLead } = await import('@/lib/projects/create-from-lead')
+      await createProjectFromLead(params.businessId, params.leadId)
+    } catch (err) {
+      console.error('[moveLeadToStage] createProjectFromLead failed:', err)
+    }
+  }
 
   return { moved: true, from_stage: currentKey, to_stage: params.toStageKey }
 }

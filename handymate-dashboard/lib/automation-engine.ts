@@ -576,6 +576,30 @@ async function handleSyncToFortnox(
   }
 }
 
+// ── Create Project from Lead ────────────────────────────
+
+async function handleCreateProject(
+  supabase: SupabaseClient,
+  businessId: string,
+  context: ExecutionContext
+): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  const leadId = context.lead_id as string | undefined
+  if (!leadId) {
+    return { success: false, error: 'Ingen lead_id i context' }
+  }
+
+  try {
+    const { createProjectFromLead } = await import('@/lib/projects/create-from-lead')
+    const result = await createProjectFromLead(businessId, leadId)
+    if (result.success) {
+      return { success: true, data: { project_id: result.project_id } }
+    }
+    return { success: false, error: result.error }
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Kunde inte skapa projekt' }
+  }
+}
+
 // ── Main action dispatcher ──────────────────────────────
 
 async function executeAction(
@@ -609,6 +633,8 @@ async function executeAction(
       return handleScheduleFollowup(supabase, businessId, actionConfig, context)
     case 'sync_to_fortnox':
       return handleSyncToFortnox(businessId, actionConfig, context)
+    case 'create_project':
+      return handleCreateProject(supabase, businessId, context)
     default:
       return { success: false, error: `Okänd åtgärdstyp: ${actionType}` }
   }

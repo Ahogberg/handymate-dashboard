@@ -3,35 +3,41 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 
 /**
- * GET /api/projects/[id]/canvas — Bakåtkompatibel, läser från canvas_items
+ * GET /api/canvas?entityType=project&entityId=xxx
+ * Hämta canvas-data för valfri entity (project, lead, standalone)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: projectId } = await params
+    const entityType = request.nextUrl.searchParams.get('entityType')
+    const entityId = request.nextUrl.searchParams.get('entityId')
+
+    if (!entityType || !entityId) {
+      return NextResponse.json({ error: 'entityType och entityId krävs' }, { status: 400 })
+    }
+
     const supabase = getServerSupabase()
 
     const { data, error } = await supabase
       .from('canvas_items')
       .select('*')
-      .eq('entity_type', 'project')
-      .eq('entity_id', projectId)
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
       .eq('business_id', business.business_id)
       .single()
 
     if (error && error.code !== 'PGRST116') throw error
 
+    // Return empty canvas if none exists
     if (!data) {
       return NextResponse.json({
         canvas: {
-          project_id: projectId,
+          entity_type: entityType,
+          entity_id: entityId,
           canvas_data: { objects: [], background: '#ffffff' },
         },
       })
@@ -45,19 +51,23 @@ export async function GET(
 }
 
 /**
- * PUT /api/projects/[id]/canvas — Bakåtkompatibel, skriver till canvas_items
+ * PUT /api/canvas?entityType=project&entityId=xxx
+ * Spara canvas-data (upsert)
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { id: projectId } = await params
+    const entityType = request.nextUrl.searchParams.get('entityType')
+    const entityId = request.nextUrl.searchParams.get('entityId')
+
+    if (!entityType || !entityId) {
+      return NextResponse.json({ error: 'entityType och entityId krävs' }, { status: 400 })
+    }
+
     const supabase = getServerSupabase()
     const body = await request.json()
 
@@ -65,11 +75,12 @@ export async function PUT(
       return NextResponse.json({ error: 'canvas_data krävs' }, { status: 400 })
     }
 
+    // Upsert — create or update
     const { data: existing } = await supabase
       .from('canvas_items')
       .select('id')
-      .eq('entity_type', 'project')
-      .eq('entity_id', projectId)
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
       .eq('business_id', business.business_id)
       .single()
 
@@ -91,9 +102,9 @@ export async function PUT(
         .from('canvas_items')
         .insert({
           business_id: business.business_id,
-          project_id: projectId,
-          entity_type: 'project',
-          entity_id: projectId,
+          project_id: entityType === 'project' ? entityId : null,
+          entity_type: entityType,
+          entity_id: entityId,
           canvas_data: body.canvas_data,
         })
         .select()

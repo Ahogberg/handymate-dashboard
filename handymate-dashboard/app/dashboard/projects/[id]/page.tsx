@@ -60,6 +60,16 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
+  loading: () => (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+    </div>
+  ),
+  ssr: false,
+})
 
 // --- Types ---
 
@@ -195,7 +205,7 @@ interface ExtraCost {
   date: string
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas'
 
 interface ScheduleEntry {
   id: string
@@ -1144,6 +1154,7 @@ export default function ProjectDetailPage() {
     { key: 'documents', label: 'Dokument' },
     { key: 'log', label: 'Byggdagbok' },
     { key: 'checklists', label: 'Checklistor' },
+    { key: 'canvas', label: 'Rityta' },
     { key: 'leverantorer', label: 'Leverantorer' },
     { key: 'economy', label: 'Ekonomi' },
     { key: 'ai_log', label: 'Projektanalys' }
@@ -2662,6 +2673,11 @@ export default function ProjectDetailPage() {
               />
             )}
           </div>
+        )}
+
+        {/* === TAB: Canvas === */}
+        {activeTab === 'canvas' && (
+          <ProjectCanvas projectId={projectId} />
         )}
 
         {/* === TAB: Ekonomi === */}
