@@ -24,7 +24,7 @@ async function getExpoPushTokens(businessId: string): Promise<string[]> {
     return []
   }
 
-  return (data || []).map((row) => row.token)
+  return (data || []).map((row: { token: string }) => row.token)
 }
 
 /**
