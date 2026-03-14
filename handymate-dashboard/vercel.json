@@ -55,7 +55,7 @@
     },
     {
       "path": "/api/cron/gmail-poll",
-      "schedule": "*/1 * * * *"
+      "schedule": "0 8 * * *"
     }
   ]
 }

@@ -259,6 +259,12 @@ export default function NewQuotePage() {
   // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
+  // Product search modal
+  const [showProductSearch, setShowProductSearch] = useState(false)
+  const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [productSearchResults, setProductSearchResults] = useState<any[]>([])
+  const [productSearchLoading, setProductSearchLoading] = useState(false)
+
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
@@ -747,6 +753,55 @@ export default function NewQuotePage() {
       newItem.sort_order = prev.length
       return [...prev, newItem]
     })
+  }, [])
+
+  const addFromProduct = useCallback((product: any) => {
+    const newItem: QuoteItem = {
+      id: generateItemId(),
+      item_type: 'item',
+      description: product.name,
+      article_number: product.sku || undefined,
+      quantity: 1,
+      unit: normalizeUnit(product.unit),
+      unit_price: product.sales_price,
+      cost_price: product.purchase_price || undefined,
+      total: product.sales_price,
+      is_rot_eligible: product.rot_eligible || false,
+      is_rut_eligible: product.rut_eligible || false,
+      sort_order: 0,
+    }
+    setItems((prev) => {
+      newItem.sort_order = prev.length
+      return [...prev, newItem]
+    })
+    setShowProductSearch(false)
+    setProductSearchQuery('')
+  }, [])
+
+  const searchProducts = useCallback(async (query: string) => {
+    setProductSearchQuery(query)
+    if (!query.trim()) {
+      // Show favorites by default
+      setProductSearchLoading(true)
+      try {
+        const res = await fetch('/api/products?favorites=true')
+        if (res.ok) {
+          const data = await res.json()
+          setProductSearchResults(data.products || [])
+        }
+      } catch { /* ignore */ }
+      finally { setProductSearchLoading(false) }
+      return
+    }
+    setProductSearchLoading(true)
+    try {
+      const res = await fetch(`/api/products?search=${encodeURIComponent(query)}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProductSearchResults(data.products || [])
+      }
+    } catch { /* ignore */ }
+    finally { setProductSearchLoading(false) }
   }, [])
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1256,6 +1311,14 @@ export default function NewQuotePage() {
                   Lägg till rad
                 </button>
 
+                <button
+                  onClick={() => { setShowProductSearch(true); searchProducts('') }}
+                  className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F766E] transition-colors bg-transparent border-none cursor-pointer"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  Sök produkt
+                </button>
+
                 {/* Advanced types dropdown */}
                 <div className="relative">
                   <button
@@ -1733,6 +1796,68 @@ export default function NewQuotePage() {
         onSelect={addFromGrossist}
         businessId={business.business_id}
       />
+
+      {/* Product search */}
+      {showProductSearch && (
+        <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={() => setShowProductSearch(false)}>
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#E2E8F0]">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input
+                type="text"
+                value={productSearchQuery}
+                onChange={e => searchProducts(e.target.value)}
+                placeholder="Sök produkt eller material..."
+                autoFocus
+                className="flex-1 text-sm text-[#1E293B] placeholder-[#94A3B8] bg-transparent border-none outline-none"
+              />
+              <button onClick={() => setShowProductSearch(false)} className="p-1 text-[#94A3B8] hover:text-[#1E293B]">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
+              {productSearchLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-[#0F766E] border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : productSearchResults.length > 0 ? (
+                <div className="space-y-1">
+                  {productSearchResults.map((p: any) => (
+                    <button
+                      key={p.id}
+                      onClick={() => addFromProduct(p)}
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-[#F8FAFC] transition text-left"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          {p.is_favorite && <span className="text-amber-500 text-xs">★</span>}
+                          <span className="text-sm font-medium text-[#1E293B] truncate">{p.name}</span>
+                          {p.rot_eligible && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-100 text-emerald-600 rounded">ROT</span>}
+                          {p.rut_eligible && <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-600 rounded">RUT</span>}
+                        </div>
+                        {p.sku && <p className="text-[11px] text-[#94A3B8] truncate">{p.sku}</p>}
+                      </div>
+                      <div className="text-right ml-4 shrink-0">
+                        <span className="text-sm font-medium text-[#1E293B]">{p.sales_price?.toLocaleString('sv-SE')} kr</span>
+                        <span className="text-[11px] text-[#94A3B8] ml-1">/{p.unit}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <p className="text-sm text-[#94A3B8]">
+                    {productSearchQuery ? 'Inga produkter hittades' : 'Inga favoriter ännu'}
+                  </p>
+                  <p className="text-xs text-[#CBD5E1] mt-1">
+                    Lägg till produkter under Inställningar → Produkter
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (

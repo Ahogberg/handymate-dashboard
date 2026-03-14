@@ -290,6 +290,21 @@ export default function MyPricesPage() {
           </div>
         </div>
 
+        {/* Link to products */}
+        <Link
+          href="/dashboard/settings/products"
+          className="flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 hover:border-amber-300 transition-all group"
+        >
+          <div className="flex items-center gap-3">
+            <Package className="w-5 h-5 text-amber-600" />
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Produktregister</p>
+              <p className="text-xs text-gray-500">Sökbart register med alla produkter, material och artiklar</p>
+            </div>
+          </div>
+          <span className="text-xs text-amber-600 font-medium group-hover:underline">Öppna →</span>
+        </Link>
+
         {/* Info box */}
         <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 text-sm text-teal-700">
           <p className="font-medium mb-1">Tips</p>
