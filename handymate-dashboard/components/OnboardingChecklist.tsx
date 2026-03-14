@@ -35,6 +35,7 @@ interface OnboardingChecklistProps {
   }
   callCount: number
   customerCount?: number
+  priceListCount?: number
   onDismiss: () => void
   onUpdate: () => void
 }
@@ -57,6 +58,7 @@ export default function OnboardingChecklist({
   businessConfig,
   callCount,
   customerCount = 0,
+  priceListCount = 0,
   onDismiss,
   onUpdate,
 }: OnboardingChecklistProps) {
@@ -160,6 +162,17 @@ export default function OnboardingChecklist({
         type: 'link',
         label: 'Konfigurera',
         href: '/dashboard/settings/pricelist',
+      },
+    },
+    {
+      id: 'prices',
+      label: 'Lägg till dina priser',
+      description: priceListCount > 0 ? `${priceListCount} priser` : 'Hjälper AI:n skapa korrekta offerter',
+      completed: priceListCount > 0,
+      action: priceListCount > 0 ? undefined : {
+        type: 'link',
+        label: 'Lägg till',
+        href: '/dashboard/settings/my-prices',
       },
     },
     {

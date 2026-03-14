@@ -1,6 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 
+export interface PriceListItem {
+  name: string
+  unit: string
+  unit_price: number
+  category: string
+}
+
+export interface QuoteTemplate {
+  name: string
+  default_items: any
+  category?: string
+}
+
 export interface QuoteGenerationInput {
   businessId: string
   branch: string
@@ -9,7 +22,9 @@ export interface QuoteGenerationInput {
   voiceTranscript?: string
   textDescription?: string
   customerId?: string
-  priceList?: Array<{ name: string; unit: string; unit_price: number; category: string }>
+  priceList?: PriceListItem[]
+  templates?: QuoteTemplate[]
+  defaultHourlyRate?: number
 }
 
 export interface GeneratedQuoteItem {
@@ -20,6 +35,8 @@ export interface GeneratedQuoteItem {
   unitPrice: number
   type: 'labor' | 'material' | 'service'
   confidence: number
+  note?: string | null
+  fromPriceList?: boolean
 }
 
 export interface GeneratedQuote {
@@ -34,6 +51,8 @@ export interface GeneratedQuote {
   confidence: number
   reasoning: string
   similarHistoricalQuotes: Array<{ id: string; title: string; total: number }>
+  priceListEmpty: boolean
+  missingPriceCount: number
 }
 
 export interface ImageAnalysis {
@@ -45,6 +64,48 @@ export interface ImageAnalysis {
 
 function getAnthropic() {
   return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
+}
+
+/**
+ * Bygger prisliste-kontext för AI-prompten.
+ * Om prislistan är tom returneras en tydlig markering.
+ */
+export function buildPriceContext(
+  priceList: PriceListItem[] | undefined,
+  hourlyRate: number,
+  templates?: QuoteTemplate[]
+): string {
+  const lines: string[] = []
+
+  if (priceList && priceList.length > 0) {
+    lines.push('HANTVERKARENS PRISLISTA (använd dessa priser exakt):')
+    // Gruppera per kategori
+    const byCategory: Record<string, PriceListItem[]> = {}
+    for (const item of priceList) {
+      const cat = item.category || 'Övrigt'
+      if (!byCategory[cat]) byCategory[cat] = []
+      byCategory[cat].push(item)
+    }
+    for (const [category, items] of Object.entries(byCategory)) {
+      lines.push(`\n  ${category}:`)
+      for (const item of items) {
+        lines.push(`  - ${item.name}: ${item.unit_price} kr/${item.unit}`)
+      }
+    }
+  } else {
+    lines.push('PRISLISTA: Ej ifylld av hantverkaren. Markera ALLA priser med "PRIS SAKNAS — fyll i manuellt" och sätt unit_price till 0.')
+  }
+
+  lines.push(`\nStandard timpris: ${hourlyRate} kr/tim`)
+
+  if (templates && templates.length > 0) {
+    lines.push('\nTILLGÄNGLIGA OFFERTMALLAR (referens för typiska rader):')
+    for (const t of templates) {
+      lines.push(`- ${t.name}${t.category ? ` (${t.category})` : ''}`)
+    }
+  }
+
+  return lines.join('\n')
 }
 
 export async function analyzeJobImage(
@@ -209,37 +270,43 @@ export async function generateQuoteFromInput(
     ? `\nHistoriska priser för liknande jobb: Snitt ${priceStats.average} kr, Min ${priceStats.min} kr, Max ${priceStats.max} kr (${priceStats.count} offerter)`
     : ''
 
-  const priceListContext = input.priceList && input.priceList.length > 0
-    ? `\nHantverkarens prislista:\n${input.priceList.map(p => `- ${p.name}: ${p.unit_price} kr/${p.unit} (${p.category})`).join('\n')}`
-    : ''
+  const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates)
+  const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.
 
 Bransch: ${input.branch || 'Bygg/Hantverkare'}
-Hantverkarens timpris: ${input.hourlyRate} kr/h${historicalContext}${priceListContext}
+${priceContext}${historicalContext}
 
 Analysera beskrivningen (och eventuell bildanalys/ritningsanalys) och ge ett detaljerat offertförslag.
 
-VIKTIGA REGLER:
-- Arbete: använd ALLTID hantverkarens timpris (${input.hourlyRate} kr/h)
-- Material: ${input.priceList && input.priceList.length > 0 ? 'MATCHA mot hantverkarens prislista ovan när möjligt. Markera priser från prislistan med "fromPriceList": true. Om ingen match finns, använd realistiska marknadspriser.' : 'Använd realistiska marknadspriser i SEK.'}
-- Inkludera alltid "Småmaterial" (skruv, borrspets, tejp, etc.) ~100-300 kr
-- Var realistisk med tidsuppskattningar (hellre lite för mycket tid än för lite)
-- ROT gäller installation/reparation/underhåll i bostad, RUT gäller hemtjänster/städ/trädgård
-- Alla priser exkl moms
+REGLER FÖR PRISSÄTTNING:
+1. Arbete: använd ALLTID hantverkarens timpris (${input.hourlyRate} kr/h)
+2. Material: ${hasPriceList
+    ? 'Använd ENBART priser från prislistan ovan. Markera priser från prislistan med "fromPriceList": true.'
+    : 'Prislista saknas — sätt ALLA materialpriser till 0 och markera med "note": "PRIS SAKNAS — fyll i manuellt".'}
+3. Om en tjänst eller ett material SAKNAS i prislistan — lägg till raden men sätt priset till 0 och lägg till "note": "PRIS SAKNAS — fyll i manuellt"
+4. Gissa ALDRIG ett pris — det är bättre med 0 kr och en markering än ett felaktigt pris
+5. Separera ALLTID material och arbete som separata rader
+6. ROT-avdrag gäller enbart arbetskostnad (installation/reparation/underhåll i bostad), aldrig material
+7. RUT gäller hemtjänster/städ/trädgård
+8. Inkludera alltid "Småmaterial" (skruv, borrspets, tejp, etc.) — ${hasPriceList ? 'använd pris från prislistan om det finns, annars 0 kr med markering' : '0 kr med markering'}
+9. Alla priser exkl moms
+10. Var realistisk med tidsuppskattningar (hellre lite för mycket tid än för lite)
+11. Max 8 rader — var konkret och specifik
 
 OM RITNING/PLANRITNING ANALYSERATS:
 - Använd de identifierade måtten för att beräkna exakta materialkvantiteter
 - Beräkna m² för golv, väggar, tak separat
 - Räkna in spill (~10% extra på material)
-- Identifiera alla installationspunker (el, vatten, avlopp)
+- Identifiera alla installationspunkter (el, vatten, avlopp)
 
 OM FOTO ANALYSERATS:
 - Uppskatta mått baserat på proportioner
 - Identifiera materialtyper och skick
 - Föreslå vad som behöver bytas vs kan behållas
 
-Svara ENDAST med JSON:
+Svara ENDAST med JSON (ingen markdown):
 {
   "jobTitle": "Kort titel",
   "jobDescription": "Professionell beskrivning till kund (2-3 meningar)",
@@ -250,8 +317,8 @@ Svara ENDAST med JSON:
     "ceiling_area_m2": null
   },
   "items": [
-    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false},
-    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 3200, "type": "material", "confidence": 70, "fromPriceList": false}
+    {"description": "Arbete - beskrivning", "quantity": 8, "unit": "timmar", "unitPrice": ${input.hourlyRate}, "type": "labor", "confidence": 90, "fromPriceList": false, "note": null},
+    {"description": "Materialnamn", "quantity": 1, "unit": "st", "unitPrice": 0, "type": "material", "confidence": 70, "fromPriceList": false, "note": "PRIS SAKNAS — fyll i manuellt"}
   ],
   "suggestedDeductionType": "rot",
   "confidence": 75,
@@ -299,11 +366,14 @@ Svara ENDAST med JSON:
     description: item.description,
     quantity: item.quantity,
     unit: item.unit,
-    unitPrice: item.unitPrice,
+    unitPrice: item.unitPrice || 0,
     type: item.type || 'material',
-    confidence: item.confidence || parsed.confidence || 70
+    confidence: item.confidence || parsed.confidence || 70,
+    ...(item.note ? { note: item.note } : {}),
+    ...(item.fromPriceList !== undefined ? { fromPriceList: item.fromPriceList } : {})
   }))
 
+  const missingPriceCount = items.filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
   const laborCost = items.filter(i => i.type === 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
   const materialCost = items.filter(i => i.type !== 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
 
@@ -322,6 +392,8 @@ Svara ENDAST med JSON:
       id: q.quote_id,
       title: q.title,
       total: q.total
-    }))
+    })),
+    priceListEmpty: !hasPriceList,
+    missingPriceCount
   }
 }

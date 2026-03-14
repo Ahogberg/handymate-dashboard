@@ -1,6 +1,7 @@
 // Quote system types – used across editor, API, and PDF generation
 
 export type QuoteItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+export type RotRutType = 'rot' | 'rut' | null
 export type DetailLevel = 'detailed' | 'subtotals_only' | 'total_only'
 export type StandardTextType = 'introduction' | 'conclusion' | 'not_included' | 'ata_terms' | 'payment_terms'
 
@@ -19,6 +20,7 @@ export interface QuoteItem {
   article_number?: string
   is_rot_eligible: boolean
   is_rut_eligible: boolean
+  rot_rut_type?: RotRutType
   sort_order: number
 }
 
@@ -163,6 +165,11 @@ export interface EnhancedQuote {
   ai_confidence?: number
   source_transcript?: string
   template_id?: string
+
+  // Versioning
+  version_number?: number
+  parent_quote_id?: string | null
+  version_label?: string | null
 
   // Signature
   signature_data?: string

@@ -74,6 +74,18 @@ function Step2Content({ data, onNext, onBack, onUpdate, saving }: StepProps) {
       }),
     }).catch(() => {})
 
+    // Seed price_list with selected services as labor rows
+    if (selectedServices.length > 0 && hourlyRate > 0) {
+      await fetch('/api/price-list/seed-from-onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          services: selectedServices,
+          hourlyRate,
+        }),
+      }).catch(() => {})
+    }
+
     onUpdate({
       services_offered: selectedServices,
       default_hourly_rate: hourlyRate,
@@ -160,7 +172,7 @@ function Step2Content({ data, onNext, onBack, onUpdate, saving }: StepProps) {
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Utryckningsavgift (kr)</label>
+            <label className="block text-sm text-zinc-400 mb-1">Startavgift / Reseavgift (kr)</label>
             <input
               type="number"
               value={calloutFee || ''}
@@ -168,6 +180,7 @@ function Step2Content({ data, onNext, onBack, onUpdate, saving }: StepProps) {
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-teal-500"
               placeholder="0"
             />
+            <p className="text-xs text-zinc-500 mt-1">Fast avgift du tar utöver timpriset, t.ex. för att åka ut till kunden.</p>
           </div>
         </div>
 

@@ -75,6 +75,32 @@ ${triggerData.rule_name ? `Regel: ${triggerData.rule_name}` : ''}`
 Hantera ekonomi-relaterad uppgift (${triggerType}).`
   }
 
+  // Build price list block
+  const priceList = ctx.priceList || []
+  let priceListBlock = ''
+  if (priceList.length > 0) {
+    const byCategory: Record<string, typeof priceList> = {}
+    for (const item of priceList) {
+      const cat = item.category || 'Övrigt'
+      if (!byCategory[cat]) byCategory[cat] = []
+      byCategory[cat].push(item)
+    }
+    const lines = ['## Hantverkarens prislista (använd dessa priser exakt)']
+    for (const [category, items] of Object.entries(byCategory)) {
+      lines.push(`### ${category}`)
+      for (const item of items) {
+        lines.push(`- ${item.name}: ${item.unit_price} kr/${item.unit}`)
+      }
+    }
+    priceListBlock = lines.join('\n')
+  } else {
+    priceListBlock = `## Prislista
+Hantverkaren har INGEN prislista inlagd.
+- Arbete: använd timpris ${hourlyRate} kr/tim
+- Material: sätt alla materialpriser till 0 kr
+- Lägg till "PRIS SAKNAS — fyll i manuellt" som kommentar på varje materialrad`
+  }
+
   return `Du är Ekonomi-agenten för ${biz.business_name}.
 Du hanterar ENBART offerter, fakturor, betalningar och ROT/RUT-beräkningar.
 
@@ -82,6 +108,18 @@ Du hanterar ENBART offerter, fakturor, betalningar och ROT/RUT-beräkningar.
 - Timpris: ${hourlyRate} kr/tim (exkl. moms)
 - Moms: ${vatRate}%
 ${pricingTendency}
+
+${priceListBlock}
+
+## REGLER FÖR OFFERTPRISER
+1. Arbete: använd ALLTID timpris ${hourlyRate} kr/tim
+2. Material: ${priceList.length > 0
+    ? 'Använd ENBART priser från prislistan ovan'
+    : 'Sätt alla materialpriser till 0 kr (prislista saknas)'}
+3. Om material/tjänst SAKNAS i prislistan: sätt pris till 0 kr, kommentera "PRIS SAKNAS — fyll i manuellt"
+4. Gissa ALDRIG ett pris — det är bättre med 0 kr och markering än ett felaktigt pris
+5. Separera ALLTID arbete och material som separata rader
+6. Inkludera alltid en rad för "Småmaterial" (skruv, tejp etc.)
 
 ## ROT-avdrag
 - 30% av arbetskostnaden, max 50 000 kr/år per person
@@ -96,7 +134,6 @@ ${pricingTendency}
 - Fakturapåminnelse: dag ${invoiceReminderDays} efter förfall
 - Skicka offert: ${requireApprovalQuote ? 'kräver godkännande' : 'auto'}
 - Skicka faktura: ${requireApprovalInvoice ? 'kräver godkännande' : 'auto'}
-- Separera ALLTID arbete och material i offerter
 - Skicka ALDRIG SMS mellan 21:00 och 08:00
 - Offertens giltighetstid: 30 dagar
 

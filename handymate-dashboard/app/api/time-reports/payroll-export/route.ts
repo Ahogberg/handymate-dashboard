@@ -77,6 +77,15 @@ export async function GET(request: NextRequest) {
       .gte('date', startDate)
       .lte('date', endDate)
 
+    // Hämta ersättningar (allowance_reports)
+    const { data: allowanceReports } = await supabase
+      .from('allowance_reports')
+      .select('business_user_id, amount, allowance_type:allowance_type_id(name, type, is_taxable)')
+      .eq('business_id', businessId)
+      .in('business_user_id', userIds)
+      .gte('report_date', startDate)
+      .lte('report_date', endDate)
+
     // Beräkna per medarbetare
     const payroll = users.map((user: any) => {
       const userEntries = (entries || []).filter((e: any) => e.business_user_id === user.id)
@@ -136,7 +145,11 @@ export async function GET(request: NextRequest) {
       const allowanceDays = userTravels.filter((t: any) => t.has_overnight).length
       const allowanceAmount = userTravels.reduce((s: number, t: any) => s + (t.allowance_amount || 0), 0)
 
-      const grossTotal = regularAmount + ob1Amount + ob2Amount + ot50Amount + ot100Amount + travelReimbursement + allowanceAmount
+      // Ersättningar från allowance_reports
+      const userAllowances = (allowanceReports || []).filter((a: any) => a.business_user_id === user.id)
+      const extraAllowanceAmount = userAllowances.reduce((s: number, a: any) => s + (a.amount || 0), 0)
+
+      const grossTotal = regularAmount + ob1Amount + ob2Amount + ot50Amount + ot100Amount + travelReimbursement + allowanceAmount + extraAllowanceAmount
 
       return {
         employee: user.name,
@@ -154,6 +167,11 @@ export async function GET(request: NextRequest) {
         travel_reimbursement: Math.round(travelReimbursement),
         allowance_days: allowanceDays,
         allowance_amount: Math.round(allowanceAmount),
+        extra_allowance_amount: Math.round(extraAllowanceAmount),
+        extra_allowances: userAllowances.map((a: any) => ({
+          name: a.allowance_type?.name || 'Ersättning',
+          amount: Math.round(a.amount || 0),
+        })),
         gross_amount: {
           regular: Math.round(regularAmount),
           overtime_50: Math.round(ot50Amount),
@@ -161,7 +179,7 @@ export async function GET(request: NextRequest) {
           ob1: Math.round(ob1Amount),
           ob2: Math.round(ob2Amount),
           travel: Math.round(travelReimbursement),
-          allowance: Math.round(allowanceAmount),
+          allowance: Math.round(allowanceAmount + extraAllowanceAmount),
           total: Math.round(grossTotal),
         },
       }

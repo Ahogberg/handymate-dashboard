@@ -90,11 +90,22 @@ async function runAgentContext() {
   const succeeded = results.filter(r => r.context.success).length
   const totalTokens = results.reduce((sum, r) => sum + (r.context.tokens_used || 0), 0)
 
+  // Process partner commissions
+  let commissionResult = { processed: 0, commissioned: 0, completed: 0, errors: [] as string[] }
+  try {
+    const { processMonthlyCommissions } = await import('@/lib/partners/commission')
+    commissionResult = await processMonthlyCommissions()
+    console.log(`[AgentContext Cron] Commissions: ${commissionResult.commissioned} processed, ${commissionResult.completed} completed`)
+  } catch (err: any) {
+    console.error('[AgentContext Cron] Commission processing failed:', err.message)
+  }
+
   return NextResponse.json({
     total: businesses.length,
     succeeded,
     failed: businesses.length - succeeded,
     total_tokens: totalTokens,
+    commissions: commissionResult,
     results,
   })
 }

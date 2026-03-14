@@ -9,6 +9,7 @@ import {
   Camera,
   Upload,
   X,
+  Eye,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -17,6 +18,8 @@ import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import TemplateSelector from '@/components/quotes/TemplateSelector'
+import QuotePreview from '@/components/quotes/QuotePreview'
+import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import {
   QuoteItem,
   PaymentPlanEntry,
@@ -267,6 +270,10 @@ export default function NewQuotePage() {
   // Template panel in sidebar
   const [showTemplatePanel, setShowTemplatePanel] = useState(false)
 
+  // Preview panel in sidebar + mobile modal
+  const [showPreviewPanel, setShowPreviewPanel] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+
   // ─── Derived: standard texts grouped by type ──────────────────────────────
   const textsByType = useMemo(() => {
     const map: Record<string, QuoteStandardText[]> = {
@@ -302,6 +309,44 @@ export default function NewQuotePage() {
     [totals.total, paymentPlan]
   )
   const paymentPlanValid = validatePaymentPlan(paymentPlan)
+
+  // ─── Preview data (debounced) ──────────────────────────────────────────────
+  const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const selectedCustomerObj = useMemo(
+    () => customers.find(c => c.customer_id === selectedCustomer) || null,
+    [customers, selectedCustomer]
+  )
+
+  useEffect(() => {
+    if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
+    previewTimerRef.current = setTimeout(() => {
+      setDebouncedPreviewData({
+        title,
+        customerName: selectedCustomerObj?.name || '',
+        customerAddress: selectedCustomerObj?.address_line || '',
+        validDays,
+        items,
+        discountPercent,
+        vatRate,
+        introductionText,
+        conclusionText,
+        notIncluded,
+        ataTerms,
+        paymentPlan,
+        referencePerson,
+        customerReference,
+        projectAddress,
+        detailLevel,
+        showUnitPrices,
+        showQuantities,
+      })
+    }, 300)
+    return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current) }
+  }, [title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
+      introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
+      referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Data fetching
@@ -629,12 +674,20 @@ export default function NewQuotePage() {
         } else if (updated.item_type === 'discount') {
           updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
         }
-        // Mutual exclusion: ROT and RUT cannot both be true
-        if (field === 'is_rot_eligible' && value === true) {
+        // Sync rot_rut_type with boolean flags
+        if (field === 'rot_rut_type') {
+          updated.is_rot_eligible = value === 'rot'
+          updated.is_rut_eligible = value === 'rut'
+        } else if (field === 'is_rot_eligible' && value === true) {
           updated.is_rut_eligible = false
-        }
-        if (field === 'is_rut_eligible' && value === true) {
+          updated.rot_rut_type = 'rot'
+        } else if (field === 'is_rut_eligible' && value === true) {
           updated.is_rot_eligible = false
+          updated.rot_rut_type = 'rut'
+        } else if ((field === 'is_rot_eligible' || field === 'is_rut_eligible') && value === false) {
+          if (!updated.is_rot_eligible && !updated.is_rut_eligible) {
+            updated.rot_rut_type = null
+          }
         }
         return updated
       })
@@ -1168,25 +1221,22 @@ export default function NewQuotePage() {
                             </div>
                           )}
                           {isEditable && (
-                            <div className="flex items-center gap-3 text-[12px]">
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={item.is_rot_eligible}
-                                  onChange={(e) => updateItem(item.id, 'is_rot_eligible', e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0F766E] focus:ring-[#0F766E]"
-                                />
-                                <span className="text-[#64748B]">ROT</span>
-                              </label>
-                              <label className="flex items-center gap-1 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={item.is_rut_eligible}
-                                  onChange={(e) => updateItem(item.id, 'is_rut_eligible', e.target.checked)}
-                                  className="w-3.5 h-3.5 rounded border-gray-300 text-[#0F766E] focus:ring-[#0F766E]"
-                                />
-                                <span className="text-[#64748B]">RUT</span>
-                              </label>
+                            <div className="flex items-center gap-2 text-[12px]">
+                              <span className="text-[#64748B]">Avdrag:</span>
+                              <select
+                                value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
+                                onChange={(e) => {
+                                  const val = e.target.value || null
+                                  updateItem(item.id, 'rot_rut_type', val)
+                                  updateItem(item.id, 'is_rot_eligible', val === 'rot')
+                                  updateItem(item.id, 'is_rut_eligible', val === 'rut')
+                                }}
+                                className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                              >
+                                <option value="">Ingen</option>
+                                <option value="rot">ROT (30%)</option>
+                                <option value="rut">RUT (50%)</option>
+                              </select>
                             </div>
                           )}
                         </div>
@@ -1500,6 +1550,30 @@ export default function NewQuotePage() {
               )}
             </div>
 
+            {/* Preview panel (collapsible) */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl hidden lg:block">
+              <button
+                type="button"
+                onClick={() => setShowPreviewPanel(!showPreviewPanel)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left"
+              >
+                <span className="flex items-center gap-2">
+                  <Eye className="w-3.5 h-3.5 text-[#CBD5E1]" />
+                  <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Förhandsgranska</span>
+                </span>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showPreviewPanel ? 'rotate-180' : ''}`} />
+              </button>
+              {showPreviewPanel && debouncedPreviewData && (
+                <div className="px-3 pb-3">
+                  <QuotePreview
+                    data={debouncedPreviewData}
+                    businessName={business.business_name}
+                    contactName={business.contact_name}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Summary */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
               <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering</div>
@@ -1608,6 +1682,47 @@ export default function NewQuotePage() {
           </div>
         </div>
       </div>
+
+      {/* ── Mobile preview button (floating) ────────────────────────── */}
+      <button
+        type="button"
+        onClick={() => setShowPreviewModal(true)}
+        className="fixed bottom-6 right-6 z-40 lg:hidden flex items-center gap-2 px-4 py-3 bg-[#0F766E] text-white rounded-full shadow-lg hover:bg-[#0D655D] transition-colors"
+      >
+        <Eye className="w-4 h-4" />
+        <span className="text-sm font-medium">Förhandsgranska</span>
+      </button>
+
+      {/* ── Mobile preview modal ─────────────────────────────────── */}
+      {showPreviewModal && debouncedPreviewData && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto lg:hidden"
+          onClick={() => setShowPreviewModal(false)}
+        >
+          <div
+            className="bg-[#F8FAFC] rounded-xl w-full max-w-lg relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0]">
+              <span className="text-sm font-medium text-[#1E293B]">Förhandsgranska offert</span>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="p-1 text-[#94A3B8] hover:text-[#1E293B] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <QuotePreview
+                data={debouncedPreviewData}
+                businessName={business.business_name}
+                contactName={business.contact_name}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modals ─────────────────────────────────────────────────── */}
 

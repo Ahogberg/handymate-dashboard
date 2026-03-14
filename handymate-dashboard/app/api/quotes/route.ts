@@ -53,12 +53,24 @@ export async function GET(request: NextRequest) {
         customer = data
       }
 
+      // Fetch sibling versions if this quote is part of a version family
+      let versions: any[] = []
+      const parentId = quote.parent_quote_id || quote.quote_id
+      const { data: versionData } = await supabase
+        .from('quotes')
+        .select('quote_id, version_number, version_label, status, total, created_at')
+        .or(`quote_id.eq.${parentId},parent_quote_id.eq.${parentId}`)
+        .eq('business_id', businessId)
+        .order('version_number', { ascending: true })
+      versions = versionData || []
+
       return NextResponse.json({
         quote: {
           ...quote,
           quote_items: quoteItems || [],
           customer,
-        }
+        },
+        versions: versions.length > 1 ? versions : [],
       })
     }
 
@@ -145,13 +157,36 @@ export async function POST(request: NextRequest) {
       const validUntil = new Date()
       validUntil.setDate(validUntil.getDate() + 30)
 
+      // Version support: if create_version is true, link to parent and increment version
+      const isVersion = body.create_version === true
+      const parentQuoteId = isVersion ? (source.parent_quote_id || source.quote_id) : null
+      let versionNumber = 1
+      let versionLabel = body.version_label || null
+
+      if (isVersion && parentQuoteId) {
+        // Find highest version number in this family
+        const { data: siblings } = await supabase
+          .from('quotes')
+          .select('version_number')
+          .or(`quote_id.eq.${parentQuoteId},parent_quote_id.eq.${parentQuoteId}`)
+          .eq('business_id', businessId)
+          .order('version_number', { ascending: false })
+          .limit(1)
+        versionNumber = (siblings?.[0]?.version_number || 1) + 1
+        if (!versionLabel) versionLabel = `Version ${versionNumber}`
+      }
+
       const dupData: Record<string, any> = {
         quote_id: newId,
         business_id: businessId,
         customer_id: source.customer_id,
         quote_number: quoteNumber,
         status: 'draft',
-        title: source.title ? source.title + ' (kopia)' : 'Kopia',
+        title: isVersion ? (source.title || 'Offert') : (source.title ? source.title + ' (kopia)' : 'Kopia'),
+        // Version fields
+        parent_quote_id: parentQuoteId,
+        version_number: isVersion ? versionNumber : 1,
+        version_label: isVersion ? versionLabel : null,
         description: source.description,
         items: source.items,
         labor_total: source.labor_total,
@@ -367,6 +402,7 @@ export async function POST(request: NextRequest) {
         article_number: item.article_number || null,
         is_rot_eligible: item.is_rot_eligible || false,
         is_rut_eligible: item.is_rut_eligible || false,
+        rot_rut_type: item.rot_rut_type || null,
         sort_order: idx,
       }))
 
@@ -508,6 +544,7 @@ export async function PUT(request: NextRequest) {
         article_number: item.article_number || null,
         is_rot_eligible: item.is_rot_eligible || false,
         is_rut_eligible: item.is_rut_eligible || false,
+        rot_rut_type: item.rot_rut_type || null,
         sort_order: idx,
       }))
       if (itemInserts.length > 0) {

@@ -42,6 +42,7 @@ import {
   PaymentPlanEntry,
   QuoteStandardText,
   DetailLevel,
+  RotRutType,
 } from '@/lib/types/quote'
 import {
   calculateQuoteTotals,
@@ -696,12 +697,19 @@ export default function EditQuotePage() {
         } else if (updated.item_type === 'discount') {
           updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
         }
-        // Mutual exclusion: ROT and RUT cannot both be true
+        // Sync rot_rut_type with boolean flags
+        if (field === 'rot_rut_type') {
+          updated.rot_rut_type = (value || null) as RotRutType
+          updated.is_rot_eligible = value === 'rot'
+          updated.is_rut_eligible = value === 'rut'
+        }
         if (field === 'is_rot_eligible' && value === true) {
           updated.is_rut_eligible = false
+          updated.rot_rut_type = 'rot'
         }
         if (field === 'is_rut_eligible' && value === true) {
           updated.is_rot_eligible = false
+          updated.rot_rut_type = 'rut'
         }
         return updated
       })
@@ -1779,24 +1787,15 @@ function ItemRow({
         )}
         {isEditable && (
           <div className="flex items-center gap-3 pl-8 text-xs">
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.is_rot_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rot_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-gray-600">ROT</span>
-            </label>
-            <label className="flex items-center gap-1 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={item.is_rut_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rut_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="text-gray-600">RUT</span>
-            </label>
+            <select
+              value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
+              onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
+              className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+            >
+              <option value="">Ingen</option>
+              <option value="rot">ROT (30%)</option>
+              <option value="rut">RUT (50%)</option>
+            </select>
           </div>
         )}
         {showTotal && !isEditable && (
@@ -1904,33 +1903,18 @@ function ItemRow({
           {showTotal ? formatCurrency(displayTotal) : ''}
         </span>
 
-        {/* ROT/RUT checkboxes */}
+        {/* ROT/RUT dropdown */}
         {isEditable ? (
-          <div className="flex items-center gap-1 justify-center">
-            <label
-              className="cursor-pointer"
-              title="ROT-berättigat"
+          <div className="flex items-center justify-center">
+            <select
+              value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
+              onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
+              className="text-xs border border-gray-200 rounded-md px-1.5 py-0.5 text-gray-700 bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
             >
-              <input
-                type="checkbox"
-                checked={item.is_rot_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rot_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="sr-only">ROT</span>
-            </label>
-            <label
-              className="cursor-pointer"
-              title="RUT-berättigat"
-            >
-              <input
-                type="checkbox"
-                checked={item.is_rut_eligible}
-                onChange={(e) => onUpdate(item.id, 'is_rut_eligible', e.target.checked)}
-                className="w-3.5 h-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-              />
-              <span className="sr-only">RUT</span>
-            </label>
+              <option value="">—</option>
+              <option value="rot">ROT</option>
+              <option value="rut">RUT</option>
+            </select>
           </div>
         ) : (
           <span />

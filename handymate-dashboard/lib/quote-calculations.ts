@@ -1,4 +1,27 @@
-import { QuoteItem, PaymentPlanEntry, QuoteTotals } from '@/lib/types/quote'
+import { QuoteItem, PaymentPlanEntry, QuoteTotals, RotRutType } from '@/lib/types/quote'
+
+/**
+ * Get the effective ROT/RUT type for an item.
+ * Prefers rot_rut_type dropdown value, falls back to boolean flags.
+ */
+export function getItemRotRutType(item: QuoteItem): RotRutType {
+  if (item.rot_rut_type !== undefined) return item.rot_rut_type
+  if (item.is_rot_eligible) return 'rot'
+  if (item.is_rut_eligible) return 'rut'
+  return null
+}
+
+/**
+ * Set rot_rut_type and sync boolean flags for backward compatibility.
+ */
+export function setItemRotRut(item: QuoteItem, type: RotRutType): QuoteItem {
+  return {
+    ...item,
+    rot_rut_type: type,
+    is_rot_eligible: type === 'rot',
+    is_rut_eligible: type === 'rut',
+  }
+}
 
 /**
  * Calculate all quote totals from structured items
@@ -20,10 +43,11 @@ export function calculateQuoteTotals(
 
   for (const item of regularItems) {
     const lineTotal = item.quantity * item.unit_price
-    if (item.is_rot_eligible) {
+    const rotRut = getItemRotRutType(item)
+    if (rotRut === 'rot') {
       laborTotal += lineTotal
       rotWorkCost += lineTotal
-    } else if (item.is_rut_eligible) {
+    } else if (rotRut === 'rut') {
       laborTotal += lineTotal
       rutWorkCost += lineTotal
     } else if (item.unit === 'tim' || item.unit === 'hour' || item.unit === 'h') {

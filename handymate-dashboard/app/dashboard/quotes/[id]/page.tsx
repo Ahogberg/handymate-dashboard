@@ -28,7 +28,9 @@ import {
   ClipboardList,
   MapPin,
   CreditCard,
-  AlertTriangle
+  AlertTriangle,
+  GitBranch,
+  ChevronDown
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -46,6 +48,15 @@ interface QuoteItem {
   is_rot_eligible: boolean
   is_rut_eligible: boolean
   sort_order: number
+}
+
+interface QuoteVersion {
+  quote_id: string
+  version_number: number
+  version_label: string | null
+  status: string
+  total: number
+  created_at: string
 }
 
 interface PaymentPlanEntry {
@@ -113,6 +124,9 @@ interface Quote {
   signature_data?: string
   signed_at?: string
   signed_by_name?: string
+  version_number?: number
+  parent_quote_id?: string
+  version_label?: string
 }
 
 export default function QuoteDetailPage() {
@@ -135,6 +149,8 @@ export default function QuoteDetailPage() {
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [versions, setVersions] = useState<QuoteVersion[]>([])
+  const [creatingVersion, setCreatingVersion] = useState(false)
 
   const saveAsTemplate = async () => {
     if (!quote || !templateName.trim()) return
@@ -179,6 +195,7 @@ export default function QuoteDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setQuote(data.quote || null)
+        setVersions(data.versions || [])
       }
     } catch (err) {
       console.error('Failed to fetch quote:', err)
@@ -283,6 +300,34 @@ export default function QuoteDetailPage() {
       showToast('Något gick fel', 'error')
     }
     setDuplicating(false)
+  }
+
+  const createNewVersion = async () => {
+    if (!quote) return
+    const label = prompt('Versionsnamn (valfritt):', `Version ${(versions.length || 1) + 1}`)
+    if (label === null) return // cancelled
+    setCreatingVersion(true)
+    try {
+      const res = await fetch('/api/quotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          duplicate_from: quote.quote_id,
+          create_version: true,
+          version_label: label || undefined,
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        showToast('Ny version skapad!', 'success')
+        router.push(`/dashboard/quotes/${data.quote.quote_id}/edit`)
+      } else {
+        showToast('Kunde inte skapa version', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setCreatingVersion(false)
   }
 
   const previewPDF = async () => {
@@ -611,6 +656,29 @@ export default function QuoteDetailPage() {
           </div>
         </div>
 
+        {/* Version selector */}
+        {versions.length > 1 && (
+          <div className="flex items-center gap-3 mb-4 bg-white border border-gray-200 rounded-xl p-3">
+            <GitBranch className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            <span className="text-sm text-gray-500">Version:</span>
+            <select
+              value={quoteId}
+              onChange={(e) => router.push(`/dashboard/quotes/${e.target.value}`)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-900 font-medium focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+            >
+              {versions.map((v) => (
+                <option key={v.quote_id} value={v.quote_id}>
+                  {v.version_label || `Version ${v.version_number}`}
+                  {v.status === 'accepted' ? ' ✓' : v.status === 'sent' ? ' (skickad)' : v.status === 'draft' ? ' (utkast)' : ''}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400">
+              {versions.length} versioner
+            </span>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex flex-wrap gap-2 mb-6">
           {quote.status === 'draft' && (
@@ -675,6 +743,14 @@ export default function QuoteDetailPage() {
           >
             {duplicating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
             Duplicera
+          </button>
+          <button
+            onClick={createNewVersion}
+            disabled={creatingVersion}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+          >
+            {creatingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
+            Ny version
           </button>
           <button
             onClick={previewPDF}

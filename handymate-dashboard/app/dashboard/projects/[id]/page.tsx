@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   ArrowLeft,
@@ -42,7 +42,16 @@ import {
   PenTool,
   Activity,
   RefreshCw,
-  Zap
+  Zap,
+  Send,
+  Eye,
+  Copy,
+  FileSignature,
+  ChevronRight,
+  MapPin,
+  Phone,
+  Printer,
+  MessageSquare,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -103,6 +112,15 @@ interface Milestone {
   completed_at: string | null
 }
 
+interface AtaItem {
+  name: string
+  description?: string
+  quantity: number
+  unit: string
+  unit_price: number
+  rot_rut_type?: string | null
+}
+
 interface Change {
   change_id: string
   project_id: string
@@ -113,6 +131,19 @@ interface Change {
   status: string
   approved_at: string | null
   created_at: string
+  ata_number?: number
+  items?: AtaItem[]
+  total?: number
+  sign_token?: string
+  sent_at?: string | null
+  signed_at?: string | null
+  signed_by_name?: string | null
+  declined_at?: string | null
+  declined_reason?: string | null
+  notes?: string | null
+  invoice_id?: string | null
+  invoiced_at?: string | null
+  customer_id?: string | null
 }
 
 interface TimeEntry {
@@ -163,7 +194,7 @@ interface ExtraCost {
   date: string
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer'
 
 interface ScheduleEntry {
   id: string
@@ -319,6 +350,16 @@ export default function ProjectDetailPage() {
   const [showChecklistCreate, setShowChecklistCreate] = useState(false)
   const [activeChecklist, setActiveChecklist] = useState<any>(null)
 
+  // Form submissions
+  const [formSubmissions, setFormSubmissions] = useState<any[]>([])
+  const [formTemplates, setFormTemplates] = useState<any[]>([])
+  const [showFormCreate, setShowFormCreate] = useState(false)
+  const [activeForm, setActiveForm] = useState<any>(null)
+  const [formAnswers, setFormAnswers] = useState<Record<string, any>>({})
+  const [formSaving, setFormSaving] = useState(false)
+  const [formSignName, setFormSignName] = useState('')
+  const [formSignDrawing, setFormSignDrawing] = useState(false)
+
   // AI log state
   const [aiLogs, setAiLogs] = useState<{ id: string; event_type: string; action: string; details: Record<string, unknown>; created_at: string }[]>([])
   const [aiLogLoading, setAiLogLoading] = useState(false)
@@ -332,9 +373,21 @@ export default function ProjectDetailPage() {
 
   // Modals
   const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; editing: Milestone | null }>({ open: false, editing: null })
-  const [changeModal, setChangeModal] = useState(false)
+  const [changeModal, setChangeModal] = useState<{ open: boolean; editing: Change | null }>({ open: false, editing: null })
   const [costModal, setCostModal] = useState(false)
+  const [sendingAtaId, setSendingAtaId] = useState<string | null>(null)
+  const [expandedAtaId, setExpandedAtaId] = useState<string | null>(null)
   const [deletingCostId, setDeletingCostId] = useState<string | null>(null)
+
+  // Work orders
+  const [workOrders, setWorkOrders] = useState<any[]>([])
+  const [woModal, setWoModal] = useState<{ open: boolean; editing: any | null }>({ open: false, editing: null })
+  const [woDetail, setWoDetail] = useState<any | null>(null)
+  const [woSending, setWoSending] = useState<string | null>(null)
+
+  // Supplier invoices
+  const [supplierInvoices, setSupplierInvoices] = useState<any[]>([])
+  const [siModal, setSiModal] = useState<{ open: boolean; editing: any | null }>({ open: false, editing: null })
 
   // Profitability (lazy loaded)
   const [profitability, setProfitability] = useState<Profitability | null>(null)
@@ -406,6 +459,7 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     if (activeTab === 'economy') {
       fetchProfitability()
+      fetchSupplierInvoices()
     }
   }, [activeTab, fetchProfitability])
 
@@ -447,6 +501,14 @@ export default function ProjectDetailPage() {
     if (activeTab === 'checklists') {
       fetchChecklists()
       fetchChecklistTemplates()
+      fetchFormSubmissions()
+      fetchFormTemplates()
+    }
+    if (activeTab === 'arbetsorder') {
+      fetchWorkOrders()
+    }
+    if (activeTab === 'leverantorer') {
+      fetchSupplierInvoices()
     }
     if (activeTab === 'ai_log') {
       fetchAiLogs()
@@ -537,6 +599,26 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         const data = await res.json()
         setLogs(data.logs || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchWorkOrders = async () => {
+    try {
+      const res = await fetch(`/api/work-orders?project_id=${projectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setWorkOrders(data.work_orders || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchSupplierInvoices = async () => {
+    try {
+      const res = await fetch(`/api/supplier-invoices?project_id=${projectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setSupplierInvoices(data.invoices || [])
       }
     } catch { /* ignore */ }
   }
@@ -683,6 +765,87 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // --- Form Submissions ---
+
+  const fetchFormSubmissions = async () => {
+    try {
+      const res = await fetch(`/api/form-submissions?projectId=${projectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setFormSubmissions(data.submissions || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const fetchFormTemplates = async () => {
+    try {
+      const res = await fetch('/api/form-templates')
+      if (res.ok) {
+        const data = await res.json()
+        setFormTemplates(data.templates || [])
+      }
+    } catch { /* ignore */ }
+  }
+
+  const handleCreateFormSubmission = async (templateId: string, name?: string) => {
+    try {
+      const res = await fetch('/api/form-submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_id: templateId, project_id: projectId, name }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      showToast('Formulär skapat!', 'success')
+      setShowFormCreate(false)
+      fetchFormSubmissions()
+      // Open the form immediately
+      setActiveForm(data.submission)
+      setFormAnswers(data.submission.answers || {})
+    } catch {
+      showToast('Kunde inte skapa formulär', 'error')
+    }
+  }
+
+  const handleSaveFormAnswers = async (opts?: { status?: string; signatureName?: string; signatureData?: string }) => {
+    if (!activeForm) return
+    setFormSaving(true)
+    try {
+      const payload: any = { id: activeForm.id, answers: formAnswers }
+      if (opts?.status) payload.status = opts.status
+      if (opts?.signatureName) payload.signed_by_name = opts.signatureName
+      if (opts?.signatureData) payload.signature_data = opts.signatureData
+
+      const res = await fetch('/api/form-submissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      setActiveForm(data.submission)
+      showToast(opts?.status === 'signed' ? 'Formulär signerat!' : 'Sparat!', 'success')
+      fetchFormSubmissions()
+    } catch {
+      showToast('Kunde inte spara', 'error')
+    } finally {
+      setFormSaving(false)
+    }
+  }
+
+  const handleDeleteFormSubmission = async (id: string) => {
+    if (!confirm('Ta bort detta formulär?')) return
+    try {
+      const res = await fetch(`/api/form-submissions?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      showToast('Formulär borttaget', 'success')
+      if (activeForm?.id === id) setActiveForm(null)
+      fetchFormSubmissions()
+    } catch {
+      showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
   const handleAssignMember = async (businessUserId: string) => {
     setAssignLoading(true)
     try {
@@ -778,36 +941,59 @@ export default function ProjectDetailPage() {
 
   const updateChangeStatus = async (changeId: string, status: 'approved' | 'rejected') => {
     try {
-      const res = await fetch(`/api/projects/${projectId}/changes`, {
-        method: 'PUT',
+      const res = await fetch(`/api/ata/${changeId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ change_id: changeId, status })
+        body: JSON.stringify({ status })
       })
-      if (!res.ok) throw new Error()
-      showToast(status === 'approved' ? 'ATA godkand' : 'ATA avslagen', 'success')
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error')
+      }
+      showToast(status === 'approved' ? 'ÄTA godkänd' : 'ÄTA avslagen', 'success')
       setProfitability(null)
       await fetchProjectData()
-    } catch {
-      showToast('Kunde inte uppdatera ATA', 'error')
+    } catch (err: any) {
+      showToast(err.message || 'Kunde inte uppdatera ÄTA', 'error')
     }
   }
 
   const deleteChange = async (changeId: string) => {
-    if (!confirm('Vill du ta bort denna ATA?')) return
+    if (!confirm('Vill du ta bort denna ÄTA?')) return
     try {
-      const res = await fetch(`/api/projects/${projectId}/changes?changeId=${changeId}`, {
+      const res = await fetch(`/api/ata/${changeId}`, {
         method: 'DELETE'
       })
       if (!res.ok) {
         const data = await res.json()
         throw new Error(data.error || 'Error')
       }
-      showToast('ATA borttagen', 'success')
+      showToast('ÄTA borttagen', 'success')
       setProfitability(null)
       await fetchProjectData()
     } catch (err: any) {
       showToast(err.message || 'Kunde inte ta bort', 'error')
     }
+  }
+
+  const sendAta = async (changeId: string) => {
+    setSendingAtaId(changeId)
+    try {
+      const res = await fetch(`/api/ata/${changeId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: 'sms' })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Error')
+      }
+      showToast('ÄTA skickad till kund', 'success')
+      await fetchProjectData()
+    } catch (err: any) {
+      showToast(err.message || 'Kunde inte skicka ÄTA', 'error')
+    }
+    setSendingAtaId(null)
   }
 
   const createInvoiceFromTime = async () => {
@@ -951,11 +1137,13 @@ export default function ProjectDetailPage() {
     { key: 'schedule', label: 'Schema' },
     { key: 'milestones', label: 'Delmoment' },
     { key: 'changes', label: 'ATA' },
+    { key: 'arbetsorder', label: 'Arbetsorder' },
     { key: 'time', label: 'Tidrapporter' },
     { key: 'material', label: 'Material' },
     { key: 'documents', label: 'Dokument' },
-    { key: 'log', label: 'Dagbok' },
+    { key: 'log', label: 'Byggdagbok' },
     { key: 'checklists', label: 'Checklistor' },
+    { key: 'leverantorer', label: 'Leverantorer' },
     { key: 'economy', label: 'Ekonomi' },
     { key: 'ai_log', label: 'Projektanalys' }
   ]
@@ -1218,7 +1406,7 @@ export default function ProjectDetailPage() {
                 <span className="text-sm text-gray-700">Nytt delmoment</span>
               </button>
               <button
-                onClick={() => { setActiveTab('changes'); setChangeModal(true) }}
+                onClick={() => { setActiveTab('changes'); setChangeModal({ open: true, editing: null }) }}
                 className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
@@ -1400,29 +1588,29 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* === TAB: ATA === */}
+        {/* === TAB: ÄTA === */}
         {activeTab === 'changes' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">ATA (Andring/Tillagg/Avgaende)</h2>
+              <h2 className="text-lg font-semibold text-gray-900">ÄTA (Ändring/Tillägg/Avgående)</h2>
               <button
-                onClick={() => setChangeModal(true)}
+                onClick={() => setChangeModal({ open: true, editing: null })}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
-                Ny ATA
+                Ny ÄTA
               </button>
             </div>
 
-            {/* ATA summary */}
+            {/* ÄTA summary */}
             {summary && (summary.ata_additions > 0 || summary.ata_removals > 0) && (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
-                  <p className="text-xs text-emerald-600 mb-1">Tillagg</p>
+                  <p className="text-xs text-emerald-600 mb-1">Tillägg</p>
                   <p className="text-lg font-bold text-emerald-600">+{formatCurrency(summary.ata_additions)}</p>
                 </div>
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center">
-                  <p className="text-xs text-red-600 mb-1">Avgaende</p>
+                  <p className="text-xs text-red-600 mb-1">Avgående</p>
                   <p className="text-lg font-bold text-red-600">-{formatCurrency(summary.ata_removals)}</p>
                 </div>
                 <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
@@ -1437,72 +1625,197 @@ export default function ProjectDetailPage() {
             {changes.length === 0 ? (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
                 <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-400">Inga ATA annu</p>
-                <p className="text-xs text-gray-400 mt-1">Registrera tillagg, andringar eller avgaende arbeten</p>
+                <p className="text-gray-400">Inga ÄTA ännu</p>
+                <p className="text-xs text-gray-400 mt-1">Registrera tillägg, ändringar eller avgående arbeten</p>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
-                {changes.map(change => (
-                  <div key={change.change_id} className="p-4 hover:bg-gray-100/30 transition-all">
-                    <div className="flex items-start gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                            change.change_type === 'addition'
-                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                              : change.change_type === 'change'
-                              ? 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-                              : 'bg-red-100 text-red-600 border-red-500/30'
-                          }`}>
-                            {change.change_type === 'addition' ? 'Tillagg' : change.change_type === 'change' ? 'Andring' : 'Avgaende'}
-                          </span>
-                          <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                            change.status === 'approved'
-                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                              : change.status === 'rejected'
-                              ? 'bg-red-100 text-red-600 border-red-500/30'
-                              : 'bg-gray-100 text-gray-500 border-gray-300'
-                          }`}>
-                            {change.status === 'approved' ? 'Godkand' : change.status === 'rejected' ? 'Avslagen' : 'Vantande'}
-                          </span>
-                        </div>
-                        <p className="text-gray-900 text-sm mb-1">{change.description}</p>
-                        <div className="flex gap-3 text-xs text-gray-400">
-                          {change.amount > 0 && <span>{formatCurrency(change.amount)}</span>}
-                          {change.hours > 0 && <span>{formatHours(change.hours)}</span>}
-                          <span>{formatDate(change.created_at)}</span>
-                        </div>
-                      </div>
+              <div className="space-y-3">
+                {changes.map(change => {
+                  const isExpanded = expandedAtaId === change.change_id
+                  const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
+                    draft: { label: 'Utkast', bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' },
+                    pending: { label: 'Väntande', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
+                    sent: { label: 'Skickad', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+                    signed: { label: 'Signerad', bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+                    approved: { label: 'Godkänd', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+                    rejected: { label: 'Avslagen', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+                    declined: { label: 'Avböjd', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+                    invoiced: { label: 'Fakturerad', bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
+                  }
+                  const sc = statusConfig[change.status] || statusConfig.draft
 
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        {change.status === 'pending' && (
-                          <>
-                            <button
-                              onClick={() => updateChangeStatus(change.change_id, 'approved')}
-                              className="p-1.5 text-emerald-600 hover:bg-emerald-500/10 rounded-lg transition-all"
-                              title="Godkann"
-                            >
-                              <CheckCircle className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => updateChangeStatus(change.change_id, 'rejected')}
-                              className="p-1.5 text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
-                              title="Avsla"
-                            >
-                              <XCircle className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => deleteChange(change.change_id)}
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
+                  return (
+                    <div key={change.change_id} className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                      {/* Header row */}
+                      <button
+                        onClick={() => setExpandedAtaId(isExpanded ? null : change.change_id)}
+                        className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-all"
+                      >
+                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="text-sm font-semibold text-gray-900">
+                              ÄTA-{change.ata_number || '?'}
+                            </span>
+                            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                              change.change_type === 'addition'
+                                ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+                                : change.change_type === 'change'
+                                ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                : 'bg-red-100 text-red-600 border-red-500/30'
+                            }`}>
+                              {change.change_type === 'addition' ? 'Tillägg' : change.change_type === 'change' ? 'Ändring' : 'Avgående'}
+                            </span>
+                            <span className={`px-2 py-0.5 text-xs rounded-full border ${sc.bg} ${sc.text} ${sc.border}`}>
+                              {sc.label}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600 truncate">{change.description}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-sm font-semibold text-gray-900">
+                            {change.total ? formatCurrency(change.total) : change.amount > 0 ? formatCurrency(change.amount) : '–'}
+                          </p>
+                          <p className="text-xs text-gray-400">{formatDate(change.created_at)}</p>
+                        </div>
+                      </button>
+
+                      {/* Expanded content */}
+                      {isExpanded && (
+                        <div className="border-t border-gray-100 px-4 pb-4">
+                          {/* Items table */}
+                          {change.items && change.items.length > 0 && (
+                            <div className="mt-3">
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="text-xs text-gray-400 border-b border-gray-100">
+                                    <th className="text-left py-2 font-medium">Rad</th>
+                                    <th className="text-right py-2 font-medium w-16">Antal</th>
+                                    <th className="text-left py-2 font-medium w-16 pl-2">Enhet</th>
+                                    <th className="text-right py-2 font-medium w-24">à-pris</th>
+                                    <th className="text-right py-2 font-medium w-24">Summa</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {change.items.map((item, idx) => (
+                                    <tr key={idx} className="border-b border-gray-50">
+                                      <td className="py-2 text-gray-700">{item.name}</td>
+                                      <td className="py-2 text-right text-gray-600">{item.quantity}</td>
+                                      <td className="py-2 text-left pl-2 text-gray-500">{item.unit}</td>
+                                      <td className="py-2 text-right text-gray-600">{formatCurrency(item.unit_price)}</td>
+                                      <td className="py-2 text-right font-medium text-gray-900">{formatCurrency(item.quantity * item.unit_price)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {change.notes && (
+                            <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+                              <p className="text-xs text-gray-400 mb-1">Anteckning</p>
+                              {change.notes}
+                            </div>
+                          )}
+
+                          {/* Signing info */}
+                          {change.signed_at && change.signed_by_name && (
+                            <div className="mt-3 flex items-center gap-2 text-xs text-teal-600">
+                              <FileSignature className="w-3.5 h-3.5" />
+                              Signerad av {change.signed_by_name} {formatDate(change.signed_at)}
+                            </div>
+                          )}
+
+                          {change.declined_at && (
+                            <div className="mt-3 flex items-center gap-2 text-xs text-red-600">
+                              <XCircle className="w-3.5 h-3.5" />
+                              Avböjd {formatDate(change.declined_at)}
+                              {change.declined_reason && <span>— {change.declined_reason}</span>}
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="mt-4 flex items-center gap-2 flex-wrap">
+                            {/* Send to customer */}
+                            {(change.status === 'draft' || change.status === 'pending') && (
+                              <button
+                                onClick={() => sendAta(change.change_id)}
+                                disabled={sendingAtaId === change.change_id}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg text-sm font-medium hover:bg-blue-100 disabled:opacity-50 transition-all"
+                              >
+                                {sendingAtaId === change.change_id
+                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  : <Send className="w-3.5 h-3.5" />
+                                }
+                                Skicka till kund
+                              </button>
+                            )}
+
+                            {/* Approve */}
+                            {(change.status === 'pending' || change.status === 'sent' || change.status === 'signed') && (
+                              <button
+                                onClick={() => updateChangeStatus(change.change_id, 'approved')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-all"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5" />
+                                Godkänn
+                              </button>
+                            )}
+
+                            {/* Reject */}
+                            {(change.status === 'pending' || change.status === 'sent') && (
+                              <button
+                                onClick={() => updateChangeStatus(change.change_id, 'rejected')}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-all"
+                              >
+                                <XCircle className="w-3.5 h-3.5" />
+                                Avslå
+                              </button>
+                            )}
+
+                            {/* Edit */}
+                            {(change.status === 'draft' || change.status === 'pending') && (
+                              <button
+                                onClick={() => setChangeModal({ open: true, editing: change })}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                                Redigera
+                              </button>
+                            )}
+
+                            {/* Copy sign link */}
+                            {change.sign_token && change.status === 'sent' && (
+                              <button
+                                onClick={() => {
+                                  const url = `${window.location.origin}/sign/ata/${change.sign_token}`
+                                  navigator.clipboard.writeText(url)
+                                  showToast('Signeringslänk kopierad', 'success')
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                                Kopiera länk
+                              </button>
+                            )}
+
+                            {/* Delete */}
+                            {(change.status === 'draft' || change.status === 'pending') && (
+                              <button
+                                onClick={() => deleteChange(change.change_id)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg text-sm transition-all ml-auto"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Ta bort
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
@@ -1995,69 +2308,117 @@ export default function ProjectDetailPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <BookOpen className="w-5 h-5 text-amber-400" />
-                Byggdagbok
+                Byggdagbok {project?.name ? `\u2014 ${project.name}` : ''}
               </h2>
-              <button
-                onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
-              >
-                <Plus className="w-4 h-4" /> Ny anteckning
-              </button>
+              <div className="flex items-center gap-2">
+                {logs.length > 0 && (
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/projects/${projectId}/logs/pdf`)
+                        if (!res.ok) throw new Error()
+                        const blob = await res.blob()
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url
+                        a.download = `byggdagbok-${project?.name || projectId}.pdf`
+                        a.click()
+                        URL.revokeObjectURL(url)
+                      } catch {
+                        showToast('Kunde inte exportera PDF', 'error')
+                      }
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors"
+                  >
+                    <Download className="w-4 h-4" /> Exportera PDF
+                  </button>
+                )}
+                <button
+                  onClick={() => { setEditingLog(null); setShowLogModal(true) }}
+                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                >
+                  <Plus className="w-4 h-4" /> Ny dagbokspost
+                </button>
+              </div>
             </div>
 
             {logs.length > 0 ? (
               <div className="space-y-4">
-                {logs.map((log: any) => (
-                  <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <p className="text-gray-900 font-medium">{formatDate(log.log_date)}</p>
-                        {log.business_user && (
-                          <p className="text-xs text-gray-400 mt-0.5">{log.business_user.name}</p>
-                        )}
+                {logs.map((log: any) => {
+                  const weatherMap: Record<string, string> = { sunny: '\u2600\uFE0F Sol', cloudy: '\u26C5 Mulet', rainy: '\uD83C\uDF27\uFE0F Regn', snowy: '\u2744\uFE0F Snö', windy: '\uD83C\uDF2C\uFE0F Blåsigt' }
+                  const weatherLabel = log.weather ? weatherMap[log.weather] || log.weather : null
+                  return (
+                    <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <p className="text-gray-900 font-semibold">
+                            {new Date(log.date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                          </p>
+                          {log.business_user && (
+                            <p className="text-xs text-gray-400 mt-0.5">{log.business_user.name}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+                          {weatherLabel && (
+                            <span>{weatherLabel}{log.temperature != null ? `, ${log.temperature}°C` : ''}</span>
+                          )}
+                          {log.workers_count != null && (
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3.5 h-3.5" />
+                              {log.workers_count} arbetare
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-gray-400">
-                        {log.weather && (
-                          <span className="flex items-center gap-1">
-                            <CloudSun className="w-3.5 h-3.5" />
-                            {log.weather}{log.temperature != null ? `, ${log.temperature}°C` : ''}
-                          </span>
-                        )}
-                        {log.hours_worked && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3.5 h-3.5" />
-                            {log.hours_worked} tim
-                          </span>
-                        )}
+
+                      {log.work_performed && (
+                        <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{log.work_performed}</p>
+                      )}
+
+                      {log.materials_used && (
+                        <p className="text-xs text-gray-500 mb-2">
+                          <span className="font-medium text-gray-600">Material:</span> {log.materials_used}
+                        </p>
+                      )}
+
+                      {log.issues && (
+                        <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800">{log.issues}</p>
+                        </div>
+                      )}
+
+                      {log.description && (
+                        <p className="text-xs text-gray-400 italic">{log.description}</p>
+                      )}
+
+                      {log.photos && log.photos.length > 0 && (
+                        <div className="flex gap-2 mt-2 overflow-x-auto">
+                          {log.photos.map((photo: any, i: number) => (
+                            <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+                              <img src={photo.url} alt={photo.caption || `Foto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                        <button
+                          onClick={() => { setEditingLog(log); setShowLogModal(true) }}
+                          className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
+                        >
+                          <Edit className="w-3.5 h-3.5" /> Redigera
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLog(log.id)}
+                          className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Ta bort
+                        </button>
                       </div>
                     </div>
-                    {log.work_description && (
-                      <p className="text-sm text-gray-700 mb-2">{log.work_description}</p>
-                    )}
-                    {log.materials_used && (
-                      <p className="text-xs text-gray-400 mb-2">
-                        <span className="text-gray-500 font-medium">Material:</span> {log.materials_used}
-                      </p>
-                    )}
-                    {log.notes && (
-                      <p className="text-xs text-gray-400 italic">{log.notes}</p>
-                    )}
-                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
-                      <button
-                        onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                        className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
-                      >
-                        <Edit className="w-3.5 h-3.5" /> Redigera
-                      </button>
-                      <button
-                        onClick={() => handleDeleteLog(log.id)}
-                        className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" /> Ta bort
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
@@ -2081,20 +2442,23 @@ export default function ProjectDetailPage() {
         {/* === TAB: Checklistor === */}
         {activeTab === 'checklists' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <ClipboardCheck className="w-5 h-5 text-emerald-600" />
-                Checklistor
-              </h2>
-              <button
-                onClick={() => setShowChecklistCreate(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
-              >
-                <Plus className="w-4 h-4" /> Ny checklista
-              </button>
-            </div>
 
-            {activeChecklist ? (
+            {/* --- Active form fill-in view --- */}
+            {activeForm ? (
+              <FormFillView
+                submission={activeForm}
+                answers={formAnswers}
+                setAnswers={setFormAnswers}
+                saving={formSaving}
+                signName={formSignName}
+                setSignName={setFormSignName}
+                signDrawing={formSignDrawing}
+                setSignDrawing={setFormSignDrawing}
+                onSave={handleSaveFormAnswers}
+                onBack={() => { setActiveForm(null); fetchFormSubmissions() }}
+                onDelete={() => handleDeleteFormSubmission(activeForm.id)}
+              />
+            ) : activeChecklist ? (
               /* Active checklist detail view */
               <div className="space-y-4">
                 <button
@@ -2165,8 +2529,22 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             ) : (
-              /* Checklist list view */
+              /* List view — Checklists + Forms */
               <>
+                {/* Checklistor section */}
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <ClipboardCheck className="w-5 h-5 text-emerald-600" />
+                    Checklistor
+                  </h2>
+                  <button
+                    onClick={() => setShowChecklistCreate(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                  >
+                    <Plus className="w-4 h-4" /> Ny checklista
+                  </button>
+                </div>
+
                 {checklists.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {checklists.map((cl: any) => (
@@ -2198,10 +2576,68 @@ export default function ProjectDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
-                    <ClipboardList className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-400">Inga checklistor skapade</p>
-                    <p className="text-xs text-gray-400 mt-1">Skapa en checklista från en mall eller bygg en egen</p>
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-8 text-center">
+                    <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">Inga checklistor skapade</p>
+                  </div>
+                )}
+
+                {/* Formulär section */}
+                <div className="flex items-center justify-between mt-8">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-sky-600" />
+                    Formulär
+                  </h2>
+                  <button
+                    onClick={() => setShowFormCreate(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-sky-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                  >
+                    <Plus className="w-4 h-4" /> Nytt formulär
+                  </button>
+                </div>
+
+                {formSubmissions.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {formSubmissions.map((fs: any) => (
+                      <button
+                        key={fs.id}
+                        onClick={() => { setActiveForm(fs); setFormAnswers(fs.answers || {}) }}
+                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-sky-300 transition"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="text-sm font-medium text-gray-900">{fs.name}</h3>
+                          <span className={`px-2 py-0.5 text-xs rounded-full ${
+                            fs.status === 'signed'
+                              ? 'bg-emerald-100 text-emerald-600'
+                              : fs.status === 'completed'
+                                ? 'bg-sky-100 text-sky-600'
+                                : 'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {fs.status === 'signed' ? 'Signerat' : fs.status === 'completed' ? 'Ifyllt' : 'Utkast'}
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-sky-500 rounded-full transition-all"
+                            style={{ width: `${fs.progress?.percent || 0}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-gray-400 mt-1.5">
+                          {fs.progress?.completed || 0}/{fs.progress?.total || 0} obligatoriska fält klara
+                        </p>
+                        {fs.signed_at && (
+                          <p className="text-xs text-emerald-600 mt-1">
+                            Signerat {new Date(fs.signed_at).toLocaleDateString('sv-SE')} av {fs.signed_by_name}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-8 text-center">
+                    <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <p className="text-gray-400 text-sm">Inga formulär skapade</p>
+                    <p className="text-xs text-gray-400 mt-1">Skapa egenkontroll, säkerhetschecklist eller eget formulär</p>
                   </div>
                 )}
               </>
@@ -2213,6 +2649,15 @@ export default function ProjectDetailPage() {
                 templates={checklistTemplates}
                 onClose={() => setShowChecklistCreate(false)}
                 onCreate={handleCreateChecklist}
+              />
+            )}
+
+            {/* Create Form Modal */}
+            {showFormCreate && (
+              <FormCreateModal
+                templates={formTemplates}
+                onClose={() => setShowFormCreate(false)}
+                onCreate={handleCreateFormSubmission}
               />
             )}
           </div>
@@ -2292,6 +2737,15 @@ export default function ProjectDetailPage() {
                           <span>{formatCurrency(profitability.costs.other)}</span>
                         </div>
                       )}
+                      {supplierInvoices.length > 0 && (() => {
+                        const siTotal = supplierInvoices.reduce((s, inv) => s + (parseFloat(inv.total_amount) || 0), 0)
+                        return siTotal > 0 ? (
+                          <div className="flex justify-between">
+                            <span>Leverantörsfakturor</span>
+                            <span>{formatCurrency(siTotal)}</span>
+                          </div>
+                        ) : null
+                      })()}
                     </div>
                   </div>
 
@@ -2569,6 +3023,374 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         )}
+        {/* === TAB: Arbetsorder === */}
+        {activeTab === 'arbetsorder' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <ClipboardList className="w-5 h-5 text-teal-600" />
+                Arbetsorder
+              </h2>
+              <button
+                onClick={() => setWoModal({ open: true, editing: null })}
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+              >
+                <Plus className="w-4 h-4" />
+                Ny arbetsorder
+              </button>
+            </div>
+
+            {workOrders.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-medium text-gray-900 mb-1">Inga arbetsorder</h3>
+                <p className="text-sm text-gray-500">Skapa en arbetsorder för att skicka instruktioner till din personal</p>
+              </div>
+            ) : woDetail ? (
+              /* ── Detail view ── */
+              <div className="bg-white border border-gray-200 rounded-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <button onClick={() => setWoDetail(null)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
+                    <ArrowLeft className="w-4 h-4" /> Tillbaka
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`/api/work-orders/${woDetail.id}/pdf`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Skriv ut
+                    </a>
+                    <button
+                      onClick={() => { setWoModal({ open: true, editing: woDetail }); setWoDetail(null) }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                      Redigera
+                    </button>
+                    {woDetail.status !== 'completed' && (
+                      <button
+                        onClick={async () => {
+                          await fetch(`/api/work-orders/${woDetail.id}/complete`, { method: 'POST' })
+                          fetchWorkOrders()
+                          setWoDetail(null)
+                          showToast('Arbetsorder markerad som slutförd', 'success')
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700 hover:bg-emerald-100"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Slutförd
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-xs font-mono text-gray-400">{woDetail.order_number}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    woDetail.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                    woDetail.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-100 text-gray-600'
+                  }`}>
+                    {woDetail.status === 'completed' ? 'Slutförd' : woDetail.status === 'sent' ? 'Skickad' : 'Utkast'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">{woDetail.title}</h3>
+
+                <div className="grid gap-4">
+                  {woDetail.scheduled_date && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Datum & tid</p>
+                      <p className="text-sm text-gray-900">
+                        {new Date(woDetail.scheduled_date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {woDetail.scheduled_start && ` kl ${woDetail.scheduled_start.substring(0, 5)}`}
+                        {woDetail.scheduled_end && `–${woDetail.scheduled_end.substring(0, 5)}`}
+                      </p>
+                    </div>
+                  )}
+                  {woDetail.address && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Adress</p>
+                      <p className="text-sm text-gray-900">{woDetail.address}</p>
+                    </div>
+                  )}
+                  {woDetail.access_info && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Tillträde / portkod</p>
+                      <p className="text-sm text-gray-900">{woDetail.access_info}</p>
+                    </div>
+                  )}
+                  {woDetail.contact_name && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Kontaktperson</p>
+                      <p className="text-sm text-gray-900">{woDetail.contact_name}{woDetail.contact_phone && ` — ${woDetail.contact_phone}`}</p>
+                    </div>
+                  )}
+                  {woDetail.description && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Uppdragsbeskrivning</p>
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.description}</p>
+                    </div>
+                  )}
+                  {woDetail.materials_needed && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Material att ta med</p>
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.materials_needed}</p>
+                    </div>
+                  )}
+                  {woDetail.tools_needed && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Verktyg att ta med</p>
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.tools_needed}</p>
+                    </div>
+                  )}
+                  {woDetail.notes && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Övrigt</p>
+                      <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.notes}</p>
+                    </div>
+                  )}
+                  {woDetail.assigned_to && (
+                    <div>
+                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Tilldelad</p>
+                      <p className="text-sm text-gray-900">{woDetail.assigned_to}{woDetail.assigned_phone && ` — ${woDetail.assigned_phone}`}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* ── List view ── */
+              <div className="space-y-3">
+                {workOrders.map(wo => (
+                  <div key={wo.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setWoDetail(wo)}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-mono text-gray-400">{wo.order_number}</span>
+                          <span className="text-sm font-medium text-gray-900">{wo.title}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                            wo.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                            wo.status === 'sent' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-600'
+                          }`}>
+                            {wo.status === 'completed' ? 'Slutförd' : wo.status === 'sent' ? 'Skickad' : 'Utkast'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                          {wo.scheduled_date && (
+                            <span className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3" />
+                              {new Date(wo.scheduled_date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
+                              {wo.scheduled_start && ` ${wo.scheduled_start.substring(0, 5)}`}
+                              {wo.scheduled_end && `–${wo.scheduled_end.substring(0, 5)}`}
+                            </span>
+                          )}
+                          {wo.address && (
+                            <span className="flex items-center gap-1 truncate">
+                              <MapPin className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{wo.address}</span>
+                            </span>
+                          )}
+                          {wo.assigned_to && (
+                            <span className="flex items-center gap-1">
+                              <Users className="w-3 h-3" />
+                              {wo.assigned_to}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                        <button
+                          onClick={() => setWoDetail(wo)}
+                          className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                        >
+                          Visa
+                        </button>
+                        {wo.assigned_phone && wo.status !== 'completed' && (
+                          <button
+                            disabled={woSending === wo.id}
+                            onClick={async () => {
+                              setWoSending(wo.id)
+                              try {
+                                const res = await fetch(`/api/work-orders/${wo.id}/send`, { method: 'POST' })
+                                if (res.ok) {
+                                  showToast('SMS skickat', 'success')
+                                  fetchWorkOrders()
+                                } else {
+                                  const d = await res.json()
+                                  showToast(d.error || 'Kunde inte skicka', 'error')
+                                }
+                              } catch {
+                                showToast('Fel vid SMS-utskick', 'error')
+                              }
+                              setWoSending(null)
+                            }}
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-teal-50 border border-teal-200 rounded-lg text-teal-700 hover:bg-teal-100 disabled:opacity-50"
+                          >
+                            {woSending === wo.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
+                            {wo.status === 'sent' ? 'Påminn' : 'Skicka SMS'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════ LEVERANTÖRSFAKTUROR TAB ═══════ */}
+        {activeTab === 'leverantorer' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-teal-600" />
+                Leverantörsfakturor
+              </h2>
+              <button
+                onClick={() => setSiModal({ open: true, editing: null })}
+                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+              >
+                <Plus className="w-4 h-4" />
+                Lägg till faktura
+              </button>
+            </div>
+
+            {/* Summary cards */}
+            {supplierInvoices.length > 0 && (() => {
+              const totalPurchase = supplierInvoices.reduce((s, inv) => s + (parseFloat(inv.total_amount) || 0), 0)
+              const billableInvoices = supplierInvoices.filter(inv => inv.billable_to_customer)
+              const avgMarkup = billableInvoices.length > 0
+                ? billableInvoices.reduce((s, inv) => s + (parseFloat(inv.markup_percent) || 0), 0) / billableInvoices.length
+                : 0
+              const totalMarkup = billableInvoices.reduce((s, inv) => {
+                const amt = parseFloat(inv.total_amount) || 0
+                const pct = parseFloat(inv.markup_percent) || 0
+                return s + amt * pct / 100
+              }, 0)
+              const totalBillable = billableInvoices.reduce((s, inv) => s + (parseFloat(inv.total_amount) || 0), 0) + totalMarkup
+              const unpaid = supplierInvoices.filter(inv => inv.status === 'unpaid').reduce((s, inv) => s + (parseFloat(inv.total_amount) || 0), 0)
+
+              return (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">Totalt inköp</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(totalPurchase)}</p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">Påslag ({Math.round(avgMarkup)}%)</p>
+                    <p className="text-lg font-bold text-gray-900">{formatCurrency(totalMarkup)}</p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">Debiterbart</p>
+                    <p className="text-lg font-bold text-teal-600">{formatCurrency(totalBillable)}</p>
+                  </div>
+                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">Ej betalt</p>
+                    <p className="text-lg font-bold text-amber-500">{formatCurrency(unpaid)}</p>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {supplierInvoices.length === 0 ? (
+              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+                <Receipt className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                <h3 className="font-medium text-gray-900 mb-1">Inga leverantörsfakturor</h3>
+                <p className="text-sm text-gray-500">Lägg till fakturor från leverantörer för att spåra inköpskostnader</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {supplierInvoices.map(inv => {
+                  const totalAmt = parseFloat(inv.total_amount) || 0
+                  const markup = parseFloat(inv.markup_percent) || 0
+                  const customerPrice = totalAmt + totalAmt * markup / 100
+
+                  return (
+                    <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-medium text-gray-900 truncate">{inv.supplier_name}</h3>
+                            {inv.invoice_number && (
+                              <span className="text-xs font-mono text-gray-400">{inv.invoice_number}</span>
+                            )}
+                          </div>
+                          <p className="text-lg font-bold text-gray-900">{formatCurrency(totalAmt)}</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-400">
+                            {inv.invoice_date && (
+                              <span>Fakturadatum: {new Date(inv.invoice_date + 'T00:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</span>
+                            )}
+                            {inv.due_date && (
+                              <span>Förfall: {new Date(inv.due_date + 'T00:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</span>
+                            )}
+                            {inv.billable_to_customer && markup > 0 && (
+                              <span className="text-teal-600">Påslag: {markup}% → {formatCurrency(customerPrice)} till kund</span>
+                            )}
+                          </div>
+                          {inv.notes && <p className="text-xs text-gray-400 mt-1 truncate">{inv.notes}</p>}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                            inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                            inv.status === 'invoiced' ? 'bg-blue-100 text-blue-700' :
+                            'bg-amber-100 text-amber-700'
+                          }`}>
+                            {inv.status === 'paid' ? 'Betald' : inv.status === 'invoiced' ? 'Fakturerad' : 'Obetald'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                        {inv.status === 'unpaid' && (
+                          <button
+                            onClick={async () => {
+                              await fetch('/api/supplier-invoices', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ id: inv.id, status: 'paid' }),
+                              })
+                              fetchSupplierInvoices()
+                              showToast('Markerad som betald', 'success')
+                            }}
+                            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-50 border border-emerald-200 rounded-lg text-emerald-700 hover:bg-emerald-100"
+                          >
+                            <CheckCircle className="w-3 h-3" />
+                            Markera betald
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSiModal({ open: true, editing: inv })}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100"
+                        >
+                          <Edit className="w-3 h-3" />
+                          Redigera
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Ta bort leverantörsfakturan?')) return
+                            await fetch('/api/supplier-invoices', {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ id: inv.id }),
+                            })
+                            fetchSupplierInvoices()
+                            showToast('Faktura borttagen', 'success')
+                          }}
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-red-50 border border-red-200 rounded-lg text-red-600 hover:bg-red-100"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* === Milestone Modal === */}
@@ -2586,16 +3408,18 @@ export default function ProjectDetailPage() {
         />
       )}
 
-      {/* === Change (ATA) Modal === */}
-      {changeModal && (
+      {/* === Change (ÄTA) Modal === */}
+      {changeModal.open && (
         <ChangeModal
           projectId={projectId}
-          onClose={() => setChangeModal(false)}
+          editing={changeModal.editing}
+          customerId={project?.customer_id || null}
+          onClose={() => setChangeModal({ open: false, editing: null })}
           onSaved={() => {
-            setChangeModal(false)
+            setChangeModal({ open: false, editing: null })
             setProfitability(null)
             fetchProjectData()
-            showToast('ATA skapad', 'success')
+            showToast(changeModal.editing ? 'ÄTA uppdaterad' : 'ÄTA skapad', 'success')
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -2612,6 +3436,48 @@ export default function ProjectDetailPage() {
             showToast('Kostnad tillagd', 'success')
           }}
           onError={(msg) => showToast(msg, 'error')}
+        />
+      )}
+
+      {/* === Work Order Modal === */}
+      {woModal.open && (
+        <WorkOrderModal
+          projectId={projectId}
+          editing={woModal.editing}
+          onClose={() => setWoModal({ open: false, editing: null })}
+          onSaved={() => {
+            setWoModal({ open: false, editing: null })
+            fetchWorkOrders()
+            showToast(woModal.editing ? 'Arbetsorder uppdaterad' : 'Arbetsorder skapad', 'success')
+          }}
+          onSendSMS={async (woId) => {
+            try {
+              const res = await fetch(`/api/work-orders/${woId}/send`, { method: 'POST' })
+              if (res.ok) {
+                showToast('SMS skickat', 'success')
+              } else {
+                showToast('Kunde inte skicka SMS', 'error')
+              }
+            } catch {
+              showToast('Kunde inte skicka SMS', 'error')
+            }
+            fetchWorkOrders()
+          }}
+        />
+      )}
+
+      {/* === Supplier Invoice Modal === */}
+      {siModal.open && (
+        <SupplierInvoiceModal
+          projectId={projectId}
+          editing={siModal.editing}
+          onClose={() => setSiModal({ open: false, editing: null })}
+          onSaved={() => {
+            setSiModal({ open: false, editing: null })
+            fetchSupplierInvoices()
+            setProfitability(null)
+            showToast(siModal.editing ? 'Faktura uppdaterad' : 'Faktura tillagd', 'success')
+          }}
         />
       )}
     </div>
@@ -2762,51 +3628,111 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
 
 // --- Change (ATA) Modal ---
 
-function ChangeModal({ projectId, onClose, onSaved, onError }: {
+function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError }: {
   projectId: string
+  editing: Change | null
+  customerId: string | null
   onClose: () => void
   onSaved: () => void
   onError: (msg: string) => void
 }) {
-  const [changeType, setChangeType] = useState<'addition' | 'change' | 'removal'>('addition')
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [hours, setHours] = useState('')
+  const [changeType, setChangeType] = useState<'addition' | 'change' | 'removal'>(
+    (editing?.change_type as any) || 'addition'
+  )
+  const [description, setDescription] = useState(editing?.description || '')
+  const [notes, setNotes] = useState(editing?.notes || '')
+  const [hours, setHours] = useState(editing?.hours?.toString() || '')
   const [saving, setSaving] = useState(false)
+
+  // Item rows
+  const [items, setItems] = useState<{ id: string; name: string; quantity: number; unit: string; unit_price: number }[]>(
+    editing?.items?.map((item, idx) => ({
+      id: `item_${idx}`,
+      name: item.name || '',
+      quantity: item.quantity || 1,
+      unit: item.unit || 'st',
+      unit_price: item.unit_price || 0,
+    })) || [{ id: 'item_0', name: '', quantity: 1, unit: 'st', unit_price: 0 }]
+  )
+
+  const addItem = () => {
+    setItems(prev => [...prev, { id: `item_${Date.now()}`, name: '', quantity: 1, unit: 'st', unit_price: 0 }])
+  }
+
+  const updateItemField = (id: string, field: string, value: any) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item))
+  }
+
+  const removeItem = (id: string) => {
+    if (items.length <= 1) return
+    setItems(prev => prev.filter(item => item.id !== id))
+  }
+
+  const total = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
 
   const handleSave = async () => {
     if (!description.trim()) {
-      onError('Beskrivning kravs')
+      onError('Beskrivning krävs')
       return
     }
     setSaving(true)
     try {
-      const res = await fetch(`/api/projects/${projectId}/changes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          change_type: changeType,
-          description: description.trim(),
-          amount: amount ? parseFloat(amount) : 0,
-          hours: hours ? parseFloat(hours) : 0
+      const validItems = items.filter(i => i.name.trim()).map(i => ({
+        name: i.name.trim(),
+        quantity: i.quantity,
+        unit: i.unit,
+        unit_price: i.unit_price,
+      }))
+
+      if (editing) {
+        // Update existing
+        const res = await fetch(`/api/ata/${editing.change_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            change_type: changeType,
+            description: description.trim(),
+            items: validItems,
+            hours: hours ? parseFloat(hours) : 0,
+            notes: notes.trim() || null,
+          })
         })
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Error')
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Error')
+        }
+      } else {
+        // Create new
+        const res = await fetch('/api/ata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId,
+            changeType,
+            description: description.trim(),
+            items: validItems,
+            hours: hours ? parseFloat(hours) : 0,
+            notes: notes.trim() || null,
+            customerId,
+          })
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || 'Error')
+        }
       }
       onSaved()
     } catch (err: any) {
-      onError(err.message || 'Kunde inte skapa ATA')
+      onError(err.message || 'Kunde inte spara ÄTA')
       setSaving(false)
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Ny ATA</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{editing ? 'Redigera ÄTA' : 'Ny ÄTA'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
@@ -2817,9 +3743,9 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
             <label className="text-sm text-gray-500 mb-2 block">Typ</label>
             <div className="grid grid-cols-3 gap-2">
               {([
-                { key: 'addition' as const, label: 'Tillagg', color: 'emerald' },
-                { key: 'change' as const, label: 'Andring', color: 'amber' },
-                { key: 'removal' as const, label: 'Avgaende', color: 'red' }
+                { key: 'addition' as const, label: 'Tillägg', color: 'emerald' },
+                { key: 'change' as const, label: 'Ändring', color: 'amber' },
+                { key: 'removal' as const, label: 'Avgående', color: 'red' }
               ]).map(opt => (
                 <button
                   key={opt.key}
@@ -2829,7 +3755,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                       ? opt.color === 'emerald'
                         ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
                         : opt.color === 'amber'
-                        ? 'bg-amber-500/20 border-amber-500/30 text-amber-400'
+                        ? 'bg-amber-50 border-amber-200 text-amber-600'
                         : 'bg-red-100 border-red-500/30 text-red-600'
                       : 'bg-gray-100 border-gray-300 text-gray-500'
                   }`}
@@ -2844,26 +3770,83 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
-              rows={3}
-              placeholder="Beskriv andringar/tillagg..."
+              rows={2}
+              placeholder="Beskriv ändringar/tillägg..."
               autoFocus
               className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
             />
           </div>
+
+          {/* Item rows */}
+          <div>
+            <label className="text-sm text-gray-500 mb-2 block">Rader</label>
+            <div className="space-y-2">
+              {items.map(item => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={e => updateItemField(item.id, 'name', e.target.value)}
+                    placeholder="Namn"
+                    className="flex-1 min-w-0 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  />
+                  <input
+                    type="number"
+                    value={item.quantity || ''}
+                    onChange={e => updateItemField(item.id, 'quantity', Number(e.target.value) || 0)}
+                    placeholder="Antal"
+                    min="0"
+                    step="0.5"
+                    className="w-16 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  />
+                  <select
+                    value={item.unit}
+                    onChange={e => updateItemField(item.id, 'unit', e.target.value)}
+                    className="w-16 px-1 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  >
+                    <option value="st">st</option>
+                    <option value="timme">tim</option>
+                    <option value="kvm">m²</option>
+                    <option value="m">m</option>
+                    <option value="lpm">lpm</option>
+                    <option value="kg">kg</option>
+                    <option value="paket">pkt</option>
+                  </select>
+                  <input
+                    type="number"
+                    value={item.unit_price || ''}
+                    onChange={e => updateItemField(item.id, 'unit_price', Number(e.target.value) || 0)}
+                    placeholder="à-pris"
+                    min="0"
+                    className="w-24 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  />
+                  <button
+                    onClick={() => removeItem(item.id)}
+                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                    disabled={items.length <= 1}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addItem}
+                className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Lägg till rad
+              </button>
+            </div>
+            {total > 0 && (
+              <div className="mt-2 text-right text-sm font-semibold text-gray-900">
+                Summa: {total.toLocaleString('sv-SE')} kr
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-sm text-gray-500 mb-2 block">Belopp (kr)</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Timmar</label>
+              <label className="text-sm text-gray-500 mb-2 block">Timmar (valfritt)</label>
               <input
                 type="number"
                 value={hours}
@@ -2871,6 +3854,16 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
                 placeholder="0"
                 min="0"
                 step="0.5"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-gray-500 mb-2 block">Anteckning</label>
+              <input
+                type="text"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                placeholder="Intern notering..."
                 className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
               />
             </div>
@@ -2890,7 +3883,7 @@ function ChangeModal({ projectId, onClose, onSaved, onError }: {
             className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Skapa
+            {editing ? 'Spara' : 'Skapa'}
           </button>
         </div>
       </div>
@@ -3039,21 +4032,22 @@ function LogModal({ editing, onClose, onSave }: {
   onClose: () => void
   onSave: (data: any) => void
 }) {
-  const [logDate, setLogDate] = useState(editing?.log_date || new Date().toISOString().split('T')[0])
+  const [logDate, setLogDate] = useState(editing?.date || new Date().toISOString().split('T')[0])
   const [weather, setWeather] = useState(editing?.weather || '')
   const [temperature, setTemperature] = useState(editing?.temperature?.toString() || '')
-  const [workDescription, setWorkDescription] = useState(editing?.work_description || '')
+  const [workDescription, setWorkDescription] = useState(editing?.work_performed || '')
   const [materialsUsed, setMaterialsUsed] = useState(editing?.materials_used || '')
   const [hoursWorked, setHoursWorked] = useState(editing?.hours_worked?.toString() || '')
-  const [notes, setNotes] = useState(editing?.notes || '')
+  const [workersPresent, setWorkersPresent] = useState(editing?.workers_count?.toString() || '')
+  const [deviations, setDeviations] = useState(editing?.issues || '')
+  const [notes, setNotes] = useState(editing?.description || '')
   const [saving, setSaving] = useState(false)
 
   const weatherOptions = [
-    { value: 'sunny', label: 'Sol' },
-    { value: 'cloudy', label: 'Mulet' },
-    { value: 'rainy', label: 'Regn' },
-    { value: 'snowy', label: 'Snö' },
-    { value: 'windy', label: 'Blåsigt' },
+    { value: 'sunny', emoji: '\u2600\uFE0F', label: 'Sol' },
+    { value: 'cloudy', emoji: '\u26C5', label: 'Mulet' },
+    { value: 'rainy', emoji: '\uD83C\uDF27\uFE0F', label: 'Regn' },
+    { value: 'snowy', emoji: '\u2744\uFE0F', label: 'Snö' },
   ]
 
   const handleSubmit = () => {
@@ -3066,122 +4060,514 @@ function LogModal({ editing, onClose, onSave }: {
       work_description: workDescription.trim(),
       materials_used: materialsUsed.trim() || null,
       hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
+      workers_present: workersPresent ? parseInt(workersPresent) : null,
+      deviations: deviations.trim() || null,
       notes: notes.trim() || null,
     })
   }
 
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">
-            {editing ? 'Redigera dagboksanteckning' : 'Ny dagboksanteckning'}
+            {editing ? 'Redigera dagbokspost' : 'Ny dagbokspost'}
           </h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Datum *</label>
-              <input
-                type="date"
-                value={logDate}
-                onChange={e => setLogDate(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Timmar</label>
-              <input
-                type="number"
-                value={hoursWorked}
-                onChange={e => setHoursWorked(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Väder</label>
-              <select
-                value={weather}
-                onChange={e => setWeather(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              >
-                <option value="">Välj...</option>
-                {weatherOptions.map(w => (
-                  <option key={w.value} value={w.value}>{w.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Temperatur (°C)</label>
-              <input
-                type="number"
-                value={temperature}
-                onChange={e => setTemperature(e.target.value)}
-                placeholder="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
-            </div>
-          </div>
-
+        <div className="p-6 space-y-4">
+          {/* Datum */}
           <div>
-            <label className="text-sm text-gray-500 mb-2 block">Arbetsbeskrivning *</label>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Datum</label>
+            <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} className={inputCls} />
+          </div>
+
+          {/* Väder — emoji knappar */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Väder</label>
+            <div className="flex gap-2">
+              {weatherOptions.map(w => (
+                <button
+                  key={w.value}
+                  type="button"
+                  onClick={() => setWeather(weather === w.value ? '' : w.value)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-lg border text-sm transition-all ${
+                    weather === w.value
+                      ? 'bg-teal-50 border-teal-400 text-teal-700 ring-1 ring-teal-400'
+                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}
+                >
+                  <span className="text-lg">{w.emoji}</span>
+                  <span className="text-xs">{w.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Temperatur + Arbetare */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Temperatur (°C)</label>
+              <input type="number" value={temperature} onChange={e => setTemperature(e.target.value)} placeholder="0" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Antal arbetare</label>
+              <input type="number" value={workersPresent} onChange={e => setWorkersPresent(e.target.value)} placeholder="0" min="0" className={inputCls} />
+            </div>
+          </div>
+
+          {/* Vad gjordes idag */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Vad gjordes idag *</label>
             <textarea
               value={workDescription}
               onChange={e => setWorkDescription(e.target.value)}
               rows={3}
               placeholder="Beskriv dagens arbete..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+              className={`${inputCls} resize-none`}
             />
           </div>
 
+          {/* Material */}
           <div>
-            <label className="text-sm text-gray-500 mb-2 block">Använt material</label>
-            <input
-              type="text"
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Material som användes</label>
+            <textarea
               value={materialsUsed}
               onChange={e => setMaterialsUsed(e.target.value)}
+              rows={2}
               placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className={`${inputCls} resize-none`}
             />
           </div>
 
+          {/* Avvikelser */}
           <div>
-            <label className="text-sm text-gray-500 mb-2 block">Anteckningar</label>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Avvikelser</label>
+            <textarea
+              value={deviations}
+              onChange={e => setDeviations(e.target.value)}
+              rows={2}
+              placeholder="Avvikelser från plan, problem eller hinder..."
+              className={`${inputCls} resize-none`}
+            />
+          </div>
+
+          {/* Anteckningar */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Anteckningar</label>
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
               rows={2}
               placeholder="Övriga anteckningar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+              className={`${inputCls} resize-none`}
             />
           </div>
         </div>
 
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             Avbryt
           </button>
           <button
             onClick={handleSubmit}
             disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Spara' : 'Skapa'}
+            {editing ? 'Spara' : 'Skapa dagbokspost'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Work Order Modal ---
+
+function WorkOrderModal({ projectId, editing, onClose, onSaved, onSendSMS }: {
+  projectId: string
+  editing: any | null
+  onClose: () => void
+  onSaved: () => void
+  onSendSMS?: (id: string) => void
+}) {
+  const [title, setTitle] = useState(editing?.title || '')
+  const [scheduledDate, setScheduledDate] = useState(editing?.scheduled_date || '')
+  const [scheduledStart, setScheduledStart] = useState(editing?.scheduled_start?.substring(0, 5) || '')
+  const [scheduledEnd, setScheduledEnd] = useState(editing?.scheduled_end?.substring(0, 5) || '')
+  const [address, setAddress] = useState(editing?.address || '')
+  const [accessInfo, setAccessInfo] = useState(editing?.access_info || '')
+  const [contactName, setContactName] = useState(editing?.contact_name || '')
+  const [contactPhone, setContactPhone] = useState(editing?.contact_phone || '')
+  const [description, setDescription] = useState(editing?.description || '')
+  const [materialsNeeded, setMaterialsNeeded] = useState(editing?.materials_needed || '')
+  const [toolsNeeded, setToolsNeeded] = useState(editing?.tools_needed || '')
+  const [notes, setNotes] = useState(editing?.notes || '')
+  const [assignedTo, setAssignedTo] = useState(editing?.assigned_to || '')
+  const [assignedPhone, setAssignedPhone] = useState(editing?.assigned_phone || '')
+  const [saving, setSaving] = useState(false)
+  const [sendAfterSave, setSendAfterSave] = useState(false)
+
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+
+  const handleSave = async (andSend: boolean) => {
+    if (!title.trim()) return
+    setSaving(true)
+    setSendAfterSave(andSend)
+
+    try {
+      const payload: any = {
+        project_id: projectId,
+        title: title.trim(),
+        scheduled_date: scheduledDate || null,
+        scheduled_start: scheduledStart || null,
+        scheduled_end: scheduledEnd || null,
+        address: address.trim() || null,
+        access_info: accessInfo.trim() || null,
+        contact_name: contactName.trim() || null,
+        contact_phone: contactPhone.trim() || null,
+        description: description.trim() || null,
+        materials_needed: materialsNeeded.trim() || null,
+        tools_needed: toolsNeeded.trim() || null,
+        notes: notes.trim() || null,
+        assigned_to: assignedTo.trim() || null,
+        assigned_phone: assignedPhone.trim() || null,
+      }
+
+      let res: Response
+      if (editing) {
+        payload.id = editing.id
+        res = await fetch('/api/work-orders', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      } else {
+        res = await fetch('/api/work-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      }
+
+      if (!res.ok) throw new Error('Kunde inte spara')
+
+      if (andSend && onSendSMS) {
+        const data = await res.json()
+        const woId = editing?.id || data.work_order?.id
+        if (woId) {
+          onSendSMS(woId)
+        }
+      }
+
+      onSaved()
+    } catch (err) {
+      console.error('Save work order error:', err)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {editing ? 'Redigera arbetsorder' : 'Ny arbetsorder'}
+          </h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Titel */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Titel *</label>
+            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="T.ex. Montera kök Storgatan 12" className={inputCls} />
+          </div>
+
+          {/* Datum + Tid */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Datum</label>
+              <input type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Start</label>
+              <input type="time" value={scheduledStart} onChange={e => setScheduledStart(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Slut</label>
+              <input type="time" value={scheduledEnd} onChange={e => setScheduledEnd(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Adress */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Adress</label>
+            <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Storgatan 12, 123 45 Stockholm" className={inputCls} />
+          </div>
+
+          {/* Tillträde / portkod */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Tillträde / portkod</label>
+            <input type="text" value={accessInfo} onChange={e => setAccessInfo(e.target.value)} placeholder="Portkod 1234, nyckel i låda" className={inputCls} />
+          </div>
+
+          {/* Kontaktperson */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Kontaktperson</label>
+              <input type="text" value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Namn" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Telefon</label>
+              <input type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} placeholder="070-123 45 67" className={inputCls} />
+            </div>
+          </div>
+
+          {/* Vad ska göras */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Vad ska göras</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Beskriv arbetet som ska utföras..." className={inputCls + ' resize-none'} />
+          </div>
+
+          {/* Material */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Material att ta med</label>
+            <textarea value={materialsNeeded} onChange={e => setMaterialsNeeded(e.target.value)} rows={2} placeholder="Lista material som behövs..." className={inputCls + ' resize-none'} />
+          </div>
+
+          {/* Verktyg */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Verktyg att ta med</label>
+            <textarea value={toolsNeeded} onChange={e => setToolsNeeded(e.target.value)} rows={2} placeholder="Lista verktyg som behövs..." className={inputCls + ' resize-none'} />
+          </div>
+
+          {/* Tilldela till */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Tilldela till</label>
+              <input type="text" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} placeholder="Namn" className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Mottagarens telefon</label>
+              <input type="tel" value={assignedPhone} onChange={e => setAssignedPhone(e.target.value)} placeholder="070-123 45 67" className={inputCls} />
+            </div>
+          </div>
+
+          {/* Övrigt */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Övrigt</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Övrig information..." className={inputCls + ' resize-none'} />
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={() => handleSave(false)}
+            disabled={saving || !title.trim()}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+          >
+            {saving && !sendAfterSave ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            Spara utkast
+          </button>
+          {assignedPhone.trim() && (
+            <button
+              onClick={() => handleSave(true)}
+              disabled={saving || !title.trim()}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            >
+              {saving && sendAfterSave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Spara & skicka
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Supplier Invoice Modal ---
+
+function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
+  projectId: string
+  editing: any | null
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [supplierName, setSupplierName] = useState(editing?.supplier_name || '')
+  const [invoiceNumber, setInvoiceNumber] = useState(editing?.invoice_number || '')
+  const [invoiceDate, setInvoiceDate] = useState(editing?.invoice_date || '')
+  const [dueDate, setDueDate] = useState(editing?.due_date || '')
+  const [amountExclVat, setAmountExclVat] = useState(editing?.amount_excl_vat?.toString() || '')
+  const [vatAmount, setVatAmount] = useState(editing?.vat_amount?.toString() || '')
+  const [markupPercent, setMarkupPercent] = useState(editing?.markup_percent?.toString() || '15')
+  const [billable, setBillable] = useState(editing?.billable_to_customer ?? true)
+  const [showToCustomer, setShowToCustomer] = useState(editing?.show_to_customer ?? false)
+  const [notes, setNotes] = useState(editing?.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  const exclVat = parseFloat(amountExclVat) || 0
+  const vat = parseFloat(vatAmount) || 0
+  const total = exclVat + vat
+  const markup = parseFloat(markupPercent) || 0
+  const customerPrice = total + total * markup / 100
+
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+
+  const handleSave = async () => {
+    if (!supplierName.trim()) return
+    setSaving(true)
+    try {
+      const payload: any = {
+        project_id: projectId,
+        supplier_name: supplierName.trim(),
+        invoice_number: invoiceNumber.trim() || null,
+        invoice_date: invoiceDate || null,
+        due_date: dueDate || null,
+        amount_excl_vat: exclVat,
+        vat_amount: vat,
+        total_amount: total,
+        markup_percent: markup,
+        billable_to_customer: billable,
+        show_to_customer: showToCustomer,
+        notes: notes.trim() || null,
+      }
+
+      if (editing) {
+        payload.id = editing.id
+        await fetch('/api/supplier-invoices', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      } else {
+        await fetch('/api/supplier-invoices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      }
+
+      onSaved()
+    } catch (err) {
+      console.error('Save supplier invoice error:', err)
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {editing ? 'Redigera leverantörsfaktura' : 'Ny leverantörsfaktura'}
+          </h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Leverantör */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Leverantör *</label>
+            <input type="text" value={supplierName} onChange={e => setSupplierName(e.target.value)} placeholder="T.ex. Byggmaterial AB" className={inputCls} />
+          </div>
+
+          {/* Fakturanr */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Fakturanummer</label>
+            <input type="text" value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} placeholder="INV-2241" className={inputCls} />
+          </div>
+
+          {/* Datum */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Fakturadatum</label>
+              <input type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Förfallodatum</label>
+              <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className={inputCls} />
+            </div>
+          </div>
+
+          {/* Belopp */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Exkl. moms</label>
+              <div className="relative">
+                <input type="number" value={amountExclVat} onChange={e => setAmountExclVat(e.target.value)} placeholder="0" className={inputCls + ' pr-8'} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">kr</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Moms</label>
+              <div className="relative">
+                <input type="number" value={vatAmount} onChange={e => setVatAmount(e.target.value)} placeholder="0" className={inputCls + ' pr-8'} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">kr</span>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Totalt</label>
+              <div className="px-3 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-900">
+                {total.toLocaleString('sv-SE')} kr
+              </div>
+            </div>
+          </div>
+
+          {/* Påslag */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Påslag till kund (%)</label>
+            <div className="flex items-center gap-3">
+              <div className="relative w-24">
+                <input type="number" value={markupPercent} onChange={e => setMarkupPercent(e.target.value)} placeholder="15" className={inputCls + ' pr-6'} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+              </div>
+              {total > 0 && markup > 0 && (
+                <p className="text-sm text-teal-600 font-medium">
+                  → {customerPrice.toLocaleString('sv-SE')} kr till kund
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Checkboxar */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={billable} onChange={e => setBillable(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <span className="text-sm text-gray-700">Debiterbar till kund</span>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" checked={showToCustomer} onChange={e => setShowToCustomer(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <span className="text-sm text-gray-700">Visa för kund i kundportalen</span>
+            </label>
+          </div>
+
+          {/* Anteckning */}
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Anteckning</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Valfri anteckning..." className={inputCls + ' resize-none'} />
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving || !supplierName.trim()}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {editing ? 'Spara' : 'Lägg till'}
           </button>
         </div>
       </div>
@@ -3292,6 +4678,492 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
           >
             Skapa checklista
           </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Form Create Modal ---
+
+function FormCreateModal({ templates, onClose, onCreate }: {
+  templates: any[]
+  onClose: () => void
+  onCreate: (templateId: string, name?: string) => void
+}) {
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Nytt formulär</h2>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-gray-500 mb-4">Välj en mall att utgå ifrån</p>
+
+        <div className="space-y-2 max-h-64 overflow-y-auto">
+          {templates.map((t: any) => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTemplate(t)}
+              className={`w-full p-4 rounded-xl text-left border transition ${
+                selectedTemplate?.id === t.id
+                  ? 'bg-sky-50 border-sky-300 ring-1 ring-sky-300'
+                  : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm text-gray-900">{t.name}</span>
+                {t.is_system && (
+                  <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-600 rounded-full">System</span>
+                )}
+              </div>
+              {t.description && (
+                <p className="text-xs text-gray-500 mt-1">{t.description}</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">
+                {(t.fields || []).filter((f: any) => f.type !== 'header').length} fält
+              </p>
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+          >
+            Avbryt
+          </button>
+          <button
+            onClick={() => selectedTemplate && onCreate(selectedTemplate.id)}
+            disabled={!selectedTemplate}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-sky-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+          >
+            Skapa formulär
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// --- Form Fill View ---
+
+function FormFillView({ submission, answers, setAnswers, saving, signName, setSignName, signDrawing, setSignDrawing, onSave, onBack, onDelete }: {
+  submission: any
+  answers: Record<string, any>
+  setAnswers: (a: Record<string, any>) => void
+  saving: boolean
+  signName: string
+  setSignName: (n: string) => void
+  signDrawing: boolean
+  setSignDrawing: (d: boolean) => void
+  onSave: (opts?: { status?: string; signatureName?: string; signatureData?: string }) => void
+  onBack: () => void
+  onDelete: () => void
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawingRef = useRef(false)
+  const fields: any[] = submission.fields || []
+  const isSigned = submission.status === 'signed'
+  const isCompleted = submission.status === 'completed'
+  const [showSignSection, setShowSignSection] = useState(false)
+
+  const updateAnswer = (fieldId: string, key: string, value: any) => {
+    if (isSigned) return
+    setAnswers({
+      ...answers,
+      [fieldId]: { ...(answers[fieldId] || {}), [key]: value },
+    })
+  }
+
+  // Canvas drawing for signature
+  const initCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * 2
+    canvas.height = rect.height * 2
+    ctx.scale(2, 2)
+    ctx.strokeStyle = '#1a1a1a'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  }
+
+  const getCanvasPos = (e: React.PointerEvent) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+    const rect = canvas.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    drawingRef.current = true
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const pos = getCanvasPos(e)
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+    canvas.setPointerCapture(e.pointerId)
+  }
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!drawingRef.current) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const pos = getCanvasPos(e)
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+  }
+
+  const onPointerUp = () => {
+    drawingRef.current = false
+  }
+
+  const getSignatureData = (): string | null => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    return canvas.toDataURL('image/png')
+  }
+
+  const handleSign = () => {
+    if (!signName.trim()) return
+    const sigData = getSignatureData()
+    onSave({ status: 'signed', signatureName: signName.trim(), signatureData: sigData || undefined })
+    setShowSignSection(false)
+  }
+
+  // Calculate progress
+  const requiredFields = fields.filter((f: any) => f.required && f.type !== 'header')
+  const answeredRequired = requiredFields.filter((f: any) => {
+    const a = answers[f.id]
+    if (!a) return false
+    if (f.type === 'checkbox') return a.checked === true
+    if (f.type === 'text') return !!a.value
+    if (f.type === 'photo') return !!a.photo_url
+    if (f.type === 'signature') return !!a.signature_data
+    return false
+  })
+  const progressPercent = requiredFields.length > 0
+    ? Math.round((answeredRequired.length / requiredFields.length) * 100)
+    : 100
+
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-sky-400'
+
+  return (
+    <div className="space-y-4">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600"
+      >
+        <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
+      </button>
+
+      <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-gray-900 font-semibold text-lg">{submission.name}</h3>
+          <span className={`px-2 py-0.5 text-xs rounded-full ${
+            isSigned
+              ? 'bg-emerald-100 text-emerald-600'
+              : isCompleted
+                ? 'bg-sky-100 text-sky-600'
+                : 'bg-amber-500/20 text-amber-400'
+          }`}>
+            {isSigned ? 'Signerat' : isCompleted ? 'Ifyllt' : 'Utkast'}
+          </span>
+        </div>
+
+        {/* Progress */}
+        {requiredFields.length > 0 && (
+          <div className="mb-6">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>{answeredRequired.length} av {requiredFields.length} obligatoriska klara</span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full bg-sky-500 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+            </div>
+          </div>
+        )}
+
+        {/* Signed info */}
+        {isSigned && submission.signed_at && (
+          <div className="mb-6 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+            <p className="text-sm text-emerald-700">
+              Signerat {new Date(submission.signed_at).toLocaleDateString('sv-SE')} av {submission.signed_by_name}
+            </p>
+            {submission.signature_data && (
+              <img src={submission.signature_data} alt="Signatur" className="mt-2 h-16 border border-emerald-200 rounded bg-white" />
+            )}
+          </div>
+        )}
+
+        {/* Fields */}
+        <div className="space-y-4">
+          {fields.map((field: any) => {
+            const answer = answers[field.id] || {}
+
+            if (field.type === 'header') {
+              return (
+                <div key={field.id} className="pt-4 pb-1 border-b border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">{field.label}</h4>
+                </div>
+              )
+            }
+
+            if (field.type === 'checkbox') {
+              return (
+                <label key={field.id} className="flex items-start gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                  <input
+                    type="checkbox"
+                    checked={answer.checked || false}
+                    onChange={e => updateAnswer(field.id, 'checked', e.target.checked)}
+                    disabled={isSigned}
+                    className="w-4 h-4 mt-0.5 rounded border-gray-300 text-sky-600 focus:ring-sky-500"
+                  />
+                  <div>
+                    <span className={`text-sm ${answer.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-1">*</span>}
+                    </span>
+                    {field.description && <p className="text-xs text-gray-400 mt-0.5">{field.description}</p>}
+                  </div>
+                </label>
+              )
+            }
+
+            if (field.type === 'text') {
+              return (
+                <div key={field.id}>
+                  <label className="text-xs text-gray-500 mb-1.5 block">
+                    {field.label}
+                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {field.description && <p className="text-xs text-gray-400 mb-1">{field.description}</p>}
+                  <textarea
+                    value={answer.value || ''}
+                    onChange={e => updateAnswer(field.id, 'value', e.target.value)}
+                    rows={2}
+                    disabled={isSigned}
+                    placeholder="Skriv här..."
+                    className={inputCls + ' resize-none'}
+                  />
+                </div>
+              )
+            }
+
+            if (field.type === 'photo') {
+              return (
+                <div key={field.id}>
+                  <label className="text-xs text-gray-500 mb-1.5 block">
+                    {field.label}
+                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {answer.photo_url ? (
+                    <div className="relative inline-block">
+                      <img src={answer.photo_url} alt={field.label} className="w-32 h-32 object-cover rounded-lg border border-gray-200" />
+                      {!isSigned && (
+                        <button
+                          onClick={() => updateAnswer(field.id, 'photo_url', null)}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : !isSigned ? (
+                    <label className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-sky-400 transition">
+                      <Image className="w-5 h-5 text-gray-400" />
+                      <span className="text-sm text-gray-500">Välj foto...</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          // Convert to base64 for simplicity
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            updateAnswer(field.id, 'photo_url', reader.result as string)
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                      />
+                    </label>
+                  ) : (
+                    <p className="text-sm text-gray-400">Inget foto</p>
+                  )}
+                </div>
+              )
+            }
+
+            if (field.type === 'signature') {
+              return (
+                <div key={field.id}>
+                  <label className="text-xs text-gray-500 mb-1.5 block">
+                    {field.label}
+                    {field.required && <span className="text-red-500 ml-1">*</span>}
+                  </label>
+                  {answer.signature_data ? (
+                    <div className="relative inline-block">
+                      <img src={answer.signature_data} alt="Signatur" className="h-20 border border-gray-200 rounded-lg bg-white" />
+                      {!isSigned && (
+                        <button
+                          onClick={() => updateAnswer(field.id, 'signature_data', null)}
+                          className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  ) : !isSigned ? (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                      <canvas
+                        ref={canvasRef}
+                        onPointerDown={onPointerDown}
+                        onPointerMove={onPointerMove}
+                        onPointerUp={onPointerUp}
+                        onPointerLeave={onPointerUp}
+                        className="w-full h-24 touch-none cursor-crosshair"
+                        style={{ touchAction: 'none' }}
+                      />
+                      <div className="flex gap-2 p-2 border-t border-gray-100">
+                        <button
+                          type="button"
+                          onClick={() => { initCanvas(); clearCanvas() }}
+                          className="text-xs text-gray-500 hover:text-gray-700"
+                        >
+                          Rensa
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            initCanvas()
+                            const sigData = getSignatureData()
+                            if (sigData) updateAnswer(field.id, 'signature_data', sigData)
+                          }}
+                          className="text-xs text-sky-600 hover:text-sky-700 ml-auto"
+                        >
+                          Spara signatur
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400">Ingen signatur</p>
+                  )}
+                </div>
+              )
+            }
+
+            return null
+          })}
+        </div>
+
+        {/* Action buttons */}
+        {!isSigned && (
+          <div className="mt-6 pt-4 border-t border-gray-200 space-y-3">
+            {/* Save */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => onSave()}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Spara
+              </button>
+              <button
+                onClick={() => setShowSignSection(!showSignSection)}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+              >
+                <PenTool className="w-4 h-4" /> Signera
+              </button>
+            </div>
+
+            {/* Sign section */}
+            {showSignSection && (
+              <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200 space-y-3">
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Namn</label>
+                  <input
+                    type="text"
+                    value={signName}
+                    onChange={e => setSignName(e.target.value)}
+                    placeholder="Ditt namn"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 mb-1 block">Signatur</label>
+                  <div className="border border-emerald-200 rounded-lg overflow-hidden bg-white">
+                    <canvas
+                      ref={canvasRef}
+                      onPointerDown={onPointerDown}
+                      onPointerMove={onPointerMove}
+                      onPointerUp={onPointerUp}
+                      onPointerLeave={onPointerUp}
+                      className="w-full h-24 touch-none cursor-crosshair"
+                      style={{ touchAction: 'none' }}
+                    />
+                    <div className="flex gap-2 p-2 border-t border-emerald-100">
+                      <button type="button" onClick={() => { initCanvas(); clearCanvas() }} className="text-xs text-gray-500">
+                        Rensa
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={handleSign}
+                  disabled={saving || !signName.trim()}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSignature className="w-4 h-4" />}
+                  Signera formulär
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer: PDF + Delete */}
+        <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
+          <button
+            onClick={() => window.open(`/api/form-submissions/${submission.id}/pdf`, '_blank')}
+            className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
+          >
+            <Printer className="w-3.5 h-3.5" /> Exportera PDF
+          </button>
+          {!isSigned && (
+            <button
+              onClick={onDelete}
+              className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Ta bort formulär
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -87,6 +87,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null)
   const [callCount, setCallCount] = useState(0)
+  const [priceListCount, setPriceListCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [activeProjects, setActiveProjects] = useState(0)
   const [pipelineStats, setPipelineStats] = useState<{
@@ -209,6 +210,15 @@ export default function DashboardPage() {
         setCallCount(count || 0)
       })
 
+    const priceListPromise = supabase
+      .from('price_list')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', business.business_id)
+      .eq('is_active', true)
+      .then(({ count }: { count: number | null }) => {
+        setPriceListCount(count || 0)
+      })
+
     const projectsPromise = supabase
       .from('project')
       .select('project_id, name, ai_health_score, ai_health_summary, status')
@@ -288,7 +298,7 @@ export default function DashboardPage() {
 
     // Wait for all — each section renders independently as it resolves
     await Promise.all([
-      bookingsPromise, configPromise, callsPromise, projectsPromise,
+      bookingsPromise, configPromise, callsPromise, priceListPromise, projectsPromise,
       schedulePromise, pipelinePromise, statsPromise, profitPromise,
       activityPromise, speedPromise, insightsPromise,
     ])
@@ -497,6 +507,7 @@ export default function DashboardPage() {
             businessId={business.business_id}
             businessConfig={onboardingData}
             callCount={callCount}
+            priceListCount={priceListCount}
             onDismiss={() => setShowOnboarding(false)}
             onUpdate={fetchData}
           />

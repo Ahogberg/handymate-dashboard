@@ -16,13 +16,30 @@ import {
   Loader2,
   Calendar,
   Download,
-  ExternalLink
+  ExternalLink,
+  PenTool,
+  Eraser,
+  FileText as FileSignature,
 } from 'lucide-react'
 
 interface PortalData {
   customer: { name: string; email: string; phone: string; customerId: string }
   business: { name: string; contactName: string; email: string; phone: string }
   unreadMessages: number
+}
+
+interface PortalAta {
+  change_id: string
+  ata_number: number
+  change_type: string
+  description: string
+  items: Array<{ name: string; quantity: number; unit: string; unit_price: number }>
+  total: number
+  status: string
+  sign_token: string | null
+  signed_at: string | null
+  signed_by_name: string | null
+  created_at: string
 }
 
 interface Project {
@@ -36,6 +53,7 @@ interface Project {
   milestones: Array<{ name: string; status: string; sort_order: number }>
   latestLog: { description: string; created_at: string } | null
   nextVisit: { title: string; start_time: string; end_time: string } | null
+  atas: PortalAta[]
 }
 
 interface Quote {
@@ -127,6 +145,13 @@ export default function CustomerPortalPage() {
   const [sendingMessage, setSendingMessage] = useState(false)
   const [loadingTab, setLoadingTab] = useState(false)
 
+  // ÄTA signing state
+  const [signingAtaId, setSigningAtaId] = useState<string | null>(null)
+  const [signerName, setSignerName] = useState('')
+  const [signingSaving, setSigningSaving] = useState(false)
+  const ataCanvasRef = useRef<HTMLCanvasElement>(null)
+  const [ataDrawing, setAtaDrawing] = useState(false)
+
   useEffect(() => {
     fetchPortal()
   }, [token])
@@ -204,6 +229,86 @@ export default function CustomerPortalPage() {
       console.error('Failed to send message')
     }
     setSendingMessage(false)
+  }
+
+  // ÄTA canvas drawing helpers
+  function initAtaCanvas(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width * 2
+    canvas.height = rect.height * 2
+    ctx.scale(2, 2)
+    ctx.strokeStyle = '#1E293B'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }
+
+  function clearAtaCanvas() {
+    const canvas = ataCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+  }
+
+  function handleAtaCanvasPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
+    setAtaDrawing(true)
+    const canvas = ataCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const rect = canvas.getBoundingClientRect()
+    ctx.beginPath()
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top)
+  }
+
+  function handleAtaCanvasPointerMove(e: React.PointerEvent<HTMLCanvasElement>) {
+    if (!ataDrawing) return
+    const canvas = ataCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const rect = canvas.getBoundingClientRect()
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top)
+    ctx.stroke()
+  }
+
+  function handleAtaCanvasPointerUp() {
+    setAtaDrawing(false)
+  }
+
+  async function signAta(signToken: string) {
+    if (!signerName.trim()) return
+    const canvas = ataCanvasRef.current
+    if (!canvas) return
+    const signatureData = canvas.toDataURL('image/png')
+
+    setSigningSaving(true)
+    try {
+      const res = await fetch(`/api/ata/sign/${signToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sign',
+          name: signerName.trim(),
+          signature_data: signatureData,
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Kunde inte signera')
+      } else {
+        setSigningAtaId(null)
+        setSignerName('')
+        // Refresh project data
+        fetchTabData('projects')
+      }
+    } catch {
+      alert('Kunde inte signera ÄTA')
+    }
+    setSigningSaving(false)
   }
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -465,6 +570,130 @@ export default function CustomerPortalPage() {
                   <div className="bg-white rounded-xl border border-gray-200 p-4">
                     <h3 className="font-medium text-gray-900 mb-2">Beskrivning</h3>
                     <p className="text-sm text-gray-600">{selectedProjectData.description}</p>
+                  </div>
+                )}
+
+                {/* ÄTA (Change Orders) */}
+                {selectedProjectData.atas && selectedProjectData.atas.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="font-medium text-gray-900">Ändringar (ÄTA)</h3>
+                    {selectedProjectData.atas.map(ata => (
+                      <div key={ata.change_id} className="bg-white rounded-xl border border-gray-200 p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-900">ÄTA-{ata.ata_number}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full border ${
+                              ata.change_type === 'addition' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              ata.change_type === 'change' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                              'bg-red-50 text-red-600 border-red-200'
+                            }`}>
+                              {ata.change_type === 'addition' ? 'Tillägg' : ata.change_type === 'change' ? 'Ändring' : 'Avgående'}
+                            </span>
+                          </div>
+                          {ata.status === 'signed' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 border border-teal-200">
+                              Signerad
+                            </span>
+                          )}
+                          {ata.status === 'approved' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              Godkänd
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-sm text-gray-600 mb-3">{ata.description}</p>
+
+                        {/* Items */}
+                        {ata.items && ata.items.length > 0 && (
+                          <div className="border-t border-gray-100 pt-2 mb-3">
+                            {ata.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between text-sm py-1">
+                                <span className="text-gray-700">{item.name} ({item.quantity} {item.unit})</span>
+                                <span className="text-gray-900 font-medium">{formatCurrency(item.quantity * item.unit_price)}</span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between text-sm font-semibold pt-2 border-t border-gray-100 mt-1">
+                              <span>Totalt</span>
+                              <span>{formatCurrency(ata.total)}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Signed info */}
+                        {ata.signed_at && ata.signed_by_name && (
+                          <div className="flex items-center gap-2 text-xs text-teal-600 mt-2">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            Signerad av {ata.signed_by_name}, {formatDate(ata.signed_at)}
+                          </div>
+                        )}
+
+                        {/* Sign button for "sent" status */}
+                        {ata.status === 'sent' && ata.sign_token && (
+                          <div className="mt-3">
+                            {signingAtaId === ata.change_id ? (
+                              <div className="space-y-3 border-t border-gray-100 pt-3">
+                                <div>
+                                  <label className="text-xs text-gray-500 mb-1 block">Ditt namn</label>
+                                  <input
+                                    type="text"
+                                    value={signerName}
+                                    onChange={e => setSignerName(e.target.value)}
+                                    placeholder="Förnamn Efternamn"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-teal-500"
+                                  />
+                                </div>
+                                <div>
+                                  <div className="flex items-center justify-between mb-1">
+                                    <label className="text-xs text-gray-500">Signatur</label>
+                                    <button onClick={clearAtaCanvas} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                                      <Eraser className="w-3 h-3" /> Rensa
+                                    </button>
+                                  </div>
+                                  <canvas
+                                    ref={ataCanvasRef}
+                                    className="w-full h-24 border border-gray-300 rounded-lg bg-white cursor-crosshair touch-none"
+                                    onPointerDown={handleAtaCanvasPointerDown}
+                                    onPointerMove={handleAtaCanvasPointerMove}
+                                    onPointerUp={handleAtaCanvasPointerUp}
+                                    onPointerLeave={handleAtaCanvasPointerUp}
+                                  />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => { setSigningAtaId(null); setSignerName('') }}
+                                    className="flex-1 px-3 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+                                  >
+                                    Avbryt
+                                  </button>
+                                  <button
+                                    onClick={() => signAta(ata.sign_token!)}
+                                    disabled={!signerName.trim() || signingSaving}
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                                  >
+                                    {signingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenTool className="w-3.5 h-3.5" />}
+                                    Signera
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setSigningAtaId(ata.change_id)
+                                  setTimeout(() => {
+                                    if (ataCanvasRef.current) initAtaCanvas(ataCanvasRef.current)
+                                  }, 100)
+                                }}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                              >
+                                <PenTool className="w-4 h-4" />
+                                Granska och signera
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

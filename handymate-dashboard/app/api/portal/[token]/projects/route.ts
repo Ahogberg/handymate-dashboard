@@ -29,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
 
     // For each project, get milestones and latest log
     const enriched = await Promise.all((projects || []).map(async (p: any) => {
-      const [milestonesRes, logsRes, scheduleRes] = await Promise.all([
+      const [milestonesRes, logsRes, scheduleRes, ataRes] = await Promise.all([
         supabase
           .from('project_milestone')
           .select('name, status, sort_order')
@@ -47,14 +47,25 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           .eq('customer_id', customer.customer_id)
           .gte('start_time', new Date().toISOString())
           .order('start_time', { ascending: true })
-          .limit(1)
+          .limit(1),
+        supabase
+          .from('project_change')
+          .select('change_id, ata_number, change_type, description, items, total, status, sign_token, signed_at, signed_by_name, created_at')
+          .eq('project_id', p.project_id)
+          .in('status', ['sent', 'signed', 'approved'])
+          .order('ata_number', { ascending: true })
       ])
 
       return {
         ...p,
         milestones: milestonesRes.data || [],
         latestLog: logsRes.data?.[0] || null,
-        nextVisit: scheduleRes.data?.[0] || null
+        nextVisit: scheduleRes.data?.[0] || null,
+        atas: (ataRes.data || []).map((a: any) => ({
+          ...a,
+          // Only expose sign_token for ÄTAs that need signing
+          sign_token: a.status === 'sent' ? a.sign_token : null,
+        })),
       }
     }))
 

@@ -670,6 +670,11 @@ export default function TimePage() {
             CSV
           </a>
 
+          <Link href="/dashboard/time/allowances"
+            className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]">
+            Ersättningar
+          </Link>
+
           <Link href="/dashboard/time/payroll"
             className="px-[14px] py-[7px] bg-transparent border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#64748B] hover:text-[#1E293B]">
             Löneunderlag

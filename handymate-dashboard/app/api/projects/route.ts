@@ -313,7 +313,7 @@ export async function DELETE(request: NextRequest) {
 
     // Delete all child records first (order matters for FK constraints)
     await supabase.from('project_document').delete().eq('project_id', projectId)
-    await supabase.from('project_log').delete().eq('project_id', projectId)
+    await supabase.from('project_log').delete().eq('order_id', projectId)
     await supabase.from('project_checklist').delete().eq('project_id', projectId)
     await supabase.from('project_assignment').delete().eq('project_id', projectId)
     await supabase.from('project_material').delete().eq('project_id', projectId)

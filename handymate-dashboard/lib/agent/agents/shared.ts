@@ -67,6 +67,7 @@ export interface BusinessContext {
   agentContext: any
   learnedPreferences: any
   toolContext: ToolContext
+  priceList?: Array<{ name: string; unit: string; unit_price: number; category: string }>
 }
 
 // ── Escalation tool definition ──
@@ -222,6 +223,19 @@ export async function fetchBusinessContext(
     learnedPreferences = prefs
   } catch { /* non-blocking */ }
 
+  // Fetch price list for quote generation context
+  let priceList: Array<{ name: string; unit: string; unit_price: number; category: string }> = []
+  try {
+    const { data: prices } = await supabase
+      .from('price_list')
+      .select('name, unit, unit_price, category')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+      .order('category', { ascending: true })
+      .limit(50)
+    priceList = prices || []
+  } catch { /* non-blocking */ }
+
   return {
     bizConfig,
     googleConnection,
@@ -229,6 +243,7 @@ export async function fetchBusinessContext(
     v3Settings,
     agentContext,
     learnedPreferences,
+    priceList,
     toolContext: {
       businessName: bizConfig.business_name || 'Handymate',
       contactEmail: bizConfig.contact_email || '',

@@ -21,14 +21,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ange bild, röst eller text' }, { status: 400 })
     }
 
-    // Get business pricing and price list
+    // Get business pricing, price list and templates in parallel
     const supabase = getServerSupabase()
-    const { data: priceListData } = await supabase
-      .from('price_list')
-      .select('name, unit, unit_price, category')
-      .eq('business_id', business.business_id)
-      .eq('is_active', true)
-      .limit(50)
+    const [priceListResult, templatesResult] = await Promise.all([
+      supabase
+        .from('price_list')
+        .select('name, unit, unit_price, category')
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .limit(50),
+      supabase
+        .from('quote_templates')
+        .select('name, default_items, category')
+        .eq('business_id', business.business_id)
+        .limit(5)
+    ])
+
+    const priceListData = priceListResult.data || []
+    const templatesData = templatesResult.data || []
 
     const hourlyRate = business.pricing_settings?.hourly_rate || 650
     const branch = business.industry || 'Bygg'
@@ -41,7 +51,8 @@ export async function POST(request: NextRequest) {
       voiceTranscript,
       textDescription,
       customerId,
-      priceList: priceListData || []
+      priceList: priceListData,
+      templates: templatesData
     })
 
     // Get price comparison
@@ -50,10 +61,26 @@ export async function POST(request: NextRequest) {
       ? await getAveragePrice(business.business_id, description)
       : { average: 0, min: 0, max: 0, count: 0 }
 
+    // Build price warning if applicable
+    const priceWarning = quote.priceListEmpty
+      ? {
+          warning: true,
+          message: 'Din prislista är tom. Lägg till dina priser under Inställningar → Prislista för att få konsekventa AI-offerter.',
+          link: '/dashboard/settings/pricing',
+        }
+      : quote.missingPriceCount > 0
+        ? {
+            warning: true,
+            message: `${quote.missingPriceCount} rad${quote.missingPriceCount > 1 ? 'er' : ''} saknar pris från din prislista. Fyll i priserna manuellt eller uppdatera din prislista under Inställningar → Prislista.`,
+            link: '/dashboard/settings/pricing',
+          }
+        : null
+
     return NextResponse.json({
       success: true,
       quote,
-      priceComparison
+      priceComparison,
+      priceWarning
     })
   } catch (error: any) {
     console.error('AI quote generation error:', error)

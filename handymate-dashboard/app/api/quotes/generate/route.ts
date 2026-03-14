@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
+import { buildPriceContext, PriceListItem } from '@/lib/ai-quote-generator'
 
 function getAnthropic() {
   return new Anthropic({
@@ -25,22 +26,30 @@ export async function POST(request: NextRequest) {
     const anthropic = getAnthropic()
     const { prompt, priceList, pricingSettings } = await request.json()
 
+    const hourlyRate = pricingSettings?.hourly_rate || 650
+    const vatRate = pricingSettings?.vat_rate || 25
+    const hasPriceList = Array.isArray(priceList) && priceList.length > 0
+    const priceContext = buildPriceContext(priceList as PriceListItem[] || [], hourlyRate)
+
     const systemPrompt = `Du är en expert på att skapa offerter för hantverkare i Sverige.
 
-Användarens prislista:
-${JSON.stringify(priceList, null, 2)}
+${priceContext}
 
 Grundinställningar:
-- Timpris: ${pricingSettings?.hourly_rate || 650} kr/h
-- Moms: ${pricingSettings?.vat_rate || 25}%
+- Moms: ${vatRate}%
 
-Din uppgift:
-1. Analysera arbetsbeskrivningen
-2. Skapa en detaljerad offert med arbete och material
-3. Använd realistiska tidsuppskattningar
-4. Använd priser från prislistan när möjligt, annars rimliga marknadspriser
+REGLER FÖR PRISSÄTTNING:
+1. Arbete (labor): använd ALLTID timpris ${hourlyRate} kr/h
+2. Material: ${hasPriceList
+      ? 'Använd ENBART priser från prislistan ovan. Markera med "from_price_list": true.'
+      : 'Prislista saknas — sätt ALLA materialpriser till 0 kr.'}
+3. Om ett material SAKNAS i prislistan — sätt unit_price till 0 och lägg till "note": "PRIS SAKNAS — fyll i manuellt"
+4. Gissa ALDRIG ett pris — det är bättre med 0 kr och markering än ett felaktigt pris
+5. Separera alltid arbete och material som separata rader
+6. Inkludera alltid "Småmaterial" — ${hasPriceList ? 'använd pris från prislistan om det finns, annars 0 kr med markering' : '0 kr med markering'}
+7. Max 8 rader
 
-Svara ENDAST med JSON i detta format:
+Svara ENDAST med JSON (ingen markdown):
 {
   "title": "Kort titel för jobbet",
   "description": "Beskrivning av arbetet",
@@ -51,8 +60,10 @@ Svara ENDAST med JSON i detta format:
       "name": "Beskrivning av arbetsmoment",
       "quantity": 2,
       "unit": "hour",
-      "unit_price": 650,
-      "total": 1300
+      "unit_price": ${hourlyRate},
+      "total": ${hourlyRate * 2},
+      "from_price_list": false,
+      "note": null
     },
     {
       "id": "item_2",
@@ -60,17 +71,13 @@ Svara ENDAST med JSON i detta format:
       "name": "Materialnamn",
       "quantity": 3,
       "unit": "piece",
-      "unit_price": 150,
-      "total": 450
+      "unit_price": 0,
+      "total": 0,
+      "from_price_list": false,
+      "note": "PRIS SAKNAS — fyll i manuellt"
     }
   ]
-}
-
-Tänk på:
-- Arbete (labor): timpris, uppskatta realistisk tid
-- Material: styckpris eller meterpris
-- Inkludera alltid "småmaterial" för skruv, tejp etc (~50-100 kr)
-- Var realistisk med tidsuppskattningar`
+}`
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
@@ -87,6 +94,10 @@ Tänk på:
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const data = JSON.parse(jsonMatch[0])
+      // Add metadata about missing prices
+      const missingPriceItems = (data.items || []).filter((item: any) => item.unit_price === 0 || item.note?.includes('PRIS SAKNAS'))
+      data.priceListEmpty = !hasPriceList
+      data.missingPriceCount = missingPriceItems.length
       return NextResponse.json(data)
     }
 

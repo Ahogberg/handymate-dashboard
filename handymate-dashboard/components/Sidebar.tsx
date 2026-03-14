@@ -90,6 +90,8 @@ const NAV: NavItem[] = [
       { label: 'Schema', href: '/dashboard/schedule' },
       { label: 'Kalender', href: '/dashboard/calendar' },
       { label: 'Tidrapportering', href: '/dashboard/time' },
+      { label: 'Ersättningar', href: '/dashboard/time/allowances' },
+      { label: 'Fordon', href: '/dashboard/vehicles' },
     ],
   },
 ]
@@ -101,6 +103,7 @@ const BOTTOM_NAV: NavItem[] = [
     children: [
       { label: 'Företag', href: '/dashboard/settings' },
       { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
+      { label: 'Mina priser', href: '/dashboard/settings/my-prices' },
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
       { label: 'Prenumeration', href: '/dashboard/billing' },
       { label: 'Team', href: '/dashboard/settings?tab=team' },

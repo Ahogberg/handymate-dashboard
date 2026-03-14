@@ -115,18 +115,42 @@ if (action === 'register') {
   // 4. Referral-spårning
   if (referralCode) {
     try {
-      const { resolveReferralCode } = await import('@/lib/referral/codes')
-      const referrerBusinessId = await resolveReferralCode(referralCode)
-      if (referrerBusinessId) {
-        await supabaseAdmin
-          .from('referrals')
-          .insert({
-            referrer_business_id: referrerBusinessId,
-            referred_business_id: businessId,
-            referred_email: email,
-            referrer_type: 'customer',
-            status: 'pending',
-          })
+      if (referralCode.startsWith('P-')) {
+        // Partner referral — look up partner by code
+        const { data: partner } = await supabaseAdmin
+          .from('partners')
+          .select('id')
+          .eq('referral_code', referralCode)
+          .eq('status', 'active')
+          .maybeSingle()
+
+        if (partner) {
+          await supabaseAdmin
+            .from('referrals')
+            .insert({
+              referrer_business_id: 'PARTNER',
+              referred_business_id: businessId,
+              referred_email: email,
+              referrer_type: 'partner',
+              partner_id: partner.id,
+              status: 'pending',
+            })
+        }
+      } else {
+        // Customer-to-customer referral
+        const { resolveReferralCode } = await import('@/lib/referral/codes')
+        const referrerBusinessId = await resolveReferralCode(referralCode)
+        if (referrerBusinessId) {
+          await supabaseAdmin
+            .from('referrals')
+            .insert({
+              referrer_business_id: referrerBusinessId,
+              referred_business_id: businessId,
+              referred_email: email,
+              referrer_type: 'customer',
+              status: 'pending',
+            })
+        }
       }
     } catch (err) {
       console.error('[Register] Referral tracking failed:', err)

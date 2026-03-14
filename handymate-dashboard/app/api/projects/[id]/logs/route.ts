@@ -25,9 +25,9 @@ export async function GET(
         *,
         business_user:business_user_id (id, name, color)
       `)
-      .eq('project_id', projectId)
+      .eq('order_id', projectId)
       .eq('business_id', business.business_id)
-      .order('log_date', { ascending: false })
+      .order('date', { ascending: false })
 
     if (error) throw error
 
@@ -66,6 +66,8 @@ export async function POST(
       hours_worked,
       notes,
       photos,
+      workers_present,
+      deviations,
     } = body
 
     if (!log_date) {
@@ -78,17 +80,19 @@ export async function POST(
       .from('project_log')
       .insert({
         id,
-        project_id: projectId,
+        order_id: projectId,
         business_id: business.business_id,
         business_user_id: currentUser?.id || null,
-        log_date,
+        date: log_date,
         weather: weather || null,
         temperature: temperature != null ? temperature : null,
-        work_description: work_description || null,
+        work_performed: work_description || null,
         materials_used: materials_used || null,
         hours_worked: hours_worked != null ? hours_worked : null,
-        notes: notes || null,
+        description: notes || null,
         photos: photos || [],
+        workers_count: workers_present != null ? workers_present : null,
+        issues: deviations || null,
       })
       .select(`
         *,

@@ -18,15 +18,24 @@ export async function PATCH(
     const supabase = getServerSupabase()
     const body = await request.json()
 
-    const allowedFields = [
-      'log_date', 'weather', 'temperature', 'work_description',
-      'materials_used', 'hours_worked', 'notes', 'photos'
-    ]
+    // Map frontend field names → actual DB column names
+    const fieldMap: Record<string, string> = {
+      log_date: 'date',
+      weather: 'weather',
+      temperature: 'temperature',
+      work_description: 'work_performed',
+      materials_used: 'materials_used',
+      hours_worked: 'hours_worked',
+      notes: 'description',
+      photos: 'photos',
+      workers_present: 'workers_count',
+      deviations: 'issues',
+    }
 
     const updates: Record<string, any> = {}
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updates[field] = body[field]
+    for (const [frontendKey, dbKey] of Object.entries(fieldMap)) {
+      if (body[frontendKey] !== undefined) {
+        updates[dbKey] = body[frontendKey]
       }
     }
 
@@ -38,7 +47,7 @@ export async function PATCH(
       .from('project_log')
       .update(updates)
       .eq('id', params.logId)
-      .eq('project_id', params.id)
+      .eq('order_id', params.id)
       .eq('business_id', business.business_id)
       .select(`
         *,
@@ -75,7 +84,7 @@ export async function DELETE(
       .from('project_log')
       .delete()
       .eq('id', params.logId)
-      .eq('project_id', params.id)
+      .eq('order_id', params.id)
       .eq('business_id', business.business_id)
 
     if (error) throw error

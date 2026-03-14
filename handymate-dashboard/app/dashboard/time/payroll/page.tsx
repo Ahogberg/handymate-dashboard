@@ -30,6 +30,8 @@ interface PayrollEntry {
   travel_reimbursement: number
   allowance_days: number
   allowance_amount: number
+  extra_allowance_amount?: number
+  extra_allowances?: { name: string; amount: number }[]
   gross_amount: {
     regular: number
     overtime_50: number
@@ -215,8 +217,24 @@ export default function PayrollPage() {
                     )}
                   </div>
 
+                  {/* Ersättningar (allowance_reports) */}
+                  {p.extra_allowances && p.extra_allowances.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-100">
+                      <p className="text-xs text-gray-500 mb-2">Ersättningar</p>
+                      <div className="space-y-1">
+                        {p.extra_allowances.map((a, ai) => (
+                          <div key={ai} className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">{a.name}</span>
+                            <span className="font-medium text-gray-900">{fmtKr(a.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="text-xs text-gray-400 pt-2 border-t border-gray-100">
                     Totalt {p.total_hours}h
+                    {(p.extra_allowance_amount || 0) > 0 && ` · Ersättningar ${fmtKr(p.extra_allowance_amount || 0)}`}
                   </div>
                 </div>
               </div>
