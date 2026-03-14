@@ -58,6 +58,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
+import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import Link from 'next/link'
 
 // --- Types ---
@@ -3398,11 +3399,12 @@ export default function ProjectDetailPage() {
         <MilestoneModal
           projectId={projectId}
           editing={milestoneModal.editing}
+          existingNames={milestones.map(m => m.name)}
           onClose={() => setMilestoneModal({ open: false, editing: null })}
           onSaved={() => {
             setMilestoneModal({ open: false, editing: null })
             fetchProjectData()
-            showToast(milestoneModal.editing ? 'Delmoment uppdaterat' : 'Delmoment skapat', 'success')
+            showToast(milestoneModal.editing ? 'Delmoment uppdaterat' : 'Delmoment tillagda', 'success')
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -3486,9 +3488,10 @@ export default function ProjectDetailPage() {
 
 // --- Milestone Modal ---
 
-function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
+function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, onError }: {
   projectId: string
   editing: Milestone | null
+  existingNames?: string[]
   onClose: () => void
   onSaved: () => void
   onError: (msg: string) => void
@@ -3499,10 +3502,26 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
   const [budgetAmount, setBudgetAmount] = useState(editing?.budget_amount?.toString() || '')
   const [dueDate, setDueDate] = useState(editing?.due_date || '')
   const [saving, setSaving] = useState(false)
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set())
+  const [showChips, setShowChips] = useState(!editing)
+
+  const existingSet = new Set((existingNames || []).map(n => n.toLowerCase()))
+
+  const toggleTask = (taskName: string) => {
+    setSelectedTasks(prev => {
+      const next = new Set(prev)
+      if (next.has(taskName)) {
+        next.delete(taskName)
+      } else {
+        next.add(taskName)
+      }
+      return next
+    })
+  }
 
   const handleSave = async () => {
     if (!name.trim()) {
-      onError('Namn kravs')
+      onError('Namn krävs')
       return
     }
     setSaving(true)
@@ -3535,92 +3554,206 @@ function MilestoneModal({ projectId, editing, onClose, onSaved, onError }: {
     }
   }
 
+  const handleBatchCreate = async () => {
+    if (selectedTasks.size === 0) return
+    setSaving(true)
+    try {
+      const tasks = Array.from(selectedTasks)
+      for (const taskName of tasks) {
+        const res = await fetch(`/api/projects/${projectId}/milestones`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: taskName })
+        })
+        if (!res.ok) {
+          const data = await res.json()
+          throw new Error(data.error || `Kunde inte skapa "${taskName}"`)
+        }
+      }
+      onSaved()
+    } catch (err: any) {
+      onError(err.message || 'Kunde inte skapa delmoment')
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50'
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
-            {editing ? 'Redigera delmoment' : 'Nytt delmoment'}
+            {editing ? 'Redigera delmoment' : 'Lägg till delmoment'}
           </h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Namn *</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              placeholder="T.ex. Stomresning"
-              autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Beskrivning</label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Valfri beskrivning"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Budgettimmar</label>
-              <input
-                type="number"
-                value={budgetHours}
-                onChange={e => setBudgetHours(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
+        {/* Quick-add chips for new milestones */}
+        {!editing && showChips && (
+          <div className="mb-5">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-500">Välj arbetsuppgifter</p>
+              <button
+                onClick={() => setShowChips(false)}
+                className="text-xs text-teal-600 hover:text-teal-700"
+              >
+                Skriv egen istället
+              </button>
             </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr)</label>
-              <input
-                type="number"
-                value={budgetAmount}
-                onChange={e => setBudgetAmount(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-              />
+            <div className="space-y-3">
+              {Object.entries(TASK_CATEGORIES).map(([catKey, catLabel]) => {
+                const tasks = DEFAULT_TASKS.filter(t => t.category === catKey)
+                if (tasks.length === 0) return null
+                return (
+                  <div key={catKey}>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1.5">{catLabel}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {tasks.map(task => {
+                        const isSelected = selectedTasks.has(task.name)
+                        const alreadyExists = existingSet.has(task.name.toLowerCase())
+                        return (
+                          <button
+                            key={task.name}
+                            onClick={() => !alreadyExists && toggleTask(task.name)}
+                            disabled={alreadyExists}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                              alreadyExists
+                                ? 'bg-gray-100 text-gray-300 cursor-not-allowed line-through'
+                                : isSelected
+                                  ? 'bg-teal-100 border border-teal-300 text-teal-700'
+                                  : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600'
+                            }`}
+                          >
+                            {isSelected && <span className="mr-1">✓</span>}
+                            {task.name}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Forfallodatum</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-            />
-          </div>
-        </div>
 
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
-          >
-            Avbryt
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !name.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Spara' : 'Skapa'}
-          </button>
-        </div>
+            {selectedTasks.size > 0 && (
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={onClose}
+                  className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                >
+                  Avbryt
+                </button>
+                <button
+                  onClick={handleBatchCreate}
+                  disabled={saving}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  Lägg till {selectedTasks.size} st
+                </button>
+              </div>
+            )}
+
+            {selectedTasks.size === 0 && (
+              <div className="flex items-center gap-3 mt-4">
+                <div className="h-px flex-1 bg-gray-100" />
+                <span className="text-xs text-gray-400">eller fyll i manuellt</span>
+                <div className="h-px flex-1 bg-gray-100" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Manual form — always shown when editing, or below chips when creating */}
+        {(editing || !showChips || selectedTasks.size === 0) && (
+          <>
+            {!editing && !showChips && (
+              <button
+                onClick={() => setShowChips(true)}
+                className="text-xs text-teal-600 hover:text-teal-700 mb-3"
+              >
+                ← Visa förinställda uppgifter
+              </button>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-500 mb-2 block">Namn *</label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="T.ex. Stomresning"
+                  autoFocus={!showChips}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 mb-2 block">Beskrivning</label>
+                <textarea
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Valfri beskrivning"
+                  className={inputCls + ' resize-none'}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm text-gray-500 mb-2 block">Budgettimmar</label>
+                  <input
+                    type="number"
+                    value={budgetHours}
+                    onChange={e => setBudgetHours(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    step="0.5"
+                    className={inputCls}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-500 mb-2 block">Budgetbelopp (kr)</label>
+                  <input
+                    type="number"
+                    value={budgetAmount}
+                    onChange={e => setBudgetAmount(e.target.value)}
+                    placeholder="0"
+                    min="0"
+                    className={inputCls}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm text-gray-500 mb-2 block">Förfallodatum</label>
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !name.trim()}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {editing ? 'Spara' : 'Skapa'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
