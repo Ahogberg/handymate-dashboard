@@ -1,9 +1,9 @@
-﻿'use client'
+'use client'
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { Inbox, Mic, Volume2, Loader2 } from 'lucide-react'
+import { Inbox, Volume2, Mail, Loader2 } from 'lucide-react'
 
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center py-20">
@@ -19,16 +19,16 @@ const RecordingsPage = dynamic(() => import('@/app/dashboard/recordings/page'), 
   loading: LoadingSpinner,
 })
 
-const AssistantPage = dynamic(() => import('@/app/dashboard/assistant/page'), {
+const EmailInboxPage = dynamic(() => import('@/app/dashboard/email/page'), {
   loading: LoadingSpinner,
 })
 
-type TabKey = 'inbox' | 'history' | 'assistant'
+type TabKey = 'inbox' | 'email' | 'history'
 
 const tabs: { key: TabKey; label: string; icon: any }[] = [
   { key: 'inbox', label: 'Inbox', icon: Inbox },
+  { key: 'email', label: 'E-post', icon: Mail },
   { key: 'history', label: 'Samtalshistorik', icon: Volume2 },
-  { key: 'assistant', label: 'AI-assistent', icon: Mic },
 ]
 
 export default function CallsPage() {
@@ -60,10 +60,10 @@ export default function CallsPage() {
         </div>
       </div>
 
-      {/* Tab Content - each page renders its own full layout */}
+      {/* Tab Content */}
       {activeTab === 'inbox' && <InboxPage />}
+      {activeTab === 'email' && <EmailInboxPage />}
       {activeTab === 'history' && <RecordingsPage />}
-      {activeTab === 'assistant' && <AssistantPage />}
     </div>
   )
 }

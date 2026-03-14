@@ -12,7 +12,6 @@ import {
   Settings,
   Zap,
   LogOut,
-  HelpCircle,
   ChevronDown,
   Menu,
   X,
@@ -20,7 +19,6 @@ import {
   TrendingUp,
   Bell,
   Lock,
-  Globe,
   Bot,
   ClipboardCheck,
   Gift,
@@ -74,14 +72,7 @@ const NAV: NavItem[] = [
   },
   { type: 'link', key: 'calls', label: 'Samtal', icon: Phone, href: '/dashboard/calls', paths: ['/dashboard/calls', '/dashboard/inbox', '/dashboard/assistant', '/dashboard/recordings'], hasBadge: true },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
-  {
-    type: 'group', key: 'customers', label: 'Kunder', icon: Users,
-    children: [
-      { label: 'Kundlista', href: '/dashboard/customers' },
-      { label: 'Garantier', href: '/dashboard/warranties', featureGate: 'warranty_tracking' },
-      { label: 'Kundportal', href: '/dashboard/customer-portal' },
-    ],
-  },
+  { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'AI-assistent', icon: Bot, href: '/dashboard/agent' },
   {
@@ -101,7 +92,10 @@ const NAV: NavItem[] = [
       { label: 'Tidrapportering', href: '/dashboard/time' },
     ],
   },
-  { type: 'link', key: 'website', label: 'Hemsida', icon: Globe, href: '/dashboard/website', featureGate: 'storefront_basic' },
+]
+
+// Bottom section: Inställningar + Bjud in kollega (rendered below separator)
+const BOTTOM_NAV: NavItem[] = [
   {
     type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
     children: [
@@ -115,10 +109,10 @@ const NAV: NavItem[] = [
       { label: 'Standardtexter', href: '/dashboard/settings/quote-texts', featureGate: 'quote_templates' },
       { label: 'Lager & Material', href: '/dashboard/orders' },
       { label: 'Marknadsföring', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
+      { label: 'Hemsida', href: '/dashboard/website', featureGate: 'storefront_basic' },
     ],
   },
   { type: 'link', key: 'referral', label: 'Bjud in kollega', icon: Gift, href: '/dashboard/referral' },
-  { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────
@@ -173,7 +167,8 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     setIsMobileOpen(false)
     setUserMenuOpen(false)
 
-    const activeKey = NAV.find(item => item.type === 'group' && isGroupActive(item))?.key
+    const allNav = [...NAV, ...BOTTOM_NAV]
+    const activeKey = allNav.find(item => item.type === 'group' && isGroupActive(item))?.key
     setOpenGroups(activeKey ? new Set([activeKey]) : new Set())
   }, [pathname])
 
@@ -404,6 +399,73 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     }`
   }
 
+  // ── Render a single nav item (shared helper) ──────────────────────
+  function renderNavItem(item: NavItem) {
+    if (item.type === 'link') {
+      const active = isLinkActive(item)
+      const Icon = item.icon
+      const locked = item.featureGate ? !hasFeature(plan, item.featureGate) : false
+      return (
+        <Link key={item.key} href={item.href} className={`${navClass(active)} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+          <div className="flex items-center gap-3">
+            <Icon className={`w-5 h-5 ${active ? 'text-teal-300' : ''}`} />
+            <span className="text-sm">{item.label}</span>
+          </div>
+          {locked ? (
+            <Lock className="w-3.5 h-3.5 text-teal-300/40" />
+          ) : item.hasBadge && pendingCount > 0 ? (
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-teal-600 text-white rounded-full animate-pulse">
+              {pendingCount > 99 ? '99+' : pendingCount}
+            </span>
+          ) : item.hasApprovalBadge && approvalCount > 0 ? (
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-red-500 text-white rounded-full animate-pulse">
+              {approvalCount > 99 ? '99+' : approvalCount}
+            </span>
+          ) : null}
+        </Link>
+      )
+    }
+
+    // Group item
+    const groupActive = isGroupActive(item)
+    const isOpen = openGroups.has(item.key)
+    const Icon = item.icon
+
+    return (
+      <div key={item.key}>
+        <button
+          onClick={() => toggleGroup(item.key)}
+          className={`w-full ${navClass(groupActive)}`}
+        >
+          <div className="flex items-center gap-3">
+            <Icon className={`w-5 h-5 ${groupActive ? 'text-teal-300' : ''}`} />
+            <span className="text-sm">{item.label}</span>
+          </div>
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+        {isOpen && (
+          <div className="ml-8 mt-0.5 mb-1 space-y-0.5">
+            {item.children.map(child => {
+              const childActive = isPathActive(child.href, child.exact)
+              const childLocked = child.featureGate ? !hasFeature(plan, child.featureGate) : false
+              return (
+                <Link key={child.href} href={child.href} className={`${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`} title={childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+                  <span className="flex items-center gap-2">
+                    {child.label}
+                    {childLocked && <Lock className="w-3 h-3 text-teal-300/40" />}
+                    {child.dotKey === 'automation_failed' && automationFailed && (
+                      <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
+                    )}
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Sidebar content (shared by mobile + desktop) ───────────────────
   const sidebarContent = (
     <>
@@ -489,74 +551,15 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Main navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(item => {
-          if (item.type === 'link') {
-            const active = isLinkActive(item)
-            const Icon = item.icon
-            const locked = item.featureGate ? !hasFeature(plan, item.featureGate) : false
-            return (
-              <Link key={item.key} href={item.href} className={`${navClass(active)} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 ${active ? 'text-teal-300' : ''}`} />
-                  <span className="text-sm">{item.label}</span>
-                </div>
-                {locked ? (
-                  <Lock className="w-3.5 h-3.5 text-teal-300/40" />
-                ) : item.hasBadge && pendingCount > 0 ? (
-                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-teal-600 text-white rounded-full animate-pulse">
-                    {pendingCount > 99 ? '99+' : pendingCount}
-                  </span>
-                ) : item.hasApprovalBadge && approvalCount > 0 ? (
-                  <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-orange-500 text-white rounded-full animate-pulse">
-                    {approvalCount > 99 ? '99+' : approvalCount}
-                  </span>
-                ) : null}
-              </Link>
-            )
-          }
-
-          // Group item
-          const groupActive = isGroupActive(item)
-          const isOpen = openGroups.has(item.key)
-          const Icon = item.icon
-
-          return (
-            <div key={item.key}>
-              <button
-                onClick={() => toggleGroup(item.key)}
-                className={`w-full ${navClass(groupActive)}`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-5 h-5 ${groupActive ? 'text-teal-300' : ''}`} />
-                  <span className="text-sm">{item.label}</span>
-                </div>
-                <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {isOpen && (
-                <div className="ml-8 mt-0.5 mb-1 space-y-0.5">
-                  {item.children.map(child => {
-                    const childActive = isPathActive(child.href, child.exact)
-                    const childLocked = child.featureGate ? !hasFeature(plan, child.featureGate) : false
-                    return (
-                      <Link key={child.href} href={child.href} className={`${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`} title={childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
-                        <span className="flex items-center gap-2">
-                          {child.label}
-                          {childLocked && <Lock className="w-3 h-3 text-teal-300/40" />}
-                          {child.dotKey === 'automation_failed' && automationFailed && (
-                            <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
-                          )}
-                        </span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          )
-        })}
+        {NAV.map(item => renderNavItem(item))}
       </nav>
+
+      {/* Bottom section: Inställningar + Bjud in kollega */}
+      <div className="p-3 pt-0 space-y-0.5 border-t border-white/10">
+        {BOTTOM_NAV.map(item => renderNavItem(item))}
+      </div>
 
       {/* User Menu */}
       <div className="p-4 border-t border-white/10">

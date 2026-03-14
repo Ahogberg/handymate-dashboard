@@ -1,7 +1,7 @@
 ﻿'use client'
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Users,
@@ -13,7 +13,8 @@ import {
   Clock,
   Filter,
   Sparkles,
-  CalendarClock
+  CalendarClock,
+  Upload
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -33,10 +34,19 @@ interface Booking {
   scheduled_start: string
 }
 
-type FilterType = 'all' | 'inactive_30' | 'inactive_90' | 'manual'
+type FilterType = 'all' | 'inactive_30' | 'inactive_90' | 'manual' | 'imported'
 
-export default function NewCampaignPage() {
+export default function NewCampaignPageWrapper() {
+  return (
+    <Suspense fallback={<div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><div className="text-gray-500">Laddar...</div></div>}>
+      <NewCampaignPage />
+    </Suspense>
+  )
+}
+
+function NewCampaignPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const business = useBusiness()
   const toast = useToast()
 
@@ -44,7 +54,10 @@ export default function NewCampaignPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  
+
+  // Import flow state
+  const [importedCustomerIds, setImportedCustomerIds] = useState<string[]>([])
+
   // Form state
   const [campaignName, setCampaignName] = useState('')
   const [message, setMessage] = useState('')
@@ -58,6 +71,27 @@ export default function NewCampaignPage() {
   const [scheduleType, setScheduleType] = useState<'now' | 'later'>('now')
   const [scheduledDate, setScheduledDate] = useState('')
   const [scheduledTime, setScheduledTime] = useState('09:00')
+
+  // Read import flow from URL params + sessionStorage
+  useEffect(() => {
+    if (searchParams.get('source') === 'import') {
+      try {
+        const stored = sessionStorage.getItem('importedCustomerIds')
+        if (stored) {
+          const ids: string[] = JSON.parse(stored)
+          if (ids.length > 0) {
+            setImportedCustomerIds(ids)
+            setFilterType('imported')
+            const today = new Date().toLocaleDateString('sv-SE')
+            setCampaignName(`Reaktivering ${today}`)
+            setPurposeType('reactivation')
+            setMessage(`Hej! Det var ett tag sedan – har du något hemma som behöver fixas? Vi har lediga tider! Svara så hjälper vi dig. //${business.business_name}`)
+          }
+          sessionStorage.removeItem('importedCustomerIds')
+        }
+      } catch { /* ignore parse errors */ }
+    }
+  }, [searchParams, business.business_name])
 
   useEffect(() => {
     fetchCustomers()
@@ -131,6 +165,9 @@ export default function NewCampaignPage() {
       case 'manual':
         filtered = filtered.filter((c: Customer) => selectedCustomers.has(c.customer_id))
         break
+      case 'imported':
+        filtered = filtered.filter((c: Customer) => importedCustomerIds.includes(c.customer_id))
+        break
     }
 
     return filtered
@@ -138,6 +175,14 @@ export default function NewCampaignPage() {
 
   const filteredCustomers = getFilteredCustomers()
   const recipientCount = filterType === 'manual' ? selectedCustomers.size : filteredCustomers.length
+
+  // For 'imported' filter in handleSend, use filteredCustomers directly
+  const getRecipients = (): Customer[] => {
+    if (filterType === 'manual') {
+      return customers.filter((c: Customer) => selectedCustomers.has(c.customer_id))
+    }
+    return filteredCustomers
+  }
 
   const toggleCustomer = (customerId: string) => {
     const newSelected = new Set(selectedCustomers)
@@ -167,9 +212,7 @@ export default function NewCampaignPage() {
 
     setSending(true)
     try {
-      const recipients = filterType === 'manual'
-        ? customers.filter((c: Customer) => selectedCustomers.has(c.customer_id))
-        : filteredCustomers
+      const recipients = getRecipients()
 
       const campaignId = 'camp_' + Math.random().toString(36).substr(2, 12)
       const isScheduled = scheduleType === 'later'
@@ -329,12 +372,15 @@ const messageSuggestions = [
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Välj mottagare</h2>
               
               {/* Filter options */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className={`grid grid-cols-2 ${importedCustomerIds.length > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-3 mb-6`}>
                 {[
                   { id: 'all', label: 'Alla kunder', icon: Users, count: customers.length },
                   { id: 'inactive_30', label: 'Inaktiva 30+ dagar', icon: Clock, count: getInactiveCount(30) },
                   { id: 'inactive_90', label: 'Inaktiva 90+ dagar', icon: Clock, count: getInactiveCount(90) },
-                  { id: 'manual', label: 'Välj manuellt', icon: Filter, count: selectedCustomers.size }
+                  { id: 'manual', label: 'Välj manuellt', icon: Filter, count: selectedCustomers.size },
+                  ...(importedCustomerIds.length > 0
+                    ? [{ id: 'imported', label: 'Importerade kunder', icon: Upload, count: importedCustomerIds.length }]
+                    : [])
                 ].map((f) => (
                   <button
                     key={f.id}

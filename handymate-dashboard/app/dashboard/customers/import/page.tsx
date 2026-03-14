@@ -2,15 +2,15 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  ArrowLeft, 
-  Upload, 
+import {
+  ArrowLeft,
+  Upload,
   FileSpreadsheet,
   Check,
-  AlertCircle,
   Loader2,
   Download,
-  X
+  X,
+  Megaphone
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -22,6 +22,7 @@ interface ParsedRow {
   email: string
   address: string
   raw: string[]
+  isDuplicate?: boolean
 }
 
 interface ColumnMapping {
@@ -34,7 +35,7 @@ interface ColumnMapping {
 export default function ImportCustomersPage() {
   const router = useRouter()
   const business = useBusiness()
-  
+
   const [step, setStep] = useState(1)
   const [file, setFile] = useState<File | null>(null)
   const [headers, setHeaders] = useState<string[]>([])
@@ -46,8 +47,10 @@ export default function ImportCustomersPage() {
     address: null
   })
   const [parsedData, setParsedData] = useState<ParsedRow[]>([])
+  const [duplicateCount, setDuplicateCount] = useState(0)
+  const [skipDuplicates, setSkipDuplicates] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[]; importedIds: string[] } | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
   const parseCSV = (text: string): { headers: string[]; rows: string[][] } => {
@@ -166,7 +169,7 @@ export default function ImportCustomersPage() {
     return /^\+46\d{7,10}$/.test(formatted)
   }
 
-  const prepareData = () => {
+  const prepareData = async () => {
     if (mapping.phone_number === null) return
 
     const prepared: ParsedRow[] = rows.map(row => ({
@@ -177,18 +180,39 @@ export default function ImportCustomersPage() {
       raw: row
     })).filter(row => row.phone_number && validatePhoneNumber(row.phone_number))
 
-    setParsedData(prepared)
+    // Check for existing customers (duplicates)
+    const phones = prepared.map(r => r.phone_number)
+    const { data: existingCustomers } = await supabase
+      .from('customer')
+      .select('phone_number')
+      .eq('business_id', business.business_id)
+      .in('phone_number', phones)
+
+    const existingPhones = new Set((existingCustomers || []).map((c: { phone_number: string }) => c.phone_number))
+    const withDuplicates = prepared.map(row => ({
+      ...row,
+      isDuplicate: existingPhones.has(row.phone_number)
+    }))
+    const dupes = withDuplicates.filter(r => r.isDuplicate).length
+    setDuplicateCount(dupes)
+
+    setParsedData(withDuplicates)
     setStep(3)
   }
 
   const handleImport = async () => {
     setImporting(true)
-    
+
     let success = 0
     let failed = 0
     const errors: string[] = []
+    const importedIds: string[] = []
 
-    for (const row of parsedData) {
+    const rowsToImport = skipDuplicates
+      ? parsedData.filter(r => !r.isDuplicate)
+      : parsedData
+
+    for (const row of rowsToImport) {
       try {
         // Kolla om kunden redan finns (baserat på telefonnummer)
         const { data: existing } = await supabase
@@ -196,7 +220,7 @@ export default function ImportCustomersPage() {
           .select('customer_id')
           .eq('business_id', business.business_id)
           .eq('phone_number', row.phone_number)
-          .single()
+          .maybeSingle()
 
         if (existing) {
           // Uppdatera befintlig kund
@@ -208,6 +232,7 @@ export default function ImportCustomersPage() {
               address_line: row.address || undefined,
             })
             .eq('customer_id', existing.customer_id)
+          importedIds.push(existing.customer_id)
           success++
         } else {
           // Skapa ny kund
@@ -228,6 +253,7 @@ export default function ImportCustomersPage() {
             failed++
             errors.push(`${row.name || row.phone_number}: ${error.message}`)
           } else {
+            importedIds.push(customerId)
             success++
           }
         }
@@ -237,7 +263,7 @@ export default function ImportCustomersPage() {
       }
     }
 
-    setImportResult({ success, failed, errors })
+    setImportResult({ success, failed, errors, importedIds })
     setStep(4)
     setImporting(false)
   }
@@ -492,8 +518,38 @@ export default function ImportCustomersPage() {
               {rows.length - parsedData.length > 0 && (
                 <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-6">
                   <p className="text-sm text-amber-600">
-                    ⚠️ {rows.length - parsedData.length} rader hoppas över (ogiltigt telefonnummer)
+                    {rows.length - parsedData.length} rader hoppas över (ogiltigt telefonnummer)
                   </p>
+                </div>
+              )}
+
+              {duplicateCount > 0 && (
+                <div className="p-4 bg-sky-50 border border-sky-200 rounded-xl mb-6">
+                  <p className="text-sm text-sky-700 mb-3">
+                    {duplicateCount} kunder finns redan i systemet
+                  </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setSkipDuplicates(false)}
+                      className={`px-4 py-2 text-sm rounded-lg border transition-all ${
+                        !skipDuplicates
+                          ? 'bg-sky-100 border-sky-400 text-sky-800 font-medium'
+                          : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      Uppdatera befintliga
+                    </button>
+                    <button
+                      onClick={() => setSkipDuplicates(true)}
+                      className={`px-4 py-2 text-sm rounded-lg border transition-all ${
+                        skipDuplicates
+                          ? 'bg-sky-100 border-sky-400 text-sky-800 font-medium'
+                          : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
+                      }`}
+                    >
+                      Hoppa över dubletter
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -545,7 +601,7 @@ export default function ImportCustomersPage() {
                 ) : (
                   <>
                     <Upload className="w-5 h-5 mr-2" />
-                    Importera {parsedData.length} kunder
+                    Importera {skipDuplicates ? parsedData.length - duplicateCount : parsedData.length} kunder
                   </>
                 )}
               </button>
@@ -598,18 +654,25 @@ export default function ImportCustomersPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-center gap-4 mt-8">
+              {importResult.success > 0 && (
+                <button
+                  onClick={() => {
+                    sessionStorage.setItem('importedCustomerIds', JSON.stringify(importResult.importedIds))
+                    router.push('/dashboard/campaigns/new?source=import')
+                  }}
+                  className="flex items-center justify-center gap-3 w-full mt-6 px-6 py-4 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 transition-all"
+                >
+                  <Megaphone className="w-5 h-5" />
+                  Skicka reaktiverings-SMS till dessa {importResult.success} kunder
+                </button>
+              )}
+
+              <div className="flex items-center justify-center gap-4 mt-4">
                 <Link
                   href="/dashboard/customers"
-                  className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90"
-                >
-                  Visa kunder
-                </Link>
-                <Link
-                  href="/dashboard/campaigns/new"
                   className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl font-medium text-gray-900 hover:bg-gray-200"
                 >
-                  Skapa kampanj
+                  Visa kunder
                 </Link>
               </div>
             </div>

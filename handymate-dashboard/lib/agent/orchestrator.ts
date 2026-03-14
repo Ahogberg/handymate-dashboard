@@ -69,6 +69,8 @@ const EVENT_ROUTING: Record<string, AgentType> = {
   phone_call: 'lead',
   pipeline_stage_changed: 'lead',
   customer_reactivation: 'lead',
+  email_received: 'lead',
+  gmail_lead_imported: 'lead',
   // Ekonomi-agent
   quote_created: 'ekonomi',
   quote_sent: 'ekonomi',
