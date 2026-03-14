@@ -519,6 +519,63 @@ async function handleScheduleFollowup(
   return { success: true, data: { followup_date: followupDate.toISOString(), description } }
 }
 
+async function handleSyncToFortnox(
+  businessId: string,
+  config: Record<string, unknown>,
+  context: ExecutionContext
+): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  try {
+    const entityType = (config.entity_type as string) || (context.entity_type as string)
+    const entityId = (context.entity_id as string) || (config.entity_id as string)
+
+    if (!entityType || !entityId) {
+      return { success: false, error: 'entity_type och entity_id krävs för Fortnox-sync' }
+    }
+
+    const { syncCustomerWithTracking, syncInvoiceWithTracking, syncQuoteWithTracking, syncPaymentWithTracking } =
+      await import('@/lib/fortnox/sync')
+
+    let result: { success: boolean; skipped?: boolean; fortnoxId?: string; error?: string }
+
+    switch (entityType) {
+      case 'customer':
+        result = await syncCustomerWithTracking(businessId, entityId)
+        break
+      case 'invoice':
+        result = await syncInvoiceWithTracking(businessId, entityId)
+        break
+      case 'quote':
+        result = await syncQuoteWithTracking(businessId, entityId)
+        break
+      case 'payment': {
+        const invoiceNumber = (context.fortnox_invoice_number as string) || ''
+        const amount = (context.amount as number) || 0
+        if (!invoiceNumber || !amount) {
+          return { success: false, error: 'fortnox_invoice_number och amount krävs för betalningssynk' }
+        }
+        const payResult = await syncPaymentWithTracking(businessId, entityId, invoiceNumber, amount)
+        result = { success: payResult.success, skipped: payResult.skipped, error: payResult.error }
+        break
+      }
+      default:
+        return { success: false, error: `Okänd Fortnox entity_type: ${entityType}` }
+    }
+
+    if (result.skipped) {
+      return { success: true, data: { skipped: true, reason: 'fortnox_not_connected' } }
+    }
+
+    return {
+      success: result.success,
+      data: { entity_type: entityType, entity_id: entityId, fortnox_id: result.fortnoxId },
+      error: result.error,
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Fortnox sync failed'
+    return { success: false, error: msg }
+  }
+}
+
 // ── Main action dispatcher ──────────────────────────────
 
 async function executeAction(
@@ -550,6 +607,8 @@ async function executeAction(
       return handleCreateBooking(supabase, businessId, actionConfig, context)
     case 'schedule_followup':
       return handleScheduleFollowup(supabase, businessId, actionConfig, context)
+    case 'sync_to_fortnox':
+      return handleSyncToFortnox(businessId, actionConfig, context)
     default:
       return { success: false, error: `Okänd åtgärdstyp: ${actionType}` }
   }

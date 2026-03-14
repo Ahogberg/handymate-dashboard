@@ -20,7 +20,7 @@ if (action === 'register') {
   if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
     return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
   }
-  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea } = data
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode } = data
 
   // 1. Skapa auth user via admin API (skippar e-postverifiering)
   const supabaseAdmin = getServerSupabase()
@@ -85,6 +85,7 @@ if (action === 'register') {
       working_hours: defaultWorkingHours,
       call_mode: 'human_first',
       knowledge_base: knowledgeBase,
+      referred_by: referralCode || null,
     })
 
   if (businessError) {
@@ -111,7 +112,36 @@ if (action === 'register') {
       can_create_invoices: true,
     })
 
-  // 4. Seeding deferred to onboarding finalize (POST /api/onboarding)
+  // 4. Referral-spårning
+  if (referralCode) {
+    try {
+      const { resolveReferralCode } = await import('@/lib/referral/codes')
+      const referrerBusinessId = await resolveReferralCode(referralCode)
+      if (referrerBusinessId) {
+        await supabaseAdmin
+          .from('referrals')
+          .insert({
+            referrer_business_id: referrerBusinessId,
+            referred_business_id: businessId,
+            referred_email: email,
+            referrer_type: 'customer',
+            status: 'pending',
+          })
+      }
+    } catch (err) {
+      console.error('[Register] Referral tracking failed:', err)
+    }
+  }
+
+  // 5. Generera referralkod för nya företaget
+  try {
+    const { generateReferralCode } = await import('@/lib/referral/codes')
+    await generateReferralCode(businessId, businessName)
+  } catch (err) {
+    console.error('[Register] Referral code generation failed:', err)
+  }
+
+  // 6. Seeding deferred to onboarding finalize (POST /api/onboarding)
   // automation_rules, lead_scoring_rules, pipeline_stages, etc. are all seeded there
 
   return NextResponse.json({

@@ -21,6 +21,9 @@ export const EKONOMI_TOOL_NAMES = [
   'create_approval_request',
   'get_automation_settings',
   'check_pending_approvals',
+  'check_fortnox_status',
+  'trigger_fortnox_sync',
+  'get_pricing_suggestion',
 ]
 
 export function getEkonomiTools() {
@@ -96,6 +99,17 @@ ${pricingTendency}
 - Separera ALLTID arbete och material i offerter
 - Skicka ALDRIG SMS mellan 21:00 och 08:00
 - Offertens giltighetstid: 30 dagar
+
+## Prissättningsintelligens
+- Använd get_pricing_suggestion INNAN du sätter pris på en offert
+- Verktyget ger rekommenderat prisintervall baserat på historik
+- Anpassa priset efter kundens situation och jobbets komplexitet
+- Nämn aldrig "AI" eller "algoritm" för kunden — säg "baserat på vår erfarenhet"
+
+## Fortnox-integration
+- Använd check_fortnox_status för att se om Fortnox är anslutet
+- Om anslutet: synka kunder, fakturor och offerter med trigger_fortnox_sync
+- Om INTE anslutet: hoppa över Fortnox-relaterade åtgärder utan felmeddelande
 
 ## Eskalering
 Eskalera till strategi-agenten om:

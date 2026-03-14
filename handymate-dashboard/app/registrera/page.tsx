@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-function SignupContent() {
+function RegistreraContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -18,11 +18,11 @@ function SignupContent() {
   )
 }
 
-export default function SignupPage() {
+export default function RegistreraPage() {
   return (
     <div className="min-h-screen bg-[#09090b] flex items-center justify-center">
       <Suspense fallback={<div className="text-zinc-500">Omdirigerar...</div>}>
-        <SignupContent />
+        <RegistreraContent />
       </Suspense>
     </div>
   )

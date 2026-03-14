@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft,
   Sparkles,
   Loader2,
   ChevronDown,
+  Camera,
+  Upload,
+  X,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -14,10 +16,6 @@ import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
-import InputSelector, { InputMethod } from '@/components/quotes/InputSelector'
-import PhotoCapture from '@/components/quotes/PhotoCapture'
-import VoiceRecorder from '@/components/quotes/VoiceRecorder'
-import AIQuotePreview from '@/components/quotes/AIQuotePreview'
 import TemplateSelector from '@/components/quotes/TemplateSelector'
 import {
   QuoteItem,
@@ -69,8 +67,6 @@ interface PricingSettings {
   payment_terms: number
   warranty_years: number
 }
-
-type WizardStep = 'select' | 'photo' | 'voice' | 'text' | 'template' | 'ai-preview' | 'form'
 
 const UNIT_OPTIONS = [
   { value: 'st', label: 'st' },
@@ -208,16 +204,16 @@ export default function NewQuotePage() {
   // ─── Standard texts (loaded from API) ──────────────────────────────────────
   const [allStandardTexts, setAllStandardTexts] = useState<QuoteStandardText[]>([])
 
-  // ─── Wizard state ──────────────────────────────────────────────────────────
-  const [wizardStep, setWizardStep] = useState<WizardStep>('select')
-  const [aiResult, setAiResult] = useState<any>(null)
-  const [priceComparison, setPriceComparison] = useState<any>(null)
-  const [transcribing, setTranscribing] = useState(false)
-  const [voiceTranscript, setVoiceTranscript] = useState('')
+  // ─── AI state ────────────────────────────────────────────────────────────────
   const [sourceImageBase64, setSourceImageBase64] = useState<string | null>(null)
   const [sourceTranscript, setSourceTranscript] = useState<string | null>(null)
   const [aiGenerated, setAiGenerated] = useState(false)
   const [aiTextInput, setAiTextInput] = useState('')
+  const [aiConfidence, setAiConfidence] = useState<number | null>(null)
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [showAiHelper, setShowAiHelper] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   // ─── Form state ────────────────────────────────────────────────────────────
   const [selectedCustomer, setSelectedCustomer] = useState<string>('')
@@ -264,6 +260,12 @@ export default function NewQuotePage() {
   const [showStandardTexts, setShowStandardTexts] = useState(false)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
+
+  // Advanced row type dropdown
+  const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
+
+  // Template panel in sidebar
+  const [showTemplatePanel, setShowTemplatePanel] = useState(false)
 
   // ─── Derived: standard texts grouped by type ──────────────────────────────
   const textsByType = useMemo(() => {
@@ -316,13 +318,10 @@ export default function NewQuotePage() {
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
-      setWizardStep('text')
+      setShowAiHelper(true)
     }
     if (customerId) {
       setSelectedCustomer(customerId)
-    }
-    if (searchParams.get('mode') === 'manual') {
-      setWizardStep('form')
     }
   }, [business.business_id])
 
@@ -398,17 +397,41 @@ export default function NewQuotePage() {
   }, [selectedCustomer])
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Wizard handlers
+  // AI helpers — photo & text
   // ═══════════════════════════════════════════════════════════════════════════
 
-  function handleInputSelect(method: InputMethod) {
-    if (method === 'text' || method === 'call') setWizardStep('text')
-    else if (method === 'photo') setWizardStep('photo')
-    else if (method === 'voice') setWizardStep('voice')
-    else if (method === 'template') setWizardStep('template')
+  function applyAiResult(quote: any) {
+    setTitle(quote.jobTitle || '')
+    setDescription(quote.jobDescription || '')
+    const converted = convertLegacyItems(quote.items || [])
+    if (quote.suggestedDeductionType === 'rot') {
+      converted.forEach((item) => {
+        if (item.unit === 'tim') item.is_rot_eligible = true
+      })
+    } else if (quote.suggestedDeductionType === 'rut') {
+      converted.forEach((item) => {
+        if (item.unit === 'tim') item.is_rut_eligible = true
+      })
+    }
+    setItems(converted)
+    setAiGenerated(true)
+    setAiConfidence(quote.confidence || null)
+    toast.success('AI genererade offertförslag!')
   }
 
-  async function handlePhotoCapture(base64: string) {
+  function handlePhotoFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string
+      setPhotoPreview(dataUrl)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function analyzePhoto() {
+    if (!photoPreview) return
+    const base64 = photoPreview.split(',')[1]
     setSourceImageBase64(base64)
     setGenerating(true)
     try {
@@ -419,28 +442,16 @@ export default function NewQuotePage() {
       })
       const data = await response.json()
       if (data.success) {
-        setAiResult(data.quote)
-        setPriceComparison(data.priceComparison)
-        setAiGenerated(true)
-        setWizardStep('ai-preview')
+        applyAiResult(data.quote)
+        setPhotoPreview(null)
       } else {
         toast.error(data.error || 'AI-generering misslyckades')
-        setWizardStep('select')
       }
     } catch (err) {
       console.error('AI generation failed:', err)
       toast.error('Nätverksfel vid AI-generering')
-      setWizardStep('select')
     }
     setGenerating(false)
-  }
-
-  function handleVoiceTranscript(transcript: string) {
-    setVoiceTranscript(transcript)
-    setSourceTranscript(transcript)
-    setAiTextInput(transcript)
-    setTranscribing(false)
-    generateFromText(transcript)
   }
 
   async function generateFromText(text?: string) {
@@ -448,10 +459,8 @@ export default function NewQuotePage() {
     if (!inputText.trim()) return
 
     setGenerating(true)
-    setWizardStep('ai-preview')
     try {
-      const body: any = { textDescription: inputText }
-      if (voiceTranscript) body.voiceTranscript = voiceTranscript
+      const body: Record<string, string> = { textDescription: inputText }
       if (sourceImageBase64) body.imageBase64 = sourceImageBase64
 
       const response = await fetch('/api/quotes/ai-generate', {
@@ -461,20 +470,21 @@ export default function NewQuotePage() {
       })
       const data = await response.json()
       if (data.success) {
-        setAiResult(data.quote)
-        setPriceComparison(data.priceComparison)
-        setAiGenerated(true)
+        setSourceTranscript(inputText)
+        applyAiResult(data.quote)
       } else {
         toast.error(data.error || 'AI-generering misslyckades')
-        setWizardStep('text')
       }
     } catch (err) {
       console.error('AI generation failed:', err)
       toast.error('Nätverksfel vid AI-generering')
-      setWizardStep('text')
     }
     setGenerating(false)
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Template handlers
+  // ═══════════════════════════════════════════════════════════════════════════
 
   /** Handle new-format template from /api/quote-templates */
   function handleNewTemplateSelect(template: QuoteTemplate) {
@@ -511,12 +521,8 @@ export default function NewQuotePage() {
     setShowUnitPrices(template.show_unit_prices ?? true)
     setShowQuantities(template.show_quantities ?? true)
 
-    // ROT/RUT: mark eligible items
-    if (template.rot_enabled) {
-      // already handled per-item from default_items
-    }
-
-    setWizardStep('form')
+    setShowTemplatePanel(false)
+    toast.success(`Mall "${template.name}" tillämpad`)
   }
 
   /** Handle legacy template (from existing TemplateSelector) */
@@ -591,40 +597,8 @@ export default function NewQuotePage() {
       body: JSON.stringify({ ...template, incrementUsage: true }),
     }).catch(() => {})
 
-    setWizardStep('form')
-  }
-
-  /** AI wizard accept → convert to new QuoteItem format */
-  function handleAIAccept(data: {
-    title: string
-    description: string
-    items: Array<{
-      id: string
-      type: 'labor' | 'material' | 'service'
-      name: string
-      quantity: number
-      unit: string
-      unit_price: number
-      total: number
-    }>
-    rotRutType: '' | 'rot' | 'rut'
-  }) {
-    setTitle(data.title)
-    setDescription(data.description)
-
-    const converted = convertLegacyItems(data.items)
-    // Apply ROT/RUT from AI suggestion
-    if (data.rotRutType === 'rot') {
-      converted.forEach((item) => {
-        if (item.unit === 'tim') item.is_rot_eligible = true
-      })
-    } else if (data.rotRutType === 'rut') {
-      converted.forEach((item) => {
-        if (item.unit === 'tim') item.is_rut_eligible = true
-      })
-    }
-    setItems(converted)
-    setWizardStep('form')
+    setShowTemplatePanel(false)
+    toast.success(`Mall "${template.name}" tillämpad`)
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -792,7 +766,7 @@ export default function NewQuotePage() {
           fastighetsbeteckning: hasRotItems ? fastighetsbeteckning || null : null,
           valid_days: validDays,
           ai_generated: aiGenerated || false,
-          ai_confidence: aiResult?.confidence || null,
+          ai_confidence: aiConfidence || null,
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
         }),
@@ -847,162 +821,16 @@ export default function NewQuotePage() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Loading
+  // Render
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
       </div>
     )
   }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Wizard steps (before form)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  if (wizardStep !== 'form') {
-    return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
-        <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-          <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-          <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
-        </div>
-
-        <div className="relative max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="flex items-center gap-4 mb-6">
-            <button
-              onClick={() => {
-                if (wizardStep === 'select') {
-                  router.push('/dashboard/quotes')
-                } else if (wizardStep === 'ai-preview') {
-                  setAiResult(null)
-                  setWizardStep('select')
-                } else {
-                  setWizardStep('select')
-                }
-              }}
-              className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Ny offert</h1>
-            </div>
-            <button
-              onClick={() => setWizardStep('form')}
-              className="text-sm text-gray-400 hover:text-gray-900 transition-all"
-            >
-              Hoppa till formulär
-            </button>
-          </div>
-
-          {/* Wizard content */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
-            {wizardStep === 'select' && <InputSelector onSelect={handleInputSelect} />}
-
-            {wizardStep === 'photo' && (
-              <PhotoCapture
-                onCapture={handlePhotoCapture}
-                onBack={() => setWizardStep('select')}
-                analyzing={generating}
-              />
-            )}
-
-            {wizardStep === 'voice' && (
-              <VoiceRecorder
-                onTranscript={handleVoiceTranscript}
-                onBack={() => setWizardStep('select')}
-                transcribing={transcribing}
-              />
-            )}
-
-            {wizardStep === 'text' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-sky-700" />
-                    <h2 className="text-lg font-semibold text-gray-900">Beskriv jobbet</h2>
-                  </div>
-                </div>
-                <textarea
-                  value={aiTextInput}
-                  onChange={(e) => setAiTextInput(e.target.value)}
-                  placeholder="Beskriv jobbet... t.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
-                  rows={5}
-                  autoFocus
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none mb-4"
-                />
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setWizardStep('select')}
-                    className="px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 min-h-[48px]"
-                  >
-                    Tillbaka
-                  </button>
-                  <button
-                    onClick={() => generateFromText()}
-                    disabled={generating || !aiTextInput.trim()}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50 min-h-[48px]"
-                  >
-                    {generating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    {generating ? 'Genererar...' : 'Generera offertförslag'}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {wizardStep === 'template' && (
-              <TemplateSelector
-                onSelect={handleTemplateSelect}
-                onBack={() => setWizardStep('select')}
-              />
-            )}
-
-            {wizardStep === 'ai-preview' && generating && (
-              <div className="text-center py-12">
-                <Loader2 className="w-10 h-10 text-sky-700 animate-spin mx-auto mb-4" />
-                <p className="text-gray-900 font-medium">Genererar offertförslag...</p>
-                <div className="space-y-1 mt-3 text-sm text-gray-400">
-                  <p>Analyserar beskrivning...</p>
-                  <p>Hämtar din prishistorik...</p>
-                  <p>Beräknar material och arbete...</p>
-                </div>
-              </div>
-            )}
-
-            {wizardStep === 'ai-preview' && !generating && aiResult && (
-              <AIQuotePreview
-                jobTitle={aiResult.jobTitle}
-                jobDescription={aiResult.jobDescription}
-                items={aiResult.items}
-                confidence={aiResult.confidence}
-                reasoning={aiResult.reasoning}
-                suggestedDeductionType={aiResult.suggestedDeductionType}
-                priceComparison={priceComparison || { average: 0, min: 0, max: 0, count: 0 }}
-                similarQuotes={aiResult.similarHistoricalQuotes || []}
-                onAccept={handleAIAccept}
-                onRegenerate={() => generateFromText()}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Full Form (step: 'form')
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // State for advanced row type dropdown
-  const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
   return (
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
@@ -1027,9 +855,128 @@ export default function NewQuotePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* Main Content */}
+          {/* Left Column — Form                                       */}
           {/* ══════════════════════════════════════════════════════════ */}
           <div className="flex flex-col gap-4">
+            {/* ── AI-hjälp ──────────────────────────────────────────── */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-5">
+              <button
+                type="button"
+                onClick={() => setShowAiHelper(!showAiHelper)}
+                className="w-full flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#0F766E]" />
+                  <span className="text-[13px] font-medium text-[#1E293B]">AI-hjälp</span>
+                  <span className="text-[11px] text-[#94A3B8]">Fota eller beskriv jobbet</span>
+                </div>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showAiHelper ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showAiHelper && (
+                <div className="mt-4 space-y-4">
+                  {/* Photo capture */}
+                  <div>
+                    <p className="text-[12px] text-[#64748B] mb-2">Fota jobbet — AI analyserar och fyller i rader</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handlePhotoFile(file)
+                        }}
+                      />
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) handlePhotoFile(file)
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={generating}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Kamera
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={generating}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
+                      >
+                        <Upload className="w-4 h-4" />
+                        Ladda upp
+                      </button>
+                    </div>
+
+                    {/* Photo preview */}
+                    {photoPreview && (
+                      <div className="mt-3 flex items-start gap-3">
+                        <div className="relative w-24 h-24 rounded-lg overflow-hidden border-thin border-[#E2E8F0] flex-shrink-0">
+                          <img src={photoPreview} alt="Förhandsvisning" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => setPhotoPreview(null)}
+                            className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center"
+                          >
+                            <X className="w-3 h-3 text-white" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={analyzePhoto}
+                          disabled={generating}
+                          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
+                        >
+                          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                          {generating ? 'Analyserar...' : 'Analysera bild'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-px bg-[#E2E8F0]" />
+                    <span className="text-[11px] text-[#CBD5E1]">eller</span>
+                    <div className="flex-1 h-px bg-[#E2E8F0]" />
+                  </div>
+
+                  {/* Text description */}
+                  <div>
+                    <p className="text-[12px] text-[#64748B] mb-2">Beskriv jobbet — AI genererar offertrader</p>
+                    <textarea
+                      value={aiTextInput}
+                      onChange={(e) => setAiTextInput(e.target.value)}
+                      placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
+                      rows={3}
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => generateFromText()}
+                      disabled={generating || !aiTextInput.trim()}
+                      className="mt-2 flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
+                    >
+                      {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      {generating ? 'Genererar...' : 'Generera offertförslag'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* ── Kund ──────────────────────────────────────────────── */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
               <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Kund</div>
@@ -1104,7 +1051,7 @@ export default function NewQuotePage() {
 
               {items.length === 0 ? (
                 <div className="text-center py-8 text-[#CBD5E1] text-[13px]">
-                  <p>Inga rader ännu. Lägg till poster nedan.</p>
+                  <p>Inga rader ännu. Lägg till poster nedan eller använd AI-hjälp.</p>
                 </div>
               ) : (
                 <div>
@@ -1530,9 +1477,30 @@ export default function NewQuotePage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* Sidebar */}
+          {/* Right Column — Sidebar                                    */}
           {/* ══════════════════════════════════════════════════════════ */}
           <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+            {/* Template panel */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
+              <button
+                type="button"
+                onClick={() => setShowTemplatePanel(!showTemplatePanel)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left"
+              >
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Mallar</span>
+                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showTemplatePanel ? 'rotate-180' : ''}`} />
+              </button>
+              {showTemplatePanel && (
+                <div className="px-2 pb-3">
+                  <TemplateSelector
+                    onSelect={handleTemplateSelect}
+                    onBack={() => setShowTemplatePanel(false)}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Summary */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
               <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering</div>
 
@@ -1694,4 +1662,3 @@ export default function NewQuotePage() {
     </div>
   )
 }
-

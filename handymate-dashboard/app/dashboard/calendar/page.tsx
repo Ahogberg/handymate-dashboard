@@ -1,67 +1,40 @@
-﻿'use client'
+'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import {
-  Calendar,
+  ChevronLeft,
+  ChevronRight,
   Plus,
-  Clock,
-  User,
   X,
   Loader2,
-  Trash2,
-  Edit,
-  Timer,
-  DollarSign,
-  ChevronLeft,
-  ChevronRight
+  Clock,
+  User,
+  Info,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
-import { useCurrentUser } from '@/lib/CurrentUserContext'
 
-interface Booking {
-  booking_id: string
-  customer_id: string
-  scheduled_start: string
-  scheduled_end: string
-  status: string
-  notes: string | null
-  created_at: string
-  customer?: {
-    name: string
-    phone_number: string
-  }
-}
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
-interface TimeEntry {
-  time_entry_id: string
-  booking_id: string | null
-  customer_id: string | null
-  business_user_id: string | null
-  work_date: string
-  start_time: string | null
-  end_time: string | null
-  duration_minutes: number
-  description: string | null
-  hourly_rate: number | null
-  is_billable: boolean
-  customer?: {
-    customer_id: string
-    name: string
-    phone_number: string
-  }
-  business_user?: {
-    id: string
-    name: string
-    color: string
-  } | null
-}
-
-interface TeamMember {
+interface HandymateEvent {
   id: string
-  name: string
-  color: string
-  role: string
+  title: string
+  start: string
+  end: string
+  status: string
+  customerId: string
+  customerName: string
+  customerPhone: string | null
+}
+
+interface GoogleEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  allDay: boolean
 }
 
 interface Customer {
@@ -70,160 +43,291 @@ interface Customer {
   phone_number: string
 }
 
+type ViewMode = 'week' | 'day'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const HOUR_START = 6
+const HOUR_END = 20
+const HOUR_COUNT = HOUR_END - HOUR_START
+const CELL_HEIGHT = 60 // px per hour
+const DAY_NAMES = ['mån', 'tis', 'ons', 'tor', 'fre', 'lör', 'sön']
+
+// ---------------------------------------------------------------------------
+// Date helpers
+// ---------------------------------------------------------------------------
+
+function getMondayOfWeek(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
+function isSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+}
+
+function isToday(date: Date): boolean {
+  return isSameDay(date, new Date())
+}
+
+function formatDateISO(date: Date): string {
+  return date.toISOString().split('T')[0]
+}
+
+function formatWeekRange(monday: Date): string {
+  const sunday = addDays(monday, 6)
+  const startStr = monday.toLocaleDateString('sv-SE', { day: 'numeric' })
+  const endStr = sunday.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+  if (monday.getMonth() === sunday.getMonth()) {
+    return `${startStr}–${endStr}`
+  }
+  const startWithMonth = monday.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' })
+  return `${startWithMonth} – ${endStr}`
+}
+
+function formatTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+}
+
+// ---------------------------------------------------------------------------
+// Event positioning helpers
+// ---------------------------------------------------------------------------
+
+/** Calculate top offset and height for an event block */
+function getEventPosition(startStr: string, endStr: string): { top: number; height: number } | null {
+  const start = new Date(startStr)
+  const end = new Date(endStr)
+  const startHour = start.getHours() + start.getMinutes() / 60
+  const endHour = end.getHours() + end.getMinutes() / 60
+
+  // Clamp to visible range
+  const clampedStart = Math.max(startHour, HOUR_START)
+  const clampedEnd = Math.min(endHour, HOUR_END)
+
+  if (clampedEnd <= clampedStart) return null
+
+  const top = (clampedStart - HOUR_START) * CELL_HEIGHT
+  const height = Math.max((clampedEnd - clampedStart) * CELL_HEIGHT, 20)
+
+  return { top, height }
+}
+
+/** Group overlapping events to position them side by side */
+function layoutOverlapping<T extends { start: string; end: string }>(
+  events: T[]
+): Array<T & { colIndex: number; colTotal: number }> {
+  if (events.length === 0) return []
+
+  // Sort by start time
+  const sorted = [...events].sort((a, b) =>
+    new Date(a.start).getTime() - new Date(b.start).getTime()
+  )
+
+  const result: Array<T & { colIndex: number; colTotal: number }> = []
+  const groups: T[][] = []
+  let currentGroup: T[] = []
+  let groupEnd = 0
+
+  for (const event of sorted) {
+    const eventStart = new Date(event.start).getTime()
+    if (currentGroup.length === 0 || eventStart < groupEnd) {
+      currentGroup.push(event)
+      groupEnd = Math.max(groupEnd, new Date(event.end).getTime())
+    } else {
+      groups.push(currentGroup)
+      currentGroup = [event]
+      groupEnd = new Date(event.end).getTime()
+    }
+  }
+  if (currentGroup.length > 0) groups.push(currentGroup)
+
+  for (const group of groups) {
+    const colTotal = group.length
+    for (let i = 0; i < group.length; i++) {
+      result.push({ ...group[i], colIndex: i, colTotal })
+    }
+  }
+
+  return result
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
+
 export default function CalendarPage() {
   const business = useBusiness()
-  const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
-  const [activeTab, setActiveTab] = useState<'bookings' | 'time'>('bookings')
 
-  // Bookings state
-  const [bookings, setBookings] = useState<Booking[]>([])
-  const [bookingFilter, setBookingFilter] = useState<'all' | 'today' | 'upcoming'>('upcoming')
-  const [bookingModalOpen, setBookingModalOpen] = useState(false)
-  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  // ─── Calendar navigation ──────────────────────────────────────────────────
+  const [monday, setMonday] = useState(() => getMondayOfWeek(new Date()))
+  const [viewMode, setViewMode] = useState<ViewMode>('week')
+  const [selectedDay, setSelectedDay] = useState(new Date())
 
-  // Time entries state
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  const [timeTotals, setTimeTotals] = useState({ hours: 0, revenue: 0, count: 0 })
-  const [selectedWeek, setSelectedWeek] = useState(getWeekDates(new Date()))
-  const [timeModalOpen, setTimeModalOpen] = useState(false)
-  const [editingTimeEntry, setEditingTimeEntry] = useState<TimeEntry | null>(null)
-
-  // Team state
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
-  const [filterUserId, setFilterUserId] = useState<string>('all')
-
-  // Shared state
-  const [customers, setCustomers] = useState<Customer[]>([])
+  // ─── Events data ──────────────────────────────────────────────────────────
+  const [handymateEvents, setHandymateEvents] = useState<HandymateEvent[]>([])
+  const [googleEvents, setGoogleEvents] = useState<GoogleEvent[]>([])
+  const [googleConnected, setGoogleConnected] = useState(true) // optimistic
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(false)
-  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
-  // Forms
+  // ─── Booking modal ────────────────────────────────────────────────────────
+  const [bookingModalOpen, setBookingModalOpen] = useState(false)
+  const [editingBooking, setEditingBooking] = useState<HandymateEvent | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [actionLoading, setActionLoading] = useState(false)
   const [bookingForm, setBookingForm] = useState({
     customer_id: '',
     date: '',
-    start_time: '',
-    end_time: '',
+    start_time: '09:00',
+    end_time: '10:00',
     notes: '',
-    status: 'confirmed'
+    status: 'confirmed',
   })
 
-  const [timeForm, setTimeForm] = useState({
-    customer_id: '',
-    business_user_id: '',
-    work_date: '',
-    start_time: '',
-    end_time: '',
-    duration_minutes: '',
-    description: '',
-    hourly_rate: '500',
-    is_billable: true
+  // ─── Detail panel ─────────────────────────────────────────────────────────
+  const [selectedEvent, setSelectedEvent] = useState<HandymateEvent | null>(null)
+
+  // ─── Toast ────────────────────────────────────────────────────────────────
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({
+    show: false, message: '', type: 'success',
   })
-
-  useEffect(() => {
-    if (business.business_id) {
-      fetchData()
-    }
-  }, [business.business_id, selectedWeek, filterUserId])
-
-  function getWeekDates(date: Date) {
-    const day = date.getDay()
-    const diff = date.getDate() - day + (day === 0 ? -6 : 1) // Monday
-    const monday = new Date(date.setDate(diff))
-    const sunday = new Date(monday)
-    sunday.setDate(monday.getDate() + 6)
-    return {
-      start: monday.toISOString().split('T')[0],
-      end: sunday.toISOString().split('T')[0]
-    }
-  }
-
-  function changeWeek(direction: number) {
-    const current = new Date(selectedWeek.start)
-    current.setDate(current.getDate() + (direction * 7))
-    setSelectedWeek(getWeekDates(current))
-  }
-
-  async function fetchData() {
-    setLoading(true)
-
-    // Fetch bookings
-    const { data: bookingsData } = await supabase
-      .from('booking')
-      .select(`
-        booking_id, customer_id, scheduled_start, scheduled_end, status, notes, created_at,
-        customer (name, phone_number)
-      `)
-      .eq('business_id', business.business_id)
-      .order('scheduled_start', { ascending: true })
-
-    // Fetch time entries for selected week
-    let timeUrl = `/api/time-entry?businessId=${business.business_id}&startDate=${selectedWeek.start}&endDate=${selectedWeek.end}`
-    if (filterUserId !== 'all') {
-      timeUrl += `&businessUserId=${filterUserId}`
-    }
-    const timeResponse = await fetch(timeUrl)
-    const timeData = await timeResponse.json()
-
-    // Fetch customers
-    const { data: customersData } = await supabase
-      .from('customer')
-      .select('customer_id, name, phone_number')
-      .eq('business_id', business.business_id)
-
-    // Fetch team members
-    const { data: teamData } = await supabase
-      .from('business_users')
-      .select('id, name, color, role')
-      .eq('business_id', business.business_id)
-      .eq('is_active', true)
-      .order('role', { ascending: true })
-
-    setBookings(bookingsData || [])
-    setTimeEntries(timeData.entries || [])
-    setTimeTotals(timeData.totals || { hours: 0, revenue: 0, count: 0 })
-    setCustomers(customersData || [])
-    setTeamMembers(teamData || [])
-    setLoading(false)
-  }
-
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
   }
 
-  // === BOOKING FUNCTIONS ===
-  const openCreateBookingModal = () => {
+  // ─── Mobile detection ─────────────────────────────────────────────────────
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  // Auto-switch to day view on mobile
+  useEffect(() => {
+    if (isMobile) setViewMode('day')
+  }, [isMobile])
+
+  // ─── Computed week dates ──────────────────────────────────────────────────
+  const weekDates = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => addDays(monday, i)),
+    [monday]
+  )
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Data fetching
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const fetchEvents = useCallback(async () => {
+    if (!business.business_id) return
+    setLoading(true)
+
+    const start = formatDateISO(monday)
+    const end = formatDateISO(addDays(monday, 6))
+
+    try {
+      const res = await fetch(`/api/calendar/events?start=${start}&end=${end}`)
+      if (res.ok) {
+        const data = await res.json()
+        setHandymateEvents(data.handymate || [])
+        setGoogleEvents(data.google || [])
+        setGoogleConnected(data.googleConnected ?? false)
+      }
+    } catch (err) {
+      console.error('Failed to fetch calendar events:', err)
+    }
+    setLoading(false)
+  }, [business.business_id, monday])
+
+  useEffect(() => {
+    fetchEvents()
+  }, [fetchEvents])
+
+  // Fetch customers for booking modal
+  useEffect(() => {
+    if (!business.business_id) return
+    supabase
+      .from('customer')
+      .select('customer_id, name, phone_number')
+      .eq('business_id', business.business_id)
+      .then(({ data }: { data: Customer[] | null }) => setCustomers(data || []))
+  }, [business.business_id])
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Navigation
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function goToday() {
+    const now = new Date()
+    setMonday(getMondayOfWeek(now))
+    setSelectedDay(now)
+  }
+
+  function navigate(direction: number) {
+    if (viewMode === 'week') {
+      setMonday(prev => addDays(prev, direction * 7))
+    } else {
+      const newDay = addDays(selectedDay, direction)
+      setSelectedDay(newDay)
+      // If new day is in a different week, update monday
+      const newMonday = getMondayOfWeek(newDay)
+      if (newMonday.getTime() !== monday.getTime()) {
+        setMonday(newMonday)
+      }
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Booking CRUD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function openCreateModal(date?: string, time?: string) {
     setEditingBooking(null)
-    const tomorrow = new Date()
-    tomorrow.setDate(tomorrow.getDate() + 1)
+    setSelectedEvent(null)
     setBookingForm({
       customer_id: '',
-      date: tomorrow.toISOString().split('T')[0],
-      start_time: '09:00',
-      end_time: '10:00',
+      date: date || formatDateISO(new Date()),
+      start_time: time || '09:00',
+      end_time: time ? `${String(parseInt(time.split(':')[0]) + 1).padStart(2, '0')}:${time.split(':')[1]}` : '10:00',
       notes: '',
-      status: 'confirmed'
+      status: 'confirmed',
     })
     setBookingModalOpen(true)
   }
 
-  const openEditBookingModal = (booking: Booking) => {
-    setEditingBooking(booking)
-    const startDate = new Date(booking.scheduled_start)
-    const endDate = new Date(booking.scheduled_end)
+  function openEditModal(event: HandymateEvent) {
+    setEditingBooking(event)
+    setSelectedEvent(null)
+    const startDate = new Date(event.start)
+    const endDate = new Date(event.end)
     setBookingForm({
-      customer_id: booking.customer_id,
-      date: startDate.toISOString().split('T')[0],
+      customer_id: event.customerId,
+      date: formatDateISO(startDate),
       start_time: startDate.toTimeString().substring(0, 5),
       end_time: endDate.toTimeString().substring(0, 5),
-      notes: booking.notes || '',
-      status: booking.status
+      notes: event.title,
+      status: event.status,
     })
     setBookingModalOpen(true)
   }
 
-  const handleBookingSubmit = async () => {
+  async function handleBookingSubmit() {
     if (!bookingForm.customer_id || !bookingForm.date || !bookingForm.start_time) {
       showToast('Kund, datum och tid krävs', 'error')
       return
@@ -240,8 +344,8 @@ export default function CalendarPage() {
         body: JSON.stringify({
           action: editingBooking ? 'update_booking' : 'create_booking',
           data: editingBooking
-            ? { bookingId: editingBooking.booking_id, scheduledStart, scheduledEnd, status: bookingForm.status, notes: bookingForm.notes }
-            : { customerId: bookingForm.customer_id, scheduledStart, scheduledEnd, notes: bookingForm.notes, businessId: business.business_id }
+            ? { bookingId: editingBooking.id, scheduledStart, scheduledEnd, status: bookingForm.status, notes: bookingForm.notes }
+            : { customerId: bookingForm.customer_id, scheduledStart, scheduledEnd, notes: bookingForm.notes, businessId: business.business_id },
         }),
       })
 
@@ -249,7 +353,7 @@ export default function CalendarPage() {
 
       showToast(editingBooking ? 'Bokning uppdaterad!' : 'Bokning skapad!', 'success')
       setBookingModalOpen(false)
-      fetchData()
+      fetchEvents()
     } catch {
       showToast('Något gick fel', 'error')
     } finally {
@@ -257,7 +361,7 @@ export default function CalendarPage() {
     }
   }
 
-  const handleBookingDelete = async (bookingId: string) => {
+  async function handleBookingDelete(bookingId: string) {
     if (!confirm('Är du säker på att du vill ta bort denna bokning?')) return
 
     try {
@@ -270,204 +374,452 @@ export default function CalendarPage() {
       if (!response.ok) throw new Error('Något gick fel')
 
       showToast('Bokning borttagen!', 'success')
-      fetchData()
+      setSelectedEvent(null)
+      fetchEvents()
     } catch {
       showToast('Något gick fel', 'error')
     }
   }
 
-  // === TIME ENTRY FUNCTIONS ===
-  const openCreateTimeModal = () => {
-    setEditingTimeEntry(null)
-    const today = new Date().toISOString().split('T')[0]
-    setTimeForm({
-      customer_id: '',
-      business_user_id: currentUser?.id || '',
-      work_date: today,
-      start_time: '08:00',
-      end_time: '16:00',
-      duration_minutes: '480',
-      description: '',
-      hourly_rate: '500',
-      is_billable: true
-    })
-    setTimeModalOpen(true)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Cell click → new booking
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function handleCellClick(date: Date, hour: number) {
+    const dateStr = formatDateISO(date)
+    const timeStr = `${String(hour).padStart(2, '0')}:00`
+    openCreateModal(dateStr, timeStr)
   }
 
-  const openEditTimeModal = (entry: TimeEntry) => {
-    setEditingTimeEntry(entry)
-    setTimeForm({
-      customer_id: entry.customer_id || '',
-      business_user_id: entry.business_user_id || '',
-      work_date: entry.work_date,
-      start_time: entry.start_time || '',
-      end_time: entry.end_time || '',
-      duration_minutes: String(entry.duration_minutes || 0),
-      description: entry.description || '',
-      hourly_rate: String(entry.hourly_rate || 500),
-      is_billable: entry.is_billable ?? true
-    })
-    setTimeModalOpen(true)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Filter events for a given day
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  function getEventsForDay(date: Date) {
+    const hm = handymateEvents.filter(e => isSameDay(new Date(e.start), date))
+    const gc = googleEvents.filter(e => !e.allDay && isSameDay(new Date(e.start), date))
+    const allDay = googleEvents.filter(e => e.allDay && isSameDay(new Date(e.start), date))
+    return { hm, gc, allDay }
   }
 
-  const handleTimeSubmit = async () => {
-    if (!timeForm.work_date || !timeForm.duration_minutes) {
-      showToast('Datum och arbetade timmar krävs', 'error')
-      return
-    }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Render helpers
+  // ═══════════════════════════════════════════════════════════════════════════
 
-    setActionLoading(true)
-    try {
-      const method = editingTimeEntry ? 'PUT' : 'POST'
-      const body = editingTimeEntry
-        ? {
-            entry_id: editingTimeEntry.time_entry_id,
-            customer_id: timeForm.customer_id || null,
-            business_user_id: timeForm.business_user_id || null,
-            work_date: timeForm.work_date,
-            start_time: timeForm.start_time || null,
-            end_time: timeForm.end_time || null,
-            duration_minutes: parseFloat(timeForm.duration_minutes),
-            description: timeForm.description || null,
-            hourly_rate: parseFloat(timeForm.hourly_rate) || 500,
-            is_billable: timeForm.is_billable
-          }
-        : {
-            business_id: business.business_id,
-            customer_id: timeForm.customer_id || null,
-            business_user_id: timeForm.business_user_id || null,
-            work_date: timeForm.work_date,
-            start_time: timeForm.start_time || null,
-            end_time: timeForm.end_time || null,
-            duration_minutes: parseFloat(timeForm.duration_minutes),
-            description: timeForm.description || null,
-            hourly_rate: parseFloat(timeForm.hourly_rate) || 500,
-            is_billable: timeForm.is_billable
-          }
+  const hours = useMemo(() =>
+    Array.from({ length: HOUR_COUNT }, (_, i) => HOUR_START + i),
+    []
+  )
 
-      const response = await fetch('/api/time-entry', {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      })
+  const headerLabel = viewMode === 'week'
+    ? formatWeekRange(monday)
+    : selectedDay.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 
-      if (!response.ok) throw new Error('Något gick fel')
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Day column renderer (shared by week and day views)
+  // ═══════════════════════════════════════════════════════════════════════════
 
-      showToast(editingTimeEntry ? 'Tid uppdaterad!' : 'Tid registrerad!', 'success')
-      setTimeModalOpen(false)
-      fetchData()
-    } catch {
-      showToast('Något gick fel', 'error')
-    } finally {
-      setActionLoading(false)
-    }
-  }
+  function renderDayColumn(date: Date, widthClass: string) {
+    const { hm, gc } = getEventsForDay(date)
 
-  const handleTimeDelete = async (entryId: string) => {
-    if (!confirm('Är du säker på att du vill ta bort denna tidrapport?')) return
+    // Combine for overlap detection
+    type UnifiedEvent = { start: string; end: string; source: 'hm' | 'gc'; event: HandymateEvent | GoogleEvent }
+    const unified: UnifiedEvent[] = [
+      ...hm.map(e => ({ start: e.start, end: e.end, source: 'hm' as const, event: e })),
+      ...gc.map(e => ({ start: e.start, end: e.end, source: 'gc' as const, event: e })),
+    ]
+    const positioned = layoutOverlapping(unified)
 
-    try {
-      const response = await fetch(`/api/time-entry?entryId=${entryId}`, {
-        method: 'DELETE'
-      })
-
-      if (!response.ok) throw new Error('Något gick fel')
-
-      showToast('Tidrapport borttagen!', 'success')
-      fetchData()
-    } catch {
-      showToast('Något gick fel', 'error')
-    }
-  }
-
-  // Calculate hours from time inputs
-  const calculateHours = (start: string, end: string) => {
-    if (!start || !end) return
-    const [sh, sm] = start.split(':').map(Number)
-    const [eh, em] = end.split(':').map(Number)
-    const minutes = eh * 60 + em - sh * 60 - sm
-    if (minutes > 0) {
-      setTimeForm(prev => ({ ...prev, duration_minutes: String(minutes) }))
-    }
-  }
-
-  // === HELPERS ===
-  const today = new Date().toISOString().split('T')[0]
-  const filteredBookings = bookings.filter(booking => {
-    const bookingDate = booking.scheduled_start?.split('T')[0]
-    if (bookingFilter === 'today') return bookingDate === today
-    if (bookingFilter === 'upcoming') return bookingDate >= today
-    return true
-  })
-
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })
-  const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-  const formatWeekRange = () => {
-    const start = new Date(selectedWeek.start)
-    const end = new Date(selectedWeek.end)
-    return `${start.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })}`
-  }
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
-      case 'completed': return 'bg-teal-100 text-teal-500 border-teal-500/30'
-      case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
-      default: return 'bg-gray-100 text-gray-500 border-gray-300'
-    }
-  }
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'confirmed': return 'Bekräftad'
-      case 'completed': return 'Slutförd'
-      case 'cancelled': return 'Avbokad'
-      case 'no_show': return 'Uteblev'
-      default: return status
-    }
-  }
-
-  if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Laddar...</div>
+      <div
+        key={formatDateISO(date)}
+        className={`relative ${widthClass}`}
+        style={{ height: HOUR_COUNT * CELL_HEIGHT }}
+      >
+        {/* Hour grid lines */}
+        {hours.map((hour) => (
+          <div
+            key={hour}
+            onClick={() => handleCellClick(date, hour)}
+            className="absolute left-0 right-0 border-b border-[#F1F5F9] cursor-pointer hover:bg-[#F8FAFC] transition-colors"
+            style={{ top: (hour - HOUR_START) * CELL_HEIGHT, height: CELL_HEIGHT }}
+          />
+        ))}
+
+        {/* Current time indicator */}
+        {isToday(date) && (() => {
+          const now = new Date()
+          const currentHour = now.getHours() + now.getMinutes() / 60
+          if (currentHour >= HOUR_START && currentHour <= HOUR_END) {
+            const top = (currentHour - HOUR_START) * CELL_HEIGHT
+            return (
+              <div className="absolute left-0 right-0 z-20 pointer-events-none" style={{ top }}>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-red-500 -ml-1" />
+                  <div className="flex-1 h-[2px] bg-red-500" />
+                </div>
+              </div>
+            )
+          }
+          return null
+        })()}
+
+        {/* Events */}
+        {positioned.map((item) => {
+          const pos = getEventPosition(item.start, item.end)
+          if (!pos) return null
+
+          const widthPercent = 100 / item.colTotal
+          const leftPercent = widthPercent * item.colIndex
+          const isHandymate = item.source === 'hm'
+          const evt = item.event
+
+          if (isHandymate) {
+            const hmEvent = evt as HandymateEvent
+            return (
+              <div
+                key={`hm-${hmEvent.id}`}
+                onClick={(e) => { e.stopPropagation(); setSelectedEvent(hmEvent) }}
+                className="absolute z-10 rounded-lg px-2 py-1 cursor-pointer overflow-hidden border-l-[3px] border-[#0F766E] bg-[#CCFBF1] hover:bg-[#99F6E4] transition-colors"
+                style={{
+                  top: pos.top,
+                  height: pos.height,
+                  left: `calc(${leftPercent}% + 2px)`,
+                  width: `calc(${widthPercent}% - 4px)`,
+                }}
+              >
+                <p className="text-[11px] font-medium text-[#0F766E] truncate leading-tight">
+                  {hmEvent.customerName}
+                </p>
+                {pos.height > 30 && (
+                  <p className="text-[10px] text-[#0F766E]/70 truncate leading-tight">
+                    {hmEvent.title}
+                  </p>
+                )}
+                {pos.height > 44 && (
+                  <p className="text-[10px] text-[#0F766E]/60 truncate">
+                    {formatTime(hmEvent.start)} – {formatTime(hmEvent.end)}
+                  </p>
+                )}
+              </div>
+            )
+          } else {
+            const gcEvent = evt as GoogleEvent
+            return (
+              <div
+                key={`gc-${gcEvent.id}`}
+                className="absolute z-10 rounded-lg px-2 py-1 overflow-hidden border-l-[3px] border-[#94A3B8] bg-[#F1F5F9]"
+                style={{
+                  top: pos.top,
+                  height: pos.height,
+                  left: `calc(${leftPercent}% + 2px)`,
+                  width: `calc(${widthPercent}% - 4px)`,
+                }}
+              >
+                <p className="text-[11px] font-medium text-[#475569] truncate leading-tight">
+                  {gcEvent.title}
+                </p>
+                {pos.height > 30 && (
+                  <p className="text-[10px] text-[#94A3B8] truncate leading-tight">
+                    {formatTime(gcEvent.start)} – {formatTime(gcEvent.end)}
+                  </p>
+                )}
+              </div>
+            )
+          }
+        })}
       </div>
     )
   }
 
-  return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
-      {/* Background effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
-      </div>
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Render
+  // ═══════════════════════════════════════════════════════════════════════════
 
+  return (
+    <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
+        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border text-sm ${
+          toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
         }`}>
           {toast.message}
         </div>
       )}
 
-      {/* Booking Modal */}
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div className="max-w-[1400px] mx-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            {/* Navigation */}
+            <div className="flex items-center bg-white border border-[#E2E8F0] rounded-lg">
+              <button
+                onClick={() => navigate(-1)}
+                className="p-2 text-[#64748B] hover:text-[#1E293B] transition-colors"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={goToday}
+                className="px-3 py-1.5 text-[13px] font-medium text-[#0F766E] hover:bg-[#F0FDFA] transition-colors border-x border-[#E2E8F0]"
+              >
+                Idag
+              </button>
+              <button
+                onClick={() => navigate(1)}
+                className="p-2 text-[#64748B] hover:text-[#1E293B] transition-colors"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Date label */}
+            <h2 className="text-[15px] sm:text-[17px] font-semibold text-[#1E293B] capitalize">
+              {headerLabel}
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* View switcher */}
+            <div className="flex bg-white border border-[#E2E8F0] rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                  viewMode === 'week' ? 'bg-[#0F766E] text-white' : 'text-[#64748B] hover:text-[#1E293B]'
+                }`}
+              >
+                Vecka
+              </button>
+              <button
+                onClick={() => { setViewMode('day'); setSelectedDay(weekDates.find(d => isToday(d)) || monday) }}
+                className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                  viewMode === 'day' ? 'bg-[#0F766E] text-white' : 'text-[#64748B] hover:text-[#1E293B]'
+                }`}
+              >
+                Dag
+              </button>
+            </div>
+
+            {/* New booking button */}
+            <button
+              onClick={() => openCreateModal()}
+              className="flex items-center gap-2 px-3 py-2 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 transition-opacity"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Ny bokning</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Google Calendar banner */}
+        {!googleConnected && (
+          <div className="flex items-center gap-2 px-4 py-2.5 mb-3 bg-amber-50 border border-amber-200 rounded-lg text-[13px] text-amber-700">
+            <Info className="w-4 h-4 flex-shrink-0" />
+            <span>Koppla Google Calendar i <a href="/dashboard/settings" className="underline font-medium">Inställningar</a> för att se alla händelser.</span>
+          </div>
+        )}
+
+        {/* Loading */}
+        {loading && (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-6 h-6 text-[#0F766E] animate-spin" />
+          </div>
+        )}
+
+        {/* ── Calendar Grid ──────────────────────────────────────────── */}
+        {!loading && (
+          <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
+            {/* All-day events row */}
+            {viewMode === 'week' && (() => {
+              const allDayEvents = weekDates.flatMap(date =>
+                getEventsForDay(date).allDay.map(e => ({ ...e, date }))
+              )
+              if (allDayEvents.length === 0) return null
+              return (
+                <div className="border-b border-[#E2E8F0] px-[52px]">
+                  <div className="grid grid-cols-7 gap-px">
+                    {weekDates.map(date => {
+                      const dayAllDay = getEventsForDay(date).allDay
+                      return (
+                        <div key={formatDateISO(date)} className="px-1 py-1">
+                          {dayAllDay.map(e => (
+                            <div key={e.id} className="text-[10px] bg-[#F1F5F9] text-[#475569] px-1.5 py-0.5 rounded truncate mb-0.5">
+                              {e.title}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* Day headers (week view) */}
+            {viewMode === 'week' && (
+              <div className="border-b border-[#E2E8F0] grid grid-cols-[52px_repeat(7,1fr)]">
+                <div /> {/* Time gutter spacer */}
+                {weekDates.map((date) => {
+                  const today = isToday(date)
+                  return (
+                    <div
+                      key={formatDateISO(date)}
+                      className={`py-2.5 text-center border-l border-[#F1F5F9] cursor-pointer hover:bg-[#F8FAFC] transition-colors ${today ? 'bg-[#F0FDFA]' : ''}`}
+                      onClick={() => { setSelectedDay(date); setViewMode('day') }}
+                    >
+                      <div className="text-[11px] text-[#94A3B8] uppercase">{DAY_NAMES[weekDates.indexOf(date)]}</div>
+                      <div className={`text-[15px] font-semibold mt-0.5 ${today ? 'text-[#0F766E]' : 'text-[#1E293B]'}`}>
+                        {date.getDate()}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Scrollable grid area */}
+            <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
+              <div className={`grid ${viewMode === 'week' ? 'grid-cols-[52px_repeat(7,1fr)]' : 'grid-cols-[52px_1fr]'}`}>
+                {/* Time gutter */}
+                <div className="relative" style={{ height: HOUR_COUNT * CELL_HEIGHT }}>
+                  {hours.map((hour) => (
+                    <div
+                      key={hour}
+                      className="absolute left-0 right-0 flex items-start justify-end pr-2 text-[11px] text-[#94A3B8] border-b border-[#F1F5F9]"
+                      style={{ top: (hour - HOUR_START) * CELL_HEIGHT, height: CELL_HEIGHT }}
+                    >
+                      <span className="-mt-[7px]">{String(hour).padStart(2, '0')}:00</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Day columns */}
+                {viewMode === 'week'
+                  ? weekDates.map((date) => (
+                      <div key={formatDateISO(date)} className="border-l border-[#F1F5F9]">
+                        {renderDayColumn(date, 'w-full')}
+                      </div>
+                    ))
+                  : (
+                      <div className="border-l border-[#F1F5F9]">
+                        {renderDayColumn(selectedDay, 'w-full')}
+                      </div>
+                    )
+                }
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Day view: day selector pills (mobile) ──────────────────── */}
+        {viewMode === 'day' && (
+          <div className="flex gap-1 mt-3 overflow-x-auto pb-1">
+            {weekDates.map((date) => {
+              const active = isSameDay(date, selectedDay)
+              const today = isToday(date)
+              return (
+                <button
+                  key={formatDateISO(date)}
+                  onClick={() => setSelectedDay(date)}
+                  className={`flex flex-col items-center px-3 py-2 rounded-lg text-center min-w-[48px] transition-colors ${
+                    active
+                      ? 'bg-[#0F766E] text-white'
+                      : today
+                        ? 'bg-[#F0FDFA] text-[#0F766E] border border-[#0F766E]/20'
+                        : 'bg-white border border-[#E2E8F0] text-[#64748B]'
+                  }`}
+                >
+                  <span className="text-[10px] uppercase">{DAY_NAMES[weekDates.indexOf(date)]}</span>
+                  <span className="text-[14px] font-semibold">{date.getDate()}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Event detail panel ────────────────────────────────────── */}
+      {selectedEvent && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={() => setSelectedEvent(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-sm sm:mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-[16px] font-semibold text-[#1E293B]">{selectedEvent.customerName}</h3>
+                <p className="text-[13px] text-[#64748B]">{selectedEvent.title}</p>
+              </div>
+              <button onClick={() => setSelectedEvent(null)} className="p-1 text-[#94A3B8] hover:text-[#1E293B]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-2 mb-5">
+              <div className="flex items-center gap-2 text-[13px] text-[#64748B]">
+                <Clock className="w-4 h-4" />
+                <span>
+                  {new Date(selectedEvent.start).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-[13px] text-[#64748B]">
+                <Clock className="w-4 h-4" />
+                <span>{formatTime(selectedEvent.start)} – {formatTime(selectedEvent.end)}</span>
+              </div>
+              {selectedEvent.customerPhone && (
+                <div className="flex items-center gap-2 text-[13px] text-[#64748B]">
+                  <User className="w-4 h-4" />
+                  <a href={`tel:${selectedEvent.customerPhone}`} className="text-[#0F766E] underline">{selectedEvent.customerPhone}</a>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <span className={`inline-flex px-2.5 py-1 text-[11px] rounded-full font-medium ${
+                  selectedEvent.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' :
+                  selectedEvent.status === 'completed' ? 'bg-teal-50 text-teal-700' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  {selectedEvent.status === 'confirmed' ? 'Bekräftad' :
+                   selectedEvent.status === 'completed' ? 'Slutförd' :
+                   selectedEvent.status}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => openEditModal(selectedEvent)}
+                className="flex-1 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90"
+              >
+                Redigera
+              </button>
+              <button
+                onClick={() => handleBookingDelete(selectedEvent.id)}
+                className="px-4 py-2.5 border border-red-200 text-red-600 rounded-lg text-[13px] hover:bg-red-50 transition-colors"
+              >
+                Ta bort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Booking Modal ────────────────────────────────────────── */}
       {bookingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</h3>
-              <button onClick={() => setBookingModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={() => setBookingModalOpen(false)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md sm:mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="text-[16px] font-semibold text-[#1E293B]">
+                {editingBooking ? 'Redigera bokning' : 'Ny bokning'}
+              </h3>
+              <button onClick={() => setBookingModalOpen(false)} className="p-1 text-[#94A3B8] hover:text-[#1E293B]">
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Kund *</label>
+                <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
                 <select
                   value={bookingForm.customer_id}
                   onChange={(e) => setBookingForm({ ...bookingForm, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -476,41 +828,41 @@ export default function CalendarPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Datum *</label>
+                <label className="block text-[12px] text-[#64748B] mb-1">Datum *</label>
                 <input
                   type="date"
                   value={bookingForm.date}
                   onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Starttid *</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Starttid *</label>
                   <input
                     type="time"
                     value={bookingForm.start_time}
                     onChange={(e) => setBookingForm({ ...bookingForm, start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Sluttid *</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Sluttid *</label>
                   <input
                     type="time"
                     value={bookingForm.end_time}
                     onChange={(e) => setBookingForm({ ...bookingForm, end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
               {editingBooking && (
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Status</label>
+                  <label className="block text-[12px] text-[#64748B] mb-1">Status</label>
                   <select
                     value={bookingForm.status}
                     onChange={(e) => setBookingForm({ ...bookingForm, status: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="confirmed">Bekräftad</option>
                     <option value="completed">Slutförd</option>
@@ -520,556 +872,33 @@ export default function CalendarPage() {
                 </div>
               )}
               <div>
-                <label className="block text-sm text-gray-500 mb-1">Anteckningar</label>
+                <label className="block text-[12px] text-[#64748B] mb-1">Anteckningar</label>
                 <textarea
                   value={bookingForm.notes}
                   onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
                   placeholder="T.ex. Elinstallation - 3 nya uttag"
                   rows={3}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-3 py-[9px] text-[13px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setBookingModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">Avbryt</button>
+            <div className="flex justify-end gap-2 mt-5">
+              <button onClick={() => setBookingModalOpen(false)} className="px-4 py-2.5 text-[#64748B] text-[13px] hover:text-[#1E293B]">
+                Avbryt
+              </button>
               <button
                 onClick={handleBookingSubmit}
                 disabled={actionLoading || customers.length === 0}
-                className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#0F766E] rounded-lg text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {actionLoading && <Loader2 className="w-4 h-4 animate-spin" />}
                 {editingBooking ? 'Spara' : 'Skapa'}
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Time Entry Modal */}
-      {timeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">{editingTimeEntry ? 'Redigera tid' : 'Registrera tid'}</h3>
-              <button onClick={() => setTimeModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Kund (valfritt)</label>
-                <select
-                  value={timeForm.customer_id}
-                  onChange={(e) => setTimeForm({ ...timeForm, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                >
-                  <option value="">Ingen kund vald</option>
-                  {customers.map(c => (
-                    <option key={c.customer_id} value={c.customer_id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              {teamMembers.length > 1 && (
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Medarbetare</label>
-                  <select
-                    value={timeForm.business_user_id}
-                    onChange={(e) => setTimeForm({ ...timeForm, business_user_id: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  >
-                    <option value="">Ingen vald</option>
-                    {teamMembers.map(m => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Datum *</label>
-                <input
-                  type="date"
-                  value={timeForm.work_date}
-                  onChange={(e) => setTimeForm({ ...timeForm, work_date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Starttid</label>
-                  <input
-                    type="time"
-                    value={timeForm.start_time}
-                    onChange={(e) => {
-                      setTimeForm({ ...timeForm, start_time: e.target.value })
-                      calculateHours(e.target.value, timeForm.end_time)
-                    }}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Sluttid</label>
-                  <input
-                    type="time"
-                    value={timeForm.end_time}
-                    onChange={(e) => {
-                      setTimeForm({ ...timeForm, end_time: e.target.value })
-                      calculateHours(timeForm.start_time, e.target.value)
-                    }}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Timmar *</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={timeForm.duration_minutes ? String(Math.round((parseFloat(timeForm.duration_minutes) / 60) * 10) / 10) : ''}
-                    onChange={(e) => setTimeForm({ ...timeForm, duration_minutes: String(Math.round(parseFloat(e.target.value || '0') * 60)) })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Timpris (kr)</label>
-                  <input
-                    type="number"
-                    value={timeForm.hourly_rate}
-                    onChange={(e) => setTimeForm({ ...timeForm, hourly_rate: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={timeForm.is_billable}
-                    onChange={(e) => setTimeForm({ ...timeForm, is_billable: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500/50"
-                  />
-                  Fakturerbar tid
-                </label>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-500 mb-1">Beskrivning</label>
-                <textarea
-                  value={timeForm.description}
-                  onChange={(e) => setTimeForm({ ...timeForm, description: e.target.value })}
-                  placeholder="Vad gjordes?"
-                  rows={2}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button onClick={() => setTimeModalOpen(false)} className="px-4 py-2 text-gray-500 hover:text-gray-900">Avbryt</button>
-              <button
-                onClick={handleTimeSubmit}
-                disabled={actionLoading}
-                className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {editingTimeEntry ? 'Spara' : 'Registrera'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="relative">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">Kalender</h1>
-            <p className="text-sm text-gray-500">Hantera bokningar och tidrapportering</p>
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex flex-col gap-4 mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1">
-              <button
-                onClick={() => setActiveTab('bookings')}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
-                  activeTab === 'bookings'
-                    ? 'bg-teal-600 text-white'
-                    : 'text-gray-500 hover:text-white'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                Bokningar
-              </button>
-              <button
-                onClick={() => setActiveTab('time')}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
-                  activeTab === 'time'
-                    ? 'bg-teal-600 text-white'
-                    : 'text-gray-500 hover:text-white'
-                }`}
-              >
-                <Timer className="w-4 h-4" />
-                Tidrapport
-              </button>
-            </div>
-
-            {/* Tab-specific controls */}
-            {activeTab === 'bookings' && (
-              <button onClick={openCreateBookingModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
-                <Plus className="w-4 h-4 mr-2" />
-                Ny bokning
-              </button>
-            )}
-
-            {activeTab === 'time' && (
-              <button onClick={openCreateTimeModal} className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]">
-                <Plus className="w-4 h-4 mr-2" />
-                Registrera tid
-              </button>
-            )}
-          </div>
-
-          {/* Filter controls on their own row on mobile */}
-          {activeTab === 'bookings' && (
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
-              {(['all', 'today', 'upcoming'] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setBookingFilter(f)}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap min-h-[40px] ${
-                    bookingFilter === f ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  {f === 'all' ? 'Alla' : f === 'today' ? 'Idag' : 'Kommande'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {activeTab === 'time' && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="flex items-center justify-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
-                <button onClick={() => changeWeek(-1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-                <span className="px-3 text-sm text-gray-900 min-w-[160px] sm:min-w-[180px] text-center">{formatWeekRange()}</span>
-                <button onClick={() => changeWeek(1)} className="p-3 text-gray-500 hover:text-gray-900 min-w-[44px] min-h-[44px] flex items-center justify-center">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
-              </div>
-              {teamMembers.length > 1 && isOwnerOrAdmin && (
-                <select
-                  value={filterUserId}
-                  onChange={(e) => setFilterUserId(e.target.value)}
-                  className="px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                >
-                  <option value="all">Alla medarbetare</option>
-                  {teamMembers.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Time Stats */}
-        {activeTab === 'time' && (
-          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Timer className="w-4 h-4 sm:w-5 sm:h-5 text-sky-700" />
-                </div>
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold text-gray-900">{timeTotals.hours.toFixed(1)}h</p>
-                  <p className="text-xs sm:text-sm text-gray-400">Timmar</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <DollarSign className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold text-gray-900">{(timeTotals.revenue / 1000).toFixed(0)}k</p>
-                  <p className="text-xs sm:text-sm text-gray-400">kr</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-teal-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-teal-500" />
-                </div>
-                <div>
-                  <p className="text-lg sm:text-2xl font-bold text-gray-900">{timeTotals.count}</p>
-                  <p className="text-xs sm:text-sm text-gray-400">Poster</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
-          {activeTab === 'bookings' && (
-            <>
-              {filteredBookings.length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-400">{bookingFilter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
-                  {customers.length > 0 ? (
-                    <button onClick={openCreateBookingModal} className="mt-4 text-sky-700 hover:text-teal-600">
-                      Skapa din första bokning →
-                    </button>
-                  ) : (
-                    <a href="/dashboard/customers" className="mt-4 text-sky-700 hover:text-teal-600 block">
-                      Skapa en kund först →
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <>
-                  {/* Mobile Card View */}
-                  <div className="sm:hidden divide-y divide-gray-200">
-                    {filteredBookings.map((booking) => (
-                      <div key={booking.booking_id} className="p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3 min-w-0 flex-1">
-                            <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300 flex-shrink-0">
-                              <User className="w-5 h-5 text-sky-700" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="font-medium text-gray-900 truncate">{booking.customer?.name || 'Okänd'}</p>
-                              <p className="text-sm text-gray-400">{booking.notes ? booking.notes.split(' - ')[0] : 'Tjänst ej angiven'}</p>
-                              <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                                <Clock className="w-3.5 h-3.5" />
-                                <span>{formatDate(booking.scheduled_start)}</span>
-                                <span className="text-gray-400">•</span>
-                                <span>{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <span className={`inline-flex px-2 py-1 text-xs rounded-full border flex-shrink-0 ${getStatusStyle(booking.status)}`}>
-                            {getStatusText(booking.status)}
-                          </span>
-                        </div>
-                        <div className="flex gap-2 mt-3 ml-13">
-                          <button onClick={() => openEditBookingModal(booking)} className="flex-1 flex items-center justify-center gap-2 p-2.5 text-gray-500 hover:text-gray-900 bg-gray-50 rounded-lg min-h-[44px]">
-                            <Edit className="w-4 h-4" />
-                            Redigera
-                          </button>
-                          <button onClick={() => handleBookingDelete(booking.booking_id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Desktop Table View */}
-                  <table className="w-full hidden sm:table">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Kund</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Tjänst</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Datum & Tid</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredBookings.map((booking) => (
-                        <tr key={booking.booking_id} className="hover:bg-gray-100/30 transition-all">
-                          <td className="px-6 py-4">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300">
-                                <User className="w-5 h-5 text-sky-700" />
-                              </div>
-                              <div className="ml-4">
-                                <p className="font-medium text-gray-900">{booking.customer?.name || 'Okänd'}</p>
-                                <p className="text-sm text-gray-400">{booking.customer?.phone_number || '-'}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-gray-900">{booking.notes ? booking.notes.split(' - ')[0] : 'Tjänst ej angiven'}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center">
-                              <Clock className="w-4 h-4 text-gray-400 mr-2" />
-                              <div>
-                                <p className="text-gray-900">{formatDate(booking.scheduled_start)}</p>
-                                <p className="text-sm text-gray-400">{formatTime(booking.scheduled_start)} - {formatTime(booking.scheduled_end)}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={`inline-flex px-3 py-1 text-xs rounded-full border ${getStatusStyle(booking.status)}`}>
-                              {getStatusText(booking.status)}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex space-x-2">
-                              <button onClick={() => openEditBookingModal(booking)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button onClick={() => handleBookingDelete(booking.booking_id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
-              )}
-            </>
-          )}
-
-          {activeTab === 'time' && (
-            <>
-              {timeEntries.length === 0 ? (
-                <div className="text-center py-12">
-                  <Timer className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-400">Ingen tid registrerad denna vecka</p>
-                  <button onClick={openCreateTimeModal} className="mt-4 text-sky-700 hover:text-teal-600">
-                    Registrera din första tid →
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Mobile Card View */}
-                  <div className="sm:hidden divide-y divide-gray-200">
-                    {timeEntries.map((entry) => {
-                      const hours = (entry.duration_minutes || 0) / 60
-                      const total = Math.round(hours * (entry.hourly_rate || 0))
-                      return (
-                        <div key={entry.time_entry_id} className="p-4">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="font-medium text-gray-900">
-                                  {new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                </p>
-                                <span className="text-sm text-gray-400">
-                                  {hours.toFixed(1)}h @ {entry.hourly_rate} kr
-                                </span>
-                              </div>
-                              {entry.customer && (
-                                <p className="text-sm text-gray-500 mt-1">{entry.customer.name}</p>
-                              )}
-                              {entry.business_user && (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.business_user.color }} />
-                                  {entry.business_user.name}
-                                </span>
-                              )}
-                              {entry.description && (
-                                <p className="text-sm text-gray-400 mt-1 line-clamp-2">{entry.description}</p>
-                              )}
-                            </div>
-                            <div className="text-right flex-shrink-0">
-                              <p className="font-bold text-gray-900">{total.toLocaleString('sv-SE')} kr</p>
-                              {!entry.is_billable && (
-                                <p className="text-xs text-gray-400">Ej fakturerbar</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2 mt-3">
-                            <button onClick={() => openEditTimeModal(entry)} className="flex-1 flex items-center justify-center gap-2 p-2.5 text-gray-500 hover:text-gray-900 bg-gray-50 rounded-lg min-h-[44px]">
-                              <Edit className="w-4 h-4" />
-                              Redigera
-                            </button>
-                            <button onClick={() => handleTimeDelete(entry.time_entry_id)} className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {/* Desktop Table View */}
-                  <table className="w-full hidden sm:table">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Datum</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Kund</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Beskrivning</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Tid</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Summa</th>
-                        <th className="px-6 py-4 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {timeEntries.map((entry) => {
-                        const hours = (entry.duration_minutes || 0) / 60
-                        const total = Math.round(hours * (entry.hourly_rate || 0))
-                        return (
-                          <tr key={entry.time_entry_id} className="hover:bg-gray-100/30 transition-all">
-                            <td className="px-6 py-4">
-                              <p className="text-gray-900">{new Date(entry.work_date).toLocaleDateString('sv-SE', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
-                              {entry.start_time && entry.end_time && (
-                                <p className="text-sm text-gray-400">{entry.start_time} - {entry.end_time}</p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              {entry.customer ? (
-                                <div>
-                                  <p className="text-gray-900">{entry.customer.name}</p>
-                                  <p className="text-sm text-gray-400">{entry.customer.phone_number}</p>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                              {entry.business_user && (
-                                <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: entry.business_user.color }} />
-                                  {entry.business_user.name}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-gray-900">{entry.description || '-'}</p>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <Timer className="w-4 h-4 text-gray-400" />
-                                <span className="text-gray-900">{hours.toFixed(1)}h</span>
-                                <span className="text-gray-400 text-sm">@ {entry.hourly_rate} kr</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <p className="text-gray-900 font-medium">{total.toLocaleString('sv-SE')} kr</p>
-                              {!entry.is_billable && (
-                                <p className="text-xs text-gray-400">Ej fakturerbar</p>
-                              )}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex space-x-2">
-                                <button onClick={() => openEditTimeModal(entry)} className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
-                                  <Edit className="w-4 h-4" />
-                                </button>
-                                <button onClick={() => handleTimeDelete(entry.time_entry_id)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

@@ -378,4 +378,52 @@ export const toolDefinitions = [
       required: ["rule_name", "action_type", "status"],
     },
   },
+  // V7 Fortnox integration tools
+  {
+    name: "check_fortnox_status",
+    description: "Kontrollera Fortnox-koppling och synkroniseringsstatus. Visar om Fortnox är anslutet och antal synkade/felaktiga entiteter.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "trigger_fortnox_sync",
+    description: "Synka en specifik entitet (kund, faktura eller offert) till Fortnox. Kräver att Fortnox är anslutet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        entity_type: {
+          type: "string",
+          enum: ["customer", "invoice", "quote"],
+          description: "Typ av entitet att synka",
+        },
+        entity_id: {
+          type: "string",
+          description: "ID för entiteten (customer_id, invoice_id eller quote_id)",
+        },
+      },
+      required: ["entity_type", "entity_id"],
+    },
+  },
+  // V7 T2 Pricing intelligence
+  {
+    name: "get_pricing_suggestion",
+    description: "Hämta prisförslag baserat på historisk data för en jobbtyp. Returnerar rekommenderat prisintervall, genomsnittspris, vinstfrekvens och pristrend.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        job_type: {
+          type: "string",
+          description: "Jobbtyp att hämta prisdata för, t.ex. 'badrumsrenovering', 'målning', 'elinstallation'",
+        },
+        details: {
+          type: "string",
+          description: "Valfri beskrivning av jobbet för mer specifikt prisförslag",
+        },
+      },
+      required: ["job_type"],
+    },
+  },
 ] as const

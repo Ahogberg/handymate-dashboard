@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 
 /**
  * GET /api/dashboard/profitability - Topp 5 aktiva projekt med lönsamhet
+ * Optimized: batch all data in parallel instead of N+1 queries per project
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,91 +29,90 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ projects: [] })
     }
 
-    const results = await Promise.all(
-      projects.map(async (project: any) => {
-        // Get quote total
-        let quoteAmount = 0
-        if (project.quote_id) {
-          const { data: quote } = await supabase
-            .from('quotes')
-            .select('total')
-            .eq('quote_id', project.quote_id)
-            .single()
-          quoteAmount = quote?.total || 0
-        }
+    const projectIds = projects.map((p: any) => p.project_id)
+    const quoteIds = projects
+      .map((p: any) => p.quote_id)
+      .filter((id: string | null): id is string => !!id)
 
-        // Get ATA
-        const { data: changes } = await supabase
-          .from('project_change')
-          .select('change_type, amount')
-          .eq('project_id', project.project_id)
-          .eq('status', 'approved')
+    // Batch all queries in parallel — 5 queries instead of 61
+    const [quotesResult, changesResult, materialsResult, timeResult, costsResult] = await Promise.all([
+      // All quotes for these projects
+      quoteIds.length > 0
+        ? supabase.from('quotes').select('quote_id, total').in('quote_id', quoteIds)
+        : Promise.resolve({ data: [] }),
+      // All approved changes
+      supabase.from('project_change').select('project_id, change_type, amount')
+        .in('project_id', projectIds).eq('status', 'approved'),
+      // All materials (both sell and purchase)
+      supabase.from('project_material').select('project_id, total_sell, total_purchase')
+        .in('project_id', projectIds),
+      // All time entries
+      supabase.from('time_entry').select('project_id, duration_minutes, hourly_rate')
+        .in('project_id', projectIds),
+      // All extra costs
+      supabase.from('project_cost').select('project_id, amount')
+        .in('project_id', projectIds),
+    ])
 
-        const ataAdditions = (changes || [])
-          .filter((c: any) => c.change_type === 'addition' || c.change_type === 'change')
-          .reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
-        const ataRemovals = (changes || [])
-          .filter((c: any) => c.change_type === 'removal')
-          .reduce((sum: number, c: any) => sum + Math.abs(c.amount || 0), 0)
+    // Build lookup maps
+    const quoteMap = new Map<string, number>()
+    for (const q of (quotesResult.data || []) as any[]) {
+      quoteMap.set(q.quote_id, q.total || 0)
+    }
 
-        // Get material sell total
-        const { data: mats } = await supabase
-          .from('project_material')
-          .select('total_sell')
-          .eq('project_id', project.project_id)
+    const results = projects.map((project: any) => {
+      const pid = project.project_id
 
-        const materialSell = (mats || []).reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
+      // Quote amount
+      const quoteAmount = project.quote_id ? (quoteMap.get(project.quote_id) || 0) : 0
 
-        // Get time costs
-        const { data: timeEntries } = await supabase
-          .from('time_entry')
-          .select('duration_minutes, hourly_rate')
-          .eq('project_id', project.project_id)
+      // ATA changes
+      const changes = ((changesResult.data || []) as any[]).filter((c) => c.project_id === pid)
+      const ataAdditions = changes
+        .filter((c) => c.change_type === 'addition' || c.change_type === 'change')
+        .reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+      const ataRemovals = changes
+        .filter((c) => c.change_type === 'removal')
+        .reduce((sum: number, c: any) => sum + Math.abs(c.amount || 0), 0)
 
-        const timeCost = (timeEntries || []).reduce((sum: number, e: any) => {
-          return sum + ((e.duration_minutes || 0) / 60) * (e.hourly_rate || 0)
-        }, 0)
-        const hoursWorked = (timeEntries || []).reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0) / 60
+      // Materials
+      const mats = ((materialsResult.data || []) as any[]).filter((m) => m.project_id === pid)
+      const materialSell = mats.reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
+      const materialPurchase = mats.reduce((s: number, m: any) => s + (m.total_purchase || 0), 0)
 
-        // Get material purchase costs
-        const { data: matPurchase } = await supabase
-          .from('project_material')
-          .select('total_purchase')
-          .eq('project_id', project.project_id)
+      // Time
+      const timeEntries = ((timeResult.data || []) as any[]).filter((t) => t.project_id === pid)
+      const timeCost = timeEntries.reduce((sum: number, e: any) =>
+        sum + ((e.duration_minutes || 0) / 60) * (e.hourly_rate || 0), 0)
+      const hoursWorked = timeEntries.reduce((sum: number, e: any) =>
+        sum + (e.duration_minutes || 0), 0) / 60
 
-        const materialPurchase = (matPurchase || []).reduce((s: number, m: any) => s + (m.total_purchase || 0), 0)
+      // Extra costs
+      const extras = ((costsResult.data || []) as any[]).filter((c) => c.project_id === pid)
+      const extraTotal = extras.reduce((s: number, c: any) => s + (c.amount || 0), 0)
 
-        // Get extra costs
-        const { data: extraCosts } = await supabase
-          .from('project_cost')
-          .select('amount')
-          .eq('project_id', project.project_id)
+      const totalRevenue = quoteAmount + ataAdditions - ataRemovals + materialSell
+      const totalCosts = timeCost + materialPurchase + extraTotal
+      const marginAmount = totalRevenue - totalCosts
+      const marginPercent = totalRevenue > 0 ? (marginAmount / totalRevenue) * 100 : 0
 
-        const extraTotal = (extraCosts || []).reduce((s: number, c: any) => s + (c.amount || 0), 0)
-
-        const totalRevenue = quoteAmount + ataAdditions - ataRemovals + materialSell
-        const totalCosts = timeCost + materialPurchase + extraTotal
-        const marginAmount = totalRevenue - totalCosts
-        const marginPercent = totalRevenue > 0 ? (marginAmount / totalRevenue) * 100 : 0
-
-        return {
-          project_id: project.project_id,
-          name: project.name,
-          status: project.status,
-          revenue: Math.round(totalRevenue),
-          costs: Math.round(totalCosts),
-          margin_amount: Math.round(marginAmount),
-          margin_percent: Math.round(marginPercent * 10) / 10,
-          hours_worked: Math.round(hoursWorked * 100) / 100,
-          budget_hours: project.budget_hours || 0,
-        }
-      })
-    )
+      return {
+        project_id: pid,
+        name: project.name,
+        status: project.status,
+        revenue: Math.round(totalRevenue),
+        costs: Math.round(totalCosts),
+        margin_amount: Math.round(marginAmount),
+        margin_percent: Math.round(marginPercent * 10) / 10,
+        hours_worked: Math.round(hoursWorked * 100) / 100,
+        budget_hours: project.budget_hours || 0,
+      }
+    })
 
     // Sort by revenue descending and take top 5
     const sorted = results
-      .filter(p => p.revenue > 0 || p.costs > 0)
-      .sort((a, b) => b.revenue - a.revenue)
+      .filter((p: { revenue: number; costs: number }) => p.revenue > 0 || p.costs > 0)
+      .sort((a: { revenue: number }, b: { revenue: number }) => b.revenue - a.revenue)
       .slice(0, 5)
 
     return NextResponse.json({ projects: sorted })

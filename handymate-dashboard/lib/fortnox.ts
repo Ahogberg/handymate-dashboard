@@ -370,14 +370,14 @@ export async function isFortnoxConnected(businessId: string): Promise<boolean> {
 export async function syncCustomerToFortnox(
   businessId: string,
   customerId: string
-): Promise<{ success: boolean; customerNumber?: string; error?: string }> {
+): Promise<{ success: boolean; skipped?: boolean; customerNumber?: string; error?: string }> {
   const supabase = getSupabase()
 
   try {
     // Check if Fortnox is connected
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
-      return { success: false, error: 'Fortnox not connected' }
+      return { success: false, skipped: true, error: 'fortnox_not_connected' }
     }
 
     // Get customer data
@@ -523,13 +523,13 @@ export async function getFortnoxInvoice(
 export async function syncInvoiceToFortnox(
   businessId: string,
   invoiceId: string
-): Promise<{ success: boolean; fortnoxInvoiceNumber?: string; fortnoxDocumentNumber?: string; error?: string }> {
+): Promise<{ success: boolean; skipped?: boolean; fortnoxInvoiceNumber?: string; fortnoxDocumentNumber?: string; error?: string }> {
   const supabase = getSupabase()
 
   try {
     const connected = await isFortnoxConnected(businessId)
     if (!connected) {
-      return { success: false, error: 'Fortnox not connected' }
+      return { success: false, skipped: true, error: 'fortnox_not_connected' }
     }
 
     // Get invoice with customer
@@ -619,5 +619,238 @@ export async function syncInvoiceToFortnox(
       .eq('invoice_id', invoiceId)
 
     return { success: false, error: errorMessage }
+  }
+}
+
+// ============================================
+// INVOICE ACTIONS (book, mark paid)
+// ============================================
+
+/**
+ * Book (bokför) a Fortnox invoice. Makes it final/immutable.
+ */
+export async function bookFortnoxInvoice(
+  businessId: string,
+  documentNumber: string
+): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+  const connected = await isFortnoxConnected(businessId)
+  if (!connected) {
+    return { success: false, skipped: true, error: 'fortnox_not_connected' }
+  }
+
+  try {
+    await fortnoxRequest(businessId, 'PUT', `/invoices/${documentNumber}/bookkeep`)
+    return { success: true }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Book invoice failed'
+    return { success: false, error: msg }
+  }
+}
+
+/**
+ * Register a payment on a Fortnox invoice.
+ */
+export async function registerFortnoxPayment(
+  businessId: string,
+  invoiceNumber: string,
+  amount: number,
+  paymentDate?: string
+): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
+  const connected = await isFortnoxConnected(businessId)
+  if (!connected) {
+    return { success: false, skipped: true, error: 'fortnox_not_connected' }
+  }
+
+  try {
+    const date = paymentDate || new Date().toISOString().split('T')[0]
+    await fortnoxRequest(businessId, 'POST', '/invoicepayments', {
+      InvoicePayment: {
+        InvoiceNumber: invoiceNumber,
+        Amount: amount,
+        AmountCurrency: amount,
+        PaymentDate: date,
+      },
+    })
+    return { success: true }
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Register payment failed'
+    return { success: false, error: msg }
+  }
+}
+
+// ============================================
+// OFFER / QUOTE SYNC
+// ============================================
+
+export interface FortnoxOffer {
+  DocumentNumber?: string
+  OfferNumber?: string
+  CustomerNumber: string
+  OfferDate: string
+  ExpireDate: string
+  YourReference?: string
+  OurReference?: string
+  OfferRows: FortnoxInvoiceRow[]
+}
+
+export interface FortnoxOfferResponse {
+  Offer: FortnoxOffer
+}
+
+/**
+ * Create an offer in Fortnox
+ */
+export async function createFortnoxOffer(
+  businessId: string,
+  offer: Omit<FortnoxOffer, 'DocumentNumber' | 'OfferNumber'>
+): Promise<FortnoxOffer> {
+  const response = await fortnoxRequest<FortnoxOfferResponse>(
+    businessId,
+    'POST',
+    '/offers',
+    { Offer: offer }
+  )
+  return response.Offer
+}
+
+/**
+ * Sync a Handymate quote to Fortnox as an offer.
+ */
+export async function syncQuoteToFortnox(
+  businessId: string,
+  quoteId: string
+): Promise<{ success: boolean; skipped?: boolean; fortnoxOfferNumber?: string; error?: string }> {
+  const supabase = getSupabase()
+
+  try {
+    const connected = await isFortnoxConnected(businessId)
+    if (!connected) {
+      return { success: false, skipped: true, error: 'fortnox_not_connected' }
+    }
+
+    // Get quote with customer
+    const { data: quote, error: fetchError } = await supabase
+      .from('quotes')
+      .select('*, customer(customer_id, name, email, phone_number, address_line, fortnox_customer_number)')
+      .eq('quote_id', quoteId)
+      .eq('business_id', businessId)
+      .single()
+
+    if (fetchError || !quote) {
+      return { success: false, error: 'Quote not found' }
+    }
+
+    // Already synced?
+    if (quote.fortnox_offer_number) {
+      return { success: true, fortnoxOfferNumber: quote.fortnox_offer_number }
+    }
+
+    // Ensure customer exists in Fortnox
+    let customerNumber = quote.customer?.fortnox_customer_number
+    if (!customerNumber && quote.customer) {
+      const syncResult = await syncCustomerToFortnox(businessId, quote.customer.customer_id)
+      if (!syncResult.success) {
+        return { success: false, error: `Could not sync customer: ${syncResult.error}` }
+      }
+      customerNumber = syncResult.customerNumber
+    }
+
+    if (!customerNumber) {
+      return { success: false, error: 'No customer linked to quote' }
+    }
+
+    // Build offer rows
+    const items = quote.items || []
+    const offerRows: FortnoxInvoiceRow[] = items.map((item: { description?: string; name?: string; quantity: number; unit?: string; unit_price: number }) => ({
+      Description: item.description || item.name || '',
+      DeliveredQuantity: item.quantity,
+      Price: item.unit_price,
+      Unit: item.unit === 'timmar' ? 'h' : item.unit === 'st' ? 'st' : undefined,
+    }))
+
+    // Calculate expire date
+    const validDays = quote.valid_days || 30
+    const expireDate = new Date()
+    expireDate.setDate(expireDate.getDate() + validDays)
+
+    const fortnoxOffer = await createFortnoxOffer(businessId, {
+      CustomerNumber: customerNumber,
+      OfferDate: quote.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+      ExpireDate: expireDate.toISOString().split('T')[0],
+      OfferRows: offerRows,
+    })
+
+    // Update quote in DB
+    await supabase
+      .from('quotes')
+      .update({
+        fortnox_offer_number: fortnoxOffer.OfferNumber || fortnoxOffer.DocumentNumber,
+        fortnox_synced_at: new Date().toISOString(),
+      })
+      .eq('quote_id', quoteId)
+
+    return { success: true, fortnoxOfferNumber: fortnoxOffer.OfferNumber || fortnoxOffer.DocumentNumber }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Quote sync failed'
+    return { success: false, error: errorMessage }
+  }
+}
+
+// ============================================
+// FORTNOX STATUS (for agent tools)
+// ============================================
+
+export interface FortnoxStatus {
+  connected: boolean
+  companyName: string | null
+  connectedAt: string | null
+  syncStats?: {
+    customers: { synced: number; errors: number }
+    invoices: { synced: number; errors: number }
+    quotes: { synced: number; errors: number }
+  }
+}
+
+/**
+ * Get Fortnox connection status and sync stats for a business.
+ */
+export async function getFortnoxStatus(businessId: string): Promise<FortnoxStatus> {
+  const config = await getFortnoxConfig(businessId)
+
+  if (!config?.fortnox_access_token || !config?.fortnox_connected_at) {
+    return { connected: false, companyName: null, connectedAt: null }
+  }
+
+  const supabase = getSupabase()
+
+  // Get sync stats from fortnox_sync table
+  const { data: syncRows } = await supabase
+    .from('fortnox_sync')
+    .select('entity_type, sync_status')
+    .eq('business_id', businessId)
+
+  const stats = {
+    customers: { synced: 0, errors: 0 },
+    invoices: { synced: 0, errors: 0 },
+    quotes: { synced: 0, errors: 0 },
+  }
+
+  if (syncRows) {
+    for (const row of syncRows) {
+      const key = row.entity_type === 'customer' ? 'customers'
+        : row.entity_type === 'invoice' ? 'invoices'
+        : row.entity_type === 'quote' ? 'quotes'
+        : null
+      if (!key) continue
+      if (row.sync_status === 'synced') stats[key].synced++
+      else if (row.sync_status === 'error') stats[key].errors++
+    }
+  }
+
+  return {
+    connected: true,
+    companyName: config.fortnox_company_name,
+    connectedAt: config.fortnox_connected_at,
+    syncStats: stats,
   }
 }

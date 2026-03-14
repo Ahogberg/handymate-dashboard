@@ -133,6 +133,18 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
         amount_total: session.amount_total
       }
     })
+
+  // Referral-konvertering — belöna referrer vid första betalning
+  try {
+    const { handleFirstPaymentReferral } = await import('@/lib/referral/discounts')
+    const amountSek = Math.round((session.amount_total || 0) / 100)
+    const referralResult = await handleFirstPaymentReferral(businessId, amountSek)
+    if (referralResult.rewarded) {
+      console.log(`[Billing] Referral rewarded for ${businessId}, referrer: ${referralResult.referrerBusinessId}`)
+    }
+  } catch (err) {
+    console.error('[Billing] Referral conversion failed:', err)
+  }
 }
 
 /**

@@ -26,12 +26,39 @@ const TRIGGER_TYPES = [
   { value: 'manual', label: 'Manuell', description: 'Körs manuellt från dashboard', icon: '👆' },
 ]
 
-const EVENT_OPTIONS = [
-  { value: 'lead_created', label: 'Ny lead' },
-  { value: 'sms_received', label: 'Inkommande SMS' },
-  { value: 'call_missed', label: 'Missat samtal' },
-  { value: 'invoice_created', label: 'Faktura skapad' },
-  { value: 'payment_received', label: 'Betalning mottagen' },
+const EVENT_GROUPS = [
+  {
+    label: 'Leads & kommunikation',
+    options: [
+      { value: 'lead_created', label: 'Ny lead' },
+      { value: 'sms_received', label: 'Inkommande SMS' },
+      { value: 'call_missed', label: 'Missat samtal' },
+      { value: 'pipeline_stage_changed', label: 'Lead bytte steg i pipeline' },
+      { value: 'customer_reactivation', label: 'Kund inaktiv 6+ månader' },
+    ],
+  },
+  {
+    label: 'Offerter',
+    options: [
+      { value: 'quote_sent', label: 'Offert skickad' },
+      { value: 'quote_opened', label: 'Offert öppnad av kund' },
+      { value: 'quote_signed', label: 'Offert signerad' },
+    ],
+  },
+  {
+    label: 'Jobb & bokningar',
+    options: [
+      { value: 'booking_created', label: 'Bokning skapad' },
+      { value: 'job_completed', label: 'Jobb avslutat' },
+    ],
+  },
+  {
+    label: 'Ekonomi',
+    options: [
+      { value: 'invoice_created', label: 'Faktura skapad' },
+      { value: 'payment_received', label: 'Betalning mottagen' },
+    ],
+  },
 ]
 
 const THRESHOLD_ENTITIES = [
@@ -179,8 +206,12 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="">Välj händelse...</option>
-                    {EVENT_OPTIONS.map(e => (
-                      <option key={e.value} value={e.value}>{e.label}</option>
+                    {EVENT_GROUPS.map(group => (
+                      <optgroup key={group.label} label={group.label}>
+                        {group.options.map(e => (
+                          <option key={e.value} value={e.value}>{e.label}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>

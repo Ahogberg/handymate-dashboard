@@ -39,10 +39,10 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 | V1 | MVP | AI Job Estimator, Instant Quote via foto, grundläggande agent | ✅ Klar |
 | V2 | Onboarding + Dashboard | Approval-flöde, push-notiser, Google Calendar/Gmail, tidrapportering | ✅ Klar |
 | V3 | Automation Engine | Regelmotor (automation_rules/settings/logs), 9 systemregler, event-hooks | ✅ Klar |
-| V4 | Pipeline + Proaktiv | Självgående säljtratt, pipeline_stages, insights-motor, nattlig analys | ✅ Klar |
+| V4 | Pipeline + Proaktiv | Självgående säljtratt, pipeline_stages, insights-motor, nattlig analys | 🔄 Pågår |
 | V5 | Kontextmotor | agent_context, per-företags-inlärning, prediktiv schemaläggning | ✅ Klar |
-| V6 | Subagenter | Multi-agent-arkitektur, Cowork-integration, dokumentflöde | 🔄 Pågår |
-| V7 | Full autonomi | Prissättningsintelligens, leverantörskommunikation, Fortnox-djup | 📋 Planerad |
+| V6 | Subagenter | Multi-agent-arkitektur, Cowork-integration, dokumentflöde | ✅ Klar |
+| V7 | Full autonomi | Prissättningsintelligens, leverantörskommunikation, Fortnox-djup | 🔄 Pågår |
 
 ---
 
@@ -165,8 +165,9 @@ När hantverkaren markerar ett lead som ej aktuellt:
 | `time_entries` | Operations | Tidrapportering, fakturerbar tid, kund |
 | `bookings` | Operations | Bokningar, Google Calendar sync |
 | `sms_conversations` | Comms | Alla SMS in/ut, matchad lead/kund |
-| `agent_context` | Agent (V5) | Tolkad företagsstatus — uppdateras nattligen av Claude |
-| `learning_events` | Agent (V5) | Inlärningsdata — mönster per företag |
+| `agent_context` | Agent | Tolkad företagsstatus — uppdateras nattligen av Claude ✅ |
+| `learning_events` | Agent | Råa inlärningshändelser — accept/reject/edit per approval ✅ |
+| `business_preferences` | Agent | Tolkade preferenser — ton, prissättning, SMS-längd ✅ |
 
 ### 6.2 Kritiska fält att aldrig blanda ihop
 
@@ -258,24 +259,19 @@ if (agentDecidesTransfer) {
 
 > ⚠️ **KRITISK REGEL:** Terminaler som jobbar parallellt får **inte** röra varandras territorium.
 
-### Pågående — V4
+### Pågående — V7
 | Terminal | Äger | Får inte röra |
 |----------|------|---------------|
-| T1 — UI Sprint | `quotes/new`, `invoices/new`, `time/page.tsx`, `TimeEntryModal.tsx` | `lib/*`, API-routes, `automation-engine.ts` |
-| T2 — Pipeline V2 | `pipeline_stages`-tabell, `leads.pipeline_stage_key`, Kanban-vy, `update_status` action | UI-komponenter, quote/invoice-logik |
+| T1 — Prissättningsintelligens | Dynamisk prissättning, marginanalys, konkurrentjämförelse | Subagenter, databas |
+| T2 — Fortnox-djup | Bokföring, SIE-export, kontoplan, momsrapport | Agent-logik, UI |
 
-### Nästa — V5 (efter V4 verifierad)
-| Terminal | Äger | Får inte röra |
-|----------|------|---------------|
-| T1 — Insights-motor | `agent_context`-tabell, nattlig Claude-körning, morgonrapport | Pipeline, UI, telefoni |
-| T2 — Onboarding-fix | Onboarding steg 3, `personal_phone` i `business_config` | Automation-regler, pipeline |
-| T3 — Per-företags-inlärning | `learning_events`-tabell, preference-uppdatering | UI, telefoni, pipeline |
-
-### V6 (efter V5 verifierad)
-| Terminal | Äger | Får inte röra |
-|----------|------|---------------|
-| T1 — Subagent-arkitektur | Lead-agent, Ekonomiagent, Orchestrator | Befintlig agent-router (bara utöka) |
-| T2 — Cowork-integration | Dokumentflöde, lokal filhantering, PDF-export | Agent-logik, databas |
+### Klara — V4 + V5 + V6
+| Sprint | Status |
+|--------|--------|
+| V4 Pipeline + UI-sprint | ✅ Klar |
+| V5 T1 — Insights-motor | ✅ Klar |
+| V5 T2 — Per-företags-inlärning | ✅ Klar |
+| V6 — Subagent-arkitektur (Orchestrator + Lead/Ekonomi/Strategi) | ✅ Klar |
 
 ---
 

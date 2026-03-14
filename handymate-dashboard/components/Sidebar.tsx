@@ -23,6 +23,7 @@ import {
   Globe,
   Bot,
   ClipboardCheck,
+  Gift,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -116,6 +117,7 @@ const NAV: NavItem[] = [
       { label: 'Marknadsföring', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
     ],
   },
+  { type: 'link', key: 'referral', label: 'Bjud in kollega', icon: Gift, href: '/dashboard/referral' },
   { type: 'link', key: 'help', label: 'Hjälp', icon: HelpCircle, href: '/dashboard/help' },
 ]
 

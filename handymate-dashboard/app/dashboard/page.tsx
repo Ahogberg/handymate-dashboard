@@ -114,10 +114,18 @@ export default function DashboardPage() {
   }>>([])
   const [insightsExpanded, setInsightsExpanded] = useState(false)
 
+  // Per-section loading states for skeleton UI
+  const [bookingsLoaded, setBookingsLoaded] = useState(false)
+  const [configLoaded, setConfigLoaded] = useState(false)
+  const [statsLoaded, setStatsLoaded] = useState(false)
+  const [pipelineLoaded, setPipelineLoaded] = useState(false)
+  const [profitLoaded, setProfitLoaded] = useState(false)
+  const [activityLoaded, setActivityLoaded] = useState(false)
+  const [projectsLoaded, setProjectsLoaded] = useState(false)
+  const [scheduleLoaded, setScheduleLoaded] = useState(false)
+
   useEffect(() => {
     fetchData()
-    fetchSpeedToLead()
-    fetchInsights()
   }, [business.business_id])
 
   async function fetchInsights() {
@@ -143,163 +151,148 @@ export default function DashboardPage() {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
 
-    // Dagens bokningar
-    const { data: bookingsData } = await supabase
+    // Fire ALL independent fetches in parallel
+    const bookingsPromise = supabase
       .from('booking')
       .select(`
-        booking_id,
-        customer_id,
-        scheduled_start,
-        scheduled_end,
-        status,
-        notes,
-        customer (
-          name,
-          phone_number
-        )
+        booking_id, customer_id, scheduled_start, scheduled_end, status, notes,
+        customer (name, phone_number)
       `)
       .eq('business_id', business.business_id)
       .gte('scheduled_start', todayStr)
       .lt('scheduled_start', todayStr + 'T23:59:59')
       .order('scheduled_start', { ascending: true })
+      .then(({ data }: { data: any }) => {
+        setBookings(data || [])
+        setBookingsLoaded(true)
+      })
 
-    setBookings(bookingsData || [])
-
-    // Hämta onboarding-data
-    const { data: configData } = await supabase
-      .from('business_config')
-      .select(`
-        email_confirmed_at,
-        assigned_phone_number,
-        phone_setup_type,
-        forwarding_confirmed,
-        working_hours,
-        logo_url,
-        onboarding_dismissed,
-        onboarding_data,
-        lead_sources
-      `)
-      .eq('business_id', business.business_id)
-      .single()
-
-    if (configData) {
-      // Check Google Calendar connection
-      const { data: calConn } = await supabase
-        .from('calendar_connection')
-        .select('id, gmail_sync_enabled')
+    const configPromise = (async () => {
+      const { data: configData } = await supabase
+        .from('business_config')
+        .select(`
+          email_confirmed_at, assigned_phone_number, phone_setup_type,
+          forwarding_confirmed, working_hours, logo_url,
+          onboarding_dismissed, onboarding_data, lead_sources
+        `)
         .eq('business_id', business.business_id)
-        .maybeSingle()
+        .single()
 
-      const enriched = {
-        ...configData,
-        google_calendar_connected: !!calConn,
-        gmail_enabled: calConn?.gmail_sync_enabled || false,
-      }
-      setOnboardingData(enriched)
-      setShowOnboarding(!configData.onboarding_dismissed)
-      // Load dismissed reminders
-      const obData = (configData.onboarding_data || {}) as Record<string, unknown>
-      const dismissed = (obData.dismissed_reminders as string[]) || []
-      if (dismissed.length > 0) {
-        setDismissedReminders(new Set(dismissed))
-      }
-    }
+      if (configData) {
+        const { data: calConn } = await supabase
+          .from('calendar_connection')
+          .select('id, gmail_sync_enabled')
+          .eq('business_id', business.business_id)
+          .maybeSingle()
 
-    // Hämta antal samtal
-    const { count: calls } = await supabase
+        const enriched = {
+          ...configData,
+          google_calendar_connected: !!calConn,
+          gmail_enabled: calConn?.gmail_sync_enabled || false,
+        }
+        setOnboardingData(enriched)
+        setShowOnboarding(!configData.onboarding_dismissed)
+        const obData = (configData.onboarding_data || {}) as Record<string, unknown>
+        const dismissed = (obData.dismissed_reminders as string[]) || []
+        if (dismissed.length > 0) {
+          setDismissedReminders(new Set(dismissed))
+        }
+      }
+      setConfigLoaded(true)
+    })()
+
+    const callsPromise = supabase
       .from('call_recording')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', business.business_id)
+      .then(({ count }: { count: number | null }) => {
+        setCallCount(count || 0)
+      })
 
-    setCallCount(calls || 0)
-
-    // Hämta aktiva projekt + hälsodata
-    const { data: activeProjectsData } = await supabase
+    const projectsPromise = supabase
       .from('project')
       .select('project_id, name, ai_health_score, ai_health_summary, status')
       .eq('business_id', business.business_id)
       .in('status', ['planning', 'active', 'paused'])
       .order('ai_health_score', { ascending: true, nullsFirst: false })
+      .then(({ data }: { data: any }) => {
+        setActiveProjects(data?.length || 0)
+        const atRisk = (data || []).filter(
+          (p: { ai_health_score: number | null }) => p.ai_health_score != null && p.ai_health_score < 70
+        )
+        setProjectsAtRisk(atRisk)
+        setProjectsLoaded(true)
+      })
 
-    setActiveProjects(activeProjectsData?.length || 0)
+    const schedulePromise = fetch(`/api/schedule?start_date=${todayStr}&end_date=${todayStr}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(schedData => {
+        if (schedData) {
+          const entries = schedData.entries || []
+          const uniquePeople = new Set(entries.map((e: any) => e.business_user_id))
+          setScheduleToday({
+            count: entries.length,
+            people: uniquePeople.size,
+            entries: entries.slice(0, 3).map((e: any) => ({
+              title: e.title,
+              color: e.color || e.business_user?.color || '#8B5CF6',
+              time: e.all_day ? 'Heldag' : new Date(e.start_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+            }))
+          })
+        }
+        setScheduleLoaded(true)
+      })
+      .catch(() => setScheduleLoaded(true))
 
-    // Store projects needing attention (low health score)
-    const atRisk = (activeProjectsData || []).filter(
-      (p: { ai_health_score: number | null }) => p.ai_health_score != null && p.ai_health_score < 70
-    )
-    setProjectsAtRisk(atRisk)
+    const pipelinePromise = fetch('/api/pipeline/stats')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setPipelineStats(data)
+        setPipelineLoaded(true)
+      })
+      .catch(() => setPipelineLoaded(true))
 
-    // Hämta dagens schema
-    try {
-      const schedRes = await fetch(`/api/schedule?start_date=${todayStr}&end_date=${todayStr}`)
-      if (schedRes.ok) {
-        const schedData = await schedRes.json()
-        const entries = schedData.entries || []
-        const uniquePeople = new Set(entries.map((e: any) => e.business_user_id))
-        setScheduleToday({
-          count: entries.length,
-          people: uniquePeople.size,
-          entries: entries.slice(0, 3).map((e: any) => ({
-            title: e.title,
-            color: e.color || e.business_user?.color || '#8B5CF6',
-            time: e.all_day ? 'Heldag' : new Date(e.start_datetime).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
-          }))
-        })
-      }
-    } catch { /* ignore */ }
+    const statsPromise = fetch(`/api/dashboard/stats?businessId=${business.business_id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setStats(data)
+        setStatsLoaded(true)
+      })
+      .catch(() => setStatsLoaded(true))
 
-    // Hämta pipeline-statistik
-    try {
-      const pipeRes = await fetch('/api/pipeline/stats')
-      if (pipeRes.ok) {
-        const pipeData = await pipeRes.json()
-        setPipelineStats(pipeData)
-      }
-    } catch { /* ignore */ }
+    const profitPromise = fetch('/api/dashboard/profitability')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data) setProfitProjects(data.projects || [])
+        setProfitLoaded(true)
+      })
+      .catch(() => setProfitLoaded(true))
 
-    // Hämta statistik från API
-    try {
-      const response = await fetch(`/api/dashboard/stats?businessId=${business.business_id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setStats(data)
-      }
-    } catch (error) {
-      console.error('Failed to fetch stats:', error)
-    }
+    const activityPromise = supabase
+      .from('customer_activity')
+      .select('activity_id, activity_type, title, description, created_at, customer:customer_id(name)')
+      .eq('business_id', business.business_id)
+      .order('created_at', { ascending: false })
+      .limit(5)
+      .then(({ data }: { data: any }) => {
+        setRecentActivity(data || [])
+        setActivityLoaded(true)
+      })
 
-    // Hämta projektlönsamhet
-    try {
-      const profitRes = await fetch('/api/dashboard/profitability')
-      if (profitRes.ok) {
-        const profitData = await profitRes.json()
-        setProfitProjects(profitData.projects || [])
-      }
-    } catch { /* ignore */ }
+    const speedPromise = fetch(`/api/analytics/speed-to-lead?period=30d&business_id=${business.business_id}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setSpeedData(data) })
+      .catch(() => {})
 
-    // Hämta senaste aktivitet
-    try {
-      const { data: activityData } = await supabase
-        .from('customer_activity')
-        .select('activity_id, activity_type, title, description, created_at, customer:customer_id(name)')
-        .eq('business_id', business.business_id)
-        .order('created_at', { ascending: false })
-        .limit(5)
+    const insightsPromise = fetchInsights()
 
-      setRecentActivity(activityData || [])
-    } catch { /* ignore */ }
-
+    // Wait for all — each section renders independently as it resolves
+    await Promise.all([
+      bookingsPromise, configPromise, callsPromise, projectsPromise,
+      schedulePromise, pipelinePromise, statsPromise, profitPromise,
+      activityPromise, speedPromise, insightsPromise,
+    ])
     setLoading(false)
-  }
-
-  async function fetchSpeedToLead() {
-    try {
-      const res = await fetch(`/api/analytics/speed-to-lead?period=30d&business_id=${business.business_id}`)
-      if (res.ok) {
-        const data = await res.json()
-        setSpeedData(data)
-      }
-    } catch { /* ignore if feature not available */ }
   }
 
   const formatTime = (dateString: string) => {
@@ -391,13 +384,22 @@ export default function DashboardPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Laddar...</div>
-      </div>
-    )
-  }
+  // Skeleton components
+  const SkeletonPulse = ({ className = '' }: { className?: string }) => (
+    <div className={`animate-pulse bg-gray-200 rounded ${className}`} />
+  )
+
+  const SkeletonCard = ({ className = '', children }: { className?: string; children?: React.ReactNode }) => (
+    <div className={`bg-white shadow-sm rounded-xl border border-gray-200 p-4 ${className}`}>
+      {children || (
+        <div className="space-y-3">
+          <SkeletonPulse className="h-4 w-24" />
+          <SkeletonPulse className="h-8 w-16" />
+          <SkeletonPulse className="h-3 w-32" />
+        </div>
+      )}
+    </div>
+  )
 
   const todaysBookingsCount = bookings.length
 
@@ -475,13 +477,13 @@ export default function DashboardPage() {
                 {stats.quotes.sent > 0 && (
                   <div className="flex items-center gap-2 text-xs text-amber-600">
                     <FileText className="w-3.5 h-3.5" />
-                    <span>{stats.quotes.sent} offerter v\u00E4ntar p\u00E5 svar</span>
+                    <span>{stats.quotes.sent} offerter väntar på svar</span>
                   </div>
                 )}
                 {(stats.ai?.pending_suggestions ?? 0) > 0 && (
                   <div className="flex items-center gap-2 text-xs text-sky-700">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>{stats.ai.pending_suggestions} AI-f\u00F6rslag att granska</span>
+                    <span>{stats.ai.pending_suggestions} AI-förslag att granska</span>
                   </div>
                 )}
               </div>
@@ -605,59 +607,69 @@ export default function DashboardPage() {
 
         {/* KPI cards — 2 per row on mobile, 5 on desktop */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-teal-50">
-                <Calendar className="w-4 h-4 text-teal-600" />
+          {!statsLoaded ? (
+            <>
+              {[...Array(5)].map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </>
+          ) : (
+            <>
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-lg bg-teal-50">
+                    <Calendar className="w-4 h-4 text-teal-600" />
+                  </div>
+                  <TrendIndicator value={stats?.bookings?.trend || 0} />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stats?.bookings?.week || 0}</p>
+                <p className="text-xs text-gray-400">Bokningar denna vecka</p>
               </div>
-              <TrendIndicator value={stats?.bookings?.trend || 0} />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats?.bookings?.week || 0}</p>
-            <p className="text-xs text-gray-400">Bokningar denna vecka</p>
-          </div>
 
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-sky-50">
-                <Users className="w-4 h-4 text-sky-600" />
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-lg bg-sky-50">
+                    <Users className="w-4 h-4 text-sky-600" />
+                  </div>
+                  <TrendIndicator value={stats?.customers?.trend || 0} />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stats?.customers?.new_this_month || 0}</p>
+                <p className="text-xs text-gray-400">Nya kunder i månad</p>
               </div>
-              <TrendIndicator value={stats?.customers?.trend || 0} />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats?.customers?.new_this_month || 0}</p>
-            <p className="text-xs text-gray-400">Nya kunder i månad</p>
-          </div>
 
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-emerald-50">
-                <Mic className="w-4 h-4 text-emerald-600" />
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-lg bg-emerald-50">
+                    <Mic className="w-4 h-4 text-emerald-600" />
+                  </div>
+                  <TrendIndicator value={stats?.calls?.trend || 0} />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stats?.calls?.week || 0}</p>
+                <p className="text-xs text-gray-400">Samtal denna vecka</p>
               </div>
-              <TrendIndicator value={stats?.calls?.trend || 0} />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats?.calls?.week || 0}</p>
-            <p className="text-xs text-gray-400">Samtal denna vecka</p>
-          </div>
 
-          <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-amber-50">
-                <Clock className="w-4 h-4 text-amber-600" />
+              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-lg bg-amber-50">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{stats?.time?.week_hours || 0}h</p>
+                <p className="text-xs text-gray-400">Arbetad tid vecka</p>
               </div>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{stats?.time?.week_hours || 0}h</p>
-            <p className="text-xs text-gray-400">Arbetad tid vecka</p>
-          </div>
 
-          <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-teal-300 transition-all">
-            <div className="flex items-center justify-between mb-3">
-              <div className="p-2 rounded-lg bg-slate-100">
-                <FolderKanban className="w-4 h-4 text-slate-600" />
-              </div>
-              <ArrowRight className="w-3 h-3 text-gray-400" />
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{activeProjects}</p>
-            <p className="text-xs text-gray-400">Aktiva projekt</p>
-          </Link>
+              <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-teal-300 transition-all">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="p-2 rounded-lg bg-slate-100">
+                    <FolderKanban className="w-4 h-4 text-slate-600" />
+                  </div>
+                  <ArrowRight className="w-3 h-3 text-gray-400" />
+                </div>
+                <p className="text-2xl font-bold text-gray-900">{activeProjects}</p>
+                <p className="text-xs text-gray-400">Aktiva projekt</p>
+              </Link>
+            </>
+          )}
         </div>
 
         {/* Speed-to-Lead Widget */}
@@ -726,6 +738,23 @@ export default function DashboardPage() {
           {/* ═══ Row 1: Dagens bokningar + Säljtratt ═══ */}
 
           {/* Dagens bokningar (compact, max 4) */}
+          {!bookingsLoaded ? (
+            <SkeletonCard>
+              <SkeletonPulse className="h-4 w-36 mb-4" />
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <SkeletonPulse className="w-8 h-8 rounded-lg" />
+                    <div className="flex-1 space-y-1.5">
+                      <SkeletonPulse className="h-3.5 w-28" />
+                      <SkeletonPulse className="h-3 w-20" />
+                    </div>
+                    <SkeletonPulse className="h-3.5 w-12" />
+                  </div>
+                ))}
+              </div>
+            </SkeletonCard>
+          ) : (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -788,8 +817,23 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Säljtratt (horizontal bars with full stage names) */}
+          {!pipelineLoaded ? (
+            <SkeletonCard>
+              <SkeletonPulse className="h-4 w-24 mb-4" />
+              <div className="space-y-3">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <SkeletonPulse className="h-3 w-24" />
+                    <SkeletonPulse className="h-7 flex-1 rounded-md" />
+                    <SkeletonPulse className="h-4 w-6" />
+                  </div>
+                ))}
+              </div>
+            </SkeletonCard>
+          ) : (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -913,10 +957,25 @@ export default function DashboardPage() {
               )
             })()}
           </div>
+          )}
 
           {/* ═══ Row 2: Senaste aktivitet + Projektlönsamhet ═══ */}
 
           {/* Senaste aktivitet */}
+          {!activityLoaded ? (
+            <SkeletonCard>
+              <SkeletonPulse className="h-4 w-32 mb-4" />
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <SkeletonPulse className="w-4 h-4 rounded" />
+                    <SkeletonPulse className="h-3.5 flex-1" />
+                    <SkeletonPulse className="h-3 w-10" />
+                  </div>
+                ))}
+              </div>
+            </SkeletonCard>
+          ) : (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2 mb-4">
               <Activity className="w-4 h-4 text-sky-700" />
@@ -945,8 +1004,25 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Projektlönsamhet */}
+          {!profitLoaded ? (
+            <SkeletonCard>
+              <SkeletonPulse className="h-4 w-32 mb-4" />
+              <div className="space-y-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-2">
+                    <div className="space-y-1.5 flex-1">
+                      <SkeletonPulse className="h-3.5 w-32" />
+                      <SkeletonPulse className="h-3 w-20" />
+                    </div>
+                    <SkeletonPulse className="h-5 w-10" />
+                  </div>
+                ))}
+              </div>
+            </SkeletonCard>
+          ) : (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -995,6 +1071,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          )}
 
           {/* Projekthälsa - Kräver uppmärksamhet */}
           {projectsAtRisk.length > 0 && (
@@ -1033,6 +1110,21 @@ export default function DashboardPage() {
           {/* ═══ Row 3: Dagens schema + Snabbåtgärder ═══ */}
 
           {/* Dagens schema */}
+          {!scheduleLoaded ? (
+            <SkeletonCard>
+              <SkeletonPulse className="h-4 w-28 mb-4" />
+              <SkeletonPulse className="h-3 w-40 mb-3" />
+              <div className="space-y-2">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <SkeletonPulse className="w-2 h-2 rounded-full" />
+                    <SkeletonPulse className="h-3.5 flex-1" />
+                    <SkeletonPulse className="h-3 w-10" />
+                  </div>
+                ))}
+              </div>
+            </SkeletonCard>
+          ) : (
           <Link href="/dashboard/schedule" className="block bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-teal-300 transition-all group">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
@@ -1063,6 +1155,7 @@ export default function DashboardPage() {
               </>
             )}
           </Link>
+          )}
 
           {/* Snabbåtgärder (2x2 grid) */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">

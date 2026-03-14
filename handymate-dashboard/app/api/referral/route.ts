@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { generateReferralCode } from '@/lib/referral/codes'
 
 export const dynamic = 'force-dynamic'
 
 /**
- * GET /api/referral — Get or generate referral code for the business
+ * GET /api/referral — Hämta eller generera referralkod
  */
 export async function GET(request: NextRequest) {
   try {
@@ -16,25 +17,22 @@ export async function GET(request: NextRequest) {
 
     const { data: biz } = await supabase
       .from('business_config')
-      .select('referral_code, business_id')
+      .select('referral_code, business_name, business_id')
       .eq('business_id', business.business_id)
       .single()
 
     let code = biz?.referral_code
 
     if (!code) {
-      // Generate a unique code
-      code = business.business_id.substring(0, 6).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase()
-
-      await supabase
-        .from('business_config')
-        .update({ referral_code: code })
-        .eq('business_id', business.business_id)
+      code = await generateReferralCode(
+        business.business_id,
+        biz?.business_name || 'HMT'
+      )
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
-    // Count successful referrals
+    // Räkna referrals
     const { count: referralCount } = await supabase
       .from('referrals')
       .select('*', { count: 'exact', head: true })
@@ -42,7 +40,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       code,
-      referral_url: `${appUrl}/signup?ref=${code}`,
+      referral_url: `${appUrl}/registrera?ref=${code}`,
       referral_count: referralCount || 0,
     })
   } catch (error: any) {

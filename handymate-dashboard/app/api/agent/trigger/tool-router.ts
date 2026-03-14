@@ -96,6 +96,12 @@ export async function executeTool(
         return await getAutomationSettings(supabase, businessId)
       case 'log_automation_action':
         return await logAutomationAction(supabase, businessId, input)
+      case 'check_fortnox_status':
+        return await checkFortnoxStatusTool(businessId)
+      case 'trigger_fortnox_sync':
+        return await triggerFortnoxSyncTool(businessId, input)
+      case 'get_pricing_suggestion':
+        return await getPricingSuggestionTool(businessId, input)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -1276,4 +1282,136 @@ async function logAutomationAction(
   if (error) return { success: false, error: error.message }
 
   return { success: true, data: { message: `Åtgärd loggad: ${rule_name} (${status})` } }
+}
+
+// ── V7 Fortnox Tools ────────────────────────────────────
+
+async function checkFortnoxStatusTool(businessId: string): Promise<ToolResult> {
+  try {
+    const { getFortnoxStatus } = await import('@/lib/fortnox')
+    const status = await getFortnoxStatus(businessId)
+
+    if (!status.connected) {
+      return {
+        success: true,
+        data: {
+          connected: false,
+          message: 'Fortnox är inte anslutet. Hantverkaren kan koppla Fortnox under Inställningar.',
+        },
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        connected: true,
+        company_name: status.companyName,
+        connected_at: status.connectedAt,
+        sync_stats: status.syncStats,
+      },
+    }
+  } catch (err: any) {
+    return { success: false, error: `Fortnox-status misslyckades: ${err.message}` }
+  }
+}
+
+async function triggerFortnoxSyncTool(
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const entityType = params.entity_type as string
+  const entityId = params.entity_id as string
+
+  if (!entityType || !entityId) {
+    return { success: false, error: 'entity_type och entity_id krävs' }
+  }
+
+  try {
+    const { syncCustomerWithTracking, syncInvoiceWithTracking, syncQuoteWithTracking } =
+      await import('@/lib/fortnox/sync')
+
+    let result: { success: boolean; skipped?: boolean; fortnoxId?: string; error?: string }
+
+    switch (entityType) {
+      case 'customer':
+        result = await syncCustomerWithTracking(businessId, entityId)
+        break
+      case 'invoice':
+        result = await syncInvoiceWithTracking(businessId, entityId)
+        break
+      case 'quote':
+        result = await syncQuoteWithTracking(businessId, entityId)
+        break
+      default:
+        return { success: false, error: `Okänd entity_type: ${entityType}` }
+    }
+
+    if (result.skipped) {
+      return {
+        success: true,
+        data: {
+          skipped: true,
+          message: 'Fortnox är inte anslutet — synk hoppades över.',
+        },
+      }
+    }
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Synk misslyckades' }
+    }
+
+    return {
+      success: true,
+      data: {
+        entity_type: entityType,
+        entity_id: entityId,
+        fortnox_id: result.fortnoxId,
+        message: `${entityType} synkad till Fortnox (${result.fortnoxId})`,
+      },
+    }
+  } catch (err: any) {
+    return { success: false, error: `Fortnox-synk misslyckades: ${err.message}` }
+  }
+}
+
+async function getPricingSuggestionTool(
+  businessId: string,
+  params: Record<string, unknown>
+): Promise<ToolResult> {
+  const jobType = params.job_type as string
+  const details = params.details as string | undefined
+
+  if (!jobType) {
+    return { success: false, error: 'job_type krävs' }
+  }
+
+  try {
+    const { getPricingSuggestion } = await import('@/lib/agent/pricing-engine')
+    const result = await getPricingSuggestion(businessId, jobType, details)
+
+    if (result.found && result.suggestion) {
+      return {
+        success: true,
+        data: {
+          job_type: jobType,
+          ...result.suggestion,
+          message: `Prisförslag för "${jobType}": ${result.suggestion.recommended_price_range.min}–${result.suggestion.recommended_price_range.max} kr. ${result.suggestion.advice}`,
+        },
+      }
+    }
+
+    return {
+      success: true,
+      data: {
+        found: false,
+        job_type: jobType,
+        similar_types: result.similar_types,
+        message: result.similar_types?.length
+          ? `Ingen exakt match för "${jobType}". Liknande jobbtyper: ${result.similar_types.join(', ')}`
+          : `Ingen prisdata finns för "${jobType}" ännu.`,
+      },
+    }
+  } catch (err: any) {
+    return { success: false, error: `Prisförslag misslyckades: ${err.message}` }
+  }
 }

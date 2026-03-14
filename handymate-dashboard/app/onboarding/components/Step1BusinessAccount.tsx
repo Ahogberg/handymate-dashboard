@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Loader2, ArrowRight, Building2, User, Mail, Lock, Phone, MapPin } from 'lucide-react'
 import { BRANCHES } from '../constants'
 import type { SignupFormData } from '../types'
@@ -14,6 +15,8 @@ interface Step1Props {
 }
 
 export default function Step1BusinessAccount({ onComplete }: Step1Props) {
+  const searchParams = useSearchParams()
+  const refCode = searchParams?.get('ref') || ''
   const [form, setForm] = useState<SignupFormData>({
     business_name: '',
     display_name: '',
@@ -82,6 +85,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
             phone: cleanPhone,
             branch: form.branch,
             serviceArea: form.service_area,
+            referralCode: refCode || undefined,
           }
         }),
       })
