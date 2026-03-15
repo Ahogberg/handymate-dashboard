@@ -1,0 +1,81 @@
+name: Handymate Agent Team
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'   # Natt 03:00 — Engineer
+    - cron: '0 8 * * 0'   # Söndag 08:00 — Researcher
+    - cron: '0 6 * * 1'   # Måndag 06:00 — Strategist + CS
+  workflow_dispatch:
+    inputs:
+      agent:
+        description: 'Agent att köra: all / qa / fix / research / strategy / cs'
+        required: false
+        default: 'all'
+
+jobs:
+  agent-team:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Determine which agent to run
+        id: agent
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "agent=qa" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "agent=${{ github.event.inputs.agent }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            HOUR=$(date -u +%H)
+            DAY=$(date -u +%u)
+            if [ "$HOUR" = "03" ]; then
+              echo "agent=fix" >> $GITHUB_OUTPUT
+            elif [ "$DAY" = "7" ] && [ "$HOUR" = "08" ]; then
+              echo "agent=research" >> $GITHUB_OUTPUT
+            elif [ "$DAY" = "1" ] && [ "$HOUR" = "06" ]; then
+              echo "agent=strategy" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Run Agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          AGENT="${{ steps.agent.outputs.agent }}"
+          echo "Kör agent: $AGENT"
+          claude --dangerously-skip-permissions \
+            "Läs agents/orchestrator.md och kör $AGENT"
+
+      - name: Commit changes
+        run: |
+          git config --global user.email "agents@handymate.se"
+          git config --global user.name "Handymate Agents 🤖"
+          git add -A
+          if ! git diff --staged --quiet; then
+            git commit -m "🤖 Agent [${{ steps.agent.outputs.agent }}] $(date -u +%Y-%m-%d)"
+            git push
+          else
+            echo "Inga ändringar att committa"
+          fi
