@@ -274,7 +274,7 @@ export default function InvoicesPage() {
 
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border shadow-lg ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border shadow-lg ${
           toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
         }`}>
           {toast.message}

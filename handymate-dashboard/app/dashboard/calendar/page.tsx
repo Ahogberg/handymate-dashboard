@@ -540,7 +540,7 @@ export default function CalendarPage() {
     <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border text-sm ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border text-sm ${
           toast.type === 'success' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-red-50 border-red-200 text-red-700'
         }`}>
           {toast.message}

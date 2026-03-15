@@ -189,7 +189,7 @@ export default function EmailTemplatesPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-6 py-3 rounded-xl text-white font-medium shadow-lg ${
+        <div className={`fixed top-4 right-4 z-[9999] px-6 py-3 rounded-xl text-white font-medium shadow-lg ${
           toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
         }`}>
           {toast.message}

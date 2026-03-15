@@ -407,7 +407,7 @@ export default function InvoiceDetailPage() {
 
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600' : 'bg-red-100 border-red-500/30 text-red-600'
         }`}>
           {toast.message}

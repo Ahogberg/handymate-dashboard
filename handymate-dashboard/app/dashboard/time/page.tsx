@@ -607,7 +607,7 @@ export default function TimePage() {
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg border-thin text-[13px] ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-lg border-thin text-[13px] ${
           toast.type === 'success' ? 'bg-[#CCFBF1] border-[#0F766E] text-[#0F766E]' : 'bg-red-50 border-red-300 text-red-600'
         }`}>
           {toast.message}

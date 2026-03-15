@@ -774,7 +774,7 @@ export default function CommunicationPage() {
 
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-sm font-medium z-50 flex items-center gap-2 ${
+        <div className={`fixed bottom-6 right-6 px-4 py-3 rounded-xl shadow-lg text-sm font-medium z-[9999] flex items-center gap-2 ${
           toast.type === 'success'
             ? 'bg-emerald-600 text-white'
             : 'bg-red-600 text-white'

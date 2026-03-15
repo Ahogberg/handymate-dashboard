@@ -1239,7 +1239,7 @@ export default function SettingsPage() {
       </div>
 
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
@@ -3611,7 +3611,7 @@ function PreferencesTab({ businessId }: { businessId: string }) {
   return (
     <div className="space-y-6">
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
@@ -3902,7 +3902,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
   return (
     <div className="space-y-6">
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl text-sm font-medium ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl text-sm font-medium ${
           toast.type === 'success' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200' : 'bg-red-100 text-red-600 border border-red-200'
         }`}>
           {toast.message}

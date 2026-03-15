@@ -172,18 +172,26 @@ export default function TimeEntryModal({
           </div>
         )}
 
-        {/* Kund + Datum */}
+        {/* Projekt + Datum */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label className={labelClass}>Kund</label>
+            <label className={labelClass}>Projekt</label>
             <select
-              value={formData.customer_id}
-              onChange={e => setFormData((prev: any) => ({ ...prev, customer_id: e.target.value }))}
+              value={formData.project_id}
+              onChange={e => {
+                const projId = e.target.value
+                const proj = projects.find(p => p.project_id === projId)
+                setFormData((prev: any) => ({
+                  ...prev,
+                  project_id: projId,
+                  customer_id: proj?.customer_id || prev.customer_id,
+                }))
+              }}
               className={inputClass}
             >
-              <option value="">Välj kund...</option>
-              {customers.map(c => (
-                <option key={c.customer_id} value={c.customer_id}>{c.name}</option>
+              <option value="">Välj projekt...</option>
+              {projects.map(p => (
+                <option key={p.project_id} value={p.project_id}>{p.name}</option>
               ))}
             </select>
           </div>
@@ -318,21 +326,22 @@ export default function TimeEntryModal({
                 </div>
               )}
 
-              {projects.length > 0 && (
-                <div>
-                  <label className={labelClass}>Projekt</label>
-                  <select
-                    value={formData.project_id}
-                    onChange={e => setFormData((prev: any) => ({ ...prev, project_id: e.target.value }))}
-                    className={inputClass}
-                  >
-                    <option value="">Inget projekt</option>
-                    {projects.map(p => (
-                      <option key={p.project_id} value={p.project_id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className={labelClass}>Kund</label>
+                <select
+                  value={formData.customer_id}
+                  onChange={e => setFormData((prev: any) => ({ ...prev, customer_id: e.target.value }))}
+                  className={inputClass}
+                >
+                  <option value="">Välj kund...</option>
+                  {customers.map(c => (
+                    <option key={c.customer_id} value={c.customer_id}>{c.name}</option>
+                  ))}
+                </select>
+                {formData.project_id && formData.customer_id && (
+                  <p className="text-[11px] text-[#94A3B8] mt-1">Satt automatiskt från projekt</p>
+                )}
+              </div>
 
               {workTypes.length > 0 && (
                 <div>

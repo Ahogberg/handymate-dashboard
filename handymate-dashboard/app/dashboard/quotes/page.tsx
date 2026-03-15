@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { FileText, Plus, Send, CheckCircle, XCircle, Clock, Eye, Search, Filter } from 'lucide-react'
+import { FileText, Plus, Send, CheckCircle, XCircle, Clock, Eye, Search, Filter, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
@@ -27,6 +27,25 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'accepted'>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [acceptingId, setAcceptingId] = useState<string | null>(null)
+
+  async function handleAcceptQuote(e: React.MouseEvent, quoteId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!confirm('Vill du markera denna offert som accepterad?')) return
+    setAcceptingId(quoteId)
+    try {
+      const res = await fetch('/api/quotes/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId }),
+      })
+      if (res.ok) {
+        fetchQuotes()
+      }
+    } catch { /* ignore */ }
+    setAcceptingId(null)
+  }
 
   useEffect(() => {
     fetchQuotes()
@@ -215,16 +234,28 @@ export default function QuotesPage() {
                       <p className="text-sm text-gray-400">{quote.customer?.name || 'Ingen kund vald'}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900">
-                      {quote.rot_rut_type ? formatCurrency(quote.customer_pays) : formatCurrency(quote.total)}
-                    </p>
-                    {quote.rot_rut_type && (
-                      <p className="text-xs text-emerald-600">efter {quote.rot_rut_type.toUpperCase()}</p>
+                  <div className="flex items-center gap-3">
+                    {['sent', 'opened'].includes(quote.status) && (
+                      <button
+                        onClick={(e) => handleAcceptQuote(e, quote.quote_id)}
+                        disabled={acceptingId === quote.quote_id}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 rounded-lg text-white text-xs font-medium hover:opacity-90 disabled:opacity-50 shrink-0"
+                      >
+                        {acceptingId === quote.quote_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                        Acceptera
+                      </button>
                     )}
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border mt-1 ${getStatusStyle(quote.status)}`}>
-                      {getStatusText(quote.status)}
-                    </span>
+                    <div className="text-right">
+                      <p className="font-medium text-gray-900">
+                        {quote.rot_rut_type ? formatCurrency(quote.customer_pays) : formatCurrency(quote.total)}
+                      </p>
+                      {quote.rot_rut_type && (
+                        <p className="text-xs text-emerald-600">efter {quote.rot_rut_type.toUpperCase()}</p>
+                      )}
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border mt-1 ${getStatusStyle(quote.status)}`}>
+                        {getStatusText(quote.status)}
+                      </span>
+                    </div>
                   </div>
                 </Link>
               ))}

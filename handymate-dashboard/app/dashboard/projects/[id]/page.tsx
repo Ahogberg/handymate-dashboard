@@ -1172,7 +1172,7 @@ export default function ProjectDetailPage() {
 
       {/* Toast */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success'
             ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
             : 'bg-red-100 border-red-500/30 text-red-600'
@@ -1400,6 +1400,54 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Personal (team allocation) */}
+            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <Users className="w-5 h-5 text-sky-700" />
+                  Personal ({projectTeam.length})
+                </h2>
+                <button
+                  onClick={() => setActiveTab('team')}
+                  className="text-sm text-sky-700 hover:text-teal-600 flex items-center gap-1"
+                >
+                  Hantera <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+              {projectTeam.length === 0 ? (
+                <div className="text-center py-6">
+                  <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                  <p className="text-sm text-gray-400 mb-3">Ingen tilldelad ännu</p>
+                  <button
+                    onClick={() => setActiveTab('team')}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    Tilldela personal
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {projectTeam.map(assignment => (
+                    <div key={assignment.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200">
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: assignment.business_user.color }}
+                      >
+                        <span className="text-gray-900 text-xs font-bold">
+                          {assignment.business_user.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-900 font-medium truncate">{assignment.business_user.name}</p>
+                        <p className="text-xs text-gray-400">{assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Quick actions */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

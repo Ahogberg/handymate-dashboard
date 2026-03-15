@@ -352,7 +352,7 @@ export default function ProfilePage() {
       {/* Toast */}
       {toast.show && (
         <div
-          className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${
+          className={`fixed bottom-6 right-6 z-[9999] px-5 py-3 rounded-xl text-sm font-medium shadow-lg transition-all ${
             toast.type === 'success'
               ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
               : 'bg-red-100 text-red-700 border border-red-200'

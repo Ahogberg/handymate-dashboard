@@ -151,6 +151,7 @@ export default function QuoteDetailPage() {
   const [duplicating, setDuplicating] = useState(false)
   const [versions, setVersions] = useState<QuoteVersion[]>([])
   const [creatingVersion, setCreatingVersion] = useState(false)
+  const [acceptingQuote, setAcceptingQuote] = useState(false)
 
   const saveAsTemplate = async () => {
     if (!quote || !templateName.trim()) return
@@ -328,6 +329,28 @@ export default function QuoteDetailPage() {
       showToast('Något gick fel', 'error')
     }
     setCreatingVersion(false)
+  }
+
+  const markQuoteAccepted = async () => {
+    if (!quote) return
+    if (!confirm('Vill du markera denna offert som accepterad?')) return
+    setAcceptingQuote(true)
+    try {
+      const res = await fetch('/api/quotes/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote.quote_id }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Kunde inte acceptera offerten')
+      }
+      showToast('Offert markerad som accepterad!', 'success')
+      fetchQuote()
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
+    }
+    setAcceptingQuote(false)
   }
 
   const previewPDF = async () => {
@@ -627,7 +650,7 @@ export default function QuoteDetailPage() {
       </div>
 
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600' : 'bg-red-100 border-red-500/30 text-red-600'}`}>
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${toast.type === 'success' ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600' : 'bg-red-100 border-red-500/30 text-red-600'}`}>
           {toast.message}
         </div>
       )}
@@ -701,13 +724,23 @@ export default function QuoteDetailPage() {
             </button>
           )}
           {['sent', 'opened'].includes(quote.status) && (
-            <button
-              onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Skicka påminnelse
-            </button>
+            <>
+              <button
+                onClick={markQuoteAccepted}
+                disabled={acceptingQuote}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {acceptingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                Markera som accepterad
+              </button>
+              <button
+                onClick={() => setShowSendModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Skicka påminnelse
+              </button>
+            </>
           )}
           {quote.status === 'accepted' && (
             <>

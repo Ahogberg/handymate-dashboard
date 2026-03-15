@@ -76,6 +76,7 @@ const EVENT_ROUTING: Record<string, AgentType> = {
   quote_created: 'ekonomi',
   quote_sent: 'ekonomi',
   quote_signed: 'ekonomi',
+  quote_accepted: 'ekonomi',
   quote_expired: 'ekonomi',
   invoice_created: 'ekonomi',
   invoice_sent: 'ekonomi',
