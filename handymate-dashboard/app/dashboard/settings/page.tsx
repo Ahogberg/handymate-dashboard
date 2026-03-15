@@ -109,6 +109,7 @@ interface BusinessConfig {
   google_review_url: string | null
   review_request_enabled: boolean
   review_request_delay_days: number
+  website_api_key: string | null
 }
 
 interface FortnoxStatus {
@@ -3059,6 +3060,71 @@ export default function SettingsPage() {
 
                   <p className="text-xs text-gray-400 text-center">
                     Du kommer att omdirigeras till Fortnox för att godkänna kopplingen
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Hemsideintegration (Embed Widget) */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-teal-100">
+                  <ExternalLink className="w-6 h-6 text-teal-500" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Hemsideintegration</h2>
+                  <p className="text-sm text-gray-400">Leads från din hemsida direkt i Handymate</p>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-500 mb-4">
+                Koppla din hemsida till Handymate — leads som skickas via ditt kontaktformulär hamnar automatiskt i din pipeline.
+              </p>
+
+              {config?.website_api_key ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-900 block mb-2">Din inbäddningskod</label>
+                    <div className="relative">
+                      <pre className="p-4 bg-gray-50 border border-gray-300 rounded-xl text-xs text-gray-700 overflow-x-auto whitespace-pre-wrap break-all select-all">
+{`<script src="https://app.handymate.se/embed.js"
+        data-key="${config.website_api_key}">
+</script>`}
+                      </pre>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>`
+                          )
+                          showToast('Kod kopierad!', 'success')
+                        }}
+                        className="absolute top-2 right-2 px-3 py-1.5 bg-teal-600 text-white text-xs rounded-lg hover:opacity-90"
+                      >
+                        Kopiera
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-2">
+                    <p className="text-sm font-medium text-gray-700">Så här gör du:</p>
+                    <ol className="text-sm text-gray-500 space-y-1 list-decimal list-inside">
+                      <li>Kopiera koden ovan</li>
+                      <li>Klistra in den precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code> på din hemsida</li>
+                      <li>Klart — en kontaktknapp dyker upp automatiskt</li>
+                    </ol>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Vill du visa formuläret på en specifik plats? Lägg till <code className="bg-gray-200 px-1 rounded">&lt;div id=&quot;handymate-form&quot;&gt;&lt;/div&gt;</code> där du vill att det ska synas.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    <p className="text-sm font-medium text-amber-700">API-nyckel saknas</p>
+                  </div>
+                  <p className="text-sm text-amber-600">
+                    Kör SQL-migrationen <code className="bg-amber-100 px-1 rounded text-xs">v13_embed.sql</code> i Supabase för att generera din widget-nyckel.
                   </p>
                 </div>
               )}
