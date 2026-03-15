@@ -74,6 +74,7 @@ export async function POST(request: NextRequest) {
         working_hours: defaultWorkingHours,
         call_mode: 'human_first',
         knowledge_base: knowledgeBase,
+        website_api_key: `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
       })
 
     if (businessError) {

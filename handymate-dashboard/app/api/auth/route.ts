@@ -86,6 +86,7 @@ if (action === 'register') {
       call_mode: 'human_first',
       knowledge_base: knowledgeBase,
       referred_by: referralCode || null,
+      website_api_key: `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
     })
 
   if (businessError) {

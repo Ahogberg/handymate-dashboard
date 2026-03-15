@@ -484,6 +484,15 @@ export default function SettingsPage() {
       .single()
 
     if (data) {
+      // Auto-generera website_api_key om det saknas
+      if (!data.website_api_key) {
+        const newKey = `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
+        await supabase
+          .from('business_config')
+          .update({ website_api_key: newKey })
+          .eq('business_id', business.business_id)
+        data.website_api_key = newKey
+      }
       setConfig(data)
       setGoogleReviewUrl(data.google_review_url || '')
       setReviewRequestEnabled(data.review_request_enabled ?? true)
@@ -3083,6 +3092,7 @@ export default function SettingsPage() {
 
               {config?.website_api_key ? (
                 <div className="space-y-4">
+                  {/* Embed code */}
                   <div>
                     <label className="text-sm font-medium text-gray-900 block mb-2">Din inbäddningskod</label>
                     <div className="relative">
@@ -3105,27 +3115,59 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 rounded-xl space-y-2">
-                    <p className="text-sm font-medium text-gray-700">Så här gör du:</p>
-                    <ol className="text-sm text-gray-500 space-y-1 list-decimal list-inside">
-                      <li>Kopiera koden ovan</li>
-                      <li>Klistra in den precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code> på din hemsida</li>
-                      <li>Klart — en kontaktknapp dyker upp automatiskt</li>
+                  {/* Action buttons */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(
+                          `<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>`
+                        )
+                        showToast('Kod kopierad!', 'success')
+                      }}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+                    >
+                      <Download className="w-4 h-4" />
+                      Kopiera kod
+                    </button>
+                    <a
+                      href={`mailto:?subject=${encodeURIComponent('Lägg till kontaktformulär på vår hemsida')}&body=${encodeURIComponent(
+                        `Hej!\n\nKan du lägga till denna kod precis före </body> på vår hemsida?\n\n<script src="https://app.handymate.se/embed.js" data-key="${config.website_api_key}"></script>\n\nDet räcker med det — ett kontaktformulär dyker upp automatiskt.\n\nTack!`
+                      )}`}
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-700 font-medium hover:bg-gray-200"
+                    >
+                      <Mail className="w-4 h-4" />
+                      Skicka till webbyrå
+                    </a>
+                  </div>
+
+                  {/* DIY Guide */}
+                  <div className="p-4 bg-gray-50 rounded-xl space-y-3">
+                    <p className="text-sm font-medium text-gray-700">Gör det själv — steg för steg</p>
+                    <ol className="text-sm text-gray-500 space-y-2 list-decimal list-inside">
+                      <li>
+                        <strong className="text-gray-700">WordPress:</strong> Gå till <em>Utseende → Temaredigerare → footer.php</em> och klistra in koden precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code>
+                      </li>
+                      <li>
+                        <strong className="text-gray-700">Wix:</strong> Gå till <em>Inställningar → Anpassad kod</em> och lägg till koden i &quot;Body - end&quot;
+                      </li>
+                      <li>
+                        <strong className="text-gray-700">Squarespace:</strong> Gå till <em>Inställningar → Avancerat → Kodinmatning</em> och klistra in i &quot;Footer&quot;
+                      </li>
+                      <li>
+                        <strong className="text-gray-700">Vanlig HTML:</strong> Klistra in koden precis före <code className="bg-gray-200 px-1 rounded text-xs">&lt;/body&gt;</code> i din HTML-fil
+                      </li>
                     </ol>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Vill du visa formuläret på en specifik plats? Lägg till <code className="bg-gray-200 px-1 rounded">&lt;div id=&quot;handymate-form&quot;&gt;&lt;/div&gt;</code> där du vill att det ska synas.
-                    </p>
+                    <div className="pt-2 border-t border-gray-200 mt-3">
+                      <p className="text-xs text-gray-400">
+                        Vill du visa formuläret på en specifik plats istället för den flytande knappen? Lägg till <code className="bg-gray-200 px-1 rounded">&lt;div id=&quot;handymate-form&quot;&gt;&lt;/div&gt;</code> där du vill att det ska synas.
+                      </p>
+                    </div>
                   </div>
                 </div>
               ) : (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-500" />
-                    <p className="text-sm font-medium text-amber-700">API-nyckel saknas</p>
-                  </div>
-                  <p className="text-sm text-amber-600">
-                    Kör SQL-migrationen <code className="bg-amber-100 px-1 rounded text-xs">v13_embed.sql</code> i Supabase för att generera din widget-nyckel.
-                  </p>
+                <div className="p-4 bg-gray-50 rounded-xl text-center">
+                  <Loader2 className="w-5 h-5 text-gray-400 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Genererar din widget-nyckel...</p>
                 </div>
               )}
             </div>
