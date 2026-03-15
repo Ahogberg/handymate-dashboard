@@ -60,7 +60,7 @@ async function sendEmail(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <offert@handymate.se>`,
+        from: `${fromName} <offert@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
         to: [to],
         subject: subject,
         html: htmlContent,
