@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { sendExpoPushNotification } from '@/lib/notifications/expo-push'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,6 +82,9 @@ export async function POST(request: NextRequest) {
         .delete()
         .in('endpoint', staleEndpoints)
     }
+
+    // Also send to Expo (mobile app) — fire and forget
+    sendExpoPushNotification(business_id, title, body || '').catch(() => {})
 
     return NextResponse.json({ success: true, sent })
   } catch (error: any) {
