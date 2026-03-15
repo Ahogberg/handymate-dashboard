@@ -75,8 +75,10 @@ export async function POST(request: NextRequest) {
 
       if (error) throw error
 
-      await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
-      return NextResponse.json({ member })
+      const emailSent = await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+      const inviteUrl = `${appUrl}/invite/${token}`
+      return NextResponse.json({ member, email_sent: emailSent, invite_url: inviteUrl })
     }
 
     // Kan inte ge högre roll än sin egen
@@ -116,9 +118,15 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     // Skicka email
-    await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
+    const emailSent = await trySendInviteEmail(business, currentUser.name, body.email, body.name, token)
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    const inviteUrl = `${appUrl}/invite/${token}`
 
-    return NextResponse.json({ member })
+    return NextResponse.json({
+      member,
+      email_sent: emailSent,
+      invite_url: inviteUrl,
+    })
 
   } catch (error: any) {
     console.error('Invite team member error:', error)
@@ -132,14 +140,20 @@ async function trySendInviteEmail(
   toEmail: string,
   toName: string,
   token: string
-) {
+): Promise<boolean> {
   try {
+    if (!process.env.RESEND_API_KEY) {
+      console.warn('[INVITE] RESEND_API_KEY saknas — e-post kan inte skickas')
+      console.log(`[INVITE] Invite URL: ${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/invite/${token}`)
+      return false
+    }
     await sendInviteEmail(business, inviterName, toEmail, toName, token)
+    return true
   } catch (error) {
-    // Log but don't fail - the invite was already created in DB
-    console.error('Failed to send invite email (Resend may not be configured):', error)
+    console.error('Failed to send invite email:', error)
     console.log(`[INVITE] Token for ${toEmail}: ${token}`)
     console.log(`[INVITE] Invite URL: ${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/invite/${token}`)
+    return false
   }
 }
 

@@ -59,39 +59,50 @@ export async function POST(
     if (error) throw error
 
     // Skicka email
-    const resend = getResend()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     const inviteUrl = `${appUrl}/invite/${token}`
-    const domain = process.env.RESEND_DOMAIN || 'handymate.se'
 
-    await resend.emails.send({
-      from: `${business.business_name} via Handymate <noreply@${domain}>`,
-      to: member.email,
-      subject: `Påminnelse: ${currentUser.name} bjuder in dig till ${business.business_name}`,
-      html: `
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #18181b; margin: 0; font-size: 24px;">Du har en väntande inbjudan</h1>
-          </div>
-          <p style="color: #3f3f46; font-size: 16px; line-height: 1.6;">
-            Hej ${member.name},
-          </p>
-          <p style="color: #3f3f46; font-size: 16px; line-height: 1.6;">
-            <strong>${currentUser.name}</strong> väntar på att du accepterar inbjudan till <strong>${business.business_name}</strong> på Handymate.
-          </p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${inviteUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
-              Acceptera inbjudan
-            </a>
-          </div>
-          <p style="color: #71717a; font-size: 14px; text-align: center;">
-            Länken gäller i 7 dagar.
-          </p>
-        </div>
-      `
-    })
+    let emailSent = false
+    try {
+      if (!process.env.RESEND_API_KEY) {
+        console.warn('[RESEND-INVITE] RESEND_API_KEY saknas')
+      } else {
+        const resend = getResend()
+        const domain = process.env.RESEND_DOMAIN || 'handymate.se'
 
-    return NextResponse.json({ success: true })
+        await resend.emails.send({
+          from: `${business.business_name} via Handymate <noreply@${domain}>`,
+          to: member.email,
+          subject: `Påminnelse: ${currentUser.name} bjuder in dig till ${business.business_name}`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 40px 20px;">
+              <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="color: #18181b; margin: 0; font-size: 24px;">Du har en väntande inbjudan</h1>
+              </div>
+              <p style="color: #3f3f46; font-size: 16px; line-height: 1.6;">
+                Hej ${member.name},
+              </p>
+              <p style="color: #3f3f46; font-size: 16px; line-height: 1.6;">
+                <strong>${currentUser.name}</strong> väntar på att du accepterar inbjudan till <strong>${business.business_name}</strong> på Handymate.
+              </p>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${inviteUrl}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #8b5cf6, #d946ef); color: white; text-decoration: none; border-radius: 12px; font-weight: 600; font-size: 16px;">
+                  Acceptera inbjudan
+                </a>
+              </div>
+              <p style="color: #71717a; font-size: 14px; text-align: center;">
+                Länken gäller i 7 dagar.
+              </p>
+            </div>
+          `
+        })
+        emailSent = true
+      }
+    } catch (emailErr) {
+      console.error('[RESEND-INVITE] Email failed:', emailErr)
+    }
+
+    return NextResponse.json({ success: true, email_sent: emailSent, invite_url: inviteUrl })
 
   } catch (error: any) {
     console.error('Resend invite error:', error)

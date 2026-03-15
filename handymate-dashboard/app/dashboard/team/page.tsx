@@ -187,9 +187,9 @@ export default function TeamPage() {
   const [editForm, setEditForm] = useState<InviteForm>({ ...DEFAULT_INVITE_FORM })
 
   // Toast
-  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
+  const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'warning' }>({ show: false, message: '', type: 'success' })
 
-  const showToast = useCallback((message: string, type: 'success' | 'error') => {
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'warning') => {
     setToast({ show: true, message, type })
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
   }, [])
@@ -284,12 +284,17 @@ export default function TeamPage() {
         body: JSON.stringify(body),
       })
 
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Kunde inte skicka inbjudan')
+        throw new Error(data.error || 'Kunde inte skicka inbjudan')
       }
 
-      showToast('Inbjudan skickad!', 'success')
+      if (data.email_sent === false && data.invite_url) {
+        await navigator.clipboard.writeText(data.invite_url).catch(() => {})
+        showToast('E-post kunde inte skickas. Inbjudningslänk kopierad till urklipp!', 'warning')
+      } else {
+        showToast('Inbjudan skickad!', 'success')
+      }
       setInviteModalOpen(false)
       fetchMembers()
     } catch (err: unknown) {
@@ -375,9 +380,14 @@ export default function TeamPage() {
       const res = await fetch(`/api/team/${editingMember.id}/resend-invite`, {
         method: 'POST',
       })
-      if (!res.ok) throw new Error('Kunde inte skicka ny inbjudan')
-
-      showToast('Ny inbjudan skickad!', 'success')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Kunde inte skicka ny inbjudan')
+      if (data.email_sent === false && data.invite_url) {
+        await navigator.clipboard.writeText(data.invite_url).catch(() => {})
+        showToast('E-post kunde inte skickas. Inbjudningslänk kopierad till urklipp!', 'warning')
+      } else {
+        showToast('Ny inbjudan skickad!', 'success')
+      }
     } catch {
       showToast('Kunde inte skicka ny inbjudan', 'error')
     } finally {
@@ -470,7 +480,7 @@ export default function TeamPage() {
       {/* Toast notification */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl border ${
-          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
+          toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : toast.type === 'warning' ? 'bg-amber-100 border-amber-200 text-amber-700' : 'bg-red-100 border-red-200 text-red-600'
         }`}>
           {toast.message}
         </div>
