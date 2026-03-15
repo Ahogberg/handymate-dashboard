@@ -18,6 +18,9 @@ jobs:
   agent-team:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: handymate-dashboard
 
     steps:
       - name: Checkout
@@ -31,12 +34,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: handymate-dashboard/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
+        working-directory: .
 
       - name: Determine which agent to run
         id: agent
@@ -69,6 +74,7 @@ jobs:
             "Läs agents/orchestrator.md och kör $AGENT"
 
       - name: Commit changes
+        working-directory: .
         run: |
           git config --global user.email "agents@handymate.se"
           git config --global user.name "Handymate Agents 🤖"
