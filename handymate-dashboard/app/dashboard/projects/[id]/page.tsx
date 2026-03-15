@@ -61,6 +61,7 @@ import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import TimeEntryModal from '@/components/time/TimeEntryModal'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -323,7 +324,7 @@ export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
   const business = useBusiness()
-  const { can } = useCurrentUser()
+  const { can, user: currentUser, isOwnerOrAdmin } = useCurrentUser()
   const projectId = params.id as string
 
   // Core data
@@ -400,6 +401,32 @@ export default function ProjectDetailPage() {
   const [supplierInvoices, setSupplierInvoices] = useState<any[]>([])
   const [siModal, setSiModal] = useState<{ open: boolean; editing: any | null }>({ open: false, editing: null })
 
+  // Time entry modal
+  const [showTimeModal, setShowTimeModal] = useState(false)
+  const [timeModalCustomers, setTimeModalCustomers] = useState<{ customer_id: string; name: string }[]>([])
+  const [timeModalBookings, setTimeModalBookings] = useState<{ booking_id: string; notes: string; customer_id: string; customer?: { name: string } }[]>([])
+  const [timeModalProjects, setTimeModalProjects] = useState<{ project_id: string; name: string; customer_id: string | null }[]>([])
+  const [timeModalWorkTypes, setTimeModalWorkTypes] = useState<{ work_type_id: string; name: string; multiplier: number; billable_default: boolean }[]>([])
+  const [timeModalTeamMembers, setTimeModalTeamMembers] = useState<{ id: string; name: string; color: string }[]>([])
+  const [timeFormPersonId, setTimeFormPersonId] = useState('')
+  const [timeFormData, setTimeFormData] = useState({
+    customer_id: '',
+    booking_id: '',
+    work_type_id: '',
+    project_id: '',
+    work_category: 'work' as string,
+    description: '',
+    work_date: new Date().toISOString().slice(0, 10),
+    start_time: '',
+    end_time: '',
+    duration_hours: 0,
+    duration_minutes: 0,
+    break_minutes: 0,
+    hourly_rate: '',
+    is_billable: true
+  })
+  const [timeSaving, setTimeSaving] = useState(false)
+
   // Profitability (lazy loaded)
   const [profitability, setProfitability] = useState<Profitability | null>(null)
   const [profitLoading, setProfitLoading] = useState(false)
@@ -412,6 +439,96 @@ export default function ProjectDetailPage() {
     setToast({ show: true, message, type })
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
   }, [])
+
+  // --- Time Modal Helpers ---
+
+  async function openTimeModal() {
+    // Pre-fill with current project
+    setTimeFormData(prev => ({
+      ...prev,
+      project_id: projectId as string,
+      customer_id: project?.customer_id || '',
+      work_date: new Date().toISOString().slice(0, 10),
+    }))
+    setTimeFormPersonId(currentUser?.id || '')
+    setShowTimeModal(true)
+
+    // Fetch supporting data for modal
+    const [custRes, bookRes, projRes, wtRes, teamRes] = await Promise.all([
+      supabase.from('customer').select('customer_id, name').eq('business_id', business.business_id).order('name'),
+      supabase.from('booking').select('booking_id, notes, customer_id, customer (name)').eq('business_id', business.business_id).in('status', ['confirmed', 'pending']).order('scheduled_start', { ascending: false }).limit(50),
+      supabase.from('project').select('project_id, name, customer_id').eq('business_id', business.business_id).in('status', ['planning', 'active']).order('name'),
+      supabase.from('work_type').select('*').eq('business_id', business.business_id).order('sort_order'),
+      fetch('/api/team').then(r => r.ok ? r.json() : { members: [] }),
+    ])
+    setTimeModalCustomers(custRes.data || [])
+    setTimeModalBookings(bookRes.data as any || [])
+    setTimeModalProjects(projRes.data || [])
+    setTimeModalWorkTypes(wtRes.data || [])
+    setTimeModalTeamMembers(
+      (teamRes.members || [])
+        .filter((m: any) => m.is_active && m.accepted_at)
+        .map((m: any) => ({ id: m.id, name: m.name, color: m.color }))
+    )
+  }
+
+  async function handleTimeSave() {
+    setTimeSaving(true)
+    try {
+      const grossMins = (timeFormData.duration_hours * 60) + timeFormData.duration_minutes
+      const breakMins = timeFormData.break_minutes || 0
+      const totalMins = Math.max(0, grossMins - breakMins)
+      if (totalMins <= 0) { showToast('Ange en tid längre än 0 (efter rast)', 'error'); setTimeSaving(false); return }
+
+      const assignToUser = isOwnerOrAdmin && timeFormPersonId ? timeFormPersonId : currentUser?.id || null
+
+      const entryData: Record<string, unknown> = {
+        business_id: business.business_id,
+        customer_id: timeFormData.customer_id || null,
+        booking_id: timeFormData.booking_id || null,
+        work_type_id: timeFormData.work_type_id || null,
+        project_id: timeFormData.project_id || null,
+        work_category: timeFormData.work_category || 'work',
+        business_user_id: assignToUser,
+        description: timeFormData.description || null,
+        work_date: timeFormData.work_date,
+        start_time: timeFormData.start_time || null,
+        end_time: timeFormData.end_time || null,
+        duration_minutes: totalMins,
+        break_minutes: breakMins,
+        hourly_rate: timeFormData.hourly_rate ? parseFloat(timeFormData.hourly_rate) : null,
+        is_billable: timeFormData.is_billable
+      }
+
+      const { error } = await supabase.from('time_entry').insert(entryData)
+      if (error) throw error
+      showToast('Tid registrerad!', 'success')
+      setShowTimeModal(false)
+      fetchProjectData()
+    } catch (error: any) {
+      showToast(error.message || 'Något gick fel', 'error')
+    } finally {
+      setTimeSaving(false)
+    }
+  }
+
+  function handleTimeBookingChange(bookingId: string) {
+    const booking = timeModalBookings.find(b => b.booking_id === bookingId)
+    setTimeFormData(prev => ({
+      ...prev,
+      booking_id: bookingId,
+      customer_id: booking?.customer_id || prev.customer_id
+    }))
+  }
+
+  function handleTimeWorkTypeChange(wtId: string) {
+    const wt = timeModalWorkTypes.find(w => w.work_type_id === wtId)
+    setTimeFormData(prev => ({
+      ...prev,
+      work_type_id: wtId,
+      is_billable: wt ? wt.billable_default : prev.is_billable
+    }))
+  }
 
   // --- Data Fetching ---
 
@@ -1420,7 +1537,7 @@ export default function ProjectDetailPage() {
                   <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
                   <p className="text-sm text-gray-400 mb-3">Ingen tilldelad ännu</p>
                   <button
-                    onClick={() => setActiveTab('team')}
+                    onClick={() => { setActiveTab('team'); setTimeout(() => setShowAddMember(true), 100) }}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
@@ -1451,13 +1568,13 @@ export default function ProjectDetailPage() {
 
             {/* Quick actions */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <Link
-                href="/dashboard/time"
+              <button
+                onClick={() => openTimeModal()}
                 className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
               >
                 <Timer className="w-5 h-5 text-sky-700" />
-                <span className="text-sm text-gray-700">Lagg till tid</span>
-              </Link>
+                <span className="text-sm text-gray-700">Lägg till tid</span>
+              </button>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
                 className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
@@ -1886,13 +2003,13 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">Tidrapporter</h2>
-              <Link
-                href="/dashboard/time"
+              <button
+                onClick={() => openTimeModal()}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
-                Lagg till tid
-              </Link>
+                Lägg till tid
+              </button>
             </div>
 
             {/* Time summary */}
@@ -1917,9 +2034,9 @@ export default function ProjectDetailPage() {
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga tidrapporter annu</p>
-                <Link href="/dashboard/time" className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
-                  Lagg till din forsta tidrapport
-                </Link>
+                <button onClick={() => openTimeModal()} className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
+                  Lägg till din första tidrapport
+                </button>
               </div>
             ) : (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
@@ -3562,6 +3679,28 @@ export default function ProjectDetailPage() {
           }}
         />
       )}
+
+      {/* === Time Entry Modal === */}
+      <TimeEntryModal
+        show={showTimeModal}
+        onClose={() => setShowTimeModal(false)}
+        editing={false}
+        formData={timeFormData}
+        setFormData={setTimeFormData}
+        customers={timeModalCustomers}
+        bookings={timeModalBookings}
+        projects={timeModalProjects}
+        workTypes={timeModalWorkTypes}
+        teamMembers={timeModalTeamMembers}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        formPersonId={timeFormPersonId}
+        setFormPersonId={setTimeFormPersonId}
+        currentUserId={currentUser?.id}
+        saving={timeSaving}
+        onSave={handleTimeSave}
+        onBookingChange={handleTimeBookingChange}
+        onWorkTypeChange={handleTimeWorkTypeChange}
+      />
     </div>
   )
 }

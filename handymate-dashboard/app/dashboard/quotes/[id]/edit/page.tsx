@@ -354,8 +354,8 @@ export default function EditQuotePage() {
   }, [business.business_id, quoteId])
 
   async function fetchData() {
-    const [customersRes, priceListRes, settingsRes, categoriesRes] = await Promise.all([
-      supabase.from('customer').select('*').eq('business_id', business.business_id),
+    const [customersApiRes, priceListRes, settingsRes, categoriesRes] = await Promise.all([
+      fetch('/api/customers').then(r => r.json()),
       supabase
         .from('price_list')
         .select('*')
@@ -373,7 +373,7 @@ export default function EditQuotePage() {
         .order('created_at'),
     ])
 
-    setCustomers(customersRes.data || [])
+    setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     setPriceList(priceListRes.data || [])
     setCustomCategories((categoriesRes.data as CustomCategory[]) || [])
     setPricingSettings(

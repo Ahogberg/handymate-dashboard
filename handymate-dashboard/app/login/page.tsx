@@ -1,11 +1,12 @@
-﻿'use client'
+'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Zap, Loader2, ArrowRight, Mail, Lock } from 'lucide-react'
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({ email: '', password: '' })
@@ -36,7 +37,8 @@ export default function LoginPage() {
         throw new Error(result.error || 'Fel e-post eller lösenord')
       }
 
-      router.push('/dashboard')
+      const redirect = searchParams.get('redirect') || '/dashboard'
+      router.push(redirect)
 
     } catch (err: any) {
       setError(err.message)
@@ -97,7 +99,7 @@ export default function LoginPage() {
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
               />
             </div>
-            
+
 <div className="text-right">
   <a href="/forgot-password" className="text-sm text-sky-700 hover:text-teal-600">
     Glömt lösenordet?
@@ -135,5 +137,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

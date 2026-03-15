@@ -416,8 +416,8 @@ export default function NewQuotePage() {
   }, [business.business_id])
 
   async function fetchData() {
-    const [customersRes, priceListRes, settingsRes, customCatRes] = await Promise.all([
-      supabase.from('customer').select('*').eq('business_id', business.business_id),
+    const [customersApiRes, priceListRes, settingsRes, customCatRes] = await Promise.all([
+      fetch('/api/customers').then(r => r.json()),
       supabase
         .from('price_list')
         .select('*')
@@ -435,10 +435,10 @@ export default function NewQuotePage() {
         .order('created_at'),
     ])
 
-    if (customersRes.error) {
-      console.error('[NewQuote] Kunde inte hämta kunder:', customersRes.error)
+    if (!customersApiRes || customersApiRes.error) {
+      console.error('[NewQuote] Kunde inte hämta kunder:', customersApiRes?.error)
     }
-    setCustomers(customersRes.data || [])
+    setCustomers(customersApiRes?.customers || [])
     setPriceList(priceListRes.data || [])
     setCustomCategories((customCatRes.data as CustomCategory[]) || [])
     setPricingSettings(

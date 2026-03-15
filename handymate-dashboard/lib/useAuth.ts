@@ -31,11 +31,11 @@ export function useAuth(requireAuth = true) {
           const data = await response.json()
           setBusiness(data.business)
         } else if (requireAuth) {
-          router.push('/login')
+          router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
         }
       } catch (error) {
         if (requireAuth) {
-          router.push('/login')
+          router.push('/login?redirect=' + encodeURIComponent(window.location.pathname))
         }
       } finally {
         setLoading(false)

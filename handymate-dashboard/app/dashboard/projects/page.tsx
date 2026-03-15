@@ -126,12 +126,14 @@ export default function ProjectsPage() {
   }
 
   async function fetchCustomers() {
-    const { data } = await supabase
-      .from('customer')
-      .select('customer_id, name')
-      .eq('business_id', business.business_id)
-      .order('name')
-    setCustomers(data || [])
+    try {
+      const res = await fetch('/api/customers')
+      const json = await res.json()
+      setCustomers(json?.customers || json?.data || [])
+    } catch (err) {
+      console.error('[Projects] Kunde inte hämta kunder:', err)
+      setCustomers([])
+    }
   }
 
   async function fetchTeamMembers() {

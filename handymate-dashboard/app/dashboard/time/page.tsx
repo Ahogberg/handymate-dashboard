@@ -681,7 +681,7 @@ export default function TimePage() {
           </Link>
 
           <button onClick={() => openAddModal()}
-            className="px-4 py-[8px] bg-[#0F766E] text-white border-none rounded-lg text-[13px] font-medium cursor-pointer hover:bg-[#0F766E]/90">
+            className="ml-auto px-4 py-[8px] bg-[#0F766E] text-white border-none rounded-lg text-[13px] font-medium cursor-pointer hover:bg-[#0F766E]/90">
             + Lägg till
           </button>
         </div>
@@ -764,7 +764,7 @@ export default function TimePage() {
         <div className="bg-white border-thin border-[#E2E8F0] rounded-xl overflow-hidden mb-6">
           {/* Grid header */}
           <div className="grid grid-cols-[180px_repeat(7,1fr)_72px] border-b border-thin border-[#E2E8F0]">
-            <div className="px-4 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-left">Kund</div>
+            <div className="px-4 py-[10px] text-[10px] tracking-[0.07em] uppercase text-[#CBD5E1] text-left">Projekt</div>
             {weekDates.map((date, i) => {
               const isToday = isSameDay(date, new Date())
               return (

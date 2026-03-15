@@ -50,12 +50,18 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
   const [loading, setLoading] = useState(true)
   const [lastSaved, setLastSaved] = useState<string | null>(null)
   const [fabricLoaded, setFabricLoaded] = useState(false)
+  const [fabricError, setFabricError] = useState(false)
 
   // Load fabric.js dynamically (client-only)
   useEffect(() => {
     import('fabric').then((mod) => {
       (window as any).__fabric = mod
       setFabricLoaded(true)
+    }).catch((err) => {
+      console.error('[ProjectCanvas] Failed to load fabric:', err)
+      setFabricError(true)
+      setFabricLoaded(true) // stop spinner
+      setLoading(false)
     })
   }, [])
 
@@ -310,6 +316,16 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
 
   const toolBtnClass = (t: ToolMode) =>
     `p-2 rounded-lg transition ${tool === t ? 'bg-teal-100 text-teal-700 border border-teal-300' : 'text-gray-500 hover:bg-gray-100 border border-transparent'}`
+
+  if (fabricError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <X className="w-8 h-8 text-red-400 mb-2" />
+        <span className="text-sm text-gray-700 font-medium">Skissblocket kunde inte laddas</span>
+        <span className="text-xs text-gray-400 mt-1">Försök ladda om sidan</span>
+      </div>
+    )
+  }
 
   if (!fabricLoaded || loading) {
     return (

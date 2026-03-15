@@ -460,7 +460,7 @@ export default function PipelinePage() {
 
   async function handleDealFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files
-    if (!files || files.length === 0 || !selectedDeal?.customer_id) return
+    if (!files || files.length === 0 || !selectedDeal) return
 
     setDealUploading(true)
     let successCount = 0
@@ -476,7 +476,7 @@ export default function PipelinePage() {
         formData.append('file', file)
         formData.append('category', dealUploadCategory)
 
-        const res = await fetch(`/api/customers/${selectedDeal.customer_id}/documents/upload`, {
+        const res = await fetch(`/api/deals/${selectedDeal.id}/documents/upload`, {
           method: 'POST',
           body: formData,
         })
@@ -498,7 +498,7 @@ export default function PipelinePage() {
     setDealUploading(false)
     e.target.value = ''
     if (successCount > 0) {
-      fetchDealDocuments(selectedDeal.customer_id)
+      fetchDealDocuments(selectedDeal.customer_id || selectedDeal.id)
       showToast(successCount === 1 ? 'Dokument uppladdat' : `${successCount} dokument uppladdade`, 'success')
     }
     if (failCount > 0) {
@@ -1134,8 +1134,8 @@ export default function PipelinePage() {
     fetchDealActivities(deal.id)
     fetchDealNotes(deal.id)
     fetchDealTasks(deal.id)
+    fetchDealDocuments(deal.customer_id || deal.id)
     if (deal.customer_id) {
-      fetchDealDocuments(deal.customer_id)
       fetchCustomerEnrichment(deal.customer_id)
     }
     // Fetch emails if customer has email
@@ -2001,75 +2001,67 @@ export default function PipelinePage() {
                 {/* TAB: Dokument */}
                 {dealTab === 'documents' && (
                   <div className="space-y-4">
-                    {selectedDeal.customer_id ? (
-                      <>
-                        {/* Upload area */}
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={dealUploadCategory}
-                            onChange={(e) => setDealUploadCategory(e.target.value)}
-                            className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-teal-400"
-                          >
-                            <option value="drawing">Ritning</option>
-                            <option value="sketch">Skiss</option>
-                            <option value="description">Beskrivning</option>
-                            <option value="contract">Kontrakt</option>
-                            <option value="photo">Foto</option>
-                            <option value="other">Övrigt</option>
-                          </select>
-                          <label className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-teal-100 cursor-pointer transition-colors">
-                            {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                            {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
-                            <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
-                          </label>
-                          <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-teal-600">
-                            Visa alla i kundkort
-                          </Link>
-                        </div>
+                    {/* Upload area */}
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={dealUploadCategory}
+                        onChange={(e) => setDealUploadCategory(e.target.value)}
+                        className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-teal-400"
+                      >
+                        <option value="drawing">Ritning</option>
+                        <option value="sketch">Skiss</option>
+                        <option value="description">Beskrivning</option>
+                        <option value="contract">Kontrakt</option>
+                        <option value="photo">Foto</option>
+                        <option value="other">Övrigt</option>
+                      </select>
+                      <label className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-teal-100 cursor-pointer transition-colors">
+                        {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
+                        <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
+                      </label>
+                      {selectedDeal.customer_id && (
+                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-teal-600">
+                          Visa alla i kundkort
+                        </Link>
+                      )}
+                    </div>
 
-                        {/* Document list */}
-                        {dealDocuments.length > 0 ? (
-                          <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
-                            {dealDocuments.map((doc) => (
-                              <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
-                                <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                  {doc.file_type?.startsWith('image/') ? (
-                                    <ImageIcon className="w-4 h-4 text-teal-600" />
-                                  ) : doc.file_type?.includes('pdf') ? (
-                                    <FileText className="w-4 h-4 text-red-500" />
-                                  ) : (
-                                    <FileIcon className="w-4 h-4 text-gray-400" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-900 truncate">{doc.file_name}</p>
-                                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
-                                      {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
-                                    </span>
-                                    {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
-                                    <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
-                                  </div>
-                                </div>
-                                <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Öppna">
-                                  <Download className="w-4 h-4" />
-                                </a>
+                    {/* Document list */}
+                    {dealDocuments.length > 0 ? (
+                      <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                        {dealDocuments.map((doc) => (
+                          <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
+                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              {doc.file_type?.startsWith('image/') ? (
+                                <ImageIcon className="w-4 h-4 text-teal-600" />
+                              ) : doc.file_type?.includes('pdf') ? (
+                                <FileText className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <FileIcon className="w-4 h-4 text-gray-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-900 truncate">{doc.file_name}</p>
+                              <div className="flex items-center gap-2 text-xs text-gray-400">
+                                <span className="px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">
+                                  {{ drawing: 'Ritning', sketch: 'Skiss', description: 'Beskrivning', contract: 'Kontrakt', photo: 'Foto', other: 'Övrigt' }[doc.category] || doc.category}
+                                </span>
+                                {doc.file_size && <span>{formatFileSize(doc.file_size)}</span>}
+                                <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
                               </div>
-                            ))}
+                            </div>
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Öppna">
+                              <Download className="w-4 h-4" />
+                            </a>
                           </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                            <Upload className="w-8 h-8 mb-2 opacity-40" />
-                            <p className="text-sm">Inga dokument ännu</p>
-                            <p className="text-xs mt-1">Ladda upp dokument med knappen ovan</p>
-                          </div>
-                        )}
-                      </>
+                        ))}
+                      </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-                        <User className="w-8 h-8 mb-2 opacity-40" />
-                        <p className="text-sm">Koppla en kund till denna deal</p>
-                        <p className="text-xs mt-1">Dokument kopplas via kundkortet</p>
+                        <Upload className="w-8 h-8 mb-2 opacity-40" />
+                        <p className="text-sm">Inga dokument ännu</p>
+                        <p className="text-xs mt-1">Ladda upp dokument med knappen ovan</p>
                       </div>
                     )}
                   </div>

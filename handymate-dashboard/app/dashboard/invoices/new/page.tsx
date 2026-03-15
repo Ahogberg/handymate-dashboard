@@ -79,12 +79,8 @@ export default function NewInvoicePage() {
   }, [business.business_id])
 
   async function fetchData() {
-    const [customersRes, timeRes, configRes] = await Promise.all([
-      supabase
-        .from('customer')
-        .select('customer_id, name, phone_number, email, address_line, personal_number, property_designation')
-        .eq('business_id', business.business_id)
-        .order('name'),
+    const [customersApiRes, timeRes, configRes] = await Promise.all([
+      fetch('/api/customers').then(r => r.json()),
       supabase
         .from('time_entry')
         .select(`*, customer:customer_id (name)`)
@@ -98,7 +94,7 @@ export default function NewInvoicePage() {
         .single()
     ])
 
-    setCustomers(customersRes.data || [])
+    setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     setTimeEntries(timeRes.data || [])
 
     if (configRes.data) {

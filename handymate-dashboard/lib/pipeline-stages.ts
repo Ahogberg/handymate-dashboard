@@ -21,12 +21,12 @@ export interface LeadPipelineStage {
 
 /** Default 8 systemsteg — seedad via SQL, fallback här */
 export const DEFAULT_LEAD_STAGES: Omit<LeadPipelineStage, 'id' | 'business_id' | 'created_at'>[] = [
-  { key: 'new_lead',      label: 'Ny lead',          sort_order: 1,  is_system: true, color: '#8B5CF6', creates_project: false },
-  { key: 'contacted',     label: 'Kontaktad',        sort_order: 2,  is_system: true, color: '#3B82F6', creates_project: false },
+  { key: 'new_lead',      label: 'Ny lead',          sort_order: 1,  is_system: true, color: '#5EEAD4', creates_project: false },
+  { key: 'contacted',     label: 'Kontaktad',        sort_order: 2,  is_system: true, color: '#14B8A6', creates_project: false },
   { key: 'quote_sent',    label: 'Offert skickad',   sort_order: 3,  is_system: true, color: '#F59E0B', creates_project: false },
   { key: 'quote_opened',  label: 'Offert öppnad',    sort_order: 4,  is_system: true, color: '#F97316', creates_project: false },
   { key: 'active_job',    label: 'Aktivt jobb',      sort_order: 5,  is_system: true, color: '#0F766E', creates_project: true },
-  { key: 'invoiced',      label: 'Fakturerad',       sort_order: 6,  is_system: true, color: '#6366F1', creates_project: false },
+  { key: 'invoiced',      label: 'Fakturerad',       sort_order: 6,  is_system: true, color: '#0D9488', creates_project: false },
   { key: 'completed',     label: 'Avslutad',         sort_order: 7,  is_system: true, color: '#22C55E', creates_project: false },
   { key: 'lost',          label: 'Förlorad',         sort_order: 99, is_system: true, color: '#EF4444', creates_project: false },
 ]

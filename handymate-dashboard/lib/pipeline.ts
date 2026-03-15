@@ -54,10 +54,10 @@ export interface PipelineActivity {
 }
 
 export const DEFAULT_STAGES = [
-  { slug: 'lead', name: 'Ny lead', color: '#8B5CF6', sort_order: 1, is_system: false, is_won: false, is_lost: false },
-  { slug: 'contacted', name: 'Kontaktad', color: '#3B82F6', sort_order: 2, is_system: false, is_won: false, is_lost: false },
+  { slug: 'lead', name: 'Ny lead', color: '#5EEAD4', sort_order: 1, is_system: false, is_won: false, is_lost: false },
+  { slug: 'contacted', name: 'Kontaktad', color: '#14B8A6', sort_order: 2, is_system: false, is_won: false, is_lost: false },
   { slug: 'quote_sent', name: 'Offert skickad', color: '#F59E0B', sort_order: 3, is_system: false, is_won: false, is_lost: false },
-  { slug: 'negotiation', name: 'Förhandling', color: '#EC4899', sort_order: 4, is_system: false, is_won: false, is_lost: false },
+  { slug: 'negotiation', name: 'Förhandling', color: '#0F766E', sort_order: 4, is_system: false, is_won: false, is_lost: false },
   { slug: 'won', name: 'Vunnen', color: '#22C55E', sort_order: 5, is_system: true, is_won: true, is_lost: false },
   { slug: 'lost', name: 'Förlorad', color: '#EF4444', sort_order: 99, is_system: true, is_won: false, is_lost: true },
 ]
