@@ -1421,6 +1421,23 @@ export default function SettingsPage() {
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
             </Link>
 
+            {/* Länk till offertkategorier */}
+            <Link
+              href="/dashboard/settings/quote-categories"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-teal-300 transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-teal-600/20 to-teal-500/20 border border-teal-300">
+                  <FileText className="w-5 h-5 text-teal-700" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Offertkategorier</p>
+                  <p className="text-sm text-gray-400">Egna kategorier för offertrader</p>
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
+            </Link>
+
             {/* Länk till formulärmallar */}
             <Link
               href="/dashboard/settings/form-templates"

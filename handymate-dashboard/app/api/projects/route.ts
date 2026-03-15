@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getNextProjectNumber } from '@/lib/numbering'
 
 /**
  * GET - Lista projekt för ett företag
@@ -178,6 +179,11 @@ export async function POST(request: NextRequest) {
     if (!projectData.name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
+
+    // Tilldela projektnummer (P-XXXX)
+    try {
+      projectData.project_number = await getNextProjectNumber(supabase, businessId)
+    } catch { /* non-blocking — kolumnen kanske inte finns ännu */ }
 
     const { data: project, error: insertError } = await supabase
       .from('project')

@@ -18,6 +18,7 @@ export interface QuoteItem {
   total: number
   cost_price?: number
   article_number?: string
+  category_slug?: string
   is_rot_eligible: boolean
   is_rut_eligible: boolean
   rot_rut_type?: RotRutType

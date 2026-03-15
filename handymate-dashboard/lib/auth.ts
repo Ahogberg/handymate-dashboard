@@ -79,18 +79,38 @@ export async function getAuthenticatedBusiness(
       return null
     }
 
-    // Hämta business_config för användaren
+    // Hämta business_config för användaren (som ägare)
     const { data: business, error: businessError } = await supabase
       .from('business_config')
       .select('*')
       .eq('user_id', user.id)
       .single()
 
-    if (businessError || !business) {
-      return null
+    if (!businessError && business) {
+      return business as AuthenticatedBusiness
     }
 
-    return business as AuthenticatedBusiness
+    // Fallback: kolla om användaren är anställd via business_users
+    const { data: businessUser } = await supabase
+      .from('business_users')
+      .select('business_id')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .single()
+
+    if (businessUser) {
+      const { data: employeeBusiness } = await supabase
+        .from('business_config')
+        .select('*')
+        .eq('business_id', businessUser.business_id)
+        .single()
+
+      if (employeeBusiness) {
+        return employeeBusiness as AuthenticatedBusiness
+      }
+    }
+
+    return null
 
   } catch (error) {
     console.error('Auth error:', error)

@@ -46,10 +46,15 @@ const UNIT_OPTIONS = [
 ]
 
 const CATEGORY_OPTIONS = [
-  { value: 'material', label: 'Material' },
-  { value: 'arbete', label: 'Arbete' },
+  { value: 'arbete_el', label: 'Arbete — El' },
+  { value: 'arbete_vvs', label: 'Arbete — VVS' },
+  { value: 'arbete_bygg', label: 'Arbete — Bygg' },
+  { value: 'arbete_maleri', label: 'Arbete — Måleri' },
+  { value: 'material_el', label: 'Material — El' },
+  { value: 'material_vvs', label: 'Material — VVS' },
+  { value: 'material_bygg', label: 'Material — Bygg' },
   { value: 'hyra', label: 'Hyra' },
-  { value: 'övrigt', label: 'Övrigt' },
+  { value: 'ovrigt', label: 'Övrigt' },
 ]
 
 export default function ProductsPage() {
@@ -230,11 +235,13 @@ export default function ProductsPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900 truncate">{product.name}</span>
                     <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${
-                      product.category === 'arbete'
+                      product.category.startsWith('arbete')
                         ? 'bg-teal-100 text-teal-600'
                         : product.category === 'hyra'
                           ? 'bg-purple-100 text-purple-600'
-                          : 'bg-gray-100 text-gray-500'
+                          : product.category.startsWith('material')
+                            ? 'bg-amber-100 text-amber-600'
+                            : 'bg-gray-100 text-gray-500'
                     }`}>
                       {CATEGORY_OPTIONS.find(c => c.value === product.category)?.label || product.category}
                     </span>
@@ -321,7 +328,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
 }) {
   const [name, setName] = useState(product?.name || '')
   const [description, setDescription] = useState(product?.description || '')
-  const [category, setCategory] = useState(product?.category || 'material')
+  const [category, setCategory] = useState(product?.category || 'material_bygg')
   const [sku, setSku] = useState(product?.sku || '')
   const [unit, setUnit] = useState(product?.unit || 'st')
   const [purchasePrice, setPurchasePrice] = useState(product?.purchase_price?.toString() || '')

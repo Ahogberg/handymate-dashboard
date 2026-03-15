@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Uppdatera offert till accepted
-    const { error: updateErr } = await supabase
+    let { error: updateErr } = await supabase
       .from('quotes')
       .update({
         status: 'accepted',
@@ -48,7 +48,19 @@ export async function POST(request: NextRequest) {
       })
       .eq('quote_id', quoteId)
 
-    if (updateErr) throw updateErr
+    // Fallback: om accepted_manually/accepted_at inte finns i DB ännu
+    if (updateErr && updateErr.message?.includes('column')) {
+      const fallback = await supabase
+        .from('quotes')
+        .update({ status: 'accepted' })
+        .eq('quote_id', quoteId)
+      updateErr = fallback.error
+    }
+
+    if (updateErr) {
+      console.error('Quote accept update error:', updateErr)
+      return NextResponse.json({ error: `Databasfel: ${updateErr.message}` }, { status: 500 })
+    }
 
     // Pipeline: flytta deal till accepted
     try {

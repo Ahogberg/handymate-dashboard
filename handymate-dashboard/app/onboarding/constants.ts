@@ -1,17 +1,12 @@
 import { Building2, Briefcase, Phone, Link2, Users, Zap, CheckCircle2, Settings, Smartphone } from 'lucide-react'
 
-// ─── Steps ──────────────────────────────────────────────────────────
+// ─── Steps (V2 — bantad till 4 steg) ────────────────────────────────
 
 export const STEPS = [
   { id: 1, label: 'Företag', icon: Building2 },
   { id: 2, label: 'Tjänster', icon: Briefcase },
   { id: 3, label: 'Telefon', icon: Phone },
-  { id: 4, label: 'Kopplingar', icon: Link2 },
-  { id: 5, label: 'Leads', icon: Users },
-  { id: 6, label: 'Automat.', icon: Zap },
-  { id: 7, label: 'Klart!', icon: CheckCircle2 },
-  { id: 8, label: 'Jobbstil', icon: Settings },
-  { id: 9, label: 'Installera', icon: Smartphone },
+  { id: 4, label: 'Klart!', icon: CheckCircle2 },
 ]
 
 // ─── Branches ───────────────────────────────────────────────────────

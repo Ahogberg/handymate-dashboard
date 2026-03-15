@@ -4,7 +4,7 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
 import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
-import { getNextCustomerNumber, getNextProjectNumber } from '@/lib/numbering'
+import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
 
 interface ToolResult {
   success: boolean
@@ -780,19 +780,19 @@ async function qualifyLead(
   }
 
   const leadId = generateId('lead')
-  const projectNumber = await getNextProjectNumber(supabase, businessId)
+  const leadNumber = await getNextLeadNumber(supabase, businessId)
   const { error } = await supabase.from('leads').insert({
     lead_id: leadId, business_id: businessId, phone, name: contactName || null,
     source, status: 'new', score, score_reasons: scoreReasons.filter(r => r.matched),
     estimated_value: estimatedValue, job_type: jobType, urgency,
-    conversation_id: conversationId, project_number: projectNumber, created_at: now, updated_at: now,
+    conversation_id: conversationId, lead_number: leadNumber, created_at: now, updated_at: now,
   })
 
   if (error) return { success: false, error: error.message }
 
   await supabase.from('lead_activities').insert({
     activity_id: generateId('la'), lead_id: leadId, business_id: businessId,
-    activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'} (${projectNumber}), score ${score}`,
+    activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'} (${leadNumber}), score ${score}`,
     created_at: now,
   }).catch(() => {})
 
@@ -805,7 +805,7 @@ async function qualifyLead(
     })
   } catch { /* non-blocking */ }
 
-  return { success: true, data: { lead_id: leadId, project_number: projectNumber, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad ${projectNumber} (score ${score})` } }
+  return { success: true, data: { lead_id: leadId, lead_number: leadNumber, action: 'created', score, urgency, job_type: jobType, estimated_value: estimatedValue, message: `Lead skapad ${leadNumber} (score ${score})` } }
 }
 
 async function updateLeadStatus(

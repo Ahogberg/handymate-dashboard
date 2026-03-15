@@ -470,6 +470,26 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     )
   }
 
+  // ── Role-based filtering ──────────────────────────────────────────
+  const isEmployee = currentUser?.role === 'employee'
+  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent'])
+  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
+
+  function filterNavForRole(items: NavItem[]): NavItem[] {
+    if (!isEmployee) return items
+    return items
+      .filter(item => !HIDDEN_FOR_EMPLOYEE.has(item.key))
+      .map(item => {
+        if (item.type === 'group') {
+          const filtered = item.children.filter(c => !HIDDEN_CHILDREN_FOR_EMPLOYEE.has(c.href))
+          if (filtered.length === 0) return null
+          return { ...item, children: filtered }
+        }
+        return item
+      })
+      .filter(Boolean) as NavItem[]
+  }
+
   // ── Sidebar content (shared by mobile + desktop) ───────────────────
   const sidebarContent = (
     <>
@@ -557,12 +577,12 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
       {/* Main navigation */}
       <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-        {NAV.map(item => renderNavItem(item))}
+        {filterNavForRole(NAV).map(item => renderNavItem(item))}
       </nav>
 
       {/* Bottom section: Inställningar + Bjud in kollega */}
       <div className="p-3 pt-0 space-y-0.5 border-t border-white/10">
-        {BOTTOM_NAV.map(item => renderNavItem(item))}
+        {filterNavForRole(BOTTOM_NAV).map(item => renderNavItem(item))}
       </div>
 
       {/* User Menu */}

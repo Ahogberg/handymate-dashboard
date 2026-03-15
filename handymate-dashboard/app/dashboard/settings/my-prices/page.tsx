@@ -180,6 +180,7 @@ export default function MyPricesPage() {
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <Wrench className="w-4 h-4 text-teal-600" />
             <h2 className="font-semibold text-gray-900">Arbete</h2>
+            <span className="text-xs text-gray-400 ml-auto">Priser exkl. moms</span>
           </div>
           <div className="divide-y divide-gray-100">
             {laborItems.length === 0 && (
@@ -238,6 +239,7 @@ export default function MyPricesPage() {
             <Package className="w-4 h-4 text-amber-600" />
             <h2 className="font-semibold text-gray-900">Material</h2>
             <span className="text-xs text-gray-400 ml-1">(valfritt)</span>
+            <span className="text-xs text-gray-400 ml-auto">Priser exkl. moms</span>
           </div>
           <div className="divide-y divide-gray-100">
             {materialItems.length === 0 && (

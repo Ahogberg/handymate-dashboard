@@ -52,6 +52,12 @@ import {
   calculatePaymentPlan,
   validatePaymentPlan,
 } from '@/lib/quote-calculations'
+import {
+  SYSTEM_CATEGORIES,
+  getAllCategories,
+  getCategoryRotRut,
+  type CustomCategory,
+} from '@/lib/constants/categories'
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -287,6 +293,11 @@ export default function EditQuotePage() {
   // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
+  // Category state
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([])
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
+  const [newCategoryLabel, setNewCategoryLabel] = useState('')
+
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
@@ -308,6 +319,9 @@ export default function EditQuotePage() {
     }
     return map
   }, [allStandardTexts])
+
+  // ─── Derived: all categories ─────────────────────────────────────────────
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories])
 
   // ─── Derived: totals ──────────────────────────────────────────────────────
   const vatRate = pricingSettings?.vat_rate ?? 25
@@ -340,7 +354,7 @@ export default function EditQuotePage() {
   }, [business.business_id, quoteId])
 
   async function fetchData() {
-    const [customersRes, priceListRes, settingsRes] = await Promise.all([
+    const [customersRes, priceListRes, settingsRes, categoriesRes] = await Promise.all([
       supabase.from('customer').select('*').eq('business_id', business.business_id),
       supabase
         .from('price_list')
@@ -352,10 +366,16 @@ export default function EditQuotePage() {
         .select('pricing_settings')
         .eq('business_id', business.business_id)
         .single(),
+      supabase
+        .from('custom_quote_categories')
+        .select('*')
+        .eq('business_id', business.business_id)
+        .order('created_at'),
     ])
 
     setCustomers(customersRes.data || [])
     setPriceList(priceListRes.data || [])
+    setCustomCategories((categoriesRes.data as CustomCategory[]) || [])
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
         hourly_rate: 650,
@@ -417,6 +437,7 @@ export default function EditQuotePage() {
           article_number: item.article_number || undefined,
           is_rot_eligible: item.is_rot_eligible || false,
           is_rut_eligible: item.is_rut_eligible || false,
+          category_slug: item.category_slug || undefined,
           sort_order: item.sort_order ?? idx,
         }))
         setItems(loadedItems)
@@ -697,6 +718,19 @@ export default function EditQuotePage() {
         } else if (updated.item_type === 'discount') {
           updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
         }
+        // Category auto-detection: set ROT/RUT based on category
+        if (field === 'category_slug' && value) {
+          const catRotRut = getCategoryRotRut(value, customCategories)
+          if (catRotRut.rot) {
+            updated.is_rot_eligible = true
+            updated.is_rut_eligible = false
+            updated.rot_rut_type = 'rot'
+          } else if (catRotRut.rut) {
+            updated.is_rot_eligible = false
+            updated.is_rut_eligible = true
+            updated.rot_rut_type = 'rut'
+          }
+        }
         // Sync rot_rut_type with boolean flags
         if (field === 'rot_rut_type') {
           updated.rot_rut_type = (value || null) as RotRutType
@@ -714,7 +748,7 @@ export default function EditQuotePage() {
         return updated
       })
     )
-  }, [])
+  }, [customCategories])
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id))
@@ -1235,7 +1269,7 @@ export default function EditQuotePage() {
               ) : (
                 <div className="space-y-2">
                   {/* Table header (desktop) */}
-                  <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_60px_40px] gap-2 px-3 py-1 text-xs text-gray-400 font-medium">
+                  <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 px-3 py-1 text-xs text-gray-400 font-medium">
                     <span />
                     <span>Typ</span>
                     <span>Beskrivning</span>
@@ -1243,6 +1277,7 @@ export default function EditQuotePage() {
                     <span className="text-center">Enhet</span>
                     <span className="text-right">Pris</span>
                     <span className="text-right">Summa</span>
+                    <span className="text-center">Kategori</span>
                     <span className="text-center">ROT/RUT</span>
                     <span />
                   </div>
@@ -1257,6 +1292,7 @@ export default function EditQuotePage() {
                       onUpdate={updateItem}
                       onRemove={removeItem}
                       onMove={moveItem}
+                      allCategories={allCategories}
                     />
                   ))}
                 </div>
@@ -1687,6 +1723,7 @@ function ItemRow({
   onUpdate,
   onRemove,
   onMove,
+  allCategories,
 }: {
   item: QuoteItem
   index: number
@@ -1695,6 +1732,7 @@ function ItemRow({
   onUpdate: (id: string, field: keyof QuoteItem, value: any) => void
   onRemove: (id: string) => void
   onMove: (index: number, direction: 'up' | 'down') => void
+  allCategories: { slug: string; label: string }[]
 }) {
   const badge = ITEM_TYPE_BADGE[item.item_type]
   const rowStyle = ITEM_TYPE_STYLES[item.item_type]
@@ -1788,6 +1826,34 @@ function ItemRow({
         {isEditable && (
           <div className="flex items-center gap-3 pl-8 text-xs">
             <select
+              value={item.category_slug ?? ''}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  // Skip inline creation in edit page
+                } else {
+                  onUpdate(item.id, 'category_slug', e.target.value || undefined)
+                }
+              }}
+              className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
+            >
+              <option value="">Kategori —</option>
+              <optgroup label="Arbete">
+                {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Material">
+                {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Övrigt">
+                {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+            </select>
+            <select
               value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
               onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
               className="text-xs border border-gray-200 rounded-md px-2 py-1 text-gray-700 bg-white focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
@@ -1808,7 +1874,7 @@ function ItemRow({
       </div>
 
       {/* ── Desktop layout ─────────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_60px_40px] gap-2 items-center">
+      <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 items-center">
         {/* Move arrows */}
         <div className="flex flex-col gap-0.5 items-center">
           <button
@@ -1902,6 +1968,42 @@ function ItemRow({
         <span className="text-gray-900 font-medium text-sm text-right whitespace-nowrap">
           {showTotal ? formatCurrency(displayTotal) : ''}
         </span>
+
+        {/* Category dropdown */}
+        {isEditable ? (
+          <div className="flex items-center justify-center">
+            <select
+              value={item.category_slug ?? ''}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  // Skip inline creation in edit page
+                } else {
+                  onUpdate(item.id, 'category_slug', e.target.value || undefined)
+                }
+              }}
+              className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
+            >
+              <option value="">Kategori —</option>
+              <optgroup label="Arbete">
+                {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Material">
+                {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Övrigt">
+                {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
+                  <option key={c.slug} value={c.slug}>{c.label}</option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+        ) : (
+          <span />
+        )}
 
         {/* ROT/RUT dropdown */}
         {isEditable ? (

@@ -10,7 +10,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 async function getNextNumber(
   supabase: SupabaseClient,
   businessId: string,
-  counterType: 'customer' | 'project',
+  counterType: 'customer' | 'project' | 'lead',
   prefix: string
 ): Promise<string> {
   const { data, error } = await supabase.rpc('increment_counter', {
@@ -46,4 +46,14 @@ export async function getNextProjectNumber(
   businessId: string
 ): Promise<string> {
   return getNextNumber(supabase, businessId, 'project', 'P')
+}
+
+/**
+ * Nästa leadnummer: L-1001, L-1002, ...
+ */
+export async function getNextLeadNumber(
+  supabase: SupabaseClient,
+  businessId: string
+): Promise<string> {
+  return getNextNumber(supabase, businessId, 'lead', 'L')
 }

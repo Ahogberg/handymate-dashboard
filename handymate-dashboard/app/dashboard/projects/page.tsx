@@ -47,6 +47,7 @@ interface Project {
   ai_health_score: number | null
   ai_health_summary: string | null
   ai_auto_created: boolean
+  project_number: string | null
 }
 
 interface Customer {
@@ -77,12 +78,15 @@ export default function ProjectsPage() {
     end_date: ''
   })
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; role: string }[]>([])
+  const [selectedTeam, setSelectedTeam] = useState<string[]>([])
 
   useEffect(() => {
     if (business.business_id) {
       fetchProjects()
       fetchCustomers()
       fetchProjectAssignments()
+      fetchTeamMembers()
     }
   }, [business.business_id, filter])
 
@@ -130,6 +134,16 @@ export default function ProjectsPage() {
     setCustomers(data || [])
   }
 
+  async function fetchTeamMembers() {
+    const { data } = await supabase
+      .from('business_users')
+      .select('id, name, role')
+      .eq('business_id', business.business_id)
+      .eq('is_active', true)
+      .order('name')
+    setTeamMembers(data || [])
+  }
+
   async function handleCreateProject() {
     if (!newProject.name.trim()) {
       showToast('Ange ett projektnamn', 'error')
@@ -160,6 +174,16 @@ export default function ProjectsPage() {
       const { project } = await response.json()
       const newProjectId = project?.project_id
 
+      // Assign team members
+      if (newProjectId && selectedTeam.length > 0) {
+        const assignments = selectedTeam.map(userId => ({
+          project_id: newProjectId,
+          business_id: business.business_id,
+          business_user_id: userId,
+        }))
+        await supabase.from('project_assignment').insert(assignments)
+      }
+
       // Upload pending files if any
       if (newProjectId && pendingFiles.length > 0) {
         let uploadedCount = 0
@@ -184,6 +208,7 @@ export default function ProjectsPage() {
       setShowCreateModal(false)
       setNewProject({ name: '', customer_id: '', project_type: 'hourly', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
       setPendingFiles([])
+      setSelectedTeam([])
       fetchProjects()
     } catch (err: any) {
       showToast(err.message || 'Något gick fel', 'error')
@@ -388,6 +413,7 @@ export default function ProjectsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
+                        {project.project_number && <span className="text-xs font-medium text-gray-400 flex-shrink-0">{project.project_number}</span>}
                         <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                         <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
                           {getStatusText(project.status)}
@@ -606,6 +632,30 @@ export default function ProjectsPage() {
                   />
                 </div>
               </div>
+
+              {/* Teammedlemmar */}
+              {teamMembers.length > 0 && (
+                <div>
+                  <label className="block text-sm text-gray-500 mb-2">Utförare</label>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {teamMembers.map(member => (
+                      <label key={member.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition">
+                        <input
+                          type="checkbox"
+                          checked={selectedTeam.includes(member.id)}
+                          onChange={e => {
+                            if (e.target.checked) setSelectedTeam(prev => [...prev, member.id])
+                            else setSelectedTeam(prev => prev.filter(id => id !== member.id))
+                          }}
+                          className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                        <span className="text-sm text-gray-700">{member.name}</span>
+                        <span className="text-xs text-gray-400 ml-auto">{member.role === 'owner' ? 'Ägare' : member.role === 'admin' ? 'Admin' : 'Anställd'}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Dokument */}
               <div>

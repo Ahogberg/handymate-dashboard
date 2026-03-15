@@ -3202,7 +3202,22 @@ export default function ProjectDetailPage() {
                   {woDetail.materials_needed && (
                     <div>
                       <p className="text-xs font-medium text-teal-600 uppercase mb-1">Material att ta med</p>
-                      <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.materials_needed}</p>
+                      <div className="space-y-1">
+                        {woDetail.materials_needed.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
+                          const isChecked = line.startsWith('[x]')
+                          const text = line.replace(/^(\[x\]|\[ \])\s*/, '')
+                          return (
+                            <div key={i} className="flex items-center gap-2">
+                              {(line.startsWith('[x]') || line.startsWith('[ ]')) ? (
+                                <input type="checkbox" checked={isChecked} readOnly className="w-3.5 h-3.5 rounded border-gray-300 text-teal-600" />
+                              ) : (
+                                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
+                              )}
+                              <span className={`text-sm ${isChecked ? 'line-through text-gray-400' : 'text-gray-900'}`}>{text}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
                   {woDetail.tools_needed && (
@@ -3510,6 +3525,7 @@ export default function ProjectDetailPage() {
         <WorkOrderModal
           projectId={projectId}
           editing={woModal.editing}
+          projectData={project}
           onClose={() => setWoModal({ open: false, editing: null })}
           onSaved={() => {
             setWoModal({ open: false, editing: null })
@@ -4391,29 +4407,57 @@ function LogModal({ editing, onClose, onSave }: {
 
 // --- Work Order Modal ---
 
-function WorkOrderModal({ projectId, editing, onClose, onSaved, onSendSMS }: {
+function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onSendSMS }: {
   projectId: string
   editing: any | null
+  projectData?: Project | null
   onClose: () => void
   onSaved: () => void
   onSendSMS?: (id: string) => void
 }) {
+  const business = useBusiness()
   const [title, setTitle] = useState(editing?.title || '')
   const [scheduledDate, setScheduledDate] = useState(editing?.scheduled_date || '')
   const [scheduledStart, setScheduledStart] = useState(editing?.scheduled_start?.substring(0, 5) || '')
   const [scheduledEnd, setScheduledEnd] = useState(editing?.scheduled_end?.substring(0, 5) || '')
-  const [address, setAddress] = useState(editing?.address || '')
+  const [address, setAddress] = useState(editing?.address || (!editing && projectData?.customer?.address_line) || '')
   const [accessInfo, setAccessInfo] = useState(editing?.access_info || '')
-  const [contactName, setContactName] = useState(editing?.contact_name || '')
-  const [contactPhone, setContactPhone] = useState(editing?.contact_phone || '')
-  const [description, setDescription] = useState(editing?.description || '')
-  const [materialsNeeded, setMaterialsNeeded] = useState(editing?.materials_needed || '')
+  const [contactName, setContactName] = useState(editing?.contact_name || (!editing && projectData?.customer?.name) || '')
+  const [contactPhone, setContactPhone] = useState(editing?.contact_phone || (!editing && projectData?.customer?.phone_number) || '')
+  const [description, setDescription] = useState(editing?.description || (!editing && projectData?.description) || '')
+  const [materialItems, setMaterialItems] = useState<{ text: string; checked: boolean }[]>(() => {
+    const raw = editing?.materials_needed || ''
+    if (!raw.trim()) return []
+    return raw.split('\n').filter((l: string) => l.trim()).map((l: string) => ({
+      text: l.replace(/^(\[x\]|\[ \])\s*/, ''),
+      checked: l.startsWith('[x]'),
+    }))
+  })
+  const [newMaterialText, setNewMaterialText] = useState('')
+
+  // Serialize material items back to text for saving
+  const materialsNeeded = materialItems.length > 0
+    ? materialItems.map(m => `${m.checked ? '[x]' : '[ ]'} ${m.text}`).join('\n')
+    : ''
   const [toolsNeeded, setToolsNeeded] = useState(editing?.tools_needed || '')
   const [notes, setNotes] = useState(editing?.notes || '')
   const [assignedTo, setAssignedTo] = useState(editing?.assigned_to || '')
   const [assignedPhone, setAssignedPhone] = useState(editing?.assigned_phone || '')
   const [saving, setSaving] = useState(false)
   const [sendAfterSave, setSendAfterSave] = useState(false)
+  const [woTeamMembers, setWoTeamMembers] = useState<{ id: string; name: string; phone: string | null }[]>([])
+
+  useEffect(() => {
+    if (business.business_id) {
+      supabase
+        .from('business_users')
+        .select('id, name, phone')
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .order('name')
+        .then(({ data }: { data: any }) => setWoTeamMembers(data || []))
+    }
+  }, [business.business_id])
 
   const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
 
@@ -4531,10 +4575,57 @@ function WorkOrderModal({ projectId, editing, onClose, onSaved, onSendSMS }: {
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Beskriv arbetet som ska utföras..." className={inputCls + ' resize-none'} />
           </div>
 
-          {/* Material */}
+          {/* Material — checklista */}
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Material att ta med</label>
-            <textarea value={materialsNeeded} onChange={e => setMaterialsNeeded(e.target.value)} rows={2} placeholder="Lista material som behövs..." className={inputCls + ' resize-none'} />
+            <div className="space-y-1.5">
+              {materialItems.map((item, idx) => (
+                <div key={idx} className="flex items-center gap-2 group">
+                  <input
+                    type="checkbox"
+                    checked={item.checked}
+                    onChange={() => setMaterialItems(prev => prev.map((m, i) => i === idx ? { ...m, checked: !m.checked } : m))}
+                    className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  <span className={`text-sm flex-1 ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>{item.text}</span>
+                  <button
+                    type="button"
+                    onClick={() => setMaterialItems(prev => prev.filter((_, i) => i !== idx))}
+                    className="p-0.5 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newMaterialText}
+                  onChange={e => setNewMaterialText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && newMaterialText.trim()) {
+                      e.preventDefault()
+                      setMaterialItems(prev => [...prev, { text: newMaterialText.trim(), checked: false }])
+                      setNewMaterialText('')
+                    }
+                  }}
+                  placeholder="Lägg till material..."
+                  className={inputCls + ' flex-1'}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (newMaterialText.trim()) {
+                      setMaterialItems(prev => [...prev, { text: newMaterialText.trim(), checked: false }])
+                      setNewMaterialText('')
+                    }
+                  }}
+                  className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Verktyg */}
@@ -4547,7 +4638,23 @@ function WorkOrderModal({ projectId, editing, onClose, onSaved, onSendSMS }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Tilldela till</label>
-              <input type="text" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} placeholder="Namn" className={inputCls} />
+              {woTeamMembers.length > 0 ? (
+                <select
+                  value={assignedTo}
+                  onChange={e => {
+                    const name = e.target.value
+                    setAssignedTo(name)
+                    const member = woTeamMembers.find(m => m.name === name)
+                    if (member?.phone) setAssignedPhone(member.phone)
+                  }}
+                  className={inputCls}
+                >
+                  <option value="">Välj person...</option>
+                  {woTeamMembers.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={assignedTo} onChange={e => setAssignedTo(e.target.value)} placeholder="Namn" className={inputCls} />
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Mottagarens telefon</label>

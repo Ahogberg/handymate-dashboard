@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Plus, X, Save, Loader2, Zap, HelpCircle, FileText, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Plus, X, Save, Loader2, Zap, HelpCircle, FileText, AlertTriangle, Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
@@ -65,8 +65,13 @@ export default function KnowledgeBasePage() {
     policies: { quote: '', payment: '', warranty: '', cancellation: '' }
   })
 
+  // AI jobbstil-preferenser (flyttade från onboarding)
+  const [prefs, setPrefs] = useState<Record<string, string>>({})
+  const [prefsSaving, setPrefsSaving] = useState(false)
+
   useEffect(() => {
     fetchKnowledgeBase()
+    fetchPreferences()
   }, [business.business_id])
 
   async function fetchKnowledgeBase() {
@@ -86,6 +91,30 @@ export default function KnowledgeBasePage() {
       })
     }
     setLoading(false)
+  }
+
+  async function fetchPreferences() {
+    const { data } = await supabase
+      .from('business_preferences')
+      .select('key, value')
+      .eq('business_id', business.business_id)
+
+    if (data) {
+      const map: Record<string, string> = {}
+      data.forEach((p: { key: string; value: string }) => { map[p.key] = p.value })
+      setPrefs(map)
+    }
+  }
+
+  async function savePref(key: string, value: string) {
+    setPrefs(prev => ({ ...prev, [key]: value }))
+    try {
+      await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value, source: 'settings' }),
+      })
+    } catch { /* silent */ }
   }
 
   const showToast = (message: string, type: 'success' | 'error') => {
@@ -373,6 +402,141 @@ export default function KnowledgeBasePage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Jobbstil — AI-preferenser */}
+          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+              <Settings className="w-5 h-5 text-teal-600" />
+              Jobbstil
+            </h2>
+            <p className="text-sm text-gray-500 mb-5">Hjälp AI:n förstå hur du jobbar</p>
+
+            <div className="space-y-5">
+              {/* Marginal på material */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vilken marginal tar du på material?</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: '10', label: '10%' },
+                    { value: '15', label: '15%' },
+                    { value: '20', label: '20%' },
+                    { value: '25', label: '25%+' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => savePref('pricing_margin_default', opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        prefs.pricing_margin_default === opt.value
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Minsta jobbvärde */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vad är ditt minsta jobbvärde?</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: '5000', label: '< 5 000 kr' },
+                    { value: '10000', label: '5 000–10 000 kr' },
+                    { value: '25000', label: '10 000–25 000 kr' },
+                    { value: '25001', label: '> 25 000 kr' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => savePref('min_job_value_sek', opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        prefs.min_job_value_sek === opt.value
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Köravstånd */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hur långt är du villig att köra?</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: '10', label: '10 km' },
+                    { value: '30', label: '30 km' },
+                    { value: '50', label: '50 km' },
+                    { value: 'any', label: 'Spelar ingen roll' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => savePref('geography_max_km', opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        prefs.geography_max_km === opt.value
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Arbetstider */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Vilka arbetstider föredrar du?</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: '07-15', label: '07–15' },
+                    { value: '07-17', label: '07–17' },
+                    { value: '08-17', label: '08–17' },
+                    { value: 'flexible', label: 'Flexibelt' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => savePref('scheduling_preferred_hours', opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        prefs.scheduling_preferred_hours === opt.value
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Kontaktkanal */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hur vill du helst bli kontaktad?</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { value: 'push', label: 'Push-notis' },
+                    { value: 'email', label: 'E-post' },
+                    { value: 'both', label: 'Båda' },
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => savePref('preferred_contact_channel', opt.value)}
+                      className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
+                        prefs.preferred_contact_channel === opt.value
+                          ? 'bg-teal-600 text-white border-teal-600'
+                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:border-teal-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Policyer */}

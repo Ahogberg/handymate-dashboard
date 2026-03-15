@@ -155,6 +155,7 @@ export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: numbe
     unit: 'st',
     unit_price: 0,
     total: 0,
+    category_slug: undefined,
     is_rot_eligible: false,
     is_rut_eligible: false,
     sort_order: sortOrder,

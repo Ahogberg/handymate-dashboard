@@ -89,6 +89,7 @@ export default function DashboardPage() {
   const [callCount, setCallCount] = useState(0)
   const [priceListCount, setPriceListCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
+  const [showWelcome, setShowWelcome] = useState(false)
   const [activeProjects, setActiveProjects] = useState(0)
   const [pipelineStats, setPipelineStats] = useState<{
     byStage: Array<{ stage: string; slug: string; color: string; count: number; value: number }>
@@ -124,6 +125,17 @@ export default function DashboardPage() {
   const [activityLoaded, setActivityLoaded] = useState(false)
   const [projectsLoaded, setProjectsLoaded] = useState(false)
   const [scheduleLoaded, setScheduleLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!localStorage.getItem('hm_welcome_seen')) {
+      setShowWelcome(true)
+    }
+  }, [])
+
+  const closeWelcome = () => {
+    localStorage.setItem('hm_welcome_seen', '1')
+    setShowWelcome(false)
+  }
 
   useEffect(() => {
     fetchData()
@@ -431,6 +443,36 @@ export default function DashboardPage() {
             Översikt för {business.business_name}
           </p>
         </div>
+
+        {/* Welcome popup — visas bara en gång */}
+        {showWelcome && (
+          <div className="mb-6 p-5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl relative">
+            <button
+              onClick={closeWelcome}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 rounded-xl bg-teal-600 flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 mb-1">Välkommen till Handymate!</h2>
+                <p className="text-sm text-gray-600 mb-3">
+                  Din AI-assistent är redo att hjälpa dig hantera kunder, offerter och bokningar. Börja med att fylla i dina uppgifter i checklistan nedan.
+                </p>
+                <button
+                  onClick={closeWelcome}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+                >
+                  Kom igång
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Dagens Plan — Jobbkompisen */}
         {!loading && bookings.length > 0 && (

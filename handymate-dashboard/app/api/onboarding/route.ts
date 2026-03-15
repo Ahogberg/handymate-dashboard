@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
 
     const updates: Record<string, unknown> = {
-      onboarding_step: 8,
+      onboarding_step: 10, // Mark fully complete (compat with both V1 and V2 flows)
       onboarding_completed_at: new Date().toISOString(),
     }
 

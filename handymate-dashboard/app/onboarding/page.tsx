@@ -8,12 +8,7 @@ import StepProgress from './components/StepProgress'
 import Step1BusinessAccount from './components/Step1BusinessAccount'
 import Step2ServicesAndPricing from './components/Step2ServicesAndPricing'
 import Step3Phone from './components/Step3Phone'
-import Step4Connections from './components/Step4Connections'
-import Step5LeadSources from './components/Step5LeadSources'
-import Step6Automations from './components/Step6Automations'
 import Step7Complete from './components/Step7Complete'
-import Step8WorkStyle from './components/Step8WorkStyle'
-import Step9InstallApp from './components/Step9InstallApp'
 import OnboardingChatbot from './components/OnboardingChatbot'
 import type { OnboardingData } from './types'
 
@@ -44,15 +39,17 @@ export default function OnboardingPage() {
         setData(d)
 
         // If already completed, go to dashboard
-        // step >= 10 = new flow done, completed_at = old flow done
-        if (d.onboarding_step >= 10 || d.onboarding_completed_at) {
+        // step >= 5 (new V2 flow) or step >= 10 (legacy) or completed_at set
+        if (d.onboarding_step >= 5 || d.onboarding_step >= 10 || d.onboarding_completed_at) {
           router.push('/dashboard')
           return
         }
 
         // Resume at step 2+ (step 1 is only for new users)
         if (d.onboarding_step > 1) {
-          setCurrentStep(Math.min(d.onboarding_step, 9))
+          // Map legacy steps to new flow: steps 4-9 → step 4 (Klart!)
+          const mapped = Math.min(d.onboarding_step, 4)
+          setCurrentStep(mapped)
         } else {
           setCurrentStep(2) // Skip step 1, already registered
         }
@@ -81,7 +78,7 @@ export default function OnboardingPage() {
   }, [])
 
   const goNext = useCallback(async () => {
-    const nextStep = Math.min(currentStep + 1, 9)
+    const nextStep = Math.min(currentStep + 1, 4)
     setSaving(true)
     await saveProgress(nextStep)
     setCurrentStep(nextStep)
@@ -139,7 +136,6 @@ export default function OnboardingPage() {
     }
 
     // Set data + advance to step 2 SYNCHRONOUSLY before any await
-    // This prevents the blank screen between step 1 and step 2
     setData(baseData)
     setIsNewUser(false)
     setCurrentStep(2)
@@ -230,32 +226,12 @@ export default function OnboardingPage() {
           <Step3Phone {...stepProps} />
         )}
 
-        {currentStep === 4 && stepProps && (
-          <Step4Connections {...stepProps} />
-        )}
-
-        {currentStep === 5 && stepProps && (
-          <Step5LeadSources {...stepProps} />
-        )}
-
-        {currentStep === 6 && stepProps && (
-          <Step6Automations {...stepProps} />
-        )}
-
-        {currentStep === 7 && data && (
-          <Step7Complete data={data} onNext={goNext} />
-        )}
-
-        {currentStep === 8 && data && (
-          <Step8WorkStyle businessId={data.business_id} onNext={goNext} />
-        )}
-
-        {currentStep === 9 && (
-          <Step9InstallApp onBack={goBack} />
+        {currentStep === 4 && data && (
+          <Step7Complete data={data} />
         )}
 
         {/* Fallback: om inget steg renderas (data saknas), visa felmeddelande */}
-        {currentStep >= 2 && currentStep <= 6 && !stepProps && (
+        {currentStep >= 2 && currentStep <= 3 && !stepProps && (
           <div className="text-center py-16 space-y-4">
             <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
             <p className="text-zinc-400">Laddar steg {currentStep}...</p>
@@ -284,10 +260,10 @@ export default function OnboardingPage() {
             </button>
           </div>
         )}
-        {currentStep >= 7 && currentStep <= 8 && !data && (
+        {currentStep === 4 && !data && (
           <div className="text-center py-16 space-y-4">
             <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
-            <p className="text-zinc-400">Laddar steg {currentStep}...</p>
+            <p className="text-zinc-400">Laddar...</p>
           </div>
         )}
       </div>

@@ -1,23 +1,14 @@
-﻿'use client'
+'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Check,
-  Circle,
-  Mail,
-  Phone,
-  PhoneForwarded,
-  Clock,
-  PhoneCall,
-  Image,
   X,
   ChevronRight,
   Sparkles,
-  ExternalLink,
-  Loader2,
+  ChevronDown,
 } from 'lucide-react'
-import { useToast } from '@/components/Toast'
 
 interface OnboardingChecklistProps {
   businessId: string
@@ -30,6 +21,8 @@ interface OnboardingChecklistProps {
     logo_url?: string | null
     onboarding_dismissed?: boolean
     google_connected?: boolean
+    google_calendar_connected?: boolean
+    gmail_enabled?: boolean
     services_offered?: string[]
     default_hourly_rate?: number
   }
@@ -43,14 +36,14 @@ interface OnboardingChecklistProps {
 interface ChecklistItem {
   id: string
   label: string
-  description?: string
   completed: boolean
-  action?: {
-    type: 'link' | 'button' | 'external'
-    label: string
-    href?: string
-    onClick?: () => void
-  }
+  optional?: boolean
+  link?: string
+}
+
+interface ChecklistGroup {
+  title: string
+  items: ChecklistItem[]
 }
 
 export default function OnboardingChecklist({
@@ -62,186 +55,151 @@ export default function OnboardingChecklist({
   onDismiss,
   onUpdate,
 }: OnboardingChecklistProps) {
-  const toast = useToast()
-  const [loading, setLoading] = useState<string | null>(null)
-  const [resendingEmail, setResendingEmail] = useState(false)
+  const [showConfetti, setShowConfetti] = useState(false)
+  const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
 
-  // Don't show if dismissed or all complete
+  // Don't show if dismissed
   if (businessConfig.onboarding_dismissed) {
     return null
   }
 
-  // Build checklist items
-  const items: ChecklistItem[] = [
+  const groups: ChecklistGroup[] = [
     {
-      id: 'account',
-      label: 'Konto skapat',
-      completed: true, // Always true if they can see dashboard
-    },
-    {
-      id: 'email',
-      label: 'E-post verifierad',
-      description: businessConfig.email_confirmed_at ? undefined : 'Verifiera för att få påminnelser och notiser',
-      completed: !!businessConfig.email_confirmed_at,
-      action: businessConfig.email_confirmed_at ? undefined : {
-        type: 'button',
-        label: 'Skicka nytt mail',
-        onClick: async () => {
-          setResendingEmail(true)
-          try {
-            await fetch('/api/auth', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'resend_verification' }),
-            })
-            toast.success('Verifieringsmail skickat!')
-          } catch (e) {
-            toast.error('Kunde inte skicka mail')
-          }
-          setResendingEmail(false)
+      title: 'Grundinställningar',
+      items: [
+        {
+          id: 'company',
+          label: 'Företagsinfo ifylld',
+          completed: true,
+          link: '/dashboard/settings',
         },
-      },
+        {
+          id: 'pricing',
+          label: 'Prislista ifylld',
+          completed: priceListCount > 0,
+          link: '/dashboard/settings/my-prices',
+        },
+        {
+          id: 'logo',
+          label: 'Logotyp uppladdad',
+          completed: !!businessConfig.logo_url,
+          link: '/dashboard/settings',
+        },
+      ],
     },
     {
-      id: 'phone',
-      label: 'Telefonnummer aktiverat',
-      description: businessConfig.assigned_phone_number
-        ? `Ditt nummer: ${businessConfig.assigned_phone_number}`
-        : 'Aktivera för att ta emot AI-assisterade samtal',
-      completed: !!businessConfig.assigned_phone_number,
-      action: businessConfig.assigned_phone_number ? undefined : {
-        type: 'link',
-        label: 'Konfigurera',
-        href: '/dashboard/settings',
-      },
+      title: 'Anslutningar',
+      items: [
+        {
+          id: 'phone',
+          label: 'Telefonnummer aktiverat',
+          completed: !!businessConfig.assigned_phone_number,
+          link: '/dashboard/settings',
+        },
+        {
+          id: 'calendar',
+          label: 'Google Calendar kopplad',
+          completed: !!(businessConfig.google_connected || businessConfig.google_calendar_connected),
+          link: '/dashboard/settings',
+        },
+        {
+          id: 'gmail',
+          label: 'Gmail kopplad',
+          completed: !!businessConfig.gmail_enabled,
+          link: '/dashboard/settings',
+        },
+        {
+          id: 'website',
+          label: 'Hemsida kopplad (valfritt)',
+          completed: false,
+          optional: true,
+          link: '/dashboard/settings/integrations',
+        },
+      ],
+    },
+    {
+      title: 'Anpassa AI:n',
+      items: [
+        {
+          id: 'ai_style',
+          label: 'AI-jobbstil konfigurerad',
+          completed: !!businessConfig.working_hours,
+          link: '/dashboard/settings/knowledge',
+        },
+        {
+          id: 'automations',
+          label: 'Automationer aktiverade',
+          completed: callCount > 0,
+          link: '/dashboard/automations',
+        },
+        {
+          id: 'invite',
+          label: 'Bjud in kollega (valfritt)',
+          completed: false,
+          optional: true,
+          link: '/dashboard/referral',
+        },
+      ],
     },
   ]
 
-  // Only show forwarding item if they chose "keep_existing"
-  if (businessConfig.phone_setup_type === 'keep_existing' && businessConfig.assigned_phone_number) {
-    items.push({
-      id: 'forwarding',
-      label: 'Vidarekoppling konfigurerad',
-      description: businessConfig.forwarding_confirmed
-        ? undefined
-        : `Vidarebefordra samtal till ${businessConfig.assigned_phone_number}`,
-      completed: !!businessConfig.forwarding_confirmed,
-      action: businessConfig.forwarding_confirmed ? undefined : {
-        type: 'button',
-        label: 'Markera som klar',
-        onClick: async () => {
-          setLoading('forwarding')
-          try {
-            await fetch('/api/onboarding/status', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                businessId,
-                forwarding_confirmed: true,
-              }),
-            })
-            onUpdate()
-          } catch (e) {
-            console.error('Failed to update forwarding status')
-          }
-          setLoading(null)
-        },
-      },
-    })
-  }
+  const allItems = groups.flatMap(g => g.items)
+  const requiredItems = allItems.filter(i => !i.optional)
+  const completedRequired = requiredItems.filter(i => i.completed).length
+  const totalRequired = requiredItems.length
+  const allRequiredDone = completedRequired === totalRequired
+  const progressPercent = totalRequired > 0 ? Math.round((completedRequired / totalRequired) * 100) : 0
 
-  const servicesConfigured = (businessConfig.services_offered?.length || 0) > 0 && (businessConfig.default_hourly_rate || 0) > 0
+  // Auto-expand first incomplete group
+  useEffect(() => {
+    if (expandedGroup !== null) return
+    const firstIncomplete = groups.findIndex(g => g.items.some(i => !i.completed && !i.optional))
+    setExpandedGroup(firstIncomplete >= 0 ? firstIncomplete : null)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  items.push(
-    {
-      id: 'services',
-      label: 'Tjänster & priser konfigurerade',
-      description: servicesConfigured ? undefined : 'Ställ in dina tjänster och timpris',
-      completed: servicesConfigured,
-      action: servicesConfigured ? undefined : {
-        type: 'link',
-        label: 'Konfigurera',
-        href: '/dashboard/settings/pricelist',
-      },
-    },
-    {
-      id: 'prices',
-      label: 'Lägg till dina priser',
-      description: priceListCount > 0 ? `${priceListCount} priser` : 'Hjälper AI:n skapa korrekta offerter',
-      completed: priceListCount > 0,
-      action: priceListCount > 0 ? undefined : {
-        type: 'link',
-        label: 'Lägg till',
-        href: '/dashboard/settings/my-prices',
-      },
-    },
-    {
-      id: 'google',
-      label: 'Google Calendar kopplad',
-      description: businessConfig.google_connected ? undefined : 'Synka bokningar automatiskt',
-      completed: !!businessConfig.google_connected,
-      action: businessConfig.google_connected ? undefined : {
-        type: 'link',
-        label: 'Koppla',
-        href: '/dashboard/settings',
-      },
-    },
-    {
-      id: 'hours',
-      label: 'Öppettider inställda',
-      description: businessConfig.working_hours ? undefined : 'Ställ in när AI-assistenten ska svara',
-      completed: !!businessConfig.working_hours,
-      action: businessConfig.working_hours ? undefined : {
-        type: 'link',
-        label: 'Konfigurera',
-        href: '/dashboard/settings',
-      },
-    },
-    {
-      id: 'customers',
-      label: 'Importera kunder',
-      description: customerCount > 0 ? `${customerCount} kunder` : 'Importera befintliga kunder via CSV',
-      completed: customerCount > 0,
-      action: customerCount > 0 ? undefined : {
-        type: 'link',
-        label: 'Importera',
-        href: '/dashboard/customers/import',
-      },
-    },
-    {
-      id: 'test_call',
-      label: 'Första testsamtalet',
-      description: callCount > 0 ? `${callCount} samtal mottagna` : 'Ring ditt nummer för att testa',
-      completed: callCount > 0,
-      action: callCount > 0 ? undefined : {
-        type: 'external',
-        label: 'Se instruktioner',
-        href: '#test-call-instructions',
-        onClick: () => {
-          toast.info(`Ring ${businessConfig.assigned_phone_number || 'ditt tilldelade nummer'} för att testa AI-assistenten.`)
-        },
-      },
-    },
-    {
-      id: 'logo',
-      label: 'Logotyp uppladdad',
-      description: businessConfig.logo_url ? undefined : 'Visas i offerter och fakturor',
-      completed: !!businessConfig.logo_url,
-      action: businessConfig.logo_url ? undefined : {
-        type: 'link',
-        label: 'Ladda upp',
-        href: '/dashboard/settings',
-      },
+  // Show confetti once when all required done, then auto-dismiss
+  useEffect(() => {
+    if (allRequiredDone && !showConfetti) {
+      setShowConfetti(true)
+      const timer = setTimeout(async () => {
+        try {
+          await fetch('/api/onboarding/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ businessId, onboarding_dismissed: true }),
+          })
+          onDismiss()
+        } catch { /* silent */ }
+      }, 4000)
+      return () => clearTimeout(timer)
     }
-  )
+  }, [allRequiredDone]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const completedCount = items.filter(i => i.completed).length
-  const totalCount = items.length
-  const progressPercent = Math.round((completedCount / totalCount) * 100)
-
-  // Don't show if all complete
-  if (completedCount === totalCount) {
-    return null
+  if (showConfetti) {
+    return (
+      <div className="relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 mb-6 text-center overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 rounded-full animate-bounce"
+              style={{
+                left: `${10 + (i * 4.2)}%`,
+                top: `${10 + ((i * 17) % 80)}%`,
+                backgroundColor: ['#10b981', '#0f766e', '#f59e0b', '#3b82f6', '#ec4899'][i % 5],
+                animationDelay: `${(i * 0.1)}s`,
+                animationDuration: `${1 + (i % 3) * 0.3}s`,
+              }}
+            />
+          ))}
+        </div>
+        <div className="relative z-10">
+          <div className="text-4xl mb-3">🎉</div>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Allt är klart!</h2>
+          <p className="text-sm text-gray-500">Du har konfigurerat allt. Handymate är redo att hjälpa dig.</p>
+        </div>
+      </div>
+    )
   }
 
   const handleDismiss = async () => {
@@ -249,15 +207,10 @@ export default function OnboardingChecklist({
       await fetch('/api/onboarding/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessId,
-          onboarding_dismissed: true,
-        }),
+        body: JSON.stringify({ businessId, onboarding_dismissed: true }),
       })
       onDismiss()
-    } catch (e) {
-      console.error('Failed to dismiss onboarding')
-    }
+    } catch { /* silent */ }
   }
 
   return (
@@ -266,11 +219,11 @@ export default function OnboardingChecklist({
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-teal-600">
-            <Sparkles className="w-5 h-5 text-gray-900" />
+            <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Kom igång med Handymate</h2>
-            <p className="text-sm text-gray-500">{completedCount} av {totalCount} steg klara</p>
+            <p className="text-sm text-gray-500">{completedRequired} av {totalRequired} klart</p>
           </div>
         </div>
         <button
@@ -283,88 +236,79 @@ export default function OnboardingChecklist({
       </div>
 
       {/* Progress bar */}
-      <div className="h-2 bg-gray-100 rounded-full overflow-hidden mb-5">
+      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-5">
         <div
-          className="h-full bg-teal-600 rounded-full transition-all duration-500"
+          className="h-full bg-teal-600 rounded-full transition-all duration-700"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
-      {/* Checklist */}
-      <div className="space-y-2">
-        {items.map((item) => (
-          <div
-            key={item.id}
-            className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
-              item.completed
-                ? 'bg-emerald-50 border border-emerald-500/20'
-                : 'bg-gray-50 border border-gray-300/50 hover:border-gray-300'
-            }`}
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              {item.completed ? (
-                <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-4 h-4 text-emerald-600" />
+      {/* Grouped checklist */}
+      <div className="space-y-3">
+        {groups.map((group, gi) => {
+          const groupCompleted = group.items.filter(i => !i.optional && i.completed).length
+          const groupTotal = group.items.filter(i => !i.optional).length
+          const isExpanded = expandedGroup === gi
+
+          return (
+            <div key={group.title} className="rounded-xl border border-gray-200 bg-white/60 overflow-hidden">
+              <button
+                onClick={() => setExpandedGroup(isExpanded ? null : gi)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-900">{group.title}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    groupCompleted === groupTotal
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-gray-100 text-gray-500'
+                  }`}>
+                    {groupCompleted}/{groupTotal}
+                  </span>
                 </div>
-              ) : (
-                <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center flex-shrink-0">
-                  <Circle className="w-3 h-3 text-gray-400" />
+                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isExpanded && (
+                <div className="px-4 pb-3 space-y-1.5">
+                  {group.items.map((item) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center justify-between py-2 px-3 rounded-lg transition-colors ${
+                        item.completed ? 'bg-emerald-50/50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        {item.completed ? (
+                          <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          </div>
+                        ) : (
+                          <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                        )}
+                        <span className={`text-sm ${
+                          item.completed ? 'text-emerald-600 line-through' : 'text-gray-700'
+                        } ${item.optional ? 'italic' : ''}`}>
+                          {item.label}
+                        </span>
+                      </div>
+
+                      {!item.completed && item.link && (
+                        <Link
+                          href={item.link}
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
+                        >
+                          Konfigurera
+                          <ChevronRight className="w-3 h-3" />
+                        </Link>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
-              <div className="min-w-0">
-                <p className={`text-sm font-medium ${item.completed ? 'text-emerald-600' : 'text-gray-900'}`}>
-                  {item.label}
-                </p>
-                {item.description && (
-                  <p className="text-xs text-gray-400 truncate">{item.description}</p>
-                )}
-              </div>
             </div>
-
-            {item.action && !item.completed && (
-              <>
-                {item.action.type === 'link' && item.action.href && (
-                  <Link
-                    href={item.action.href}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    {item.action.label}
-                    <ChevronRight className="w-3 h-3" />
-                  </Link>
-                )}
-                {item.action.type === 'button' && item.action.onClick && (
-                  <button
-                    onClick={item.action.onClick}
-                    disabled={loading === item.id || resendingEmail}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0 disabled:opacity-50"
-                  >
-                    {(loading === item.id || (item.id === 'email' && resendingEmail)) ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      item.action.label
-                    )}
-                  </button>
-                )}
-                {item.action.type === 'external' && item.action.onClick && (
-                  <button
-                    onClick={item.action.onClick}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-teal-600 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    {item.action.label}
-                    <ExternalLink className="w-3 h-3" />
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Helpful tip */}
-      <div className="mt-4 pt-4 border-t border-gray-200">
-        <p className="text-xs text-gray-400">
-          Slutför dessa steg för att få ut det mesta av Handymate. Du kan alltid hitta den här listan i inställningarna.
-        </p>
+          )
+        })}
       </div>
     </div>
   )

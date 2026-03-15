@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo } from 'react'
+import React, { useMemo } from 'react'
 import type { QuoteItem, PaymentPlanEntry, DetailLevel } from '@/lib/types/quote'
 import { calculateQuoteTotals, recalculateItems, calculatePaymentPlan } from '@/lib/quote-calculations'
 import { getItemRotRutType } from '@/lib/quote-calculations'
+import { getCategoryLabel, type CustomCategory } from '@/lib/constants/categories'
 
 // ── Design tokens (matching document-html.ts) ──
 const ACCENT = '#0F766E'
@@ -32,6 +33,8 @@ export interface QuotePreviewData {
   detailLevel: DetailLevel
   showUnitPrices: boolean
   showQuantities: boolean
+  showCategorySubtotals?: boolean
+  customCategories?: CustomCategory[]
 }
 
 interface QuotePreviewProps {
@@ -88,6 +91,28 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
     if (data.detailLevel === 'subtotals_only' && (i.item_type === 'item' || i.item_type === 'text')) return false
     return true
   })
+
+  // Group items by category for subtotal rendering
+  const groupedByCategory = useMemo(() => {
+    if (!data.showCategorySubtotals) return null
+    const groups: { slug: string; label: string; items: QuoteItem[]; subtotal: number }[] = []
+    const slugMap = new Map<string, typeof groups[0]>()
+
+    for (const item of itemsToRender) {
+      if (item.item_type !== 'item') continue
+      const slug = item.category_slug || '__uncategorized__'
+      if (!slugMap.has(slug)) {
+        const label = slug === '__uncategorized__' ? 'Övrigt' : getCategoryLabel(slug, data.customCategories)
+        const group = { slug, label, items: [], subtotal: 0 }
+        slugMap.set(slug, group)
+        groups.push(group)
+      }
+      const group = slugMap.get(slug)!
+      group.items.push(item)
+      group.subtotal += item.quantity * item.unit_price
+    }
+    return groups
+  }, [itemsToRender, data.showCategorySubtotals, data.customCategories])
 
   return (
     <div
@@ -175,71 +200,140 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                 </tr>
               </thead>
               <tbody>
-                {itemsToRender.map((item) => {
-                  if (item.item_type === 'heading') {
+                {groupedByCategory ? (
+                  <>
+                    {groupedByCategory.map((group) => (
+                      <React.Fragment key={group.slug}>
+                        <tr>
+                          <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
+                            {group.label}
+                          </td>
+                        </tr>
+                        {group.items.map((item) => {
+                          const lineTotal = item.quantity * item.unit_price
+                          const rotRutType = getItemRotRutType(item)
+                          return (
+                            <tr key={item.id} style={{ borderBottom: `0.5px solid #F1F5F9` }}>
+                              <td style={{ padding: '4px 0', verticalAlign: 'top', paddingLeft: 6 }}>
+                                <span style={{ fontWeight: 500, fontSize: '7.5px' }}>{item.description}</span>
+                                {rotRutType === 'rot' && (
+                                  <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: ACCENT, background: '#CCFBF1', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>ROT</span>
+                                )}
+                                {rotRutType === 'rut' && (
+                                  <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: '#1d4ed8', background: '#dbeafe', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>RUT</span>
+                                )}
+                              </td>
+                              {data.showQuantities && (
+                                <>
+                                  <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{item.quantity}</td>
+                                  <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{getUnitLabel(item.unit)}</td>
+                                </>
+                              )}
+                              {data.showUnitPrices && (
+                                <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{formatCurrency(item.unit_price)}</td>
+                              )}
+                              <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>{formatCurrency(lineTotal)}</td>
+                            </tr>
+                          )
+                        })}
+                        <tr>
+                          <td colSpan={10} style={{ textAlign: 'right', fontWeight: 500, borderTop: `0.5px solid ${BORDER}`, paddingTop: 3, paddingBottom: 6, fontSize: '7px', color: MUTED }}>
+                            Delsumma {group.label.toLowerCase()}: {formatCurrency(group.subtotal)}
+                          </td>
+                        </tr>
+                      </React.Fragment>
+                    ))}
+                    {/* Non-item rows (headings, texts, discounts, subtotals) rendered after groups */}
+                    {itemsToRender.filter(i => i.item_type !== 'item').map((item) => {
+                      if (item.item_type === 'heading') {
+                        return (
+                          <tr key={item.id}>
+                            <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
+                              {item.description || item.group_name}
+                            </td>
+                          </tr>
+                        )
+                      }
+                      if (item.item_type === 'discount') {
+                        return (
+                          <tr key={item.id}>
+                            <td colSpan={10} style={{ display: 'flex', justifyContent: 'space-between', color: ACCENT, padding: '4px 0', borderBottom: `0.5px solid #F1F5F9` }}>
+                              <span>{item.description || 'Rabatt'}</span>
+                              <span>{formatCurrency(item.total)}</span>
+                            </td>
+                          </tr>
+                        )
+                      }
+                      return null
+                    })}
+                  </>
+                ) : (
+                  itemsToRender.map((item) => {
+                    if (item.item_type === 'heading') {
+                      return (
+                        <tr key={item.id}>
+                          <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
+                            {item.description || item.group_name}
+                          </td>
+                        </tr>
+                      )
+                    }
+                    if (item.item_type === 'text') {
+                      return (
+                        <tr key={item.id}>
+                          <td colSpan={10} style={{ fontSize: '6.5px', color: SECONDARY, fontStyle: 'italic', padding: '3px 0' }}>
+                            {item.description}
+                          </td>
+                        </tr>
+                      )
+                    }
+                    if (item.item_type === 'subtotal') {
+                      return (
+                        <tr key={item.id}>
+                          <td colSpan={10} style={{ textAlign: 'right', fontWeight: 500, borderTop: `0.5px solid ${BORDER}`, paddingTop: 4, paddingBottom: 4, fontSize: '7.5px' }}>
+                            {item.description || 'Delsumma'} — {formatCurrency(item.total)}
+                          </td>
+                        </tr>
+                      )
+                    }
+                    if (item.item_type === 'discount') {
+                      return (
+                        <tr key={item.id}>
+                          <td colSpan={10} style={{ display: 'flex', justifyContent: 'space-between', color: ACCENT, padding: '4px 0', borderBottom: `0.5px solid #F1F5F9` }}>
+                            <span>{item.description || 'Rabatt'}</span>
+                            <span>{formatCurrency(item.total)}</span>
+                          </td>
+                        </tr>
+                      )
+                    }
+                    // item
+                    const lineTotal = item.quantity * item.unit_price
+                    const rotRutType = getItemRotRutType(item)
                     return (
-                      <tr key={item.id}>
-                        <td colSpan={10} style={{ fontWeight: 500, fontSize: '7.5px', paddingTop: 8, paddingBottom: 4, borderBottom: `0.5px solid ${BORDER}` }}>
-                          {item.description || item.group_name}
+                      <tr key={item.id} style={{ borderBottom: `0.5px solid #F1F5F9` }}>
+                        <td style={{ padding: '4px 0', verticalAlign: 'top' }}>
+                          <span style={{ fontWeight: 500, fontSize: '7.5px' }}>{item.description}</span>
+                          {rotRutType === 'rot' && (
+                            <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: ACCENT, background: '#CCFBF1', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>ROT</span>
+                          )}
+                          {rotRutType === 'rut' && (
+                            <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: '#1d4ed8', background: '#dbeafe', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>RUT</span>
+                          )}
                         </td>
-                      </tr>
-                    )
-                  }
-                  if (item.item_type === 'text') {
-                    return (
-                      <tr key={item.id}>
-                        <td colSpan={10} style={{ fontSize: '6.5px', color: SECONDARY, fontStyle: 'italic', padding: '3px 0' }}>
-                          {item.description}
-                        </td>
-                      </tr>
-                    )
-                  }
-                  if (item.item_type === 'subtotal') {
-                    return (
-                      <tr key={item.id}>
-                        <td colSpan={10} style={{ textAlign: 'right', fontWeight: 500, borderTop: `0.5px solid ${BORDER}`, paddingTop: 4, paddingBottom: 4, fontSize: '7.5px' }}>
-                          {item.description || 'Delsumma'} — {formatCurrency(item.total)}
-                        </td>
-                      </tr>
-                    )
-                  }
-                  if (item.item_type === 'discount') {
-                    return (
-                      <tr key={item.id}>
-                        <td colSpan={10} style={{ display: 'flex', justifyContent: 'space-between', color: ACCENT, padding: '4px 0', borderBottom: `0.5px solid #F1F5F9` }}>
-                          <span>{item.description || 'Rabatt'}</span>
-                          <span>{formatCurrency(item.total)}</span>
-                        </td>
-                      </tr>
-                    )
-                  }
-                  // item
-                  const lineTotal = item.quantity * item.unit_price
-                  const rotRutType = getItemRotRutType(item)
-                  return (
-                    <tr key={item.id} style={{ borderBottom: `0.5px solid #F1F5F9` }}>
-                      <td style={{ padding: '4px 0', verticalAlign: 'top' }}>
-                        <span style={{ fontWeight: 500, fontSize: '7.5px' }}>{item.description}</span>
-                        {rotRutType === 'rot' && (
-                          <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: ACCENT, background: '#CCFBF1', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>ROT</span>
+                        {data.showQuantities && (
+                          <>
+                            <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{item.quantity}</td>
+                            <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{getUnitLabel(item.unit)}</td>
+                          </>
                         )}
-                        {rotRutType === 'rut' && (
-                          <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: '#1d4ed8', background: '#dbeafe', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>RUT</span>
+                        {data.showUnitPrices && (
+                          <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{formatCurrency(item.unit_price)}</td>
                         )}
-                      </td>
-                      {data.showQuantities && (
-                        <>
-                          <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{item.quantity}</td>
-                          <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{getUnitLabel(item.unit)}</td>
-                        </>
-                      )}
-                      {data.showUnitPrices && (
-                        <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{formatCurrency(item.unit_price)}</td>
-                      )}
-                      <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>{formatCurrency(lineTotal)}</td>
-                    </tr>
-                  )
-                })}
+                        <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500 }}>{formatCurrency(lineTotal)}</td>
+                      </tr>
+                    )
+                  })
+                )}
               </tbody>
             </table>
           </>

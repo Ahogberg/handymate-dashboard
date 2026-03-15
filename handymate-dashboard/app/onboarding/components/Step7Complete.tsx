@@ -58,8 +58,6 @@ export default function Step7Complete({ data, onNext }: Step7Props) {
     { label: 'Företag & konto', done: true, icon: CheckCircle2 },
     { label: 'Tjänster & priser', done: (data.services_offered?.length || 0) > 0, icon: Briefcase },
     { label: 'Telefon', done: !!data.assigned_phone_number, icon: Phone },
-    { label: 'Google Calendar', done: data.google_connected, icon: Calendar },
-    { label: 'Leadkällor', done: (data.lead_sources?.length || 0) > 0, icon: Users },
   ]
 
   if (done) {
@@ -78,10 +76,10 @@ export default function Step7Complete({ data, onNext }: Step7Props) {
         </div>
 
         <button
-          onClick={() => onNext ? onNext() : router.push('/dashboard')}
+          onClick={() => router.push('/dashboard')}
           className="px-8 py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium hover:opacity-90 text-lg"
         >
-          {onNext ? 'Nästa: Hur du jobbar →' : 'Gå till Dashboard'}
+          Gå till Dashboard
         </button>
       </div>
     )
@@ -91,7 +89,7 @@ export default function Step7Complete({ data, onNext }: Step7Props) {
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-white">Allt klart!</h1>
-        <p className="text-zinc-400 mt-2">Steg 7 av 7 — Sammanfattning och aktivering</p>
+        <p className="text-zinc-400 mt-2">Sammanfattning och aktivering</p>
       </div>
 
       {error && (

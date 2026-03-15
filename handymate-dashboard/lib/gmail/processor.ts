@@ -6,6 +6,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { GmailMessage } from '@/lib/gmail'
+import { getNextCustomerNumber } from '@/lib/numbering'
 
 interface BusinessConfig {
   business_id: string
@@ -95,6 +96,56 @@ async function matchSender(
 }
 
 /**
+ * Extract a Swedish phone number from email body/signature.
+ */
+function extractPhoneFromBody(body: string): string | null {
+  if (!body) return null
+  // Match Swedish phone patterns: 07X-XXX XX XX, +467XXXXXXXX, 070 123 45 67 etc.
+  const patterns = [
+    /(?:\+46|0)[\s-]?7\d[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}/,
+    /(?:\+46|0)[\s-]?7\d{8}/,
+  ]
+  for (const pattern of patterns) {
+    const match = body.match(pattern)
+    if (match) return match[0].replace(/[\s-]/g, '')
+  }
+  return null
+}
+
+/**
+ * Auto-create a customer from an unmatched email sender.
+ */
+async function autoCreateCustomer(
+  supabase: SupabaseClient,
+  businessId: string,
+  email: string,
+  name: string,
+  phone: string | null
+): Promise<string | null> {
+  try {
+    const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
+    let customerNumber: string | undefined
+    try { customerNumber = await getNextCustomerNumber(supabase, businessId) } catch { /* non-blocking */ }
+
+    const { error } = await supabase.from('customer').insert({
+      customer_id: customerId,
+      business_id: businessId,
+      name: name || email,
+      email,
+      phone_number: phone,
+      ...(customerNumber ? { customer_number: customerNumber } : {}),
+    })
+    if (error) {
+      console.error('[gmail-processor] Auto-create customer error:', error.message)
+      return null
+    }
+    return customerId
+  } catch {
+    return null
+  }
+}
+
+/**
  * Process a single inbound email message.
  * - Skips outbound (from owner)
  * - Deduplicates by gmail_message_id
@@ -128,6 +179,16 @@ export async function processInboundEmail(
   const fromEmail = extractEmail(message.from)
   const fromName = extractName(message.from)
   const match = await matchSender(supabase, businessId, fromEmail, fromName)
+
+  // 3b. Auto-create customer if unmatched
+  if (match.matched_by === 'unmatched' && fromEmail) {
+    const phone = extractPhoneFromBody(message.bodyText || '')
+    const newCustomerId = await autoCreateCustomer(supabase, businessId, fromEmail, fromName, phone)
+    if (newCustomerId) {
+      match.customer_id = newCustomerId
+      match.matched_by = 'email'
+    }
+  }
 
   // 4. Truncate body for storage (keep first 5000 chars)
   const bodyPreview = message.bodyText

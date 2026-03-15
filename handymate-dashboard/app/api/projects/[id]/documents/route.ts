@@ -80,7 +80,9 @@ export async function POST(
 
     if (uploadError) {
       console.error('Upload error:', uploadError)
-      return NextResponse.json({ error: 'Kunde inte ladda upp fil' }, { status: 500 })
+      return NextResponse.json({
+        error: `Uppladdningsfel: ${uploadError.message}. Kontrollera att storage bucket "project-files" finns i Supabase.`
+      }, { status: 500 })
     }
 
     // Create document record

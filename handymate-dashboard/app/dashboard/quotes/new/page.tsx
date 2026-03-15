@@ -35,6 +35,12 @@ import {
   calculatePaymentPlan,
   validatePaymentPlan,
 } from '@/lib/quote-calculations'
+import {
+  SYSTEM_CATEGORIES,
+  getAllCategories,
+  getCategoryRotRut,
+  type CustomCategory,
+} from '@/lib/constants/categories'
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -269,6 +275,12 @@ export default function NewQuotePage() {
   const [showStandardTexts, setShowStandardTexts] = useState(false)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
+  const [showCategorySubtotals, setShowCategorySubtotals] = useState(false)
+
+  // Custom categories
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([])
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null) // item id for inline creation
+  const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
   // Advanced row type dropdown
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
@@ -296,6 +308,30 @@ export default function NewQuotePage() {
     }
     return map
   }, [allStandardTexts])
+
+  // ─── Derived: all categories (system + custom) ───────────────────────────
+  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories])
+
+  // Create a custom category inline
+  async function createCustomCategory(label: string, itemId: string) {
+    const slug = 'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
+    const { data, error } = await supabase.from('custom_quote_categories').insert({
+      business_id: business.business_id,
+      slug,
+      label,
+      rot_eligible: false,
+      rut_eligible: false,
+    }).select('*').single()
+    if (error) {
+      toast.error('Kunde inte skapa kategori')
+      return
+    }
+    const newCat: CustomCategory = data as CustomCategory
+    setCustomCategories(prev => [...prev, newCat])
+    updateItem(itemId, 'category_slug', newCat.slug)
+    setShowNewCategoryInput(null)
+    setNewCategoryLabel('')
+  }
 
   // ─── Derived: totals ──────────────────────────────────────────────────────
   const vatRate = pricingSettings?.vat_rate ?? 25
@@ -347,12 +383,15 @@ export default function NewQuotePage() {
         detailLevel,
         showUnitPrices,
         showQuantities,
+        showCategorySubtotals,
+        customCategories,
       })
     }, 300)
     return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current) }
   }, [title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
       introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
-      referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities])
+      referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
+      showCategorySubtotals, customCategories])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Data fetching
@@ -377,7 +416,7 @@ export default function NewQuotePage() {
   }, [business.business_id])
 
   async function fetchData() {
-    const [customersRes, priceListRes, settingsRes] = await Promise.all([
+    const [customersRes, priceListRes, settingsRes, customCatRes] = await Promise.all([
       supabase.from('customer').select('*').eq('business_id', business.business_id),
       supabase
         .from('price_list')
@@ -389,10 +428,19 @@ export default function NewQuotePage() {
         .select('pricing_settings')
         .eq('business_id', business.business_id)
         .single(),
+      supabase
+        .from('custom_quote_categories')
+        .select('*')
+        .eq('business_id', business.business_id)
+        .order('created_at'),
     ])
 
+    if (customersRes.error) {
+      console.error('[NewQuote] Kunde inte hämta kunder:', customersRes.error)
+    }
     setCustomers(customersRes.data || [])
     setPriceList(priceListRes.data || [])
+    setCustomCategories((customCatRes.data as CustomCategory[]) || [])
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
         hourly_rate: 650,
@@ -680,6 +728,19 @@ export default function NewQuotePage() {
         } else if (updated.item_type === 'discount') {
           updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
         }
+        // Category auto-detection: set ROT/RUT based on category
+        if (field === 'category_slug' && value) {
+          const catRotRut = getCategoryRotRut(value, customCategories)
+          if (catRotRut.rot) {
+            updated.is_rot_eligible = true
+            updated.is_rut_eligible = false
+            updated.rot_rut_type = 'rot'
+          } else if (catRotRut.rut) {
+            updated.is_rot_eligible = false
+            updated.is_rut_eligible = true
+            updated.rot_rut_type = 'rut'
+          }
+        }
         // Sync rot_rut_type with boolean flags
         if (field === 'rot_rut_type') {
           updated.is_rot_eligible = value === 'rot'
@@ -698,7 +759,7 @@ export default function NewQuotePage() {
         return updated
       })
     )
-  }, [])
+  }, [customCategories])
 
   const removeItem = useCallback((id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id))
@@ -1148,8 +1209,9 @@ export default function NewQuotePage() {
 
               {/* Table header (desktop) */}
               {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[1fr_72px_88px_96px_32px] gap-2 pb-2 border-b border-thin border-[#E2E8F0] mb-1">
+                <div className="hidden md:grid md:grid-cols-[1fr_120px_72px_88px_96px_32px] gap-2 pb-2 border-b border-thin border-[#E2E8F0] mb-1">
                   <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1]">Beskrivning</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1]">Kategori</span>
                   <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Antal</span>
                   <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Enhet</span>
                   <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Pris/enhet</span>
@@ -1171,7 +1233,7 @@ export default function NewQuotePage() {
                     return (
                       <div key={item.id}>
                         {/* Desktop row */}
-                        <div className="hidden md:grid md:grid-cols-[1fr_72px_88px_96px_32px] gap-2 items-center py-2 border-b border-thin border-[#F1F5F9]">
+                        <div className="hidden md:grid md:grid-cols-[1fr_120px_72px_88px_96px_32px] gap-2 items-center py-2 border-b border-thin border-[#F1F5F9]">
                           <input
                             type="text"
                             value={item.description}
@@ -1179,6 +1241,61 @@ export default function NewQuotePage() {
                             placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
                             className="w-full px-2.5 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                           />
+                          {isEditable ? (
+                            showNewCategoryInput === item.id ? (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={newCategoryLabel}
+                                  onChange={(e) => setNewCategoryLabel(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && newCategoryLabel.trim()) {
+                                      createCustomCategory(newCategoryLabel.trim(), item.id)
+                                    } else if (e.key === 'Escape') {
+                                      setShowNewCategoryInput(null)
+                                      setNewCategoryLabel('')
+                                    }
+                                  }}
+                                  placeholder="Namn..."
+                                  autoFocus
+                                  className="w-full px-1.5 py-[5px] text-[11px] border border-[#0F766E] rounded bg-white text-[#1E293B] focus:outline-none"
+                                />
+                              </div>
+                            ) : (
+                              <select
+                                value={item.category_slug ?? ''}
+                                onChange={(e) => {
+                                  if (e.target.value === '__new__') {
+                                    setShowNewCategoryInput(item.id)
+                                    setNewCategoryLabel('')
+                                  } else {
+                                    updateItem(item.id, 'category_slug', e.target.value || undefined)
+                                  }
+                                }}
+                                className="w-full px-1.5 py-[7px] text-[11px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
+                              >
+                                <option value="">—</option>
+                                <optgroup label="Arbete">
+                                  {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
+                                    <option key={c.slug} value={c.slug}>{c.label}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Material">
+                                  {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
+                                    <option key={c.slug} value={c.slug}>{c.label}</option>
+                                  ))}
+                                </optgroup>
+                                <optgroup label="Övrigt">
+                                  {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
+                                    <option key={c.slug} value={c.slug}>{c.label}</option>
+                                  ))}
+                                </optgroup>
+                                <option value="__new__">+ Ny kategori</option>
+                              </select>
+                            )
+                          ) : (
+                            <span />
+                          )}
                           {isEditable ? (
                             <input
                               type="number"
@@ -1276,8 +1393,58 @@ export default function NewQuotePage() {
                             </div>
                           )}
                           {isEditable && (
-                            <div className="flex items-center gap-2 text-[12px]">
-                              <span className="text-[#64748B]">Avdrag:</span>
+                            <div className="flex items-center gap-2 text-[12px] flex-wrap">
+                              <span className="text-[#64748B]">Kategori:</span>
+                              {showNewCategoryInput === item.id ? (
+                                <input
+                                  type="text"
+                                  value={newCategoryLabel}
+                                  onChange={(e) => setNewCategoryLabel(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && newCategoryLabel.trim()) {
+                                      createCustomCategory(newCategoryLabel.trim(), item.id)
+                                    } else if (e.key === 'Escape') {
+                                      setShowNewCategoryInput(null)
+                                      setNewCategoryLabel('')
+                                    }
+                                  }}
+                                  placeholder="Namn..."
+                                  autoFocus
+                                  className="px-2 py-1 text-[12px] border border-[#0F766E] rounded bg-white text-[#1E293B] focus:outline-none w-28"
+                                />
+                              ) : (
+                                <select
+                                  value={item.category_slug ?? ''}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__new__') {
+                                      setShowNewCategoryInput(item.id)
+                                      setNewCategoryLabel('')
+                                    } else {
+                                      updateItem(item.id, 'category_slug', e.target.value || undefined)
+                                    }
+                                  }}
+                                  className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                                >
+                                  <option value="">—</option>
+                                  <optgroup label="Arbete">
+                                    {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
+                                      <option key={c.slug} value={c.slug}>{c.label}</option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Material">
+                                    {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
+                                      <option key={c.slug} value={c.slug}>{c.label}</option>
+                                    ))}
+                                  </optgroup>
+                                  <optgroup label="Övrigt">
+                                    {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
+                                      <option key={c.slug} value={c.slug}>{c.label}</option>
+                                    ))}
+                                  </optgroup>
+                                  <option value="__new__">+ Ny kategori</option>
+                                </select>
+                              )}
+                              <span className="text-[#64748B] ml-1">Avdrag:</span>
                               <select
                                 value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
                                 onChange={(e) => {
@@ -1582,6 +1749,10 @@ export default function NewQuotePage() {
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={showQuantities} onChange={(e) => setShowQuantities(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
                       <span className="text-[13px] text-[#64748B]">Visa antal</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={showCategorySubtotals} onChange={(e) => setShowCategorySubtotals(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
+                      <span className="text-[13px] text-[#64748B]">Visa delsummor per kategori</span>
                     </label>
                   </div>
                 </div>

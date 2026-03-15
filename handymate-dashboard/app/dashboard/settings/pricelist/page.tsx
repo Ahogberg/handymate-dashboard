@@ -824,7 +824,7 @@ export default function PricelistPage() {
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Inköpspris</label>
+                  <label className="block text-sm text-gray-500 mb-1">Inköpspris (exkl. moms)</label>
                   <input
                     type="number"
                     value={productForm.purchase_price}
@@ -843,7 +843,7 @@ export default function PricelistPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-1">Säljpris</label>
+                  <label className="block text-sm text-gray-500 mb-1">Säljpris (exkl. moms)</label>
                   <input
                     type="number"
                     value={productForm.sell_price}
@@ -960,7 +960,7 @@ export default function PricelistPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-500 mb-1">Inköpspris</label>
+                    <label className="block text-sm text-gray-500 mb-1">Inköpspris (exkl. moms)</label>
                     <select
                       value={columnMapping.purchase_price || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, purchase_price: e.target.value })}

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getNextLeadNumber } from '@/lib/numbering'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -103,6 +104,8 @@ export async function POST(request: NextRequest) {
 
     // Skapa lead
     const leadId = 'lead_' + Math.random().toString(36).substr(2, 9)
+    let leadNumber: string | undefined
+    try { leadNumber = await getNextLeadNumber(supabase, business.business_id) } catch { /* non-blocking */ }
     await supabase.from('leads').insert({
       lead_id: leadId,
       business_id: business.business_id,
@@ -115,6 +118,7 @@ export async function POST(request: NextRequest) {
       status: 'new',
       pipeline_stage_key: firstStage?.key || 'new_lead',
       score: 0,
+      ...(leadNumber ? { lead_number: leadNumber } : {}),
     })
 
     // SMS till hantverkaren (non-blocking)

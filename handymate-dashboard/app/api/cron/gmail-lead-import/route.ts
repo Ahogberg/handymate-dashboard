@@ -4,7 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getGoogleAuthClient, ensureValidToken } from '@/lib/google-calendar'
 import { isLikelyLead, parseLeadFromEmail } from '@/lib/gmail-lead-detection'
 import { downloadAndSaveAttachments } from '@/lib/gmail-attachments'
-import { getNextCustomerNumber, getNextProjectNumber } from '@/lib/numbering'
+import { getNextCustomerNumber, getNextLeadNumber } from '@/lib/numbering'
 
 /**
  * Cron: GET /api/cron/gmail-lead-import
@@ -234,7 +234,7 @@ export async function GET(request: NextRequest) {
             ? `${leadData.job_type}${leadData.name ? ` – ${leadData.name}` : ''}`
             : subject.slice(0, 80)
 
-          const projectNumber = await getNextProjectNumber(supabase, businessId)
+          const leadNumber = await getNextLeadNumber(supabase, businessId)
           const { data: newLead } = await supabase
             .from('leads')
             .insert({
@@ -248,7 +248,7 @@ export async function GET(request: NextRequest) {
               job_type: leadData.job_type,
               urgency: leadData.urgency,
               estimated_value: leadData.estimated_value,
-              project_number: projectNumber,
+              lead_number: leadNumber,
               notes: leadData.description
                 ? `${leadData.description}\n\n---\nImporterad från Gmail: ${subject}`
                 : `Importerad från Gmail: ${subject}`,
