@@ -25,6 +25,7 @@ export interface QuoteGenerationInput {
   priceList?: PriceListItem[]
   templates?: QuoteTemplate[]
   defaultHourlyRate?: number
+  customerPriceList?: CustomerPriceList
 }
 
 export interface GeneratedQuoteItem {
@@ -70,14 +71,46 @@ function getAnthropic() {
  * Bygger prisliste-kontext för AI-prompten.
  * Om prislistan är tom returneras en tydlig markering.
  */
+/** Customer-specific price list from price_lists_v2 */
+export interface CustomerPriceList {
+  name: string
+  hourly_rate_normal?: number | null
+  hourly_rate_ob1?: number | null
+  hourly_rate_ob2?: number | null
+  hourly_rate_emergency?: number | null
+  material_markup_pct?: number | null
+  callout_fee?: number | null
+  items?: Array<{ name: string; price: number; unit: string; is_rot_eligible?: boolean }>
+}
+
 export function buildPriceContext(
   priceList: PriceListItem[] | undefined,
   hourlyRate: number,
-  templates?: QuoteTemplate[]
+  templates?: QuoteTemplate[],
+  customerPriceList?: CustomerPriceList
 ): string {
   const lines: string[] = []
 
-  if (priceList && priceList.length > 0) {
+  // Customer-specific price list takes priority if available
+  if (customerPriceList) {
+    lines.push(`PRISLISTA SOM GÄLLER FÖR DENNA KUND: ${customerPriceList.name}`)
+    if (customerPriceList.hourly_rate_normal) lines.push(`Timpris normal: ${customerPriceList.hourly_rate_normal} kr/tim`)
+    if (customerPriceList.hourly_rate_ob1) lines.push(`Timpris OB1: ${customerPriceList.hourly_rate_ob1} kr/tim`)
+    if (customerPriceList.hourly_rate_ob2) lines.push(`Timpris OB2: ${customerPriceList.hourly_rate_ob2} kr/tim`)
+    if (customerPriceList.hourly_rate_emergency) lines.push(`Timpris jour: ${customerPriceList.hourly_rate_emergency} kr/tim`)
+    if (customerPriceList.material_markup_pct != null) lines.push(`Materialpåslag: ${customerPriceList.material_markup_pct}%`)
+    if (customerPriceList.callout_fee) lines.push(`Startavgift: ${customerPriceList.callout_fee} kr`)
+
+    if (customerPriceList.items && customerPriceList.items.length > 0) {
+      lines.push('\nSpecifika rader i denna prislista:')
+      for (const item of customerPriceList.items) {
+        lines.push(`- ${item.name}: ${item.price} kr/${item.unit}${item.is_rot_eligible ? ' (ROT)' : ''}`)
+      }
+    }
+
+    lines.push('\nAnvänd ALLTID dessa priser när du skapar offertrader.')
+    lines.push('Avvik inte från priserna om inte användaren ber om det.')
+  } else if (priceList && priceList.length > 0) {
     lines.push('HANTVERKARENS PRISLISTA (använd dessa priser exakt):')
     // Gruppera per kategori
     const byCategory: Record<string, PriceListItem[]> = {}
@@ -96,7 +129,9 @@ export function buildPriceContext(
     lines.push('PRISLISTA: Ej ifylld av hantverkaren. Markera ALLA priser med "PRIS SAKNAS — fyll i manuellt" och sätt unit_price till 0.')
   }
 
-  lines.push(`\nStandard timpris: ${hourlyRate} kr/tim`)
+  if (!customerPriceList) {
+    lines.push(`\nStandard timpris: ${hourlyRate} kr/tim`)
+  }
 
   if (templates && templates.length > 0) {
     lines.push('\nTILLGÄNGLIGA OFFERTMALLAR (referens för typiska rader):')
@@ -270,7 +305,7 @@ export async function generateQuoteFromInput(
     ? `\nHistoriska priser för liknande jobb: Snitt ${priceStats.average} kr, Min ${priceStats.min} kr, Max ${priceStats.max} kr (${priceStats.count} offerter)`
     : ''
 
-  const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates)
+  const priceContext = buildPriceContext(input.priceList, input.hourlyRate, input.templates, input.customerPriceList)
   const hasPriceList = (input.priceList?.length || 0) > 0
 
   const systemPrompt = `Du är en erfaren svensk kalkylator för bygg- och hantverksprojekt.

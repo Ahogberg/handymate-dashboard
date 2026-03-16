@@ -232,6 +232,11 @@ export default function NewQuotePage() {
   const [discountPercent, setDiscountPercent] = useState(0)
   const [validDays, setValidDays] = useState(30)
 
+  // Customer price list info
+  const [customerPriceListInfo, setCustomerPriceListInfo] = useState<{
+    name: string; segment?: string; contractType?: string
+  } | null>(null)
+
   // ROT/RUT personal data
   const [personnummer, setPersonnummer] = useState('')
   const [fastighetsbeteckning, setFastighetsbeteckning] = useState('')
@@ -483,9 +488,12 @@ export default function NewQuotePage() {
     }
   }
 
-  // Auto-fill personnummer / fastighetsbeteckning when customer selected
+  // Auto-fill personnummer / fastighetsbeteckning + price list when customer selected
   useEffect(() => {
-    if (!selectedCustomer) return
+    if (!selectedCustomer) {
+      setCustomerPriceListInfo(null)
+      return
+    }
     const customer = customers.find((c) => c.customer_id === selectedCustomer)
     if (!customer) return
     if (customer.personal_number && !personnummer) setPersonnummer(customer.personal_number)
@@ -493,6 +501,25 @@ export default function NewQuotePage() {
       setFastighetsbeteckning(customer.property_designation)
     // Also pre-fill project address from customer address if empty
     if (customer.address_line && !projectAddress) setProjectAddress(customer.address_line)
+
+    // Fetch customer's price list if assigned
+    const cust = customer as any
+    if (cust.price_list_id) {
+      fetch(`/api/pricing/price-lists/${cust.price_list_id}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.priceList) {
+            setCustomerPriceListInfo({
+              name: data.priceList.name,
+              segment: data.priceList.segment?.name,
+              contractType: data.priceList.contract_type?.name,
+            })
+          }
+        })
+        .catch(() => { /* non-blocking */ })
+    } else {
+      setCustomerPriceListInfo(null)
+    }
   }, [selectedCustomer])
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1164,6 +1191,16 @@ export default function NewQuotePage() {
                       </option>
                     ))}
                   </select>
+                  {customerPriceListInfo && (
+                    <div className="mt-2 bg-teal-50 border border-teal-200 rounded-lg p-2 flex items-center gap-2 text-xs">
+                      <span className="text-teal-600">📋</span>
+                      <span className="text-teal-800">
+                        Prislista: <strong>{customerPriceListInfo.name}</strong>
+                        {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
+                        {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
+                      </span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[12px] text-[#64748B] mb-1">Giltighetstid</label>

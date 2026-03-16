@@ -211,14 +211,33 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
       ].filter(Boolean).join('\n')
 
       if (description) {
+        // Fetch customer-specific price list if available
+        let customerPriceList: any = undefined
+        if (customerId) {
+          const { data: cust } = await supabase
+            .from('customer')
+            .select('price_list_id')
+            .eq('customer_id', customerId)
+            .maybeSingle()
+          if (cust?.price_list_id) {
+            const { data: pl } = await supabase
+              .from('price_lists_v2')
+              .select('*, items:price_list_items_v2(*)')
+              .eq('id', cust.price_list_id)
+              .single()
+            if (pl) customerPriceList = pl
+          }
+        }
+
         const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
         aiQuote = await generateQuoteFromInput({
           businessId,
           branch: business?.branch || 'Bygg',
-          hourlyRate,
+          hourlyRate: customerPriceList?.hourly_rate_normal || hourlyRate,
           textDescription: description,
           customerId: customerId || undefined,
           priceList: priceListRows || undefined,
+          customerPriceList,
         })
       }
     } catch (aiErr: any) {

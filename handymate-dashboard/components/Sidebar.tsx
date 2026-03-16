@@ -106,8 +106,10 @@ const BOTTOM_NAV: NavItem[] = [
       { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
       { label: 'Mina priser', href: '/dashboard/settings/my-prices' },
       { label: 'Prislista', href: '/dashboard/settings/pricelist' },
+      { label: 'Prisstruktur', href: '/dashboard/settings/pricing' },
       { label: 'Prenumeration', href: '/dashboard/billing' },
       { label: 'Team', href: '/dashboard/settings?tab=team' },
+      { label: 'Lead-källor', href: '/dashboard/settings/lead-sources' },
       { label: 'Automationer', href: '/dashboard/automations', dotKey: 'automation_failed' },
       { label: 'Offertmallar', href: '/dashboard/settings/quote-templates', featureGate: 'quote_templates' },
       { label: 'Standardtexter', href: '/dashboard/settings/quote-texts', featureGate: 'quote_templates' },
@@ -124,7 +126,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const business = useBusiness()
-  const plan: PlanType = business.plan || 'starter'
+  const plan: PlanType = business.subscription_plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
   const [approvalCount, setApprovalCount] = useState(0)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())

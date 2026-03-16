@@ -91,8 +91,14 @@ export default function CustomersPage() {
   const [form, setForm] = useState({
     name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '',
     customer_type: 'private' as 'private' | 'company' | 'brf',
-    org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: ''
+    org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: '',
+    segment_id: '', contract_type_id: '', price_list_id: '',
   })
+
+  // Pricing structure data
+  const [pricingSegments, setPricingSegments] = useState<{ id: string; name: string }[]>([])
+  const [pricingContractTypes, setPricingContractTypes] = useState<{ id: string; name: string }[]>([])
+  const [pricingPriceLists, setPricingPriceLists] = useState<{ id: string; name: string; segment_id: string | null }[]>([])
 
   // Tags state (C1)
   const [tags, setTags] = useState<CustomerTag[]>([])
@@ -166,6 +172,19 @@ export default function CustomersPage() {
     setTags(tagsWithCount)
     setCustomerTags(tagMap)
     setCampaigns(campaignsData || [])
+
+    // Fetch pricing structure (non-blocking)
+    try {
+      const [segRes, ctRes, plRes] = await Promise.all([
+        fetch('/api/pricing/segments').then(r => r.json()).catch(() => ({ segments: [] })),
+        fetch('/api/pricing/contract-types').then(r => r.json()).catch(() => ({ contractTypes: [] })),
+        fetch('/api/pricing/price-lists').then(r => r.json()).catch(() => ({ priceLists: [] })),
+      ])
+      setPricingSegments(segRes.segments || [])
+      setPricingContractTypes(ctRes.contractTypes || [])
+      setPricingPriceLists(plRes.priceLists || [])
+    } catch { /* non-blocking */ }
+
     setLoading(false)
   }
 
@@ -179,7 +198,8 @@ export default function CustomersPage() {
     setEditingCustomer(null)
     setForm({
       name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '',
-      customer_type: 'private', org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: ''
+      customer_type: 'private', org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: '',
+      segment_id: '', contract_type_id: '', price_list_id: '',
     })
     setModalOpen(true)
   }
@@ -202,6 +222,9 @@ export default function CustomersPage() {
       visit_address: customer.visit_address || '',
       reference: customer.reference || '',
       apartment_count: customer.apartment_count ? String(customer.apartment_count) : '',
+      segment_id: (customer as any).segment_id || '',
+      contract_type_id: (customer as any).contract_type_id || '',
+      price_list_id: (customer as any).price_list_id || '',
     })
     setModalOpen(true)
   }
@@ -593,6 +616,60 @@ export default function CustomersPage() {
                     className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                   />
                   <p className="text-xs text-gray-400 mt-1">Krävs för ROT/RUT-avdrag</p>
+                </div>
+              )}
+
+              {/* Pricing: Segment, Contract type, Price list */}
+              {pricingSegments.length > 0 && (
+                <div className="grid grid-cols-1 gap-3 pt-2 border-t border-gray-100">
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Kundtyp / Segment</label>
+                    <select
+                      value={form.segment_id}
+                      onChange={e => {
+                        const segId = e.target.value
+                        setForm(prev => ({ ...prev, segment_id: segId }))
+                        // Auto-suggest price list based on segment
+                        const suggested = pricingPriceLists.find(pl => pl.segment_id === segId)
+                        if (suggested) setForm(prev => ({ ...prev, segment_id: segId, price_list_id: suggested.id }))
+                      }}
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    >
+                      <option value="">Välj segment...</option>
+                      {pricingSegments.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Avtalsform</label>
+                    <select
+                      value={form.contract_type_id}
+                      onChange={e => setForm({ ...form, contract_type_id: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    >
+                      <option value="">Välj avtalsform...</option>
+                      {pricingContractTypes.map(ct => (
+                        <option key={ct.id} value={ct.id}>{ct.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-500 mb-1">Prislista</label>
+                    <select
+                      value={form.price_list_id}
+                      onChange={e => setForm({ ...form, price_list_id: e.target.value })}
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    >
+                      <option value="">Välj prislista...</option>
+                      {pricingPriceLists.map(pl => (
+                        <option key={pl.id} value={pl.id}>{pl.name}</option>
+                      ))}
+                    </select>
+                    {form.price_list_id && form.segment_id && (
+                      <p className="text-xs text-gray-400 mt-1">Auto-vald baserat på segment</p>
+                    )}
+                  </div>
                 </div>
               )}
 

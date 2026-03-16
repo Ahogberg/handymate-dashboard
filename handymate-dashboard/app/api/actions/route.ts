@@ -104,7 +104,8 @@ export async function POST(request: NextRequest) {
 
       case 'create_customer': {
         const { name, phone_number, email, address_line, personal_number, property_designation,
-                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count } = data
+                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
+                segment_id, contract_type_id, price_list_id } = data
 
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
 
@@ -128,6 +129,9 @@ export async function POST(request: NextRequest) {
         if (visit_address) insertData.visit_address = visit_address
         if (reference) insertData.reference = reference
         if (apartment_count) insertData.apartment_count = parseInt(apartment_count)
+        if (segment_id) insertData.segment_id = segment_id
+        if (contract_type_id) insertData.contract_type_id = contract_type_id
+        if (price_list_id) insertData.price_list_id = price_list_id
 
         const { error } = await supabase
           .from('customer')
@@ -139,7 +143,8 @@ export async function POST(request: NextRequest) {
 
       case 'update_customer': {
         const { customerId, name, phone_number, email, address_line, personal_number, property_designation,
-                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count } = data
+                customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
+                segment_id, contract_type_id, price_list_id } = data
 
         const updateData: Record<string, any> = {
           name,
@@ -158,6 +163,9 @@ export async function POST(request: NextRequest) {
         if (visit_address !== undefined) updateData.visit_address = visit_address || null
         if (reference !== undefined) updateData.reference = reference || null
         if (apartment_count !== undefined) updateData.apartment_count = apartment_count ? parseInt(apartment_count) : null
+        if (segment_id !== undefined) updateData.segment_id = segment_id || null
+        if (contract_type_id !== undefined) updateData.contract_type_id = contract_type_id || null
+        if (price_list_id !== undefined) updateData.price_list_id = price_list_id || null
 
         const { error } = await supabase
           .from('customer')
