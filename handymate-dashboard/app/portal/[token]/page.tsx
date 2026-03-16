@@ -42,6 +42,22 @@ interface PortalAta {
   created_at: string
 }
 
+interface TrackerStage {
+  stage: string
+  label: string
+  completed_at: string | null
+  completed_by: string | null
+  note: string | null
+}
+
+interface ProjectPhoto {
+  id: string
+  url: string
+  caption: string | null
+  type: string
+  uploaded_at: string
+}
+
 interface Project {
   project_id: string
   name: string
@@ -54,6 +70,8 @@ interface Project {
   latestLog: { description: string; created_at: string } | null
   nextVisit: { title: string; start_time: string; end_time: string } | null
   atas: PortalAta[]
+  tracker_stages?: TrackerStage[]
+  photos?: ProjectPhoto[]
 }
 
 interface Quote {
@@ -165,6 +183,15 @@ export default function CustomerPortalPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Poll project data every 30s for live tracker updates
+  useEffect(() => {
+    if (activeTab !== 'projects' || !selectedProject || !portal) return
+    const interval = setInterval(() => {
+      fetchTabData('projects')
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [activeTab, selectedProject, portal])
 
   async function fetchPortal() {
     try {
@@ -525,6 +552,14 @@ export default function CustomerPortalPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Project Tracker */}
+                {selectedProjectData.tracker_stages && selectedProjectData.tracker_stages.length > 0 && (
+                  <ProjectTracker
+                    stages={selectedProjectData.tracker_stages}
+                    photos={selectedProjectData.photos || []}
+                  />
+                )}
 
                 {/* Next visit */}
                 {selectedProjectData.nextVisit && (
@@ -1125,6 +1160,130 @@ export default function CustomerPortalPage() {
             </div>
           </div>
         </footer>
+      )}
+    </div>
+  )
+}
+
+// ─── Project Tracker Sub-component ───────────────────────────
+
+const TRACKER_STAGES = [
+  { key: 'quote_accepted', label: 'Offert godkänd', icon: '✅' },
+  { key: 'material', label: 'Material förbereds', icon: '📦' },
+  { key: 'work_started', label: 'Arbete pågår', icon: '🔨' },
+  { key: 'inspection', label: 'Slutbesiktning', icon: '🔍' },
+  { key: 'done', label: 'Klart!', icon: '🎉' },
+]
+
+function ProjectTracker({
+  stages,
+  photos,
+}: {
+  stages: TrackerStage[]
+  photos: ProjectPhoto[]
+}) {
+  const completedKeys = stages.filter(s => s.completed_at).map(s => s.stage)
+  const currentIndex = TRACKER_STAGES.findIndex(s => !completedKeys.includes(s.key))
+  const progressPct = currentIndex < 0
+    ? 100
+    : Math.round((currentIndex / (TRACKER_STAGES.length - 1)) * 100)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <h3 className="font-medium text-gray-900 mb-1">Projektstatus</h3>
+      <p className="text-xs text-gray-400 mb-5">Uppdateras i realtid</p>
+
+      {/* Step indicator */}
+      <div className="relative pl-5">
+        {/* Background line */}
+        <div className="absolute left-[19px] top-5 bottom-5 w-0.5 bg-gray-200" />
+        {/* Progress line */}
+        <div
+          className="absolute left-[19px] top-5 w-0.5 bg-teal-500 transition-all duration-1000"
+          style={{ height: `${progressPct}%` }}
+        />
+
+        <div className="space-y-5">
+          {TRACKER_STAGES.map((step, i) => {
+            const isCompleted = completedKeys.includes(step.key)
+            const isCurrent = i === currentIndex
+            const stageData = stages.find(s => s.stage === step.key)
+
+            return (
+              <div key={step.key} className="flex items-start gap-3">
+                {/* Circle */}
+                <div
+                  className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0 border-2 transition-all ${
+                    isCompleted
+                      ? 'bg-teal-500 border-teal-500 text-white'
+                      : isCurrent
+                        ? 'bg-white border-teal-500'
+                        : 'bg-white border-gray-200'
+                  } ${isCurrent ? 'animate-pulse' : ''}`}
+                >
+                  {isCompleted ? '✓' : step.icon}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 pt-1">
+                  <p
+                    className={`text-sm font-medium ${
+                      isCompleted
+                        ? 'text-gray-900'
+                        : isCurrent
+                          ? 'text-teal-700'
+                          : 'text-gray-400'
+                    }`}
+                  >
+                    {step.label}
+                  </p>
+                  {stageData?.completed_at && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(stageData.completed_at).toLocaleDateString('sv-SE', {
+                        day: 'numeric',
+                        month: 'short',
+                      })}
+                      {stageData.note && ` · ${stageData.note}`}
+                    </p>
+                  )}
+                  {isCurrent && !isCompleted && (
+                    <p className="text-xs text-teal-600 mt-0.5">Pågår nu...</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Photos */}
+      {photos.length > 0 && (
+        <div className="mt-5 pt-5 border-t border-gray-100">
+          <p className="text-sm font-medium text-gray-700 mb-3">
+            Foton från jobbet
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map(photo => (
+              <div key={photo.id} className="relative aspect-square rounded-lg overflow-hidden">
+                <img
+                  src={photo.url}
+                  alt={photo.caption || 'Projektfoto'}
+                  className="w-full h-full object-cover"
+                />
+                {photo.type === 'after' && (
+                  <span className="absolute top-1 right-1 text-[10px] bg-teal-500 text-white px-1.5 py-0.5 rounded-full">
+                    Klart
+                  </span>
+                )}
+                {photo.type === 'before' && (
+                  <span className="absolute top-1 right-1 text-[10px] bg-gray-700 text-white px-1.5 py-0.5 rounded-full">
+                    Före
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   )

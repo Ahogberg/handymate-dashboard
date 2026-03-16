@@ -27,9 +27,9 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       .eq('customer_id', customer.customer_id)
       .order('created_at', { ascending: false })
 
-    // For each project, get milestones and latest log
+    // For each project, get milestones, latest log, stages, and photos
     const enriched = await Promise.all((projects || []).map(async (p: any) => {
-      const [milestonesRes, logsRes, scheduleRes, ataRes] = await Promise.all([
+      const [milestonesRes, logsRes, scheduleRes, ataRes, stagesRes, photosRes] = await Promise.all([
         supabase
           .from('project_milestone')
           .select('name, status, sort_order')
@@ -53,7 +53,18 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           .select('change_id, ata_number, change_type, description, items, total, status, sign_token, signed_at, signed_by_name, created_at')
           .eq('project_id', p.project_id)
           .in('status', ['sent', 'signed', 'approved'])
-          .order('ata_number', { ascending: true })
+          .order('ata_number', { ascending: true }),
+        supabase
+          .from('project_stages')
+          .select('stage, label, completed_at, completed_by, note')
+          .eq('project_id', p.project_id)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('project_photos')
+          .select('id, url, caption, type, uploaded_at')
+          .eq('project_id', p.project_id)
+          .order('uploaded_at', { ascending: false })
+          .limit(12),
       ])
 
       return {
@@ -66,6 +77,8 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           // Only expose sign_token for ÄTAs that need signing
           sign_token: a.status === 'sent' ? a.sign_token : null,
         })),
+        tracker_stages: stagesRes.data || [],
+        photos: photosRes.data || [],
       }
     }))
 
