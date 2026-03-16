@@ -52,6 +52,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
+import { TimelineView } from '@/components/pipeline/TimelineView'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -382,6 +383,9 @@ export default function PipelinePage() {
   const [newCustomerSubmitting, setNewCustomerSubmitting] = useState(false)
   const [newDealFiles, setNewDealFiles] = useState<File[]>([])
   const [newDealUploading, setNewDealUploading] = useState(false)
+
+  // View toggle
+  const [pipelineView, setPipelineView] = useState<'kanban' | 'timeline'>('kanban')
 
   // Stage management
   const [showStageSettings, setShowStageSettings] = useState(false)
@@ -1270,6 +1274,22 @@ export default function PipelinePage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Kanban / Tidslinje toggle */}
+              <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setPipelineView('kanban')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Kanban
+                </button>
+                <button
+                  onClick={() => setPipelineView('timeline')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'timeline' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                >
+                  Tidslinje
+                </button>
+              </div>
+
               <div className="relative" ref={filterRef}>
                 <button onClick={() => setShowFilter(!showFilter)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-teal-50 border-teal-300 text-sky-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
@@ -1329,8 +1349,16 @@ export default function PipelinePage() {
           </div>
         </header>
 
-        {/* Kanban Board */}
+        {/* Kanban / Timeline */}
         <div className="flex-1 overflow-hidden">
+          {pipelineView === 'timeline' ? (
+            <TimelineView
+              deals={filteredDeals as any}
+              stages={stages}
+              onDealClick={openDealDetail as any}
+            />
+          ) : (
+          <>
           {/* Desktop */}
           <div className="hidden lg:flex h-full overflow-x-auto px-4 py-4 gap-3">
             {activeStages.map(stage => {
@@ -1418,6 +1446,8 @@ export default function PipelinePage() {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
         {/* AI Activity Panel */}
