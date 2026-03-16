@@ -97,8 +97,8 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
 
   const updates: Record<string, any> = {
     stripe_customer_id: session.customer as string,
-    billing_plan: planId || 'starter',
-    billing_status: 'active'
+    subscription_plan: planId || 'starter',
+    subscription_status: 'active'
   }
 
   if (session.subscription) {
@@ -145,6 +145,14 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
   } catch (err) {
     console.error('[Billing] Referral conversion failed:', err)
   }
+
+  // Notify partner webhook about conversion
+  try {
+    const { notifyPartnerWebhook } = await import('@/lib/partners/webhook')
+    await notifyPartnerWebhook(businessId, 'converted')
+  } catch (err) {
+    console.error('[Billing] Partner webhook notification failed:', err)
+  }
 }
 
 /**
@@ -181,7 +189,7 @@ async function updateSubscriptionData(
   subscription: Stripe.Subscription,
   eventId: string
 ) {
-  // Mappa Stripe-status till vår billing_status
+  // Mappa Stripe-status till vår subscription_status
   const statusMap: Record<string, string> = {
     active: 'active',
     past_due: 'past_due',
@@ -197,14 +205,14 @@ async function updateSubscriptionData(
   const planId = subscription.metadata?.plan_id
 
   const updates: Record<string, any> = {
-    billing_status: billingStatus,
+    subscription_status: billingStatus,
     billing_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
     billing_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
     stripe_subscription_id: subscription.id
   }
 
   if (planId) {
-    updates.billing_plan = planId
+    updates.subscription_plan = planId
   }
 
   if (subscription.trial_end) {
@@ -260,7 +268,7 @@ async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
   await supabase
     .from('business_config')
     .update({
-      billing_status: 'cancelled',
+      subscription_status: 'cancelled',
       stripe_subscription_id: null
     })
     .eq('business_id', targetBusinessId)
@@ -277,6 +285,14 @@ async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
         canceled_at: subscription.canceled_at
       }
     })
+
+  // Notify partner webhook about churn
+  try {
+    const { notifyPartnerWebhook } = await import('@/lib/partners/webhook')
+    await notifyPartnerWebhook(targetBusinessId, 'churned')
+  } catch (err) {
+    console.error('[Billing] Partner webhook churn notification failed:', err)
+  }
 }
 
 /**
@@ -302,7 +318,7 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
   // Säkerställ att status är aktiv
   await supabase
     .from('business_config')
-    .update({ billing_status: 'active' })
+    .update({ subscription_status: 'active' })
     .eq('business_id', business.business_id)
 
   // Logga händelse
@@ -343,7 +359,7 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
 
   await supabase
     .from('business_config')
-    .update({ billing_status: 'past_due' })
+    .update({ subscription_status: 'past_due' })
     .eq('business_id', business.business_id)
 
   // Logga händelse

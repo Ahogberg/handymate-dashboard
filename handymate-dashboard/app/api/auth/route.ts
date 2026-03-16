@@ -136,6 +136,14 @@ if (action === 'register') {
               partner_id: partner.id,
               status: 'pending',
             })
+
+          // Notify partner webhook about new trial
+          try {
+            const { notifyPartnerWebhook } = await import('@/lib/partners/webhook')
+            await notifyPartnerWebhook(businessId, 'trial_started')
+          } catch (err) {
+            console.error('[Register] Partner webhook notification failed:', err)
+          }
         }
       } else {
         // Customer-to-customer referral
@@ -283,10 +291,10 @@ if (action === 'login') {
         return NextResponse.json({ authenticated: false }, { status: 401 })
       }
 
-      // Resolve plan from whichever column exists
-      const resolvedPlan = business.plan || business.billing_plan || business.subscription_plan || 'starter'
+      // Resolve plan
+      const resolvedPlan = business.subscription_plan || 'starter'
       const normalizedPlan = String(resolvedPlan).toLowerCase()
-      const plan = normalizedPlan === 'professional' ? 'professional' : normalizedPlan === 'business' ? 'business' : 'starter'
+      const subscription_plan = normalizedPlan === 'professional' ? 'professional' : normalizedPlan === 'business' ? 'business' : 'starter'
 
       return NextResponse.json({
         authenticated: true,
@@ -295,7 +303,7 @@ if (action === 'login') {
           business_name: business.business_name,
           contact_name: business.contact_name,
           contact_email: business.contact_email,
-          plan,
+          subscription_plan,
           onboarding_step: business.onboarding_step ?? 1,
           onboarding_completed_at: business.onboarding_completed_at ?? null,
         }
