@@ -62,7 +62,7 @@ interface BusinessData {
   rut_enabled: boolean
   google_review_url: string | null
   widget_enabled: boolean
-  plan: string | null
+  subscription_plan?: string | null
   working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
 }
 
@@ -231,7 +231,7 @@ export default function StorefrontClient({
   priceItems: PriceItem[]
   reviews: Review[]
 }) {
-  const plan = (business.plan || 'starter') as string
+  const plan = (business.subscription_plan || 'starter') as string
   const isStarter = plan === 'starter'
 
   // Feature gating per plan

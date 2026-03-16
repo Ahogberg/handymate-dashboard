@@ -45,7 +45,7 @@ interface BusinessData {
   rut_enabled: boolean
   google_review_url: string | null
   widget_enabled: boolean
-  plan: string | null
+  subscription_plan: string | null
   working_hours: Record<string, { enabled: boolean; start: string; end: string }> | null
 }
 
@@ -77,7 +77,7 @@ async function getStorefrontData(slug: string) {
 
   const { data: business } = await supabase
     .from('business_config')
-    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, plan, working_hours')
+    .select('business_id, business_name, contact_name, contact_email, phone_number, assigned_phone_number, address, service_area, branch, services_offered, default_hourly_rate, rot_enabled, rut_enabled, google_review_url, widget_enabled, subscription_plan, working_hours')
     .eq('business_id', storefront.business_id)
     .single()
 

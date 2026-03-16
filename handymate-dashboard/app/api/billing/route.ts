@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
     // Hämta business billing-data
     const { data: billingData, error: billingError } = await supabase
       .from('business_config')
-      .select('billing_plan, billing_status, trial_ends_at, billing_period_start, billing_period_end, stripe_customer_id, stripe_subscription_id')
+      .select('subscription_plan, subscription_status, trial_ends_at, billing_period_start, billing_period_end, stripe_customer_id, stripe_subscription_id')
       .eq('business_id', businessId)
       .single()
 
     if (billingError) throw billingError
 
-    const planId = billingData?.billing_plan || 'starter'
+    const planId = billingData?.subscription_plan || 'starter'
 
     // Hämta planens detaljer
     const { data: plan, error: planError } = await supabase
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     // Beräkna trial-dagar kvar
     let trialDaysLeft = 0
-    if (billingData?.billing_status === 'trialing' && billingData?.trial_ends_at) {
+    if (billingData?.subscription_status === 'trialing' && billingData?.trial_ends_at) {
       const trialEnd = new Date(billingData.trial_ends_at)
       const diffMs = trialEnd.getTime() - now.getTime()
       trialDaysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
@@ -81,14 +81,14 @@ export async function GET(request: NextRequest) {
         limits: plan.limits
       },
       subscription: {
-        status: billingData?.billing_status || 'trialing',
+        status: billingData?.subscription_status || 'trialing',
         stripe_customer_id: billingData?.stripe_customer_id || null,
         stripe_subscription_id: billingData?.stripe_subscription_id || null,
         period_start: billingData?.billing_period_start || null,
         period_end: billingData?.billing_period_end || null
       },
       trial: {
-        is_trialing: billingData?.billing_status === 'trialing',
+        is_trialing: billingData?.subscription_status === 'trialing',
         ends_at: billingData?.trial_ends_at || null,
         days_left: trialDaysLeft
       },

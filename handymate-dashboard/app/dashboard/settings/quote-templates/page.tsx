@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useBusiness } from '@/lib/BusinessContext'
-import { hasFeature, PlanType } from '@/lib/feature-gates'
+import { hasFeature, getFeatureLimit, PlanType } from '@/lib/feature-gates'
+import { UpgradeModal } from '@/components/UpgradeModal'
 import {
   Plus,
   Star,
@@ -38,9 +39,12 @@ export default function QuoteTemplatesPage() {
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
   const [branchFilter, setBranchFilter] = useState<string>('all')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
-  const plan = (business as any)?.plan || 'starter'
+  const plan = (business as any)?.subscription_plan || 'starter'
   const hasAccess = hasFeature(plan as PlanType, 'quote_templates')
+  const templateLimit = getFeatureLimit(plan as PlanType, 'quote_templates')
+  const atLimit = templateLimit !== null && templates.length >= templateLimit
 
   useEffect(() => {
     if (business) fetchTemplates()
@@ -88,6 +92,10 @@ export default function QuoteTemplatesPage() {
   }
 
   const duplicateTemplate = async (template: QuoteTemplate) => {
+    if (atLimit) {
+      setShowUpgrade(true)
+      return
+    }
     try {
       const res = await fetch('/api/quote-templates', {
         method: 'POST',
@@ -119,6 +127,10 @@ export default function QuoteTemplatesPage() {
   }
 
   const createNew = async () => {
+    if (atLimit) {
+      setShowUpgrade(true)
+      return
+    }
     try {
       const res = await fetch('/api/quote-templates', {
         method: 'POST',
@@ -143,10 +155,10 @@ export default function QuoteTemplatesPage() {
   if (!hasAccess) {
     return (
       <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-8 text-center">
-          <FileText className="w-12 h-12 text-zinc-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">Offertmallar</h2>
-          <p className="text-zinc-400 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Offertmallar</h2>
+          <p className="text-gray-500 mb-4">
             Uppgradera till Professional eller Business för att använda offertmallar.
           </p>
         </div>
@@ -159,32 +171,53 @@ export default function QuoteTemplatesPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/settings" className="text-zinc-400 hover:text-white transition-colors">
+          <Link href="/dashboard/settings" className="text-gray-400 hover:text-gray-900 transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-white">Offertmallar</h1>
-            <p className="text-zinc-400 text-sm">Skapa och hantera mallar för snabbare offerter</p>
+            <h1 className="text-2xl font-bold text-gray-900">Offertmallar</h1>
+            <p className="text-gray-500 text-sm">Skapa och hantera mallar för snabbare offerter</p>
           </div>
         </div>
-        <div className="flex gap-2">
-          {templates.length === 0 && (
-            <button
-              onClick={seedTemplates}
-              disabled={seeding}
-              className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg transition-colors"
-            >
-              {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              Skapa exempelmallar
-            </button>
+        <div className="flex items-center gap-3">
+          {/* Limit counter */}
+          {templateLimit !== null && (
+            <div className="text-sm text-gray-500">
+              {templates.length} / {templateLimit} mallar
+              {atLimit && (
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  className="text-teal-700 font-medium ml-2 hover:underline"
+                >
+                  Uppgradera →
+                </button>
+              )}
+            </div>
           )}
-          <button
-            onClick={createNew}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-500 text-white rounded-lg hover:opacity-90 transition-opacity"
-          >
-            <Plus className="w-4 h-4" />
-            Ny mall
-          </button>
+          <div className="flex gap-2">
+            {templates.length === 0 && (
+              <button
+                onClick={seedTemplates}
+                disabled={seeding}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
+              >
+                {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Skapa exempelmallar
+              </button>
+            )}
+            <button
+              onClick={createNew}
+              disabled={atLimit}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+                atLimit
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-teal-700 text-white hover:bg-teal-800'
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              Ny mall
+            </button>
+          </div>
         </div>
       </div>
 
@@ -325,6 +358,14 @@ export default function QuoteTemplatesPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Upgrade modal */}
+      {showUpgrade && (
+        <UpgradeModal
+          feature="Obegränsade offertmallar"
+          onClose={() => setShowUpgrade(false)}
+        />
       )}
     </div>
   )

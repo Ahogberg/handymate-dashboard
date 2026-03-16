@@ -174,7 +174,8 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   quote_templates: {
     key: 'quote_templates',
     name: 'Offertmallar',
-    plans: ['professional', 'business'],
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 3, professional: null, business: null },
   },
   ai_quote_generator: {
     key: 'ai_quote_generator',

@@ -8,7 +8,7 @@ interface Business {
   business_name: string
   contact_name: string
   contact_email: string
-  plan: 'starter' | 'professional' | 'business'
+  subscription_plan: 'starter' | 'professional' | 'business'
   onboarding_step: number
   onboarding_completed_at: string | null
 }

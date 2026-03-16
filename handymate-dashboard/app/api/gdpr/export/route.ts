@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       recordingsRes,
       projectsRes,
     ] = await Promise.all([
-      supabase.from('business_config').select('business_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, industry, billing_plan, created_at').eq('business_id', bid).single(),
+      supabase.from('business_config').select('business_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, industry, subscription_plan, created_at').eq('business_id', bid).single(),
       supabase.from('customer').select('*').eq('business_id', bid),
       supabase.from('quotes').select('*').eq('business_id', bid),
       supabase.from('invoice').select('*').eq('business_id', bid),

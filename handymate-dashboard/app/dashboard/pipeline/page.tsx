@@ -2581,6 +2581,11 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
               deal.lead_source_platform === 'byggahus' ? 'Byggahus' :
               deal.lead_source_platform
             }</span>}
+            {!deal.lead_source_platform && deal.source && !['manual', 'ai', 'call', 'website_form', 'vapi_call', 'inbound_sms'].includes(deal.source) && (
+              <span className="px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 bg-violet-100 text-violet-700">
+                via {deal.source}
+              </span>
+            )}
           </div>
           {deal.customer?.name && <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer.customer_number && <span className="font-medium">{deal.customer.customer_number} · </span>}{deal.customer.name}</p>}
           {deal.description && !deal.customer?.name && <p className="text-xs text-gray-400 mt-0.5 truncate ml-3.5">{deal.description}</p>}

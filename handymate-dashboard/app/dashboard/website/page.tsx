@@ -388,7 +388,7 @@ export default function WebsitePage() {
   }
 
   // Plan-based locked sections for Starter
-  const isStarterPlan = (business.plan || 'starter') === 'starter'
+  const isStarterPlan = (business.subscription_plan || 'starter') === 'starter'
   const lockedSections = isStarterPlan ? [
     { icon: MessageCircle, label: 'AI-chatbot', description: 'Fånga leads dygnet runt', featureKey: 'storefront_chatbot' },
     { icon: FileText, label: 'Kontaktformulär', description: 'Leads direkt i din pipeline', featureKey: 'storefront_contact_form' },

@@ -34,7 +34,7 @@ interface Metrics {
   recent_signups: Array<{
     business_name: string
     created_at: string
-    billing_plan: string
+    subscription_plan: string
   }>
 }
 
@@ -374,10 +374,10 @@ export default function AdminDashboardPage() {
                             <td className="px-6 py-4">
                               <span
                                 className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full border ${
-                                  PLAN_BADGE_STYLES[signup.billing_plan] || 'bg-gray-100 text-gray-600 border-gray-200'
+                                  PLAN_BADGE_STYLES[signup.subscription_plan] || 'bg-gray-100 text-gray-600 border-gray-200'
                                 }`}
                               >
-                                {PLAN_LABELS[signup.billing_plan] || signup.billing_plan}
+                                {PLAN_LABELS[signup.subscription_plan] || signup.subscription_plan}
                               </span>
                             </td>
                             <td className="px-6 py-4">

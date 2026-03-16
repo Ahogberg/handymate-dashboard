@@ -57,7 +57,7 @@ export async function processMonthlyCommissions(): Promise<{
         professional: 5995,
         enterprise: 11995,
       }
-      const subscriptionAmount = ref.subscription_amount_sek || planPrices[business.plan] || 0
+      const subscriptionAmount = ref.subscription_amount_sek || planPrices[business.subscription_plan] || 0
       if (subscriptionAmount === 0) continue
 
       // Get partner's commission rate

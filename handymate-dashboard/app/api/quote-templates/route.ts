@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getFeatureLimit, PlanType } from '@/lib/feature-gates'
 
 /**
  * GET - Lista offertmallar per business
@@ -47,6 +48,23 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
+
+    // Plan-based limit check
+    const plan = ((business as any).subscription_plan || 'starter') as PlanType
+    const limit = getFeatureLimit(plan, 'quote_templates')
+    if (limit !== null) {
+      const { count } = await supabase
+        .from('quote_templates')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', business.business_id)
+      if ((count ?? 0) >= limit) {
+        return NextResponse.json(
+          { error: `Maxgränsen på ${limit} offertmallar nådd. Uppgradera för obegränsat.` },
+          { status: 403 }
+        )
+      }
+    }
+
     const body = await request.json()
 
     const id = 'qtpl_' + Math.random().toString(36).substr(2, 9)

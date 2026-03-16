@@ -5,7 +5,7 @@ import { PlanType, hasFeature, getFeatureLimit } from './feature-gates'
 
 export function useBusinessPlan() {
   const business = useBusiness()
-  const plan: PlanType = business.plan || 'starter'
+  const plan: PlanType = business.subscription_plan || 'starter'
 
   return {
     plan,

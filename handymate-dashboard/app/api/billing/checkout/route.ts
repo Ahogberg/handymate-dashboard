@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     // Hämta eller skapa Stripe customer
     const { data: billingData } = await supabase
       .from('business_config')
-      .select('stripe_customer_id, billing_plan')
+      .select('stripe_customer_id, subscription_plan')
       .eq('business_id', business.business_id)
       .single()
 

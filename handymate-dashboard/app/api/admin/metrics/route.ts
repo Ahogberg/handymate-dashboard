@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       // All businesses with billing info
       supabase
         .from('business_config')
-        .select('business_id, business_name, billing_plan, billing_status, subscription_status, subscription_plan, created_at'),
+        .select('business_id, business_name, subscription_plan, subscription_status, created_at'),
 
       // Total quotes
       supabase
@@ -76,11 +76,9 @@ export async function GET(request: NextRequest) {
     const total_businesses = businesses.length
 
     // Determine effective status and plan for each business
-    // billing_status/billing_plan from Stripe integration take priority;
-    // fall back to subscription_status/subscription_plan from legacy fields.
     const enriched = businesses.map((b: any) => {
-      const status = b.billing_status || b.subscription_status || 'unknown'
-      const plan = b.billing_plan || b.subscription_plan || 'starter'
+      const status = b.subscription_status || 'unknown'
+      const plan = b.subscription_plan || 'starter'
       return { ...b, effective_status: status, effective_plan: plan }
     })
 
@@ -108,7 +106,7 @@ export async function GET(request: NextRequest) {
       (b: any) => b.created_at && b.created_at >= monthStart && b.created_at <= monthEnd
     ).length
 
-    // Churn this month: billing_status = 'cancelled' with cancellation happening this month
+    // Churn this month: subscription_status = 'cancelled' with cancellation happening this month
     // Since we don't have a cancelled_at column, we count all currently cancelled businesses
     // that were created before this month (approximation). A more precise approach would
     // require a billing_event table query.
@@ -134,7 +132,7 @@ export async function GET(request: NextRequest) {
     const recent_signups = sortedBusinesses.slice(0, 10).map((b: any) => ({
       business_name: b.business_name,
       created_at: b.created_at,
-      billing_plan: b.billing_plan || b.subscription_plan || 'starter',
+      subscription_plan: b.subscription_plan || 'starter',
     }))
 
     return NextResponse.json({

@@ -40,25 +40,75 @@ export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const apiKey = searchParams.get('api_key') || request.headers.get('x-api-key')
+    const portalCode = searchParams.get('portal_code')
 
-    if (!apiKey) {
-      return Response.json({ error: 'API key required' }, { status: 401, headers: corsHeaders })
+    if (!apiKey && !portalCode) {
+      return Response.json({ error: 'API key or portal code required' }, { status: 401, headers: corsHeaders })
     }
 
     const supabase = getServerSupabase()
 
-    // Validera nyckel → hämta business
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('business_id, business_name, phone_number')
-      .eq('website_api_key', apiKey)
-      .single()
+    let business: { business_id: string; business_name: string; phone_number: string | null } | null = null
+    let leadSourceId: string | null = null
+    let sourceName: string | null = null
+
+    if (portalCode) {
+      // Portal-kod autentisering via lead_sources
+      const { data: source } = await supabase
+        .from('lead_sources')
+        .select('id, name, business_id')
+        .eq('portal_code', portalCode)
+        .eq('is_active', true)
+        .single()
+
+      if (source) {
+        leadSourceId = source.id
+        sourceName = source.name
+        const { data: biz } = await supabase
+          .from('business_config')
+          .select('business_id, business_name, phone_number')
+          .eq('business_id', source.business_id)
+          .single()
+        business = biz
+      }
+    }
+
+    if (!business && apiKey) {
+      // Lead source API-nyckel
+      const { data: source } = await supabase
+        .from('lead_sources')
+        .select('id, name, business_id')
+        .eq('api_key', apiKey)
+        .eq('is_active', true)
+        .single()
+
+      if (source) {
+        leadSourceId = source.id
+        sourceName = source.name
+        const { data: biz } = await supabase
+          .from('business_config')
+          .select('business_id, business_name, phone_number')
+          .eq('business_id', source.business_id)
+          .single()
+        business = biz
+      }
+    }
+
+    if (!business && apiKey) {
+      // Fallback: befintlig website_api_key-autentisering
+      const { data: biz } = await supabase
+        .from('business_config')
+        .select('business_id, business_name, phone_number')
+        .eq('website_api_key', apiKey)
+        .single()
+      business = biz
+    }
 
     if (!business) {
       return Response.json({ error: 'Invalid API key' }, { status: 401, headers: corsHeaders })
     }
 
-    const { name, phone, email, message } = await request.json()
+    const { name, phone, email, message, source_ref } = await request.json()
 
     if (!name || !phone) {
       return Response.json({ error: 'name and phone required' }, { status: 400, headers: corsHeaders })
@@ -114,16 +164,19 @@ export async function POST(request: NextRequest) {
       phone: cleanPhone,
       email: email || null,
       notes: message || null,
-      source: 'website_form',
+      source: sourceName ? sourceName.toLowerCase() : 'website_form',
       status: 'new',
       pipeline_stage_key: firstStage?.key || 'new_lead',
       score: 0,
       ...(leadNumber ? { lead_number: leadNumber } : {}),
+      ...(leadSourceId ? { lead_source_id: leadSourceId } : {}),
+      ...(source_ref ? { source_ref } : {}),
     })
 
     // SMS till hantverkaren (non-blocking)
     if (business.phone_number) {
-      const smsText = `🌐 Ny lead från hemsidan!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
+      const sourceLabel = sourceName || 'hemsidan'
+      const smsText = `🌐 Ny lead från ${sourceLabel}!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
       sendSMS(business.phone_number, smsText, 'Handymate').catch(() => {})
     }
 
@@ -131,7 +184,7 @@ export async function POST(request: NextRequest) {
     try {
       const { fireEvent } = await import('@/lib/automation-engine')
       await fireEvent(supabase, 'lead_received', business.business_id, {
-        source: 'website_form',
+        source: sourceName || 'website_form',
         lead_id: leadId,
         customer_id: customerId,
         customer_name: name,

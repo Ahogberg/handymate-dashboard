@@ -323,7 +323,7 @@ import { hasFeature, PlanType, FEATURE_GATES } from './feature-gates'
  * Resolves the business plan from a business_config record.
  */
 export function getBusinessPlanFromConfig(business: any): PlanType {
-  const raw = business.plan || business.billing_plan || business.subscription_plan || 'starter'
+  const raw = business.subscription_plan || 'starter'
   const normalized = String(raw).toLowerCase()
   if (normalized === 'professional') return 'professional'
   if (normalized === 'business') return 'business'

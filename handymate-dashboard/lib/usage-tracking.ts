@@ -59,11 +59,11 @@ export async function checkUsageLimit(businessId: string, type: UsageType): Prom
   // Hämta planens gränser
   const { data: business } = await supabase
     .from('business_config')
-    .select('billing_plan')
+    .select('subscription_plan')
     .eq('business_id', businessId)
     .single()
 
-  const plan = business?.billing_plan || 'starter'
+  const plan = business?.subscription_plan || 'starter'
 
   const { data: planData } = await supabase
     .from('billing_plan')

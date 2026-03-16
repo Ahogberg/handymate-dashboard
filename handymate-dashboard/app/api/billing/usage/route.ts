@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
     // Hämta aktuell plan
     const { data: billingData, error: billingError } = await supabase
       .from('business_config')
-      .select('billing_plan, billing_period_start, billing_period_end')
+      .select('subscription_plan, billing_period_start, billing_period_end')
       .eq('business_id', businessId)
       .single()
 
     if (billingError) throw billingError
 
-    const planId = billingData?.billing_plan || 'starter'
+    const planId = billingData?.subscription_plan || 'starter'
 
     // Hämta planens gränser
     const { data: plan, error: planError } = await supabase
