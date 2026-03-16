@@ -850,7 +850,12 @@ export default function CustomerPortalPage() {
               const penaltyAmount = daysOverdue > 0 ? Math.round(amountToPay * (paymentInfo.penalty_interest / 100) * (daysOverdue / 365) * 100) / 100 : 0
               const reminderFeeAmount = inv.reminder_count && inv.reminder_count > 0 ? paymentInfo.reminder_fee : 0
               const totalWithFees = amountToPay + penaltyAmount + reminderFeeAmount
-              const swishUrl = paymentInfo.swish ? `swish://payment?payee=${paymentInfo.swish.replace(/\s/g, '')}&amount=${Math.round(inv.status === 'overdue' ? totalWithFees : amountToPay)}&message=Faktura ${inv.invoice_number}` : null
+              const swishPayAmount = Math.round(inv.status === 'overdue' ? totalWithFees : amountToPay)
+              const swishUrl = paymentInfo.swish ? (() => {
+                const data = { version: 1, payee: { value: paymentInfo.swish!.replace(/\D/g, '') }, amount: { value: swishPayAmount }, message: { value: inv.invoice_number } }
+                return `swish://payment?data=${encodeURIComponent(JSON.stringify(data))}`
+              })() : null
+              const swishQrUrl = paymentInfo.swish ? `/api/swish-qr?number=${encodeURIComponent(paymentInfo.swish)}&amount=${swishPayAmount}&message=${encodeURIComponent(inv.invoice_number)}` : null
 
               return (
                 <div className="space-y-4">
@@ -1056,17 +1061,29 @@ export default function CustomerPortalPage() {
                     </div>
                   )}
 
-                  {/* Swish button */}
+                  {/* Swish section with QR + deeplink */}
                   {inv.status !== 'paid' && paymentInfo.swish && (
-                    <a
-                      href={swishUrl || '#'}
-                      className="flex items-center justify-center gap-3 w-full py-4 bg-[#00C281] hover:bg-[#00A86E] text-white rounded-xl font-semibold text-lg transition-colors shadow-md"
-                    >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fill="currentColor"/>
-                      </svg>
-                      Betala {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)} med Swish
-                    </a>
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                      <p className="text-sm font-medium text-gray-700 mb-3">Betala med Swish</p>
+                      <div className="flex items-center gap-4 mb-4">
+                        {swishQrUrl && (
+                          <SwishQRImage src={swishQrUrl} />
+                        )}
+                        <div>
+                          <p className="text-lg font-semibold text-gray-900">{paymentInfo.swish}</p>
+                          <p className="text-sm text-gray-500 mt-1">Märk: {inv.invoice_number}</p>
+                          <p className="text-xl font-bold text-gray-900 mt-2">
+                            {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)}
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href={swishUrl || '#'}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-[#6A3E9E] hover:bg-[#5A2E8E] text-white rounded-xl font-semibold text-sm transition-colors"
+                      >
+                        Öppna Swish
+                      </a>
+                    </div>
                   )}
 
                   {/* Paid confirmation */}
@@ -1161,6 +1178,27 @@ export default function CustomerPortalPage() {
           </div>
         </footer>
       )}
+    </div>
+  )
+}
+
+// ─── Swish QR Image Sub-component ────────────────────────────
+
+function SwishQRImage({ src }: { src: string }) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(src)
+      .then(r => r.json())
+      .then(data => { if (data.qr) setQrDataUrl(data.qr) })
+      .catch(() => {})
+  }, [src])
+
+  if (!qrDataUrl) return <div className="w-20 h-20 bg-purple-100 rounded-xl animate-pulse" />
+
+  return (
+    <div className="bg-white p-2 rounded-xl border border-purple-200 shrink-0">
+      <img src={qrDataUrl} alt="Swish QR" width={80} height={80} />
     </div>
   )
 }

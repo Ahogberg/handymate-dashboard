@@ -148,6 +148,12 @@ export async function POST(request: NextRequest) {
       console.error('Auto project creation error (non-blocking):', projErr)
     }
 
+    // Autopilot: förbered deal-to-delivery-paket
+    try {
+      const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
+      await triggerAutopilot(business.business_id, quoteId)
+    } catch { /* non-blocking */ }
+
     // Logga aktivitet
     try {
       await supabase.from('customer_activity').insert({

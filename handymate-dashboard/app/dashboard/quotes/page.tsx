@@ -15,10 +15,24 @@ interface Quote {
   rot_rut_type: string | null
   valid_until: string
   created_at: string
+  view_count?: number
+  last_viewed_at?: string
   customer?: {
     name: string
     phone_number: string
   }
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just nu'
+  if (mins < 60) return `${mins} min sedan`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours} tim sedan`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'igår'
+  return `${days} dagar sedan`
 }
 
 export default function QuotesPage() {
@@ -232,6 +246,24 @@ export default function QuotesPage() {
                     <div>
                       <p className="font-medium text-gray-900">{quote.title || 'Offert utan titel'}</p>
                       <p className="text-sm text-gray-400">{quote.customer?.name || 'Ingen kund vald'}</p>
+                      {quote.view_count != null && quote.view_count > 0 && (
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                            <Eye className="w-3 h-3" />
+                            Öppnad {quote.view_count}x
+                          </span>
+                          {quote.last_viewed_at && (
+                            <span className="text-xs text-gray-400">
+                              · {formatRelativeTime(quote.last_viewed_at)}
+                            </span>
+                          )}
+                          {quote.view_count >= 3 && ['sent', 'opened'].includes(quote.status) && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium">
+                              Föreslå nudge
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">

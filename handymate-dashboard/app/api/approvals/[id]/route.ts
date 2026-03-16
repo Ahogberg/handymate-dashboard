@@ -23,7 +23,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { action, edited_payload, reject_reason } = body
+    const { action, edited_payload, reject_reason, action_overrides } = body
     if (!action || !['approve', 'reject', 'edit'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve, reject or edit' }, { status: 400 })
     }
@@ -109,7 +109,11 @@ export async function POST(
     let executionResult: Record<string, unknown> | null = null
     if (action === 'approve' || action === 'edit') {
       const approvalWithPayload = { ...approval, payload: finalPayload }
-      executionResult = await executeApprovalPayload(approvalWithPayload, business.business_id)
+      executionResult = await executeApprovalPayload(
+        approvalWithPayload,
+        business.business_id,
+        action_overrides as Record<string, string> | undefined
+      )
     }
 
     return NextResponse.json({
@@ -128,14 +132,16 @@ export async function POST(
  * Returns result info (non-fatal — approval is already marked approved).
  */
 async function executeApprovalPayload(
-  approval: { approval_type: string; payload: Record<string, unknown>; business_id: string },
-  businessId: string
+  approval: { approval_type: string; payload: Record<string, unknown>; business_id: string; package_data?: any },
+  businessId: string,
+  actionOverrides?: Record<string, string>
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
 
   try {
     switch (approval_type) {
+      case 'quote_nudge':
       case 'send_sms': {
         const res = await fetch(`${appUrl}/api/sms/send`, {
           method: 'POST',
@@ -176,6 +182,83 @@ async function executeApprovalPayload(
           body: JSON.stringify({ ...payload, business_id: businessId }),
         })
         return { action: 'create_booking', ok: res.ok }
+      }
+
+      case 'autopilot_package': {
+        const packageData = approval.package_data
+        if (!packageData?.actions) return { action: 'autopilot_package', skipped: 'no package_data' }
+
+        const results: Record<string, unknown>[] = []
+        const supabase = (await import('@/lib/supabase')).getServerSupabase()
+
+        for (const act of packageData.actions as any[]) {
+          // Kolla individuella overrides
+          const override = actionOverrides?.[act.id]
+          if (override === 'rejected') {
+            results.push({ id: act.id, type: act.type, skipped: 'rejected' })
+            continue
+          }
+
+          switch (act.type) {
+            case 'project_info':
+              results.push({ id: act.id, type: 'project_info', ok: true, info: true })
+              break
+
+            case 'booking_suggestion': {
+              const bookRes = await fetch(`${appUrl}/api/bookings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  business_id: businessId,
+                  customer_id: act.data.customer_id,
+                  scheduled_start: act.data.scheduled_start,
+                  scheduled_end: act.data.scheduled_end,
+                  notes: act.data.notes || '',
+                }),
+              })
+              results.push({ id: act.id, type: 'booking', ok: bookRes.ok })
+              break
+            }
+
+            case 'customer_sms': {
+              const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  business_id: businessId,
+                  to: act.data.to,
+                  message: act.data.message,
+                }),
+              })
+              results.push({ id: act.id, type: 'sms', ok: smsRes.ok })
+              break
+            }
+
+            case 'material_list': {
+              const materials = act.data.materials as any[]
+              if (materials?.length > 0 && act.data.project_id) {
+                for (const mat of materials) {
+                  await supabase.from('project_material').insert({
+                    material_id: 'mat_' + Math.random().toString(36).substr(2, 9),
+                    project_id: act.data.project_id,
+                    business_id: businessId,
+                    name: mat.name,
+                    quantity: mat.quantity,
+                    unit: mat.unit,
+                    purchase_price: mat.unit_price || 0,
+                  })
+                }
+              }
+              results.push({ id: act.id, type: 'materials', ok: true, count: materials?.length || 0 })
+              break
+            }
+
+            default:
+              results.push({ id: act.id, type: act.type, skipped: 'unknown action type' })
+          }
+        }
+
+        return { action: 'autopilot_package', results }
       }
 
       default:

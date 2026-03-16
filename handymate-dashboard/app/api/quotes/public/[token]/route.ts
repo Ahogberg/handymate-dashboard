@@ -235,6 +235,12 @@ export async function POST(
       console.error('Communication trigger error (non-blocking):', commErr)
     }
 
+    // Autopilot: förbered deal-to-delivery-paket
+    try {
+      const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
+      await triggerAutopilot(quote.business_id, quote.quote_id)
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({ success: true })
 
   } catch (error: any) {

@@ -165,6 +165,37 @@ export default function QuoteSignPage() {
     fetchQuote()
   }, [token])
 
+  // ── View tracking ─────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!quote || state !== 'viewing') return
+
+    const sessionId = new URLSearchParams(window.location.search).get('s') || crypto.randomUUID()
+    const startTime = Date.now()
+
+    // Logga "opened"
+    fetch(`/api/quotes/track?q=${quote.quote_id}&e=opened&s=${sessionId}`).catch(() => {})
+
+    // Logga tid vid stängning
+    const handleUnload = () => {
+      const duration = Math.floor((Date.now() - startTime) / 1000)
+      if (duration > 0) {
+        navigator.sendBeacon(
+          '/api/quotes/track',
+          JSON.stringify({
+            quoteId: quote.quote_id,
+            event: 'closed',
+            sessionId,
+            duration,
+          })
+        )
+      }
+    }
+
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+  }, [quote, state])
+
   // ── Canvas setup ───────────────────────────────────────────────────────────
 
   const initCanvas = useCallback(() => {

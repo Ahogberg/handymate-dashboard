@@ -34,7 +34,8 @@ import {
   CalendarDays,
   UsersRound,
   Star,
-  RefreshCw
+  RefreshCw,
+  Zap
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -110,6 +111,13 @@ interface BusinessConfig {
   review_request_enabled: boolean
   review_request_delay_days: number
   website_api_key: string | null
+  // Autopilot
+  autopilot_enabled: boolean
+  autopilot_auto_book: boolean
+  autopilot_auto_sms: boolean
+  autopilot_auto_materials: boolean
+  autopilot_booking_buffer_days: number
+  autopilot_default_duration_hours: number
 }
 
 interface FortnoxStatus {
@@ -1224,6 +1232,7 @@ export default function SettingsPage() {
       tabs: [
         { id: 'time', label: 'Tidrapport', icon: Clock },
         { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
+        { id: 'autopilot', label: 'Autopilot', icon: Zap },
         { id: 'team', label: 'Team', icon: UsersRound },
       ],
     },
@@ -3598,6 +3607,128 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Autopilot Tab */}
+        {activeTab === 'autopilot' && config && (
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-amber-500" />
+                  Autopilot-läge
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  När en offert accepteras förbereder AI:n ett komplett förslag som du godkänner med ett tryck.
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  const newVal = !config.autopilot_enabled
+                  setConfig({ ...config, autopilot_enabled: newVal })
+                  await supabase.from('business_config').update({ autopilot_enabled: newVal }).eq('business_id', business.business_id)
+                }}
+                className={`relative w-12 h-7 rounded-full transition-colors ${config.autopilot_enabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${config.autopilot_enabled ? 'translate-x-5' : ''}`} />
+              </button>
+            </div>
+
+            {config.autopilot_enabled && (
+              <div className="space-y-4 pt-4 border-t border-gray-200">
+                <label className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Föreslå bokning</span>
+                    <p className="text-xs text-gray-400">Hittar nästa lediga tid i din kalender</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newVal = !config.autopilot_auto_book
+                      setConfig({ ...config, autopilot_auto_book: newVal })
+                      await supabase.from('business_config').update({ autopilot_auto_book: newVal }).eq('business_id', business.business_id)
+                    }}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_book !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_book !== false ? 'translate-x-4' : ''}`} />
+                  </button>
+                </label>
+
+                {config.autopilot_auto_book !== false && (
+                  <div className="grid grid-cols-2 gap-4 pl-4 border-l-2 border-gray-100">
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Buffertdagar</label>
+                      <input
+                        type="number"
+                        min={0}
+                        max={14}
+                        value={config.autopilot_booking_buffer_days ?? 2}
+                        onChange={async e => {
+                          const val = parseInt(e.target.value) || 2
+                          setConfig({ ...config, autopilot_booking_buffer_days: val })
+                          await supabase.from('business_config').update({ autopilot_booking_buffer_days: val }).eq('business_id', business.business_id)
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 mb-1 block">Jobblängd (timmar)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={config.autopilot_default_duration_hours ?? 4}
+                        onChange={async e => {
+                          const val = parseInt(e.target.value) || 4
+                          setConfig({ ...config, autopilot_default_duration_hours: val })
+                          await supabase.from('business_config').update({ autopilot_default_duration_hours: val }).eq('business_id', business.business_id)
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <label className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Förbered kund-SMS</span>
+                    <p className="text-xs text-gray-400">AI:n skriver ett bekräftelse-SMS</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newVal = !config.autopilot_auto_sms
+                      setConfig({ ...config, autopilot_auto_sms: newVal })
+                      await supabase.from('business_config').update({ autopilot_auto_sms: newVal }).eq('business_id', business.business_id)
+                    }}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_sms !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_sms !== false ? 'translate-x-4' : ''}`} />
+                  </button>
+                </label>
+
+                <label className="flex items-center justify-between">
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">Generera materiallista</span>
+                    <p className="text-xs text-gray-400">Extraherar material från offertrader</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      const newVal = !config.autopilot_auto_materials
+                      setConfig({ ...config, autopilot_auto_materials: newVal })
+                      await supabase.from('business_config').update({ autopilot_auto_materials: newVal }).eq('business_id', business.business_id)
+                    }}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_materials !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_materials !== false ? 'translate-x-4' : ''}`} />
+                  </button>
+                </label>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  <span>Ingenting sker utan att du godkänner det i Godkännanden. Autopiloten föreslår — du beslutar.</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -182,6 +182,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'AI-offertgenerering',
     plans: ['professional', 'business'],
   },
+  deal_autopilot: {
+    key: 'deal_autopilot',
+    name: 'Deal-to-Delivery Autopilot',
+    plans: ['professional', 'business'],
+  },
 
   // === BEGRÄNSADE PER PLAN ===
   ai_photo_quote: {

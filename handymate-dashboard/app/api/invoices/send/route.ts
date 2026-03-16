@@ -186,9 +186,33 @@ export async function POST(request: NextRequest) {
 
       <p><strong>Betalningsinformation:</strong></p>
       <p>
-        Bankgiro: ${business?.bankgiro || 'Ej angivet'}<br>
+        ${business?.bankgiro ? `Bankgiro: ${business.bankgiro}<br>` : ''}
         OCR: ${generateOCR(invoice.invoice_number || '')}
       </p>
+
+      ${businessConfig?.swish_number ? (() => {
+        const swishData = JSON.stringify({
+          version: 1,
+          payee: { value: (businessConfig.swish_number as string).replace(/\\D/g, '') },
+          amount: { value: Math.round(amountToPay || 0) },
+          message: { value: invoice.invoice_number },
+        })
+        const swishLink = 'swish://payment?data=' + encodeURIComponent(swishData)
+        return `
+      <div style="text-align:center;margin:24px 0;padding:24px;background:#f5f0ff;border-radius:12px;border:1px solid #e4d8f8;">
+        <p style="font-size:13px;color:#6B7280;margin:0 0 12px;">Betala enkelt med</p>
+        <a href="${swishLink}"
+           style="display:inline-block;background:#6A3E9E;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:600;">
+          Betala ${amountToPay?.toLocaleString('sv-SE')} kr med Swish
+        </a>
+        <p style="font-size:13px;color:#374151;margin:16px 0 0;">
+          Swish: <strong>${businessConfig.swish_number}</strong>
+        </p>
+        <p style="font-size:12px;color:#9CA3AF;margin:4px 0 0;">
+          Märk betalningen: <strong>${invoice.invoice_number}</strong>
+        </p>
+      </div>`
+      })() : ''}
 
       <center>
         <a href="${pdfUrl}" class="btn">Visa fullständig faktura</a>

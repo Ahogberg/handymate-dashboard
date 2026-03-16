@@ -84,7 +84,7 @@ async function sendEmail(
 /**
  * Generera email HTML
  */
-function generateEmailHTML(quote: any, business: any, signUrl?: string): string {
+function generateEmailHTML(quote: any, business: any, signUrl?: string, trackingPixelUrl?: string): string {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
   }
@@ -184,6 +184,7 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string): string 
       Detta email skickades från ${business.business_name} via Handymate.
     </p>
   </div>
+${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />` : ''}
 </body>
 </html>
   `
@@ -256,7 +257,9 @@ export async function POST(request: NextRequest) {
         .update({ sign_token: signToken })
         .eq('quote_id', quoteId)
     }
-    const signUrl = `${APP_URL}/quote/${signToken}`
+    const trackingSessionId = crypto.randomUUID()
+    const signUrl = `${APP_URL}/quote/${signToken}?s=${trackingSessionId}`
+    const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&e=opened&s=${trackingSessionId}`
 
     let smsSent = false
     let emailSent = false
@@ -305,7 +308,7 @@ Frågor? Ring ${business.phone_number}`
         // Om both och ingen email, fortsätt med bara SMS
       } else {
         const emailSubject = `Offert från ${business.business_name}: ${quote.title || 'Offert'}`
-        const emailHTML = generateEmailHTML(quote, business, signUrl)
+        const emailHTML = generateEmailHTML(quote, business, signUrl, trackingPixelUrl)
 
         emailSent = await sendEmail(
           quote.customer.email,

@@ -177,10 +177,43 @@ export function invoiceEmail(params: {
   customerName: string
   invoiceNumber: string
   totalAmount: string
+  totalAmountNum?: number
   dueDate: string
   viewUrl?: string
+  swishNumber?: string | null
+  bankgiro?: string | null
 }): { subject: string; html: string } {
   const subject = `Faktura #${params.invoiceNumber} från ${params.branding.businessName}`
+
+  // Swish deeplink (proper JSON format)
+  const swishDeeplink = params.swishNumber ? (() => {
+    const data = {
+      version: 1,
+      payee: { value: params.swishNumber!.replace(/\D/g, '') },
+      amount: { value: Math.round(params.totalAmountNum || 0) },
+      message: { value: params.invoiceNumber },
+    }
+    return `swish://payment?data=${encodeURIComponent(JSON.stringify(data))}`
+  })() : null
+
+  const swishSection = params.swishNumber && params.swishNumber.trim() ? `
+    <div style="text-align:center;margin:24px 0;padding:24px;background:#f5f0ff;border-radius:12px;border:1px solid #e4d8f8;">
+      <p style="font-size:13px;color:#6B7280;margin:0 0 12px;">Betala enkelt med</p>
+      <a href="${swishDeeplink}"
+         style="display:inline-block;background:#6A3E9E;color:#ffffff;padding:14px 28px;border-radius:8px;text-decoration:none;font-size:16px;font-weight:600;">
+        Betala ${params.totalAmount} kr med Swish
+      </a>
+      <p style="font-size:13px;color:#374151;margin:16px 0 0;">
+        Swish: <strong>${params.swishNumber}</strong>
+      </p>
+      <p style="font-size:12px;color:#9CA3AF;margin:4px 0 0;">
+        Märk betalningen: <strong>${params.invoiceNumber}</strong>
+      </p>
+    </div>
+  ` : ''
+
+  const bankgiroLine = params.bankgiro ? `Bankgiro: ${params.bankgiro}. ` : ''
+
   const html = emailLayout(params.branding, `
     <h2 style="margin:0 0 8px;color:#1e293b;font-size:20px;">Hej ${params.customerName}!</h2>
     <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
@@ -204,9 +237,10 @@ export function invoiceEmail(params: {
         </td>
       </tr>
     </table>
+    ${swishSection}
     ${params.viewUrl ? `<p style="margin:0 0 24px;">${ctaButton('Visa faktura', params.viewUrl)}</p>` : ''}
     <p style="margin:0;color:#94a3b8;font-size:13px;">
-      Betalningsvillkor: 30 dagar netto. Kontakta oss vid frågor.
+      ${bankgiroLine}Betalningsvillkor: 30 dagar netto. Kontakta oss vid frågor.
     </p>
   `)
   return { subject, html }

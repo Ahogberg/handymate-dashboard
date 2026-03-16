@@ -13,6 +13,11 @@ import {
   RefreshCw,
   AlertTriangle,
   Pencil,
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  FolderOpen,
+  Package,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -29,6 +34,22 @@ interface Approval {
   created_at: string
   expires_at: string
   resolved_at: string | null
+  package_id?: string | null
+  package_type?: string | null
+  package_data?: {
+    quote_id?: string
+    customer_id?: string
+    project_id?: string
+    customer_name?: string
+    customer_phone?: string
+    actions?: Array<{
+      id: string
+      type: string
+      title: string
+      description: string
+      data: Record<string, unknown>
+    }>
+  } | null
 }
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgColor: string; textColor: string }> = {
@@ -36,6 +57,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   send_quote: { label: 'Offert', icon: FileText, bgColor: 'bg-teal-50', textColor: 'text-teal-600' },
   send_invoice: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
+  autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
+  quote_nudge: { label: 'Nudge', icon: MessageSquare, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -83,6 +106,8 @@ export default function ApprovalsPage() {
   const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
+  const [expandedPackage, setExpandedPackage] = useState<string | null>(null)
+  const [rejectedActions, setRejectedActions] = useState<Record<string, Set<string>>>({})
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -167,6 +192,53 @@ export default function ApprovalsPage() {
     handleAction(approval.id, 'approve', editedPayload)
   }
 
+  async function handleAutopilotApprove(approval: Approval, rejectIds?: string[]) {
+    setActionLoading(approval.id + 'approve')
+    try {
+      const overrides: Record<string, string> = {}
+      if (rejectIds) {
+        for (const id of rejectIds) {
+          overrides[id] = 'rejected'
+        }
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          action: 'approve',
+          action_overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
+        }),
+      })
+      if (res.ok) {
+        setApprovals(prev => prev.filter(a => a.id !== approval.id))
+        setExpandedPackage(null)
+      }
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  function toggleActionRejected(approvalId: string, actionId: string) {
+    setRejectedActions(prev => {
+      const set = new Set(prev[approvalId] || [])
+      if (set.has(actionId)) set.delete(actionId)
+      else set.add(actionId)
+      return { ...prev, [approvalId]: set }
+    })
+  }
+
+  const ACTION_ICONS: Record<string, React.ElementType> = {
+    project_info: FolderOpen,
+    booking_suggestion: Calendar,
+    customer_sms: MessageSquare,
+    material_list: Package,
+  }
+
   const pendingCount = approvals.filter(a => a.status === 'pending').length
 
   return (
@@ -245,6 +317,150 @@ export default function ApprovalsPage() {
         ) : (
           <div className="space-y-3">
             {approvals.map(approval => {
+              // Autopilot-paket — specialvy
+              if (approval.approval_type === 'autopilot_package' && approval.package_data?.actions) {
+                const pkgActions = approval.package_data.actions
+                const isExpanded = expandedPackage === approval.id
+                const rejectedSet = rejectedActions[approval.id] || new Set<string>()
+                const pendingActions = pkgActions.filter(a => a.type !== 'project_info')
+                const activeCount = pendingActions.filter(a => !rejectedSet.has(a.id)).length
+
+                return (
+                  <div key={approval.id} className={`border-2 rounded-xl transition-all ${
+                    approval.status === 'pending' ? 'border-teal-200 bg-teal-50/30' : 'border-gray-100 opacity-75'
+                  }`}>
+                    <div className="p-5">
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-lg">🤖</span>
+                            <span className="font-semibold text-gray-900">{approval.title}</span>
+                          </div>
+                          <p className="text-sm text-gray-500">{approval.package_data.customer_name} · {approval.description}</p>
+                        </div>
+                        {approval.status === 'pending' && (
+                          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
+                            {activeCount} förslag
+                          </span>
+                        )}
+                        {approval.status !== 'pending' && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            approval.status === 'approved' ? 'bg-green-50 text-green-700' :
+                            approval.status === 'rejected' ? 'bg-red-50 text-red-700' :
+                            'bg-gray-100 text-gray-500'
+                          }`}>
+                            {approval.status === 'approved' ? 'Godkänd' : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2 mb-4">
+                        {pkgActions.map(act => {
+                          const ActIcon = ACTION_ICONS[act.type] || Zap
+                          const isDone = act.type === 'project_info'
+                          const isRejected = rejectedSet.has(act.id)
+
+                          return (
+                            <div key={act.id} className={`flex items-center gap-3 p-3 rounded-lg ${
+                              isDone ? 'bg-green-50 border border-green-200' :
+                              isRejected ? 'bg-gray-50 border border-gray-200 opacity-50' :
+                              'bg-white border border-gray-200'
+                            }`}>
+                              <ActIcon className={`w-4 h-4 flex-shrink-0 ${isDone ? 'text-green-600' : isRejected ? 'text-gray-400' : 'text-teal-600'}`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900">{act.title}</p>
+                                <p className="text-xs text-gray-500 truncate">{act.description}</p>
+                              </div>
+                              {isDone && <span className="text-green-600 text-xs font-medium">✓ Klar</span>}
+                              {!isDone && approval.status === 'pending' && (
+                                <span className="text-xs text-gray-400">{isRejected ? 'Exkluderad' : 'Väntar'}</span>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {approval.status === 'pending' && (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleAutopilotApprove(approval, Array.from(rejectedSet))}
+                            disabled={actionLoading !== null || activeCount === 0}
+                            className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 transition-all"
+                          >
+                            {actionLoading === approval.id + 'approve' ? 'Godkänner...' : `✅ Godkänn allt (${activeCount})`}
+                          </button>
+                          <button
+                            onClick={() => setExpandedPackage(isExpanded ? null : approval.id)}
+                            className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-1"
+                          >
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            Granska
+                          </button>
+                          <button
+                            onClick={() => handleAction(approval.id, 'reject')}
+                            disabled={actionLoading !== null}
+                            className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                          >
+                            Avvisa
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Expanderad granskning */}
+                      {isExpanded && approval.status === 'pending' && (
+                        <div className="mt-4 pt-4 border-t border-gray-200 space-y-3">
+                          {pendingActions.map(act => {
+                            const isRejected = rejectedSet.has(act.id)
+                            return (
+                              <div key={act.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-sm font-semibold text-gray-900">{act.title}</span>
+                                  <button
+                                    onClick={() => toggleActionRejected(approval.id, act.id)}
+                                    className={`text-xs font-medium px-3 py-1 rounded-full transition-all ${
+                                      isRejected
+                                        ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                        : 'bg-green-50 text-green-600 hover:bg-green-100'
+                                    }`}
+                                  >
+                                    {isRejected ? '✕ Exkluderad' : '✓ Inkluderad'}
+                                  </button>
+                                </div>
+
+                                {act.type === 'booking_suggestion' && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-sm text-gray-600">Föreslagen tid: <strong>{act.description}</strong></p>
+                                    <p className="text-xs text-gray-400 mt-1">Baserat på din kalender</p>
+                                  </div>
+                                )}
+
+                                {act.type === 'customer_sms' && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-xs text-gray-400 mb-1">SMS-text:</p>
+                                    <p className="text-sm text-gray-700 italic">"{(act.data as any).message}"</p>
+                                    <p className="text-xs text-gray-400 mt-1">Till: {(act.data as any).to}</p>
+                                  </div>
+                                )}
+
+                                {act.type === 'material_list' && (
+                                  <div className="bg-gray-50 rounded-lg p-3">
+                                    <p className="text-xs text-gray-400 mb-2">Material:</p>
+                                    {((act.data as any).materials || []).map((m: any, i: number) => (
+                                      <p key={i} className="text-sm text-gray-700">□ {m.name} ({m.quantity} {m.unit})</p>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              }
+
+              // Standard approval card
               const config = TYPE_CONFIG[approval.approval_type] || TYPE_CONFIG.other
               const Icon = config.icon
               const isExpiringSoon =
