@@ -93,6 +93,7 @@ export default function CustomersPage() {
     customer_type: 'private' as 'private' | 'company' | 'brf',
     org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: '',
     segment_id: '', contract_type_id: '', price_list_id: '',
+    default_payment_days: '30', invoice_email: true,
   })
 
   // Pricing structure data
@@ -200,6 +201,7 @@ export default function CustomersPage() {
       name: '', phone_number: '', email: '', address_line: '', personal_number: '', property_designation: '',
       customer_type: 'private', org_number: '', contact_person: '', invoice_address: '', visit_address: '', reference: '', apartment_count: '',
       segment_id: '', contract_type_id: '', price_list_id: '',
+      default_payment_days: '30', invoice_email: true,
     })
     setModalOpen(true)
   }
@@ -225,6 +227,8 @@ export default function CustomersPage() {
       segment_id: (customer as any).segment_id || '',
       contract_type_id: (customer as any).contract_type_id || '',
       price_list_id: (customer as any).price_list_id || '',
+      default_payment_days: (customer as any).default_payment_days ? String((customer as any).default_payment_days) : '30',
+      invoice_email: (customer as any).invoice_email !== false,
     })
     setModalOpen(true)
   }
@@ -618,6 +622,36 @@ export default function CustomersPage() {
                   <p className="text-xs text-gray-400 mt-1">Krävs för ROT/RUT-avdrag</p>
                 </div>
               )}
+
+              {/* Payment terms */}
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100">
+                <div>
+                  <label className="block text-sm text-gray-500 mb-1">Betalningsvillkor</label>
+                  <select
+                    value={form.default_payment_days}
+                    onChange={(e) => setForm({ ...form, default_payment_days: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  >
+                    <option value="10">10 dagar</option>
+                    <option value="15">15 dagar</option>
+                    <option value="20">20 dagar</option>
+                    <option value="30">30 dagar</option>
+                    <option value="45">45 dagar</option>
+                    <option value="60">60 dagar</option>
+                  </select>
+                </div>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.invoice_email}
+                      onChange={(e) => setForm({ ...form, invoice_email: e.target.checked })}
+                      className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                    />
+                    <span className="text-sm text-gray-600">Skicka faktura via e-post</span>
+                  </label>
+                </div>
+              </div>
 
               {/* Pricing: Segment, Contract type, Price list */}
               {pricingSegments.length > 0 && (

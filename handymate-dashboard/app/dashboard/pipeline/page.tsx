@@ -1837,20 +1837,20 @@ export default function PipelinePage() {
                     <div className="space-y-2">
                       <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
                       <div className="flex flex-wrap gap-2">
-                        <Link href={selectedDeal.customer_id ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}` : '/dashboard/quotes/new'}
+                        <Link href={selectedDeal.quote_id
+                          ? `/dashboard/quotes/${selectedDeal.quote_id}`
+                          : selectedDeal.customer_id
+                            ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
+                            : `/dashboard/quotes/new?deal_id=${selectedDeal.id}`}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-                          <FileText className="w-4 h-4 text-sky-700" /> Skapa offert
+                          <FileText className="w-4 h-4 text-sky-700" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         {!getStageForDeal(selectedDeal)?.is_lost && (
                           <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
                             <XCircle className="w-4 h-4" /> Markera förlorad
                           </button>
                         )}
-                        {selectedDeal.quote_id && (
-                          <Link href={`/dashboard/quotes/${selectedDeal.quote_id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-                            <FileText className="w-4 h-4 text-emerald-600" /> Visa offert
-                          </Link>
-                        )}
+                        {/* Visa offert-länk hanteras nu av knappen ovan */}
                   </div>
                 </div>
 
@@ -2703,7 +2703,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       </div>
       <div className="flex items-center justify-between mt-2 ml-3.5">
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>
+          <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>{deal.value != null && deal.value > 0 && <span className="text-[9px] text-gray-400 ml-0.5">exkl.</span>}
           {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-teal-500'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
         </div>
         <div className="flex items-center gap-2">
@@ -2730,9 +2730,12 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
             <span className="text-[10px]">SMS</span>
           </button>
         )}
-        <Link href={`/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Offert" onClick={e => e.stopPropagation()}>
+        <Link href={deal.quote_id
+          ? `/dashboard/quotes/${deal.quote_id}`
+          : `/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`}
+          className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.quote_id ? 'Visa offert' : 'Skapa offert'} onClick={e => e.stopPropagation()}>
           <FileText className="w-3.5 h-3.5" />
-          <span className="text-[10px]">Offert</span>
+          <span className="text-[10px]">{deal.quote_id ? 'Offert' : 'Ny offert'}</span>
         </Link>
         {onOpenTasks && (
           <button onClick={() => onOpenTasks(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-purple-600 transition-colors" title="Uppgifter">

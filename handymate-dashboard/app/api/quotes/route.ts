@@ -411,6 +411,21 @@ export async function POST(request: NextRequest) {
       if (itemsError) console.error('Insert quote_items error:', itemsError)
     }
 
+    // Sync deal value + quote_id if deal_id provided
+    if (body.deal_id && quote.quote_id) {
+      try {
+        const dealUpdate: Record<string, unknown> = { quote_id: quote.quote_id }
+        if (quote.total) dealUpdate.value = quote.total
+        await supabase
+          .from('deal')
+          .update(dealUpdate)
+          .eq('id', body.deal_id)
+          .eq('business_id', business.business_id)
+      } catch (dealErr) {
+        console.error('Deal sync error (non-blocking):', dealErr)
+      }
+    }
+
     return NextResponse.json({ quote })
   } catch (error: any) {
     console.error('Create quote error:', error)

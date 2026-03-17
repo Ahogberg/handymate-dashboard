@@ -132,6 +132,8 @@ export async function POST(request: NextRequest) {
         if (segment_id) insertData.segment_id = segment_id
         if (contract_type_id) insertData.contract_type_id = contract_type_id
         if (price_list_id) insertData.price_list_id = price_list_id
+        if (data.default_payment_days) insertData.default_payment_days = parseInt(data.default_payment_days)
+        if (data.invoice_email !== undefined) insertData.invoice_email = data.invoice_email
 
         const { error } = await supabase
           .from('customer')
@@ -166,6 +168,8 @@ export async function POST(request: NextRequest) {
         if (segment_id !== undefined) updateData.segment_id = segment_id || null
         if (contract_type_id !== undefined) updateData.contract_type_id = contract_type_id || null
         if (price_list_id !== undefined) updateData.price_list_id = price_list_id || null
+        if (data.default_payment_days !== undefined) updateData.default_payment_days = data.default_payment_days ? parseInt(data.default_payment_days) : 30
+        if (data.invoice_email !== undefined) updateData.invoice_email = data.invoice_email
 
         const { error } = await supabase
           .from('customer')

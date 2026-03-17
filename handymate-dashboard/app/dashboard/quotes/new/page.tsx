@@ -583,6 +583,8 @@ export default function NewQuotePage() {
       setFastighetsbeteckning(customer.property_designation)
     // Also pre-fill project address from customer address if empty
     if (customer.address_line && !projectAddress) setProjectAddress(customer.address_line)
+    // Pre-fill customer reference from customer name
+    if (customer.name && !customerReference) setCustomerReference(customer.name)
 
     // Fetch customer's price list if assigned
     const cust = customer as any
@@ -1048,6 +1050,7 @@ export default function NewQuotePage() {
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
           attachments: attachments.length > 0 ? attachments : [],
+          deal_id: searchParams.get('deal_id') || searchParams.get('lead_id') || null,
         }),
       })
       const data = await res.json()
@@ -1763,7 +1766,7 @@ export default function NewQuotePage() {
 
             {/* Summary */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering</div>
+              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering <span className="normal-case">(exkl. moms)</span></div>
 
               <div className="space-y-1">
                 <div className="flex justify-between py-[5px] text-[13px]">
@@ -1811,7 +1814,7 @@ export default function NewQuotePage() {
 
                 {/* Total */}
                 <div className="flex justify-between border-t border-thin border-[#E2E8F0] mt-2 pt-3 text-[15px] font-medium text-[#1E293B]">
-                  <span>Totalt</span>
+                  <span>Totalt <span className="text-[11px] font-normal text-gray-400">inkl. moms</span></span>
                   <span>{formatCurrency(totals.total)}</span>
                 </div>
               </div>

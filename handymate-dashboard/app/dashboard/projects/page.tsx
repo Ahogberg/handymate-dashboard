@@ -502,7 +502,7 @@ export default function ProjectsPage() {
                           <div className="flex items-center gap-1 justify-end mb-1">
                             <DollarSign className="w-3 h-3 text-gray-400" />
                             <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
-                              {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
+                              {Math.round(project.actual_amount).toLocaleString('sv-SE')} / {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px] text-gray-400 font-normal">exkl. moms</span>
                             </span>
                           </div>
                           <div className="h-1.5 bg-gray-100 rounded-full w-28 ml-auto">
@@ -603,7 +603,7 @@ export default function ProjectsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-500 mb-2">Budget belopp (kr)</label>
+                  <label className="block text-sm text-gray-500 mb-2">Budget belopp (kr exkl. moms)</label>
                   <input
                     type="number"
                     value={newProject.budget_amount}
