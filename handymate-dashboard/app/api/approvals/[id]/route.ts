@@ -261,6 +261,28 @@ async function executeApprovalPayload(
         return { action: 'autopilot_package', results }
       }
 
+      case 'dispatch_suggestion': {
+        const supabaseDispatch = (await import('@/lib/supabase')).getServerSupabase()
+        const plDispatch = payload as any
+        const memberId = plDispatch.member_id
+        const memberName = plDispatch.member_name
+        const ctxType = plDispatch.context_type
+        const ctxId = plDispatch.context_id
+
+        if (ctxType === 'booking' && ctxId) {
+          await supabaseDispatch.from('booking').update({
+            assigned_to: memberName,
+            assigned_user_id: memberId,
+          }).eq('booking_id', ctxId)
+        } else if (ctxType === 'work_order' && ctxId) {
+          await supabaseDispatch.from('work_order').update({
+            assigned_to: memberName,
+          }).eq('id', ctxId)
+        }
+
+        return { action: 'dispatch_suggestion', assigned: memberName, context_type: ctxType }
+      }
+
       case 'time_attestation': {
         const supabaseTime = (await import('@/lib/supabase')).getServerSupabase()
         const plTime = payload as any

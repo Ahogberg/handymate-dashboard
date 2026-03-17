@@ -112,6 +112,30 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Smart dispatch — föreslå tekniker (non-blocking)
+    try {
+      const { suggestDispatch } = await import('@/lib/dispatch')
+      // Hämta kundnamn för kontextvisning
+      let customerName: string | null = null
+      if (customer_id) {
+        const { data: cust } = await supabase.from('customer').select('name').eq('customer_id', customer_id).maybeSingle()
+        customerName = cust?.name || null
+      }
+      await suggestDispatch({
+        businessId: business.business_id,
+        jobTitle: service_type || notes || 'Bokning',
+        jobAddress: body.address || null,
+        scheduledStart: scheduled_start,
+        scheduledEnd: scheduled_end || null,
+        jobType: service_type || '',
+        contextType: 'booking',
+        contextId: bookingId,
+        customerName,
+      })
+    } catch (dispatchErr) {
+      console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
+    }
+
     return NextResponse.json({ booking })
   } catch (error: any) {
     console.error('Create booking error:', error)

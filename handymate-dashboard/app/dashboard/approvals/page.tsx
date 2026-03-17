@@ -63,6 +63,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
   time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
+  dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -573,6 +574,33 @@ export default function ApprovalsPage() {
                                   <p className="font-medium text-gray-700">{pl.duration_minutes ? `${Math.floor(pl.duration_minutes / 60)}h ${pl.duration_minutes % 60}min` : '—'}</p>
                                 </div>
                               </div>
+                            </div>
+                          )
+                        })()}
+                        {/* Dispatch suggestion details */}
+                        {approval.approval_type === 'dispatch_suggestion' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          return (
+                            <div className="mt-2 bg-violet-50 rounded-lg p-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-violet-100 rounded-full flex items-center justify-center text-xs font-semibold text-violet-700">
+                                  {(pl.member_name || '??').slice(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{pl.member_name}</p>
+                                  <p className="text-xs text-gray-400">{pl.job_title}</p>
+                                </div>
+                              </div>
+                              {pl.reasons && (
+                                <div className="flex flex-wrap gap-1">
+                                  {(pl.reasons as string[]).map((r: string, i: number) => (
+                                    <span key={i} className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full">{r}</span>
+                                  ))}
+                                </div>
+                              )}
+                              {pl.alternatives && (pl.alternatives as any[]).length > 0 && (
+                                <p className="text-[10px] text-gray-400">Alternativ: {(pl.alternatives as any[]).map((a: any) => a.name).join(', ')}</p>
+                              )}
                             </div>
                           )
                         })()}

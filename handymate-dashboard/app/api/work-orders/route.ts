@@ -91,6 +91,26 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Smart dispatch — föreslå tekniker om ingen tilldelad (non-blocking)
+    if (!body.assigned_to) {
+      try {
+        const { suggestDispatch } = await import('@/lib/dispatch')
+        await suggestDispatch({
+          businessId: business.business_id,
+          jobTitle: body.title || 'Arbetsorder',
+          jobAddress: body.address || null,
+          scheduledStart: body.scheduled_start || body.scheduled_date || new Date().toISOString(),
+          scheduledEnd: body.scheduled_end || null,
+          jobType: body.title || body.description || '',
+          contextType: 'work_order',
+          contextId: wo.id,
+          customerName: body.contact_name || null,
+        })
+      } catch (dispatchErr) {
+        console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
+      }
+    }
+
     return NextResponse.json({ work_order: wo })
   } catch (error: any) {
     console.error('Create work order error:', error)
