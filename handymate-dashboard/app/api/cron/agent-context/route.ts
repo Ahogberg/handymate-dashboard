@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { generateAgentContext, updateBusinessPreferences } from '@/lib/agent/context-engine'
 import { sendMorningReport } from '@/lib/agent/morning-report'
 import { updatePricingIntelligence } from '@/lib/agent/pricing-engine'
+import { analyzePriceAdjustments } from '@/lib/agent/price-analysis'
 
 export const maxDuration = 60
 
@@ -46,6 +47,7 @@ async function runAgentContext() {
     report: { success: boolean; error?: string }
     preferences: { success: boolean; error?: string }
     pricing: { success: boolean; jobTypesAnalyzed?: number; error?: string }
+    priceAnalysis: { success: boolean; suggestions?: number; error?: string }
   }> = []
 
   for (const biz of businesses) {
@@ -74,16 +76,26 @@ async function runAgentContext() {
       pricingResult = { success: false, error: err.message }
     }
 
+    // Analysera prisjusteringar (estimerad vs faktisk tid)
+    let priceAnalysisResult: { success: boolean; suggestions?: number; error?: string } = { success: false, error: 'Skipped' }
+    try {
+      const res = await analyzePriceAdjustments(biz.business_id)
+      priceAnalysisResult = { success: res.success, suggestions: res.suggestions, error: res.error }
+    } catch (err: any) {
+      priceAnalysisResult = { success: false, error: err.message }
+    }
+
     results.push({
       business_id: biz.business_id,
       context: contextResult,
       report: reportResult,
       preferences: preferencesResult,
       pricing: pricingResult,
+      priceAnalysis: priceAnalysisResult,
     })
 
     console.log(
-      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, prefs=${preferencesResult.success}, pricing=${pricingResult.success}`
+      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, prefs=${preferencesResult.success}, pricing=${pricingResult.success}, priceAnalysis=${priceAnalysisResult.success}(${priceAnalysisResult.suggestions || 0} suggestions)`
     )
   }
 
