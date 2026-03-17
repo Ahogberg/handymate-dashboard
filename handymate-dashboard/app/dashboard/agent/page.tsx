@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   Bot,
   Phone,
@@ -1509,6 +1509,21 @@ function AutomationTab({ businessId }: { businessId: string }) {
 
 // ── Manual Trigger ─────────────────────────────────────────────────────
 
+const PLACEHOLDER_EXAMPLES = [
+  'Vilka kunder har inte hört av sig på 6 månader?',
+  'Visa mina obetalda fakturor',
+  'Hur mycket fakturerade vi förra månaden?',
+  'Följ upp offerter som skickades för mer än 5 dagar sedan',
+  'Lista alla aktiva projekt just nu',
+]
+
+const QUICK_BUTTONS = [
+  { emoji: '📋', label: 'Ny offert', text: 'Skapa en offert till ' },
+  { emoji: '💰', label: 'Fakturor', text: 'Visa alla obetalda fakturor' },
+  { emoji: '👥', label: 'Kunder', text: 'Vilka kunder behöver uppföljning?' },
+  { emoji: '📅', label: 'Bokningar', text: 'Vilka bokningar har jag den här veckan?' },
+]
+
 function ManualTrigger({ businessId, onTriggered }: {
   businessId: string; onTriggered: () => void
 }) {
@@ -1516,6 +1531,16 @@ function ManualTrigger({ businessId, onTriggered }: {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [elapsed, setElapsed] = useState(0)
+  const [placeholderIdx, setPlaceholderIdx] = useState(0)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Rotate placeholder every 3 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIdx(prev => (prev + 1) % PLACEHOLDER_EXAMPLES.length)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function handleTrigger() {
     if (!instruction.trim()) return
@@ -1557,11 +1582,12 @@ function ManualTrigger({ businessId, onTriggered }: {
       </div>
       <div className="flex gap-2">
         <input
+          ref={inputRef}
           type="text"
           value={instruction}
           onChange={e => setInstruction(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
-          placeholder="T.ex. &quot;Sök kund med nummer +46701234567 och skapa en offert&quot;"
+          placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
           disabled={loading}
         />
@@ -1577,6 +1603,23 @@ function ManualTrigger({ businessId, onTriggered }: {
           )}
           {loading ? `${elapsed}s…` : 'Kör'}
         </button>
+      </div>
+      {/* Quick buttons */}
+      <div className="flex flex-wrap gap-1.5 mt-2.5">
+        {QUICK_BUTTONS.map((btn) => (
+          <button
+            key={btn.label}
+            type="button"
+            onClick={() => {
+              setInstruction(btn.text)
+              inputRef.current?.focus()
+            }}
+            disabled={loading}
+            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors disabled:opacity-50"
+          >
+            {btn.emoji} {btn.label}
+          </button>
+        ))}
       </div>
       {result && (
         <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${
