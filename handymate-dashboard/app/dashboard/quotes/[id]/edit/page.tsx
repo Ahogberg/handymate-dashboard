@@ -30,6 +30,7 @@ import {
   Eye,
   EyeOff,
   Check,
+  Paperclip,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -44,6 +45,7 @@ import {
   DetailLevel,
   RotRutType,
 } from '@/lib/types/quote'
+import SharedItemRow from '@/components/quotes/ItemRow'
 import {
   calculateQuoteTotals,
   generateItemId,
@@ -1058,7 +1060,7 @@ export default function EditQuotePage() {
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Beskriv arbetet som ska utföras..."
                     rows={2}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                   />
                 </div>
               </div>
@@ -1137,7 +1139,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setIntroductionText(e.target.value)}
                       placeholder="Hälsningsfras och inledning..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                   {/* Conclusion */}
@@ -1154,7 +1156,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setConclusionText(e.target.value)}
                       placeholder="Avslutande text..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                   {/* Not included */}
@@ -1171,7 +1173,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setNotIncluded(e.target.value)}
                       placeholder="Vad ingår inte..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                   {/* ATA terms */}
@@ -1188,7 +1190,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setAtaTerms(e.target.value)}
                       placeholder="Ändrings- och tilläggsarbeten..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                   {/* Payment terms */}
@@ -1205,7 +1207,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setPaymentTermsText(e.target.value)}
                       placeholder="Betalningsvillkor..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
                     />
                   </div>
                 </div>
@@ -1283,7 +1285,7 @@ export default function EditQuotePage() {
                   </div>
 
                   {items.map((item, index) => (
-                    <ItemRow
+                    <SharedItemRow
                       key={item.id}
                       item={item}
                       index={index}
