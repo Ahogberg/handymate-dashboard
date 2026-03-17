@@ -409,7 +409,8 @@ export default function NewQuotePage() {
 
     // Check query params
     const transcript = searchParams.get('transcript')
-    const customerId = searchParams.get('customerId')
+    const customerId = searchParams.get('customerId') || searchParams.get('customer_id')
+    const prefillTitle = searchParams.get('title')
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
@@ -417,6 +418,9 @@ export default function NewQuotePage() {
     }
     if (customerId) {
       setSelectedCustomer(customerId)
+    }
+    if (prefillTitle) {
+      setTitle(prefillTitle)
     }
   }, [business.business_id])
 

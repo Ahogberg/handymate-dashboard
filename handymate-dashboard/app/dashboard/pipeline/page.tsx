@@ -341,9 +341,9 @@ export default function PipelinePage() {
     setQuickSmsText('')
   }
 
-  function handleQuickWon(dealId: string) {
-    const wonStage = stages.find(s => s.is_won)
-    if (wonStage) moveDealAction(dealId, wonStage.slug)
+  function handleOpenTasks(deal: Deal) {
+    // Öppna deal-detaljen direkt (som har uppgifter, anteckningar etc.)
+    openDealDetail(deal)
   }
 
   // Quick SMS modal
@@ -1423,7 +1423,7 @@ export default function PipelinePage() {
                     {stageDeals.length === 0 && <div className="flex items-center justify-center py-8 text-gray-300 text-xs">{isDropTarget ? 'Släpp här' : 'Inga deals'}</div>}
                     {stageDeals.map(deal => (
                       <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
+                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
                     ))}
                   </div>
                 </div>
@@ -1450,7 +1450,7 @@ export default function PipelinePage() {
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
                       {dealsForStage(lostStage.id).map(deal => (
                         <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
+                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
                       ))}
                     </div>
                   </>
@@ -1481,7 +1481,7 @@ export default function PipelinePage() {
                 {dealsForStage(stages[mobileStageIndex].id).length === 0 && <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Inga deals i detta steg</div>}
                 {dealsForStage(stages[mobileStageIndex].id).map(deal => (
                   <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
+                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
                 ))}
               </div>
             )}
@@ -2662,15 +2662,18 @@ interface DealCardProps {
   onDragEnd: () => void
   onClick: () => void
   onQuickSms?: (deal: Deal) => void
-  onQuickWon?: (dealId: string) => void
+  onOpenTasks?: (deal: Deal) => void
 }
 
-function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onQuickWon }: DealCardProps) {
+function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onOpenTasks }: DealCardProps) {
   return (
     <div draggable onDragStart={e => onDragStart(e, deal.id)} onDragEnd={onDragEnd} onClick={onClick}
       className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
+          {deal.customer?.customer_number && (
+            <span className="text-[10px] text-gray-400 font-mono ml-3.5">{deal.customer.customer_number}</span>
+          )}
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
             <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>
@@ -2726,14 +2729,14 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
             <span className="text-[10px]">SMS</span>
           </button>
         )}
-        <Link href={`/dashboard/quotes/new?customer=${deal.customer_id || ''}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Offert" onClick={e => e.stopPropagation()}>
+        <Link href={`/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Offert" onClick={e => e.stopPropagation()}>
           <FileText className="w-3.5 h-3.5" />
           <span className="text-[10px]">Offert</span>
         </Link>
-        {onQuickWon && (
-          <button onClick={() => onQuickWon(deal.id)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-green-600 transition-colors" title="Vunnen">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span className="text-[10px]">Vunnen</span>
+        {onOpenTasks && (
+          <button onClick={() => onOpenTasks(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-purple-600 transition-colors" title="Uppgifter">
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Uppgifter</span>
           </button>
         )}
       </div>
