@@ -207,7 +207,7 @@ export default function ItemRow({
       </div>
 
       {/* ── Desktop layout ─────────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[32px_56px_minmax(180px,1fr)_56px_60px_76px_76px_76px_48px_32px] gap-1.5 items-center">
+      <div className="hidden md:grid md:grid-cols-[28px_minmax(52px,5fr)_minmax(0,22fr)_minmax(0,6fr)_minmax(0,6fr)_minmax(0,8fr)_minmax(0,8fr)_minmax(0,12fr)_minmax(0,6fr)_28px] gap-1 items-center">
         {/* Move arrows */}
         <div className="flex flex-col gap-0.5 items-center">
           <button
@@ -245,7 +245,7 @@ export default function ItemRow({
                   ? 'Delsumma'
                   : 'Beskrivning'
           }
-          className={`w-full px-3 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${
+          className={`w-full min-w-0 px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/50 ${
             item.item_type === 'heading' ? 'font-bold' : ''
           } ${item.item_type === 'text' ? 'italic' : ''}`}
         />
@@ -256,7 +256,7 @@ export default function ItemRow({
             type="number"
             value={item.quantity}
             onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-            className="w-full px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-center focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+            className="w-full min-w-0 px-1.5 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             min={0}
             step="any"
           />
@@ -269,7 +269,7 @@ export default function ItemRow({
           <select
             value={item.unit}
             onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-            className="w-full px-1 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+            className="w-full min-w-0 px-1 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/50"
           >
             {UNIT_OPTIONS.map((u) => (
               <option key={u.value} value={u.value}>
@@ -289,7 +289,7 @@ export default function ItemRow({
             onChange={(e) =>
               onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)
             }
-            className="w-full px-2 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+            className="w-full min-w-0 px-1.5 py-1.5 bg-white/70 border border-gray-300 rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
             min={0}
             step="any"
           />
@@ -298,13 +298,13 @@ export default function ItemRow({
         )}
 
         {/* Total */}
-        <span className="text-gray-900 font-medium text-sm text-right whitespace-nowrap">
+        <span className="text-gray-900 font-medium text-xs text-right whitespace-nowrap min-w-0 truncate">
           {showTotal ? formatCurrency(displayTotal) : ''}
         </span>
 
         {/* Category dropdown */}
         {isEditable ? (
-          <div className="flex items-center justify-center">
+          <div className="min-w-0 overflow-hidden">
             <CategorySelect
               item={item}
               allCategories={allCategories}
@@ -323,7 +323,7 @@ export default function ItemRow({
 
         {/* ROT/RUT dropdown */}
         {isEditable ? (
-          <div className="flex items-center justify-center">
+          <div className="min-w-0">
             <select
               value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
               onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
@@ -409,7 +409,7 @@ function CategorySelect({
           onUpdate(item.id, 'category_slug', e.target.value || undefined)
         }
       }}
-      className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
+      className="w-full min-w-0 px-1 py-1 text-[11px] border border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
     >
       <option value="">Kategori —</option>
       <optgroup label="Arbete">
