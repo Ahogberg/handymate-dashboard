@@ -1271,7 +1271,7 @@ export default function EditQuotePage() {
               ) : (
                 <div className="space-y-2">
                   {/* Table header (desktop) */}
-                  <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 px-3 py-1 text-xs text-gray-400 font-medium">
+                  <div className="hidden md:grid md:grid-cols-[32px_56px_minmax(180px,1fr)_56px_60px_76px_76px_76px_48px_32px] gap-1.5 px-3 py-1 text-xs text-gray-400 font-medium">
                     <span />
                     <span>Typ</span>
                     <span>Beskrivning</span>

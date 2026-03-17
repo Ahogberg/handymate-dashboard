@@ -207,7 +207,7 @@ export default function ItemRow({
       </div>
 
       {/* ── Desktop layout ─────────────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 items-center">
+      <div className="hidden md:grid md:grid-cols-[32px_56px_minmax(180px,1fr)_56px_60px_76px_76px_76px_48px_32px] gap-1.5 items-center">
         {/* Move arrows */}
         <div className="flex flex-col gap-0.5 items-center">
           <button

@@ -1393,7 +1393,7 @@ export default function NewQuotePage() {
 
               {/* Table header (desktop) */}
               {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 pb-2 border-b border-gray-200 mb-1">
+                <div className="hidden md:grid md:grid-cols-[32px_56px_minmax(180px,1fr)_56px_60px_76px_76px_76px_48px_32px] gap-1.5 pb-2 border-b border-gray-200 mb-1">
                   <span />
                   <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Typ</span>
                   <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400">Beskrivning</span>
