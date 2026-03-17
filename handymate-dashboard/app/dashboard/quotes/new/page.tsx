@@ -10,6 +10,10 @@ import {
   Upload,
   X,
   Eye,
+  Paperclip,
+  Trash2,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -20,6 +24,7 @@ import { SelectedProduct } from '@/lib/suppliers/types'
 import TemplateSelector from '@/components/quotes/TemplateSelector'
 import QuotePreview from '@/components/quotes/QuotePreview'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
+import ItemRow, { formatCurrency as itemFormatCurrency } from '@/components/quotes/ItemRow'
 import {
   QuoteItem,
   PaymentPlanEntry,
@@ -287,6 +292,14 @@ export default function NewQuotePage() {
   const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null) // item id for inline creation
   const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
+  // Attachments (documents linked to quote)
+  const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Text section expand states
+  const [expandedTexts, setExpandedTexts] = useState<Record<string, boolean>>({})
+
   // Advanced row type dropdown
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
@@ -411,6 +424,7 @@ export default function NewQuotePage() {
     const transcript = searchParams.get('transcript')
     const customerId = searchParams.get('customerId') || searchParams.get('customer_id')
     const prefillTitle = searchParams.get('title')
+    const dealId = searchParams.get('deal_id') || searchParams.get('lead_id')
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
@@ -421,6 +435,16 @@ export default function NewQuotePage() {
     }
     if (prefillTitle) {
       setTitle(prefillTitle)
+    }
+
+    // Auto-set reference person from business config
+    if (!referencePerson && business.contact_name) {
+      setReferencePerson(business.contact_name)
+    }
+
+    // Auto-attach documents from deal/lead
+    if (dealId && customerId) {
+      fetchDealDocuments(customerId)
     }
   }, [business.business_id])
 
@@ -490,6 +514,60 @@ export default function NewQuotePage() {
     } catch {
       // silent – standard texts are optional
     }
+  }
+
+  // Fetch documents attached to a deal/customer for auto-attach
+  async function fetchDealDocuments(customerId: string) {
+    try {
+      const res = await fetch(`/api/customers/${customerId}/documents`)
+      if (!res.ok) return
+      const data = await res.json()
+      const docs = (data.documents || []).map((d: any) => ({
+        name: d.file_name,
+        url: d.file_url,
+        size: d.file_size || 0,
+      }))
+      if (docs.length > 0) {
+        setAttachments(docs)
+      }
+    } catch {
+      // silent — documents are optional
+    }
+  }
+
+  // Upload attachment file
+  async function handleFileUpload(file: File) {
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Filen är för stor (max 10 MB)')
+      return
+    }
+    setUploadingFile(true)
+    try {
+      const timestamp = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const filePath = `${business.business_id}/quotes/drafts/${timestamp}_${safeName}`
+
+      const arrayBuffer = await file.arrayBuffer()
+      const { error: uploadError } = await supabase.storage
+        .from('customer-documents')
+        .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('customer-documents')
+        .getPublicUrl(filePath)
+
+      setAttachments(prev => [...prev, {
+        name: file.name,
+        url: urlData.publicUrl,
+        size: file.size,
+      }])
+    } catch (err) {
+      console.error('Upload failed:', err)
+      toast.error('Kunde inte ladda upp filen')
+    }
+    setUploadingFile(false)
   }
 
   // Auto-fill personnummer / fastighetsbeteckning + price list when customer selected
@@ -969,6 +1047,7 @@ export default function NewQuotePage() {
           ai_confidence: aiConfidence || null,
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
+          attachments: attachments.length > 0 ? attachments : [],
         }),
       })
       const data = await res.json()
@@ -1161,7 +1240,7 @@ export default function NewQuotePage() {
                       onChange={(e) => setAiTextInput(e.target.value)}
                       placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
                       rows={3}
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-none"
+                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-y"
                     />
                     <button
                       type="button"
@@ -1186,7 +1265,7 @@ export default function NewQuotePage() {
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-auto"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map((c) => (
@@ -1239,7 +1318,7 @@ export default function NewQuotePage() {
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Kort beskrivning av jobbet..."
                   rows={2}
-                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none"
+                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y"
                 />
               </div>
             </div>
@@ -1250,12 +1329,16 @@ export default function NewQuotePage() {
 
               {/* Table header (desktop) */}
               {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[1fr_120px_72px_88px_96px_32px] gap-2 pb-2 border-b border-thin border-[#E2E8F0] mb-1">
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1]">Beskrivning</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1]">Kategori</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Antal</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Enhet</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-[#CBD5E1] text-right">Pris/enhet</span>
+                <div className="hidden md:grid md:grid-cols-[40px_70px_1fr_70px_80px_90px_90px_90px_60px_40px] gap-2 pb-2 border-b border-gray-200 mb-1">
+                  <span />
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Typ</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400">Beskrivning</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Antal</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Enhet</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-right">Pris</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-right">Summa</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Kategori</span>
+                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">ROT/RUT</span>
                   <span />
                 </div>
               )}
@@ -1265,247 +1348,25 @@ export default function NewQuotePage() {
                   <p>Inga rader ännu. Lägg till poster nedan eller använd AI-hjälp.</p>
                 </div>
               ) : (
-                <div>
-                  {items.map((item, index) => {
-                    const isEditable = item.item_type === 'item' || item.item_type === 'discount'
-                    const showTotal = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'subtotal'
-                    const displayTotal = item.item_type === 'subtotal' ? (recalculated[index]?.total ?? item.total) : item.total
-
-                    return (
-                      <div key={item.id}>
-                        {/* Desktop row */}
-                        <div className="hidden md:grid md:grid-cols-[1fr_120px_72px_88px_96px_32px] gap-2 items-center py-2 border-b border-thin border-[#F1F5F9]">
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                            placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
-                            className="w-full px-2.5 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                          />
-                          {isEditable ? (
-                            showNewCategoryInput === item.id ? (
-                              <div className="flex items-center gap-1">
-                                <input
-                                  type="text"
-                                  value={newCategoryLabel}
-                                  onChange={(e) => setNewCategoryLabel(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && newCategoryLabel.trim()) {
-                                      createCustomCategory(newCategoryLabel.trim(), item.id)
-                                    } else if (e.key === 'Escape') {
-                                      setShowNewCategoryInput(null)
-                                      setNewCategoryLabel('')
-                                    }
-                                  }}
-                                  placeholder="Namn..."
-                                  autoFocus
-                                  className="w-full px-1.5 py-[5px] text-[11px] border border-[#0F766E] rounded bg-white text-[#1E293B] focus:outline-none"
-                                />
-                              </div>
-                            ) : (
-                              <select
-                                value={item.category_slug ?? ''}
-                                onChange={(e) => {
-                                  if (e.target.value === '__new__') {
-                                    setShowNewCategoryInput(item.id)
-                                    setNewCategoryLabel('')
-                                  } else {
-                                    updateItem(item.id, 'category_slug', e.target.value || undefined)
-                                  }
-                                }}
-                                className="w-full px-1.5 py-[7px] text-[11px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#64748B] focus:outline-none focus:border-[#0F766E]"
-                              >
-                                <option value="">—</option>
-                                <optgroup label="Arbete">
-                                  {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
-                                    <option key={c.slug} value={c.slug}>{c.label}</option>
-                                  ))}
-                                </optgroup>
-                                <optgroup label="Material">
-                                  {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
-                                    <option key={c.slug} value={c.slug}>{c.label}</option>
-                                  ))}
-                                </optgroup>
-                                <optgroup label="Övrigt">
-                                  {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
-                                    <option key={c.slug} value={c.slug}>{c.label}</option>
-                                  ))}
-                                </optgroup>
-                                <option value="__new__">+ Ny kategori</option>
-                              </select>
-                            )
-                          ) : (
-                            <span />
-                          )}
-                          {isEditable ? (
-                            <input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
-                              min={0}
-                              step="any"
-                            />
-                          ) : (
-                            <span />
-                          )}
-                          {isEditable ? (
-                            <select
-                              value={item.unit}
-                              onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
-                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                            >
-                              {UNIT_OPTIONS.map((u) => (
-                                <option key={u.value} value={u.value}>{u.label}</option>
-                              ))}
-                            </select>
-                          ) : (
-                            <span />
-                          )}
-                          {isEditable ? (
-                            <input
-                              type="number"
-                              value={item.unit_price}
-                              onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
-                              className="w-full px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
-                              min={0}
-                              step="any"
-                            />
-                          ) : showTotal ? (
-                            <span className="text-[13px] text-[#1E293B] text-right">{formatCurrency(displayTotal)}</span>
-                          ) : (
-                            <span />
-                          )}
-                          <button
-                            onClick={() => removeItem(item.id)}
-                            className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px]"
-                          >
-                            ×
-                          </button>
-                        </div>
-
-                        {/* Mobile row */}
-                        <div className="md:hidden py-3 border-b border-thin border-[#F1F5F9] space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={item.description}
-                              onChange={(e) => updateItem(item.id, 'description', e.target.value)}
-                              placeholder="Beskrivning"
-                              className="flex-1 px-2.5 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                            />
-                            <button
-                              onClick={() => removeItem(item.id)}
-                              className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px] shrink-0"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          {isEditable && (
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) => updateItem(item.id, 'quantity', parseFloat(e.target.value) || 0)}
-                                className="w-16 px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-center focus:outline-none focus:border-[#0F766E]"
-                                min={0}
-                                step="any"
-                              />
-                              <select
-                                value={item.unit}
-                                onChange={(e) => updateItem(item.id, 'unit', e.target.value)}
-                                className="w-20 px-1 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                              >
-                                {UNIT_OPTIONS.map((u) => (
-                                  <option key={u.value} value={u.value}>{u.label}</option>
-                                ))}
-                              </select>
-                              <input
-                                type="number"
-                                value={item.unit_price}
-                                onChange={(e) => updateItem(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
-                                className="w-24 px-2 py-[7px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] text-right focus:outline-none focus:border-[#0F766E]"
-                                min={0}
-                                step="any"
-                              />
-                              <span className="text-[13px] text-[#1E293B] font-medium flex-1 text-right whitespace-nowrap">
-                                {formatCurrency(displayTotal)}
-                              </span>
-                            </div>
-                          )}
-                          {isEditable && (
-                            <div className="flex items-center gap-2 text-[12px] flex-wrap">
-                              <span className="text-[#64748B]">Kategori:</span>
-                              {showNewCategoryInput === item.id ? (
-                                <input
-                                  type="text"
-                                  value={newCategoryLabel}
-                                  onChange={(e) => setNewCategoryLabel(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter' && newCategoryLabel.trim()) {
-                                      createCustomCategory(newCategoryLabel.trim(), item.id)
-                                    } else if (e.key === 'Escape') {
-                                      setShowNewCategoryInput(null)
-                                      setNewCategoryLabel('')
-                                    }
-                                  }}
-                                  placeholder="Namn..."
-                                  autoFocus
-                                  className="px-2 py-1 text-[12px] border border-[#0F766E] rounded bg-white text-[#1E293B] focus:outline-none w-28"
-                                />
-                              ) : (
-                                <select
-                                  value={item.category_slug ?? ''}
-                                  onChange={(e) => {
-                                    if (e.target.value === '__new__') {
-                                      setShowNewCategoryInput(item.id)
-                                      setNewCategoryLabel('')
-                                    } else {
-                                      updateItem(item.id, 'category_slug', e.target.value || undefined)
-                                    }
-                                  }}
-                                  className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                                >
-                                  <option value="">—</option>
-                                  <optgroup label="Arbete">
-                                    {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => (
-                                      <option key={c.slug} value={c.slug}>{c.label}</option>
-                                    ))}
-                                  </optgroup>
-                                  <optgroup label="Material">
-                                    {allCategories.filter(c => c.slug.startsWith('material')).map(c => (
-                                      <option key={c.slug} value={c.slug}>{c.label}</option>
-                                    ))}
-                                  </optgroup>
-                                  <optgroup label="Övrigt">
-                                    {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => (
-                                      <option key={c.slug} value={c.slug}>{c.label}</option>
-                                    ))}
-                                  </optgroup>
-                                  <option value="__new__">+ Ny kategori</option>
-                                </select>
-                              )}
-                              <span className="text-[#64748B] ml-1">Avdrag:</span>
-                              <select
-                                value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
-                                onChange={(e) => {
-                                  const val = e.target.value || null
-                                  updateItem(item.id, 'rot_rut_type', val)
-                                  updateItem(item.id, 'is_rot_eligible', val === 'rot')
-                                  updateItem(item.id, 'is_rut_eligible', val === 'rut')
-                                }}
-                                className="px-2 py-1 text-[12px] border border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                              >
-                                <option value="">Ingen</option>
-                                <option value="rot">ROT (30%)</option>
-                                <option value="rut">RUT (50%)</option>
-                              </select>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )
-                  })}
+                <div className="space-y-1">
+                  {items.map((item, index) => (
+                    <ItemRow
+                      key={item.id}
+                      item={item}
+                      index={index}
+                      total={items.length}
+                      recalculatedTotal={recalculated[index]?.total ?? item.total}
+                      onUpdate={updateItem}
+                      onRemove={removeItem}
+                      onMove={moveItem}
+                      allCategories={allCategories}
+                      onCreateCategory={createCustomCategory}
+                      showNewCategoryInput={showNewCategoryInput}
+                      setShowNewCategoryInput={setShowNewCategoryInput}
+                      newCategoryLabel={newCategoryLabel}
+                      setNewCategoryLabel={setNewCategoryLabel}
+                    />
+                  ))}
                 </div>
               )}
 
@@ -1674,35 +1535,35 @@ export default function NewQuotePage() {
                         <label className="block text-[12px] text-[#64748B]">Inledningstext</label>
                         <StandardTextPicker texts={textsByType.introduction} onSelect={setIntroductionText} />
                       </div>
-                      <textarea value={introductionText} onChange={(e) => setIntroductionText(e.target.value)} placeholder="Hälsningsfras och inledning..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                      <textarea value={introductionText} onChange={(e) => setIntroductionText(e.target.value)} placeholder="Hälsningsfras och inledning..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[12px] text-[#64748B]">Avslutningstext</label>
                         <StandardTextPicker texts={textsByType.conclusion} onSelect={setConclusionText} />
                       </div>
-                      <textarea value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} placeholder="Avslutande text..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                      <textarea value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} placeholder="Avslutande text..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[12px] text-[#64748B]">Ej inkluderat</label>
                         <StandardTextPicker texts={textsByType.not_included} onSelect={setNotIncluded} />
                       </div>
-                      <textarea value={notIncluded} onChange={(e) => setNotIncluded(e.target.value)} placeholder="Vad ingår inte..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                      <textarea value={notIncluded} onChange={(e) => setNotIncluded(e.target.value)} placeholder="Vad ingår inte..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[12px] text-[#64748B]">ÄTA-villkor</label>
                         <StandardTextPicker texts={textsByType.ata_terms} onSelect={setAtaTerms} />
                       </div>
-                      <textarea value={ataTerms} onChange={(e) => setAtaTerms(e.target.value)} placeholder="Ändrings- och tilläggsarbeten..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                      <textarea value={ataTerms} onChange={(e) => setAtaTerms(e.target.value)} placeholder="Ändrings- och tilläggsarbeten..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <label className="block text-[12px] text-[#64748B]">Betalningsvillkor</label>
                         <StandardTextPicker texts={textsByType.payment_terms} onSelect={setPaymentTermsText} />
                       </div>
-                      <textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} placeholder="Betalningsvillkor..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-none" />
+                      <textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} placeholder="Betalningsvillkor..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
                     </div>
                   </div>
                 </div>

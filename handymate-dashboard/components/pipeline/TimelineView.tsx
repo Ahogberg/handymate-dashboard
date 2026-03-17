@@ -44,7 +44,9 @@ function getStageName(stageId: string, stages: Stage[]): string {
 }
 
 function getStageColor(stageId: string, stages: Stage[]): string {
-  return stages.find(s => s.id === stageId)?.color || '#0F766E'
+  if (!stageId || !stages?.length) return '#0F766E'
+  const stage = stages.find(s => s.id === stageId)
+  return stage?.color && stage.color.startsWith('#') ? stage.color : '#0F766E'
 }
 
 function daysBetween(a: Date, b: Date): number {

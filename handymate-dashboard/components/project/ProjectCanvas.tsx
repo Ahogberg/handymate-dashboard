@@ -327,7 +327,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
     )
   }
 
-  if (!fabricLoaded || loading) {
+  if (!fabricLoaded) {
     return (
       <div className="flex items-center justify-center py-16">
         <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
