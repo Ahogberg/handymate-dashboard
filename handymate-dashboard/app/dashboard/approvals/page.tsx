@@ -62,6 +62,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   low_stock_alert: { label: 'Lager', icon: Package, bgColor: 'bg-red-50', textColor: 'text-red-600' },
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
   time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
+  create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 

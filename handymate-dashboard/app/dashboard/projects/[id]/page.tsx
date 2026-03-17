@@ -206,7 +206,7 @@ interface ExtraCost {
   date: string
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports'
 
 interface ScheduleEntry {
   id: string
@@ -1272,6 +1272,7 @@ export default function ProjectDetailPage() {
     { key: 'log', label: 'Byggdagbok' },
     { key: 'checklists', label: 'Checklistor' },
     { key: 'canvas', label: 'Rityta' },
+    { key: 'field_reports', label: 'Fältrapporter' },
     { key: 'leverantorer', label: 'Leverantorer' },
     { key: 'economy', label: 'Ekonomi' },
     { key: 'ai_log', label: 'Projektanalys' }
@@ -3109,6 +3110,9 @@ export default function ProjectDetailPage() {
           </div>
         )}
         {/* === TAB: AI-logg (Projektanalys) === */}
+        {activeTab === 'field_reports' && (
+          <FieldReportsTab projectId={project.project_id} customerId={project.customer_id} businessId={business.business_id} />
+        )}
         {activeTab === 'ai_log' && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -5609,6 +5613,150 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── Field Reports Tab ───────────────────────────────────────
+
+function FieldReportsTab({ projectId, customerId, businessId }: { projectId: string; customerId: string | null; businessId: string }) {
+  const [reports, setReports] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showModal, setShowModal] = useState(false)
+  const [form, setForm] = useState({ title: '', work_performed: '', materials_used: '' })
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    fetchReports()
+  }, [projectId])
+
+  async function fetchReports() {
+    try {
+      const res = await fetch(`/api/field-reports?project_id=${projectId}`)
+      const data = await res.json()
+      setReports(data.reports || [])
+    } catch { /* silent */ }
+    setLoading(false)
+  }
+
+  async function createReport() {
+    if (!form.title.trim()) return
+    setSaving(true)
+    try {
+      await fetch('/api/field-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          project_id: projectId,
+          customer_id: customerId,
+          title: form.title,
+          work_performed: form.work_performed,
+          materials_used: form.materials_used,
+          status: 'sent',
+        }),
+      })
+      setShowModal(false)
+      setForm({ title: '', work_performed: '', materials_used: '' })
+      fetchReports()
+    } catch { /* silent */ }
+    setSaving(false)
+  }
+
+  const statusBadge = (status: string) => {
+    switch (status) {
+      case 'signed': return 'bg-green-100 text-green-700'
+      case 'sent': return 'bg-blue-100 text-blue-700'
+      case 'rejected': return 'bg-red-100 text-red-700'
+      default: return 'bg-gray-100 text-gray-600'
+    }
+  }
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'signed': return 'Signerad'
+      case 'sent': return 'Skickad'
+      case 'rejected': return 'Invändning'
+      case 'draft': return 'Utkast'
+      default: return status
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Fältrapporter</h2>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+        >
+          + Ny fältrapport
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-12 text-center text-gray-400">Laddar...</div>
+      ) : reports.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <p className="text-gray-400 mb-2">Inga fältrapporter ännu</p>
+          <p className="text-sm text-gray-400">Skapa en rapport som kunden kan signera digitalt</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {reports.map((r: any) => (
+            <div key={r.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge(r.status)}`}>
+                    {statusLabel(r.status)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
+                  <span>{r.report_number}</span>
+                  <span>{new Date(r.created_at).toLocaleDateString('sv-SE')}</span>
+                  {r.signed_by && <span>· Signerad av {r.signed_by}</span>}
+                </div>
+              </div>
+              {r.status === 'sent' && r.signature_token && (
+                <button
+                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/sign/report/${r.signature_token}`)}
+                  className="text-xs text-teal-700 hover:underline shrink-0"
+                >
+                  Kopiera länk
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Ny fältrapport</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Rubrik *</label>
+                <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="T.ex. Elinstallation kök klar" className="w-full border border-gray-300 rounded-lg p-2 mt-1 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Utfört arbete *</label>
+                <textarea value={form.work_performed} onChange={e => setForm({ ...form, work_performed: e.target.value })} placeholder="Beskriv arbetet..." rows={3} className="w-full border border-gray-300 rounded-lg p-2 mt-1 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Material</label>
+                <textarea value={form.materials_used} onChange={e => setForm({ ...form, materials_used: e.target.value })} placeholder="T.ex. Jordfelsbrytare × 3..." rows={2} className="w-full border border-gray-300 rounded-lg p-2 mt-1 text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={createReport} disabled={saving || !form.title.trim()} className="flex-1 bg-teal-700 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50">
+                {saving ? 'Skapar...' : 'Skapa och skicka'}
+              </button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">Avbryt</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
