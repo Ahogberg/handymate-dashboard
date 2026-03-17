@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Kan inte ge högre roll än sin egen
-    const roleHierarchy: Record<string, number> = { owner: 3, admin: 2, employee: 1 }
+    const roleHierarchy: Record<string, number> = { owner: 3, admin: 2, project_manager: 1, employee: 0 }
     const myLevel = roleHierarchy[currentUser.role] || 0
     const targetLevel = roleHierarchy[body.role || 'employee'] || 0
     if (targetLevel >= myLevel && currentUser.role !== 'owner') {

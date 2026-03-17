@@ -28,7 +28,7 @@ interface TeamMember {
   id: string
   business_id: string
   user_id: string | null
-  role: 'owner' | 'admin' | 'employee'
+  role: 'owner' | 'admin' | 'project_manager' | 'employee'
   name: string
   email: string
   phone: string | null
@@ -56,7 +56,7 @@ type Filter = 'all' | 'active' | 'invited' | 'inactive'
 interface InviteForm {
   email: string
   name: string
-  role: 'admin' | 'employee'
+  role: 'admin' | 'project_manager' | 'employee'
   title: string
   phone: string
   hourly_rate: string
@@ -89,12 +89,26 @@ const ADMIN_PERMISSIONS: Pick<InviteForm, 'can_see_all_projects' | 'can_see_fina
   can_create_invoices: true,
 }
 
+const PROJECT_MANAGER_PERMISSIONS: Pick<InviteForm, 'can_see_all_projects' | 'can_see_financials' | 'can_manage_users' | 'can_approve_time' | 'can_create_invoices'> = {
+  can_see_all_projects: true,
+  can_see_financials: true,
+  can_manage_users: false,
+  can_approve_time: true,
+  can_create_invoices: true,
+}
+
 const EMPLOYEE_PERMISSIONS: Pick<InviteForm, 'can_see_all_projects' | 'can_see_financials' | 'can_manage_users' | 'can_approve_time' | 'can_create_invoices'> = {
   can_see_all_projects: false,
   can_see_financials: false,
   can_manage_users: false,
   can_approve_time: false,
   can_create_invoices: false,
+}
+
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  admin: 'Full tillgång — fakturor, inställningar, AI, pipeline',
+  project_manager: 'Projekt, offerter, fakturor, attestering',
+  employee: 'Tidrapport, check-in, lager, sina projekt',
 }
 
 // ---------------------------------------------------------------------------
@@ -112,9 +126,10 @@ function getStatusInfo(member: TeamMember): { label: string; className: string }
 }
 
 function getRoleBadge(role: string): { label: string; className: string } {
-  if (role === 'owner') return { label: 'Agare', className: 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-teal-600 border-teal-300' }
+  if (role === 'owner') return { label: 'Ägare', className: 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-teal-600 border-teal-300' }
   if (role === 'admin') return { label: 'Admin', className: 'bg-teal-100 text-teal-500 border-teal-500/30' }
-  return { label: 'Anstalld', className: 'bg-gray-100 text-gray-500 border-gray-300' }
+  if (role === 'project_manager') return { label: 'Projektledare', className: 'bg-blue-100 text-blue-600 border-blue-300' }
+  return { label: 'Anställd', className: 'bg-gray-100 text-gray-500 border-gray-300' }
 }
 
 function formatRelativeDate(dateStr: string | null): string {
@@ -251,8 +266,8 @@ export default function TeamPage() {
     setInviteModalOpen(true)
   }
 
-  const handleInviteRoleChange = (role: 'admin' | 'employee') => {
-    const perms = role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_PERMISSIONS
+  const handleInviteRoleChange = (role: 'admin' | 'project_manager' | 'employee') => {
+    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
     setInviteForm(prev => ({ ...prev, role, ...perms }))
   }
 
@@ -330,8 +345,8 @@ export default function TeamPage() {
     setEditModalOpen(true)
   }
 
-  const handleEditRoleChange = (role: 'admin' | 'employee') => {
-    const perms = role === 'admin' ? ADMIN_PERMISSIONS : EMPLOYEE_PERMISSIONS
+  const handleEditRoleChange = (role: 'admin' | 'project_manager' | 'employee') => {
+    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
     setEditForm(prev => ({ ...prev, role, ...perms }))
   }
 
@@ -532,12 +547,14 @@ export default function TeamPage() {
                 <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={inviteForm.role}
-                  onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'employee')}
+                  onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'project_manager' | 'employee')}
                   className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50"
                 >
                   <option value="admin">Admin</option>
-                  <option value="employee">Anstalld</option>
+                  <option value="project_manager">Projektledare</option>
+                  <option value="employee">Anställd</option>
                 </select>
+                <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[inviteForm.role]}</p>
               </div>
 
               {/* Title */}
@@ -682,16 +699,20 @@ export default function TeamPage() {
                 <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={editingMember.role === 'owner' ? 'owner' : editForm.role}
-                  onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'employee')}
+                  onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'project_manager' | 'employee')}
                   disabled={editingMember.role === 'owner'}
                   className={`w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/50 ${
                     editingMember.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  {editingMember.role === 'owner' && <option value="owner">Agare</option>}
+                  {editingMember.role === 'owner' && <option value="owner">Ägare</option>}
                   <option value="admin">Admin</option>
-                  <option value="employee">Anstalld</option>
+                  <option value="project_manager">Projektledare</option>
+                  <option value="employee">Anställd</option>
                 </select>
+                {editingMember.role !== 'owner' && (
+                  <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[editForm.role]}</p>
+                )}
               </div>
 
               {/* Title */}

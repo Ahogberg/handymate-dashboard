@@ -6,7 +6,7 @@ export interface BusinessUser {
   id: string
   business_id: string
   user_id: string | null
-  role: 'owner' | 'admin' | 'employee'
+  role: 'owner' | 'admin' | 'project_manager' | 'employee'
   name: string
   email: string
   phone: string | null

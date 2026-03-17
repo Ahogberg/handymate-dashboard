@@ -56,7 +56,7 @@ export function PermissionGate({ permission, children, fallback }: PermissionGat
  * RequireRole - Döljer innehåll om användaren inte har rätt roll.
  */
 export function RequireRole({ roles, children, fallback }: {
-  roles: ('owner' | 'admin' | 'employee')[]
+  roles: ('owner' | 'admin' | 'project_manager' | 'employee')[]
   children: ReactNode
   fallback?: ReactNode
 }) {
