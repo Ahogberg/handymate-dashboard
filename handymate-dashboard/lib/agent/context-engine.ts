@@ -172,7 +172,21 @@ Om det inte finns data att analysera, returnera health "strong" med tom insights
       return { success: false, error: 'Invalid JSON from Claude', tokens_used: tokensUsed }
     }
 
-    // 5. Upserta till agent_context
+    // 5. Hämta säsongsdata
+    let slowMonths: number[] = []
+    let peakMonths: number[] = []
+    try {
+      const { data: seasonData } = await supabase
+        .from('seasonality_insights')
+        .select('month, is_slow_month, is_peak_month')
+        .eq('business_id', businessId)
+      if (seasonData) {
+        slowMonths = seasonData.filter((s: any) => s.is_slow_month).map((s: any) => s.month)
+        peakMonths = seasonData.filter((s: any) => s.is_peak_month).map((s: any) => s.month)
+      }
+    } catch { /* non-blocking */ }
+
+    // 6. Upserta till agent_context
     const { error: upsertError } = await supabase
       .from('agent_context')
       .upsert(
@@ -191,6 +205,8 @@ Om det inte finns data att analysera, returnera health "strong" med tom insights
           business_health: analysis.business_health,
           key_insights: analysis.key_insights,
           recommended_priorities: analysis.recommended_priorities,
+          slow_months: slowMonths,
+          peak_months: peakMonths,
           model_used: MODEL,
           tokens_used: tokensUsed,
         },

@@ -116,6 +116,8 @@ export default function DashboardPage() {
     id: string; insight_type: string; title: string; description: string; priority: string; feedback: string | null
   }>>([])
   const [insightsExpanded, setInsightsExpanded] = useState(false)
+  const [seasonSummary, setSeasonSummary] = useState<string | null>(null)
+  const [savedTimeText, setSavedTimeText] = useState<string | null>(null)
 
   // Per-section loading states for skeleton UI
   const [bookingsLoaded, setBookingsLoaded] = useState(false)
@@ -169,6 +171,61 @@ export default function DashboardPage() {
       if (res.ok) {
         const { insights: data } = await res.json()
         setInsights(data || [])
+      }
+    } catch { /* silent */ }
+  }
+
+  async function fetchSeasonality() {
+    try {
+      const res = await fetch('/api/seasonality/insights')
+      if (res.ok) {
+        const data = await res.json()
+        if (data.summary) setSeasonSummary(data.summary)
+      }
+    } catch { /* silent */ }
+  }
+
+  async function fetchSavedTime() {
+    try {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const { data } = await supabase
+        .from('v3_automation_logs')
+        .select('action_type, status')
+        .eq('business_id', business.business_id)
+        .eq('status', 'success')
+        .gte('created_at', weekAgo)
+
+      if (!data || data.length === 0) return
+
+      const counts: Record<string, number> = {}
+      for (const log of data) {
+        counts[log.action_type] = (counts[log.action_type] || 0) + 1
+      }
+
+      const parts: string[] = []
+      const reminders = (counts['send_reminder'] || 0) + (counts['send_invoice_reminder'] || 0)
+      const followups = (counts['send_sms'] || 0) + (counts['send_email'] || 0) + (counts['quote_followup'] || 0)
+      const leads = (counts['qualify_lead'] || 0) + (counts['contact_lead'] || 0)
+      const bookings = counts['send_booking_reminder'] || 0
+      const pipeline = counts['move_deal'] || 0
+      const morning = counts['morning_report'] || 0
+
+      if (reminders > 0) parts.push(`skickade ${reminders} påminnelse${reminders > 1 ? 'r' : ''}`)
+      if (followups > 0) parts.push(`följde upp ${followups} offert${followups > 1 ? 'er' : ''}`)
+      if (leads > 0) parts.push(`kvalificerade ${leads} lead${leads > 1 ? 's' : ''}`)
+      if (bookings > 0) parts.push(`skickade ${bookings} bokningspåminnelse${bookings > 1 ? 'r' : ''}`)
+      if (pipeline > 0) parts.push(`uppdaterade ${pipeline} affär${pipeline > 1 ? 'er' : ''}`)
+
+      if (parts.length === 0 && data.length > 0) {
+        parts.push(`utförde ${data.length} automatiska åtgärd${data.length > 1 ? 'er' : ''}`)
+      }
+
+      if (parts.length > 0) {
+        const totalActions = data.length
+        const savedMinutes = totalActions * 15
+        const savedHours = Math.round(savedMinutes / 60 * 10) / 10
+        const timeStr = savedHours >= 1 ? `~${savedHours}h` : `~${savedMinutes} min`
+        setSavedTimeText(`Senaste 7 dagarna: Handymate ${parts.join(', ')} — sparade dig ${timeStr} administration`)
       }
     } catch { /* silent */ }
   }
@@ -329,6 +386,8 @@ export default function DashboardPage() {
       .catch(() => {})
 
     const insightsPromise = fetchInsights()
+    fetchSeasonality()
+    fetchSavedTime()
 
     // Wait for all — each section renders independently as it resolves
     await Promise.all([
@@ -774,6 +833,16 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {/* Sparad tid widget */}
+        {savedTimeText && (
+          <div className="mb-4 px-4 py-2.5 bg-teal-50 border border-teal-100 rounded-xl">
+            <p className="text-sm text-teal-700">
+              <Zap className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+              {savedTimeText}
+            </p>
+          </div>
+        )}
+
         {/* Speed-to-Lead Widget */}
         {speedData && speedData.total_leads > 0 && (
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 mb-6">
@@ -982,13 +1051,12 @@ export default function DashboardPage() {
               const maxCount = Math.max(...funnelStages.map(s => s.count), 1)
               const showConversion = totalDeals >= 3
 
-              const stageColors: Record<string, string> = {
-                'new_lead': '#3B82F6',
-                'contacted': '#06B6D4',
-                'quote_sent': '#8B5CF6',
-                'negotiation': '#F59E0B',
-                'won': '#22C55E',
-              }
+              // Teal-baserade färger med fallande opacity per steg
+              const tealOpacities = ['#0F766E', '#14917E', '#1AAC8E', '#2EC4A0', '#5EEAD4', '#99F6E4']
+              const stageColors: Record<string, string> = {}
+              funnelStages.forEach((s, i) => {
+                stageColors[s.slug] = tealOpacities[i] || tealOpacities[tealOpacities.length - 1]
+              })
 
               return (
                 <div>
@@ -1294,6 +1362,17 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Säsongsinsikt */}
+        {seasonSummary && (
+          <div className="mt-4 sm:mt-6 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl px-4 sm:px-6 py-4 flex items-start gap-3">
+            <span className="text-xl shrink-0">📊</span>
+            <div>
+              <p className="text-sm font-medium text-gray-900">Säsongsmönster</p>
+              <p className="text-sm text-gray-600 mt-0.5">Baserat på din historik: {seasonSummary}</p>
+            </div>
+          </div>
+        )}
 
         {/* AI-insikter */}
         {insights.length > 0 && (
