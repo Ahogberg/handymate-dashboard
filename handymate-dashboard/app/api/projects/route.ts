@@ -180,16 +180,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    // Tilldela projektnummer (P-XXXX)
+    // Tilldela projektnummer (P-XXXX) — helt non-blocking
+    let projectNumber: string | null = null
     try {
-      projectData.project_number = await getNextProjectNumber(supabase, businessId)
-    } catch { /* non-blocking — kolumnen kanske inte finns ännu */ }
+      projectNumber = await getNextProjectNumber(supabase, businessId)
+      projectData.project_number = projectNumber
+    } catch {
+      // Kolumnen kanske inte finns — skippa
+    }
 
-    const { data: project, error: insertError } = await supabase
+    let project: any = null
+    let insertError: any = null
+
+    // Försök med project_number
+    const result1 = await supabase
       .from('project')
       .insert(projectData)
       .select('*')
       .single()
+
+    if (result1.error && projectNumber) {
+      // Om felet beror på project_number-kolumnen, försök utan den
+      console.warn('Project insert failed with project_number, retrying without:', result1.error.message)
+      delete projectData.project_number
+      const result2 = await supabase
+        .from('project')
+        .insert(projectData)
+        .select('*')
+        .single()
+      project = result2.data
+      insertError = result2.error
+    } else {
+      project = result1.data
+      insertError = result1.error
+    }
 
     if (insertError) {
       console.error('Project insert error:', insertError)

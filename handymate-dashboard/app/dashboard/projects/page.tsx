@@ -415,7 +415,7 @@ export default function ProjectsPage() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        {project.project_number && <span className="text-xs font-medium text-gray-400 flex-shrink-0">{project.project_number}</span>}
+                        <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number || `P-${project.project_id.slice(0, 6)}`}</span>
                         <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
                         <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
                           {getStatusText(project.status)}
