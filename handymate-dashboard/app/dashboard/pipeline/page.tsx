@@ -334,6 +334,46 @@ export default function PipelinePage() {
   const [lossReason, setLossReason] = useState('')
   const [lossReasonDetail, setLossReasonDetail] = useState('')
 
+  // Quick actions
+  function handleQuickSms(deal: Deal) {
+    if (!deal.customer?.phone_number) return
+    setQuickSmsTarget({ dealId: deal.id, name: deal.customer.name || 'Kund', phone: deal.customer.phone_number })
+    setQuickSmsText('')
+  }
+
+  function handleQuickWon(dealId: string) {
+    const wonStage = stages.find(s => s.is_won)
+    if (wonStage) moveDealAction(dealId, wonStage.slug)
+  }
+
+  // Quick SMS modal
+  const [quickSmsTarget, setQuickSmsTarget] = useState<{ dealId: string; name: string; phone: string } | null>(null)
+  const [quickSmsText, setQuickSmsText] = useState('')
+  const [quickSmsSending, setQuickSmsSending] = useState(false)
+
+  async function sendQuickSms() {
+    if (!quickSmsTarget || !quickSmsText.trim()) return
+    setQuickSmsSending(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ to: quickSmsTarget.phone, message: quickSmsText }),
+      })
+      showToast(`SMS skickat till ${quickSmsTarget.name}`, 'success')
+      setQuickSmsTarget(null)
+      setQuickSmsText('')
+    } catch {
+      showToast('Kunde inte skicka SMS', 'error')
+    } finally {
+      setQuickSmsSending(false)
+    }
+  }
+
   // Deal documents
   const [dealDocuments, setDealDocuments] = useState<CustomerDocument[]>([])
   const [dealUploading, setDealUploading] = useState(false)
@@ -1383,7 +1423,7 @@ export default function PipelinePage() {
                     {stageDeals.length === 0 && <div className="flex items-center justify-center py-8 text-gray-300 text-xs">{isDropTarget ? 'Släpp här' : 'Inga deals'}</div>}
                     {stageDeals.map(deal => (
                       <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} />
+                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
                     ))}
                   </div>
                 </div>
@@ -1410,7 +1450,7 @@ export default function PipelinePage() {
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
                       {dealsForStage(lostStage.id).map(deal => (
                         <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} />
+                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
                       ))}
                     </div>
                   </>
@@ -1441,7 +1481,7 @@ export default function PipelinePage() {
                 {dealsForStage(stages[mobileStageIndex].id).length === 0 && <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Inga deals i detta steg</div>}
                 {dealsForStage(stages[mobileStageIndex].id).map(deal => (
                   <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} />
+                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onQuickWon={handleQuickWon} />
                 ))}
               </div>
             )}
@@ -2564,6 +2604,39 @@ export default function PipelinePage() {
         </>
       )}
 
+      {/* Quick SMS Modal */}
+      {quickSmsTarget && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setQuickSmsTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-gray-900 mb-1">SMS till {quickSmsTarget.name}</h3>
+            <p className="text-xs text-gray-400 mb-3">{quickSmsTarget.phone}</p>
+            <textarea
+              value={quickSmsText}
+              onChange={e => setQuickSmsText(e.target.value)}
+              placeholder="Skriv ditt meddelande..."
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+              rows={3}
+              maxLength={320}
+              autoFocus
+            />
+            <p className="text-xs text-gray-400 mt-1">{quickSmsText.length}/320</p>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={sendQuickSms}
+                disabled={!quickSmsText.trim() || quickSmsSending}
+                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              >
+                {quickSmsSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
+                Skicka
+              </button>
+              <button onClick={() => setQuickSmsTarget(null)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast.show && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]">
@@ -2588,12 +2661,14 @@ interface DealCardProps {
   onDragStart: (e: React.DragEvent, dealId: string) => void
   onDragEnd: () => void
   onClick: () => void
+  onQuickSms?: (deal: Deal) => void
+  onQuickWon?: (dealId: string) => void
 }
 
-function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCardProps) {
+function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onQuickWon }: DealCardProps) {
   return (
     <div draggable onDragStart={e => onDragStart(e, deal.id)} onDragEnd={onDragEnd} onClick={onClick}
-      className={`group p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
+      className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -2635,6 +2710,32 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick }: DealCar
           )}
           <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(deal.updated_at)}</span>
         </div>
+      </div>
+
+      {/* Snabbknappar — hover desktop, alltid mobil */}
+      <div className="flex items-center justify-around mt-2 pt-2 border-t border-gray-100 opacity-0 group-hover:opacity-100 md:transition-opacity" onClick={e => e.stopPropagation()}>
+        {deal.customer?.phone_number && (
+          <a href={`tel:${deal.customer.phone_number}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Ring">
+            <Phone className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Ring</span>
+          </a>
+        )}
+        {deal.customer?.phone_number && onQuickSms && (
+          <button onClick={() => onQuickSms(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="SMS">
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span className="text-[10px]">SMS</span>
+          </button>
+        )}
+        <Link href={`/dashboard/quotes/new?customer=${deal.customer_id || ''}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Offert" onClick={e => e.stopPropagation()}>
+          <FileText className="w-3.5 h-3.5" />
+          <span className="text-[10px]">Offert</span>
+        </Link>
+        {onQuickWon && (
+          <button onClick={() => onQuickWon(deal.id)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-green-600 transition-colors" title="Vunnen">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Vunnen</span>
+          </button>
+        )}
       </div>
     </div>
   )
