@@ -175,8 +175,8 @@ interface AutomationHistoryItem {
 const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color: string; bg: string }> = {
   phone_call: { label: 'Telefonsamtal', icon: Phone, color: 'text-teal-400', bg: 'bg-teal-600/10 border-teal-500/20' },
   incoming_sms: { label: 'Inkommande SMS', icon: MessageSquare, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
-  manual: { label: 'Manuell', icon: Settings2, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-  cron: { label: 'Schemalagd', icon: Clock, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20' },
+  manual: { label: 'Du frågade', icon: Settings2, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
+  cron: { label: 'Automatisk kontroll', icon: Clock, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20' },
 }
 
 const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search; friendlyLabel: string }> = {
@@ -200,6 +200,11 @@ const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search; friendly
   search_leads: { label: 'Sök leads', icon: Search, friendlyLabel: 'Sökte intressenter' },
   get_daily_stats: { label: 'Dagsrapport', icon: Activity, friendlyLabel: 'Hämtade dagsrapport' },
   order_material: { label: 'Beställ material', icon: ClipboardList, friendlyLabel: 'Beställde material' },
+  check_pending_approvals: { label: 'Godkännanden', icon: ClipboardList, friendlyLabel: 'Kontrollerade väntande godkännanden' },
+  get_pipeline_overview: { label: 'Pipeline', icon: TrendingUp, friendlyLabel: 'Kollade dina leads och affärer' },
+  get_overdue_invoices: { label: 'Förfallna fakturor', icon: FileText, friendlyLabel: 'Kollade förfallna fakturor' },
+  get_upcoming_bookings: { label: 'Bokningar', icon: CalendarCheck, friendlyLabel: 'Kollade kommande bokningar' },
+  get_communication_stats: { label: 'Kommunikation', icon: Phone, friendlyLabel: 'Kollade samtal och meddelanden' },
 }
 
 // Format tool result as human-readable summary
@@ -250,6 +255,29 @@ function formatToolResultSummary(tool: string, result: { success: boolean; data?
     default:
       return 'Klart'
   }
+}
+
+// Humanize technical agent responses for display
+function humanizeResponse(text: string): string {
+  if (!text) return text
+  return text
+    .replace(/Cron-trigger hanterad/gi, 'Kontroll genomförd')
+    .replace(/Kommunikationskontroll/gi, 'Kollade samtal och meddelanden')
+    .replace(/cron[_-]?type[:\s]*\w+/gi, '')
+    .replace(/schema cache/gi, 'databas')
+    .replace(/pipeline granskad \(alla statusar tomma\)/gi, 'Inga aktiva leads just nu')
+    .replace(/pipeline granskad/gi, 'Kollade dina leads')
+    .replace(/Kommunikation:\s*0 samtal,?\s*0 SMS/gi, 'Inga samtal eller meddelanden idag')
+    .replace(/check_pending_approvals/gi, 'Kontrollerade godkännanden')
+    .replace(/pending_approvals/gi, 'godkännanden')
+    .replace(/\btrigger\b/gi, 'händelse')
+    .replace(/\bcron\b/gi, 'automatisk')
+    .replace(/Could not find the table/gi, 'Kunde inte kontrollera')
+    .replace(/in the schema cache/gi, '— kontakta support om det fortsätter')
+    .replace(/idempotency/gi, 'dubblettskydd')
+    .replace(/Error:/gi, 'Fel:')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 }
 
 // Simple markdown-to-HTML renderer for agent responses
@@ -364,7 +392,7 @@ function ActivityItem({ run, isSelected, onClick }: {
             </span>
           </div>
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-            {run.final_response || '(Inget svar)'}
+            {humanizeResponse(run.final_response || '(Inget svar)')}
           </p>
           <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
             <span className="flex items-center gap-1">

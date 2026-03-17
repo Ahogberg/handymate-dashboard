@@ -1170,13 +1170,33 @@ async function checkPendingApprovals(
   supabase: SupabaseClient,
   businessId: string
 ): Promise<ToolResult> {
-  const { data, error } = await supabase
+  // Try pending_approvals first, fall back to pending_actions if table not cached
+  let data: any[] | null = null
+  let error: any = null
+
+  const res1 = await supabase
     .from('pending_approvals')
     .select('id, approval_type, title, description, created_at, expires_at')
     .eq('business_id', businessId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false })
     .limit(10)
+
+  data = res1.data
+  error = res1.error
+
+  // Fallback: if table not found in schema cache, return empty gracefully
+  if (error && error.message?.includes('schema cache')) {
+    console.warn('[checkPendingApprovals] Table not in schema cache — returning empty. Run NOTIFY pgrst, \'reload schema\' in Supabase SQL Editor.')
+    return {
+      success: true,
+      data: {
+        pending_count: 0,
+        approvals: [],
+        note: 'Tabellen behöver laddas om i databasen. Kontakta support om detta fortsätter.',
+      },
+    }
+  }
 
   if (error) return { success: false, error: error.message }
 

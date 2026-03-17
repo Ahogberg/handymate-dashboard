@@ -165,6 +165,33 @@ export async function sendMorningReport(businessId: string): Promise<{
       return { success: false, error: `46elks error: ${(errData as any).message || smsResponse.status}` }
     }
 
+    // Push notification
+    try {
+      const firstSentence = message.split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 120)
+      await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/api/push/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: businessId,
+          title: 'God morgon! Din dagliga rapport är klar',
+          body: firstSentence,
+          url: '/dashboard',
+          tag: 'morning-report',
+        }),
+      })
+    } catch { /* push is non-blocking */ }
+
+    // Store summary for dashboard popup
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      await supabase.from('business_preferences').upsert({
+        business_id: businessId,
+        key: 'morning_report_latest',
+        value: JSON.stringify({ date: today, summary: message }),
+        source: 'system',
+      }, { onConflict: 'business_id,key' })
+    } catch { /* non-blocking */ }
+
     // Fire event
     try {
       const { fireEvent } = await import('@/lib/automation-engine')

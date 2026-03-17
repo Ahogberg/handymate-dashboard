@@ -90,6 +90,7 @@ export default function DashboardPage() {
   const [priceListCount, setPriceListCount] = useState(0)
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [morningReport, setMorningReport] = useState<string | null>(null)
   const [activeProjects, setActiveProjects] = useState(0)
   const [pipelineStats, setPipelineStats] = useState<{
     byStage: Array<{ stage: string; slug: string; color: string; count: number; value: number }>
@@ -129,6 +130,27 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!localStorage.getItem('hm_welcome_seen')) {
       setShowWelcome(true)
+    }
+    // Check for today's morning report
+    const today = new Date().toISOString().slice(0, 10)
+    const dismissedKey = `hm_morning_report_${today}`
+    if (!localStorage.getItem(dismissedKey)) {
+      supabase
+        .from('business_preferences')
+        .select('value')
+        .eq('business_id', business.business_id)
+        .eq('key', 'morning_report_latest')
+        .single()
+        .then(({ data }: { data: any }) => {
+          if (data?.value) {
+            try {
+              const parsed = JSON.parse(data.value)
+              if (parsed.date === today && parsed.summary) {
+                setMorningReport(parsed.summary)
+              }
+            } catch { /* ignore */ }
+          }
+        })
     }
   }, [])
 
@@ -469,6 +491,33 @@ export default function DashboardPage() {
                   Kom igång
                   <ArrowRight className="w-4 h-4" />
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Morning report popup */}
+        {morningReport && (
+          <div className="mb-6 p-5 bg-gradient-to-r from-teal-50 to-sky-50 border border-teal-200 rounded-2xl relative">
+            <button
+              onClick={() => {
+                const today = new Date().toISOString().slice(0, 10)
+                localStorage.setItem(`hm_morning_report_${today}`, '1')
+                setMorningReport(null)
+              }}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white/60 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-teal-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-1">Din dagliga rapport</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
+                  {morningReport}
+                </p>
               </div>
             </div>
           </div>
