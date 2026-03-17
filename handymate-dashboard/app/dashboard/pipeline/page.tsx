@@ -1495,7 +1495,7 @@ export default function PipelinePage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                          <h3 className="text-sm font-semibold text-gray-900">Förlorad</h3>
+                          <h3 className="text-sm font-semibold text-gray-900">{lostStage.name}</h3>
                           <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full font-medium">{dealsForStage(lostStage.id).length}</span>
                         </div>
                         <button onClick={() => setLostExpanded(false)} className="p-1 rounded hover:bg-gray-100 text-gray-400"><ChevronRight className="w-4 h-4" /></button>
@@ -1512,7 +1512,7 @@ export default function PipelinePage() {
                   <button onClick={() => setLostExpanded(true)}
                     className="flex flex-col items-center justify-center h-full py-4 gap-2 text-gray-400 hover:text-gray-600 transition-colors">
                     <span className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                    <span className="text-xs font-medium [writing-mode:vertical-lr] rotate-180">Förlorad ({dealsForStage(lostStage.id).length})</span>
+                    <span className="text-xs font-medium [writing-mode:vertical-lr] rotate-180">{lostStage.name} ({dealsForStage(lostStage.id).length})</span>
                   </button>
                 )}
               </div>

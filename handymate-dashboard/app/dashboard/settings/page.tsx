@@ -4331,7 +4331,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
               <span className="text-gray-400 text-sm w-6">{i + 1}.</span>
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
               <span className="text-gray-900 text-sm flex-1">{stage.name}</span>
-              {stage.is_won && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Vunnen</span>}
+              {stage.is_won && <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{stage.name}</span>}
             </div>
           ))}
           {stages.filter(s => s.is_lost).map((stage) => (
@@ -4339,7 +4339,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
               <span className="text-gray-400 text-sm w-6" />
               <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
               <span className="text-gray-900 text-sm flex-1">{stage.name}</span>
-              <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">Förlorad</span>
+              <span className="text-xs text-red-600 bg-red-50 px-2 py-0.5 rounded-full">{stage.name}</span>
             </div>
           ))}
         </div>
