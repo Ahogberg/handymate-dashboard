@@ -134,7 +134,7 @@ export default function QuoteDetailPage() {
   const params = useParams()
   const router = useRouter()
   const business = useBusiness()
-  const quoteId = params.id as string
+  const quoteId = (params as any)?.id as string
 
   const [quote, setQuote] = useState<Quote | null>(null)
   const [loading, setLoading] = useState(true)

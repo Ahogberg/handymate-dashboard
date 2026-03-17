@@ -53,7 +53,7 @@ const serviceOptions = [
 
 export default function LeadPortalPage() {
   const params = useParams()
-  const code = params.code as string
+  const code = params?.code as string
 
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)

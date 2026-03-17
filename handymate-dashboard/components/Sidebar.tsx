@@ -101,25 +101,7 @@ const NAV: NavItem[] = [
 
 // Bottom section: Inställningar + Bjud in kollega (rendered below separator)
 const BOTTOM_NAV: NavItem[] = [
-  {
-    type: 'group', key: 'settings', label: 'Inställningar', icon: Settings,
-    children: [
-      { label: 'Företag', href: '/dashboard/settings' },
-      { label: 'Kunskapsbas', href: '/dashboard/settings/knowledge' },
-      { label: 'Mina priser', href: '/dashboard/settings/my-prices' },
-      { label: 'Prislista', href: '/dashboard/settings/pricelist' },
-      { label: 'Prisstruktur', href: '/dashboard/settings/pricing' },
-      { label: 'Prenumeration', href: '/dashboard/billing' },
-      { label: 'Team', href: '/dashboard/settings?tab=team' },
-      { label: 'Lead-källor', href: '/dashboard/settings/lead-sources' },
-      { label: 'Automationer', href: '/dashboard/automations', dotKey: 'automation_failed' },
-      { label: 'Offertmallar', href: '/dashboard/settings/quote-templates', featureGate: 'quote_templates' },
-      { label: 'Standardtexter', href: '/dashboard/settings/quote-texts', featureGate: 'quote_templates' },
-      { label: 'Lager & Material', href: '/dashboard/settings/inventory' },
-      { label: 'Marknadsföring', href: '/dashboard/campaigns', featureGate: 'campaign_analytics' },
-      { label: 'Hemsida', href: '/dashboard/website', featureGate: 'storefront_basic' },
-    ],
-  },
+  { type: 'link', key: 'settings', label: 'Inställningar', icon: Settings, href: '/dashboard/settings', paths: ['/dashboard/settings', '/dashboard/billing', '/dashboard/automations'] },
   { type: 'link', key: 'referral', label: 'Bjud in kollega', icon: Gift, href: '/dashboard/referral' },
 ]
 
@@ -476,7 +458,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
-  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent'])
+  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings'])
   const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   function filterNavForRole(items: NavItem[]): NavItem[] {

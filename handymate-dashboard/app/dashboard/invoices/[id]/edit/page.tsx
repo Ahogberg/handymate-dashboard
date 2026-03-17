@@ -22,7 +22,7 @@ export default function EditInvoicePage() {
   const router = useRouter()
   const business = useBusiness()
   const toast = useToast()
-  const invoiceId = params.id as string
+  const invoiceId = (params as any)?.id as string
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

@@ -233,7 +233,7 @@ function StandardTextPicker({
 export default function EditQuotePage() {
   const router = useRouter()
   const params = useParams()
-  const quoteId = params.id as string
+  const quoteId = (params as any)?.id as string
   const business = useBusiness()
   const toast = useToast()
 

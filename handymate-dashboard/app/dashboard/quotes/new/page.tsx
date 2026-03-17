@@ -421,10 +421,10 @@ export default function NewQuotePage() {
     fetchStandardTexts()
 
     // Check query params
-    const transcript = searchParams.get('transcript')
-    const customerId = searchParams.get('customerId') || searchParams.get('customer_id')
-    const prefillTitle = searchParams.get('title')
-    const dealId = searchParams.get('deal_id') || searchParams.get('lead_id')
+    const transcript = searchParams?.get('transcript')
+    const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
+    const prefillTitle = searchParams?.get('title')
+    const dealId = searchParams?.get('deal_id') || searchParams?.get('lead_id')
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
@@ -1050,7 +1050,7 @@ export default function NewQuotePage() {
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
           attachments: attachments.length > 0 ? attachments : [],
-          deal_id: searchParams.get('deal_id') || searchParams.get('lead_id') || null,
+          deal_id: searchParams?.get('deal_id') || searchParams?.get('lead_id') || null,
         }),
       })
       const data = await res.json()

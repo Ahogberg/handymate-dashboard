@@ -32,7 +32,7 @@ function formatDate(d: string): string {
 
 export default function SignReportPage() {
   const params = useParams()
-  const token = params.token as string
+  const token = params?.token as string
 
   const [report, setReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(true)

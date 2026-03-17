@@ -51,7 +51,7 @@ export default function QuoteTemplateEditorPage() {
   const router = useRouter()
   const params = useParams()
   const business = useBusiness()
-  const templateId = params.id as string
+  const templateId = (params as any)?.id as string
 
   const [template, setTemplate] = useState<TemplateData | null>(null)
   const [loading, setLoading] = useState(true)

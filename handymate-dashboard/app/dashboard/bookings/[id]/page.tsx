@@ -43,9 +43,9 @@ interface Booking {
 }
 
 export default function BookingDetailPage() {
-  const params = useParams()
+  const params = useParams() || {}
   const business = useBusiness()
-  const bookingId = params.id as string
+  const bookingId = (params.id || '') as string
 
   const [booking, setBooking] = useState<Booking | null>(null)
   const [loading, setLoading] = useState(true)

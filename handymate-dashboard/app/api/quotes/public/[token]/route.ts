@@ -43,6 +43,7 @@ export async function GET(
         status,
         signed_at,
         signed_by_name,
+        attachments,
         created_at,
         business_id,
         customer:customer_id (

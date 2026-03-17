@@ -26,7 +26,7 @@ function generateSessionId() {
 
 function WidgetChatContent() {
   const searchParams = useSearchParams()
-  const businessId = searchParams.get('bid')
+  const businessId = searchParams?.get('bid')
 
   const [config, setConfig] = useState<WidgetConfig | null>(null)
   const [messages, setMessages] = useState<Message[]>([])

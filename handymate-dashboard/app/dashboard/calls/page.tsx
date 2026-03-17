@@ -33,7 +33,7 @@ const tabs: { key: TabKey; label: string; icon: any }[] = [
 
 export default function CallsPage() {
   const searchParams = useSearchParams()
-  const initialTab = (searchParams.get('tab') as TabKey) || 'inbox'
+  const initialTab = (searchParams?.get('tab') as TabKey) || 'inbox'
   const [activeTab, setActiveTab] = useState<TabKey>(
     tabs.some(t => t.key === initialTab) ? initialTab : 'inbox'
   )

@@ -25,7 +25,7 @@ const roleLabels: Record<string, string> = {
 export default function InviteAcceptPage() {
   const params = useParams()
   const router = useRouter()
-  const token = params.token as string
+  const token = params?.token as string
 
   const [invite, setInvite] = useState<InviteData | null>(null)
   const [loading, setLoading] = useState(true)

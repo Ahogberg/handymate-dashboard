@@ -424,7 +424,7 @@ export default function SettingsPage() {
 
   // Handle Fortnox OAuth callback
   useEffect(() => {
-    const fortnoxParam = searchParams.get('fortnox')
+    const fortnoxParam = searchParams?.get('fortnox')
     if (fortnoxParam === 'connected') {
       setActiveTab('integrations')
       showToast('Fortnox kopplat!', 'success')
@@ -433,19 +433,19 @@ export default function SettingsPage() {
       window.history.replaceState({}, '', '/dashboard/settings')
     } else if (fortnoxParam === 'error') {
       setActiveTab('integrations')
-      const message = searchParams.get('message') || 'Kunde inte koppla Fortnox'
+      const message = searchParams?.get('message') || 'Kunde inte koppla Fortnox'
       showToast(message, 'error')
       window.history.replaceState({}, '', '/dashboard/settings')
     }
 
     // Handle tab param
-    const tabParam = searchParams.get('tab')
+    const tabParam = searchParams?.get('tab')
     if (tabParam && ['company','hours','phone','invoice','time','team','integrations','pipeline','ai','subscription'].includes(tabParam)) {
       setActiveTab(tabParam)
     }
 
     // Handle Google Calendar OAuth callback
-    const googleParam = searchParams.get('google')
+    const googleParam = searchParams?.get('google')
     if (googleParam === 'connected') {
       setActiveTab('integrations')
       showToast('Google Calendar kopplat!', 'success')
@@ -453,7 +453,7 @@ export default function SettingsPage() {
       window.history.replaceState({}, '', '/dashboard/settings')
     } else if (googleParam === 'error') {
       setActiveTab('integrations')
-      const message = searchParams.get('message') || 'Kunde inte koppla Google Calendar'
+      const message = searchParams?.get('message') || 'Kunde inte koppla Google Calendar'
       showToast(message, 'error')
       window.history.replaceState({}, '', '/dashboard/settings')
     }
@@ -1211,36 +1211,44 @@ export default function SettingsPage() {
     )
   }
 
-  const tabGroups = [
+  const tabGroups: { label: string; tabs: { id: string; label: string; icon: any; href?: string }[] }[] = [
     {
       label: 'Företag',
       tabs: [
         { id: 'company', label: 'Företag', icon: Building2 },
         { id: 'hours', label: 'Öppettider', icon: Clock },
         { id: 'invoice', label: 'Faktura', icon: Receipt },
+        { id: 'phone', label: 'Telefoni', icon: PhoneCall },
+        { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
       ],
     },
     {
-      label: 'Kommunikation',
+      label: 'Försäljning',
       tabs: [
-        { id: 'phone', label: 'Telefoni', icon: PhoneCall },
-        { id: 'ai', label: 'AI-assistent', icon: Bot },
+        { id: '_link_templates', label: 'Offertmallar', icon: FileText, href: '/dashboard/settings/quote-templates' },
+        { id: '_link_texts', label: 'Standardtexter', icon: FileText, href: '/dashboard/settings/quote-texts' },
+        { id: '_link_pricelist', label: 'Prislista', icon: Package, href: '/dashboard/settings/pricelist' },
+        { id: '_link_pricing', label: 'Prisstruktur', icon: TrendingUp, href: '/dashboard/settings/pricing' },
+        { id: '_link_categories', label: 'Offertkategorier', icon: FileText, href: '/dashboard/settings/quote-categories' },
       ],
     },
     {
       label: 'Drift',
       tabs: [
+        { id: 'team', label: 'Team', icon: UsersRound },
         { id: 'time', label: 'Tidrapport', icon: Clock },
         { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
-        { id: 'autopilot', label: 'Autopilot', icon: Zap },
-        { id: 'team', label: 'Team', icon: UsersRound },
+        { id: '_link_automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations' },
+        { id: '_link_leads', label: 'Lead-källor', icon: Link2, href: '/dashboard/settings/lead-sources' },
+        { id: '_link_inventory', label: 'Lager & Material', icon: Package, href: '/dashboard/settings/inventory' },
       ],
     },
     {
-      label: 'System',
+      label: 'AI & Integrationer',
       tabs: [
+        { id: 'ai', label: 'AI-assistent', icon: Bot },
+        { id: 'autopilot', label: 'Autopilot', icon: Zap },
         { id: 'integrations', label: 'Integrationer', icon: Link2 },
-        { id: 'subscription', label: 'Prenumeration', icon: CreditCard },
         { id: 'preferences', label: 'Preferenser', icon: Star },
       ],
     },
@@ -1265,7 +1273,7 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="relative max-w-4xl mx-auto">
+      <div className="relative max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Inställningar</h1>
@@ -1281,30 +1289,70 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        {/* Tabs – grouped with wrap */}
-        <div className="flex flex-wrap gap-x-1 gap-y-2 mb-8 items-center">
-          {tabGroups.map((group, gi) => (
-            <Fragment key={group.label}>
-              {gi > 0 && (
-                <div className="hidden sm:block w-px h-6 bg-gray-200 mx-2" />
-              )}
-              {group.tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap ${
-                    activeTab === tab.id
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-white text-gray-500 hover:text-gray-900 border border-gray-200'
-                  }`}
-                >
-                  <tab.icon className="w-4 h-4 mr-1.5" />
-                  {tab.label}
-                </button>
-              ))}
-            </Fragment>
-          ))}
-        </div>
+        {/* Layout: vertical sidebar + content */}
+        <div className="flex flex-col lg:flex-row gap-6">
+
+        {/* Settings sidebar nav */}
+        <nav className="lg:w-56 shrink-0">
+          {/* Mobile: horizontal scroll tabs */}
+          <div className="lg:hidden flex overflow-x-auto gap-1.5 pb-2 -mx-2 px-2 scrollbar-hide">
+            {tabs.filter(t => !t.id.startsWith('_link_')).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+                  activeTab === tab.id
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-white text-gray-500 border border-gray-200'
+                }`}
+              >
+                <tab.icon className="w-3.5 h-3.5 mr-1" />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Desktop: vertical grouped menu */}
+          <div className="hidden lg:block bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            {tabGroups.map((group, gi) => (
+              <div key={group.label}>
+                {gi > 0 && <div className="border-t border-gray-100" />}
+                <p className="px-4 pt-3 pb-1 text-[10px] tracking-widest uppercase text-gray-400 font-semibold">
+                  {group.label}
+                </p>
+                {group.tabs.map((tab) =>
+                  tab.href ? (
+                    <Link
+                      key={tab.id}
+                      href={tab.href}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+                    >
+                      <tab.icon className="w-4 h-4 text-gray-400" />
+                      {tab.label}
+                      <ChevronRight className="w-3 h-3 text-gray-300 ml-auto" />
+                    </Link>
+                  ) : (
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left ${
+                        activeTab === tab.id
+                          ? 'bg-teal-50 text-teal-700 font-medium border-l-2 border-teal-600'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-teal-600' : 'text-gray-400'}`} />
+                      {tab.label}
+                    </button>
+                  )
+                )}
+              </div>
+            ))}
+          </div>
+        </nav>
+
+        {/* Content area */}
+        <div className="flex-1 min-w-0">
 
         {/* Company Tab */}
         {activeTab === 'company' && (
@@ -3802,6 +3850,9 @@ export default function SettingsPage() {
         {activeTab === 'preferences' && (
           <PreferencesTab businessId={business.business_id} />
         )}
+
+        </div>{/* close content area */}
+        </div>{/* close flex layout */}
       </div>
     </div>
     </PermissionGate>

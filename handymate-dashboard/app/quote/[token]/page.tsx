@@ -60,6 +60,7 @@ interface QuoteData {
   status: string
   signed_at?: string
   signed_by_name?: string
+  attachments?: Array<{ name: string; url: string; size?: number }>
   customer?: {
     name: string
     phone_number?: string
@@ -97,7 +98,7 @@ type PageState =
 
 export default function QuoteSignPage() {
   const params = useParams()
-  const token = params.token as string
+  const token = params?.token as string
 
   const [state, setState] = useState<PageState>('loading')
   const [quote, setQuote] = useState<QuoteData | null>(null)
@@ -773,6 +774,32 @@ export default function QuoteSignPage() {
             </div>
           )}
         </div>
+
+        {/* Attachments */}
+        {quote.attachments && quote.attachments.length > 0 && (
+          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
+            <h3 className="text-sm font-semibold text-gray-900 mb-3">Bifogade dokument</h3>
+            <div className="space-y-2">
+              {quote.attachments.map((att, i) => (
+                <a
+                  key={i}
+                  href={att.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-teal-700" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm text-gray-900 truncate">{att.name}</p>
+                    {att.size && <p className="text-xs text-gray-400">{(att.size / 1024).toFixed(0)} KB</p>}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Signature Card */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">

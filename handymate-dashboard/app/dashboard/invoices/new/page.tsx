@@ -49,7 +49,7 @@ export default function NewInvoicePage() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
 
   // Form state
-  const [customerId, setCustomerId] = useState(searchParams.get('customerId') || '')
+  const [customerId, setCustomerId] = useState(searchParams?.get('customerId') || '')
   const [items, setItems] = useState<InvoiceItem[]>([])
   const [vatRate, setVatRate] = useState(25)
   const [rotRutType, setRotRutType] = useState<string>('')
@@ -69,8 +69,8 @@ export default function NewInvoicePage() {
   const [showTimeEntries, setShowTimeEntries] = useState(false)
 
   // Pre-population from URL params
-  const fromQuoteId = searchParams.get('fromQuote')
-  const fromTimeEntriesCustomer = searchParams.get('fromTimeEntries')
+  const fromQuoteId = searchParams?.get('fromQuote')
+  const fromTimeEntriesCustomer = searchParams?.get('fromTimeEntries')
 
   useEffect(() => {
     if (business.business_id) {

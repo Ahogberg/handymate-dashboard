@@ -121,9 +121,9 @@ export default function CustomerDetailPage() {
   const searchParams = useSearchParams()
   const business = useBusiness()
   const { user: currentUser } = useCurrentUser()
-  const customerId = params.id as string
+  const customerId = (params as any)?.id as string
 
-  const tabParam = searchParams.get('tab')
+  const tabParam = searchParams?.get('tab')
   const initialTab = tabParam === 'documents' ? 'documents' : tabParam === 'bookings' ? 'bookings' : tabParam === 'tasks' ? 'tasks' : 'timeline'
 
   const [customer, setCustomer] = useState<Customer | null>(null)

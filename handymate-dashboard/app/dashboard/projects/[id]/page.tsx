@@ -325,7 +325,7 @@ export default function ProjectDetailPage() {
   const router = useRouter()
   const business = useBusiness()
   const { can, user: currentUser, isOwnerOrAdmin } = useCurrentUser()
-  const projectId = params.id as string
+  const projectId = (params as any)?.id as string
 
   // Core data
   const [project, setProject] = useState<Project | null>(null)

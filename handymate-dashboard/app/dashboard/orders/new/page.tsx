@@ -54,7 +54,7 @@ export default function NewOrderPage() {
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([])
 
   // Form state
-  const [supplierId, setSupplierId] = useState(searchParams.get('supplierId') || '')
+  const [supplierId, setSupplierId] = useState(searchParams?.get('supplierId') || '')
   const [items, setItems] = useState<OrderItem[]>([])
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [notes, setNotes] = useState('')

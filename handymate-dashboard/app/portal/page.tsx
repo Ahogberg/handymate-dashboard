@@ -69,7 +69,7 @@ export default function CustomerPortalPageWrapper() {
 
 function CustomerPortalPage() {
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+  const token = searchParams?.get('token')
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

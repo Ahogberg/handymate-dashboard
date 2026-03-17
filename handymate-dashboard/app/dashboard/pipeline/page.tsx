@@ -427,6 +427,11 @@ export default function PipelinePage() {
   // View toggle
   const [pipelineView, setPipelineView] = useState<'kanban' | 'timeline'>('kanban')
 
+  // Site visit booking
+  const [showSiteVisit, setShowSiteVisit] = useState(false)
+  const [siteVisitForm, setSiteVisitForm] = useState({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true })
+  const [siteVisitSaving, setSiteVisitSaving] = useState(false)
+
   // Stage management
   const [showStageSettings, setShowStageSettings] = useState(false)
   const [stageEdits, setStageEdits] = useState<Record<string, { name: string; color: string }>>({})
@@ -1030,6 +1035,55 @@ export default function PipelinePage() {
     } catch {
       showToast('Kunde inte ångra', 'error')
     }
+  }
+
+  // ------------------------------------------
+  // Site visit booking
+  // ------------------------------------------
+
+  async function bookSiteVisit() {
+    if (!selectedDeal || !siteVisitForm.date) return
+    setSiteVisitSaving(true)
+    try {
+      const start = new Date(`${siteVisitForm.date}T${siteVisitForm.time}:00`)
+      const end = new Date(start.getTime() + Number(siteVisitForm.duration) * 60000)
+
+      // Create booking
+      const res = await fetch('/api/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: selectedDeal.customer_id,
+          scheduled_start: start.toISOString(),
+          scheduled_end: end.toISOString(),
+          service_type: 'Platsbesök',
+          notes: siteVisitForm.notes || `Platsbesök — ${selectedDeal.title}`,
+        }),
+      })
+
+      if (!res.ok) throw new Error('Booking failed')
+
+      // Send SMS to customer if enabled
+      if (siteVisitForm.sendSms && selectedDeal.customer?.phone_number) {
+        const dateStr = start.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
+        const timeStr = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+        await fetch('/api/sms/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: selectedDeal.customer.phone_number,
+            message: `Hej ${selectedDeal.customer.name}! Vi kommer på platsbesök ${dateStr} kl ${timeStr}. Välkommen att höra av dig om tiden inte passar. //${business.contact_name}`,
+          }),
+        }).catch(() => {})
+      }
+
+      showToast('Platsbesök bokat!', 'success')
+      setShowSiteVisit(false)
+      setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true })
+    } catch {
+      showToast('Kunde inte boka platsbesök', 'error')
+    }
+    setSiteVisitSaving(false)
   }
 
   // ------------------------------------------
@@ -1845,6 +1899,10 @@ export default function PipelinePage() {
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
                           <FileText className="w-4 h-4 text-sky-700" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
+                        <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true }) }}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
+                          <Calendar className="w-4 h-4 text-teal-600" /> Platsbesök
+                        </button>
                         {!getStageForDeal(selectedDeal)?.is_lost && (
                           <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
                             <XCircle className="w-4 h-4" /> Markera förlorad
@@ -2644,6 +2702,61 @@ export default function PipelinePage() {
             {toast.type === 'success' && <CheckCircle2 className="w-4 h-4" />}
             {toast.type === 'error' && <AlertCircle className="w-4 h-4" />}
             {toast.message}
+          </div>
+        </div>
+      )}
+      {/* Site Visit Modal */}
+      {showSiteVisit && selectedDeal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={e => { if (e.target === e.currentTarget) setShowSiteVisit(false) }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Boka platsbesök</h3>
+            <p className="text-sm text-gray-500 mb-4">{selectedDeal.title}{selectedDeal.customer?.name ? ` · ${selectedDeal.customer.name}` : ''}</p>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Datum *</label>
+                  <input type="date" value={siteVisitForm.date} onChange={e => setSiteVisitForm(p => ({ ...p, date: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Tid</label>
+                  <input type="time" value={siteVisitForm.time} onChange={e => setSiteVisitForm(p => ({ ...p, time: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Längd</label>
+                <select value={siteVisitForm.duration} onChange={e => setSiteVisitForm(p => ({ ...p, duration: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                  <option value="30">30 min</option>
+                  <option value="60">1 timme</option>
+                  <option value="90">1,5 timmar</option>
+                  <option value="120">2 timmar</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Anteckning</label>
+                <input type="text" value={siteVisitForm.notes} onChange={e => setSiteVisitForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="T.ex. adress eller vad som ska inspekteras"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              {selectedDeal.customer?.phone_number && (
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={siteVisitForm.sendSms} onChange={e => setSiteVisitForm(p => ({ ...p, sendSms: e.target.checked }))}
+                    className="rounded border-gray-300 text-teal-700 focus:ring-teal-500" />
+                  <span className="text-sm text-gray-600">Skicka SMS till kund</span>
+                </label>
+              )}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <button onClick={bookSiteVisit} disabled={siteVisitSaving || !siteVisitForm.date}
+                className="flex-1 bg-teal-700 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50 hover:bg-teal-800 transition-colors">
+                {siteVisitSaving ? 'Bokar...' : 'Boka platsbesök'}
+              </button>
+              <button onClick={() => setShowSiteVisit(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">
+                Avbryt
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -74,7 +74,7 @@ function NewCampaignPage() {
 
   // Read import flow from URL params + sessionStorage
   useEffect(() => {
-    if (searchParams.get('source') === 'import') {
+    if (searchParams?.get('source') === 'import') {
       try {
         const stored = sessionStorage.getItem('importedCustomerIds')
         if (stored) {

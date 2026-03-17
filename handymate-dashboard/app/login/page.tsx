@@ -37,7 +37,7 @@ function LoginForm() {
         throw new Error(result.error || 'Fel e-post eller lösenord')
       }
 
-      const redirect = searchParams.get('redirect') || '/dashboard'
+      const redirect = searchParams?.get('redirect') || '/dashboard'
       router.push(redirect)
 
     } catch (err: any) {

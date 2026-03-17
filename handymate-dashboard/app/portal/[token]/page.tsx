@@ -142,7 +142,7 @@ type Tab = 'projects' | 'quotes' | 'invoices' | 'messages'
 
 export default function CustomerPortalPage() {
   const params = useParams()
-  const token = params.token as string
+  const token = params?.token as string
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const [portal, setPortal] = useState<PortalData | null>(null)
