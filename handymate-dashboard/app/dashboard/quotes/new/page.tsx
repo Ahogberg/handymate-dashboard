@@ -239,7 +239,9 @@ export default function NewQuotePage() {
 
   // Customer price list info
   const [customerPriceListInfo, setCustomerPriceListInfo] = useState<{
-    name: string; segment?: string; contractType?: string
+    name: string; segment?: string; contractType?: string;
+    hourlyRate?: number; materialMarkup?: number; calloutFee?: number;
+    items?: { name: string; unit: string; price: number; category_slug?: string; is_rot_eligible?: boolean; is_rut_eligible?: boolean }[];
   } | null>(null)
 
   // ROT/RUT personal data
@@ -586,18 +588,39 @@ export default function NewQuotePage() {
     // Pre-fill customer reference from customer name
     if (customer.name && !customerReference) setCustomerReference(customer.name)
 
-    // Fetch customer's price list if assigned
+    // Fetch customer's price list if assigned — auto-apply rates
     const cust = customer as any
     if (cust.price_list_id) {
       fetch(`/api/pricing/price-lists/${cust.price_list_id}`)
         .then(r => r.json())
         .then(data => {
           if (data.priceList) {
+            const pl = data.priceList
             setCustomerPriceListInfo({
-              name: data.priceList.name,
-              segment: data.priceList.segment?.name,
-              contractType: data.priceList.contract_type?.name,
+              name: pl.name,
+              segment: pl.segment?.name,
+              contractType: pl.contract_type?.name,
+              hourlyRate: pl.hourly_rate_normal,
+              materialMarkup: pl.material_markup_pct,
+              calloutFee: pl.callout_fee,
+              items: (pl.items || []).map((it: any) => ({
+                name: it.name,
+                unit: it.unit,
+                price: it.price,
+                category_slug: it.category_slug,
+                is_rot_eligible: it.is_rot_eligible,
+                is_rut_eligible: it.is_rut_eligible,
+              })),
             })
+
+            // Override pricing settings with customer-specific rates
+            if (pl.hourly_rate_normal || pl.callout_fee) {
+              setPricingSettings(prev => ({
+                ...(prev || { hourly_rate: 650, callout_fee: 495, minimum_hours: 1, vat_rate: 25, rot_enabled: true, rot_percent: 30, rut_enabled: false, rut_percent: 50, payment_terms: 30, warranty_years: 2 }),
+                hourly_rate: pl.hourly_rate_normal || prev?.hourly_rate || 650,
+                callout_fee: pl.callout_fee ?? prev?.callout_fee ?? 495,
+              }))
+            }
           }
         })
         .catch(() => { /* non-blocking */ })
@@ -1278,13 +1301,42 @@ export default function NewQuotePage() {
                     ))}
                   </select>
                   {customerPriceListInfo && (
-                    <div className="mt-2 bg-teal-50 border border-teal-200 rounded-lg p-2 flex items-center gap-2 text-xs">
-                      <span className="text-teal-600">📋</span>
-                      <span className="text-teal-800">
-                        Prislista: <strong>{customerPriceListInfo.name}</strong>
-                        {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
-                        {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
-                      </span>
+                    <div className="mt-2 bg-teal-50 border border-teal-200 rounded-lg p-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-teal-600">📋</span>
+                        <span className="text-teal-800">
+                          Prislista: <strong>{customerPriceListInfo.name}</strong>
+                          {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
+                          {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-[11px] text-teal-700">
+                        {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate} kr</span> : null}
+                        {customerPriceListInfo.materialMarkup ? <span>Materialpåslag: {customerPriceListInfo.materialMarkup}%</span> : null}
+                        {customerPriceListInfo.calloutFee ? <span>Utryckningsavgift: {customerPriceListInfo.calloutFee} kr</span> : null}
+                      </div>
+                      {customerPriceListInfo.items && customerPriceListInfo.items.length > 0 && items.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newItems = customerPriceListInfo.items!.map((plItem, idx) => ({
+                              ...createDefaultItem('item', idx),
+                              description: plItem.name,
+                              unit: plItem.unit || 'st',
+                              unit_price: plItem.price,
+                              quantity: 1,
+                              total: plItem.price,
+                              category_slug: plItem.category_slug || undefined,
+                              is_rot_eligible: plItem.is_rot_eligible || false,
+                              is_rut_eligible: plItem.is_rut_eligible || false,
+                            }))
+                            setItems(newItems as any)
+                          }}
+                          className="text-[11px] text-teal-600 hover:text-teal-800 font-medium underline underline-offset-2"
+                        >
+                          Lägg till {customerPriceListInfo.items.length} poster från prislistan
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
