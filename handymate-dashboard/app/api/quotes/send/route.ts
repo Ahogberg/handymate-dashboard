@@ -41,11 +41,12 @@ async function sendSMS(to: string, message: string, from: string): Promise<boole
  * Skicka email via Resend
  */
 async function sendEmail(
-  to: string,
+  to: string | string[],
   subject: string,
   htmlContent: string,
   fromName: string,
-  replyTo?: string
+  replyTo?: string,
+  bcc?: string[]
 ): Promise<boolean> {
   if (!RESEND_API_KEY) {
     console.log('Resend API key not configured, skipping email')
@@ -53,19 +54,25 @@ async function sendEmail(
   }
 
   try {
+    const toList = Array.isArray(to) ? to : [to]
+    const payload: Record<string, any> = {
+      from: `${fromName} <offert@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
+      to: toList,
+      subject: subject,
+      html: htmlContent,
+      reply_to: replyTo,
+    }
+    if (bcc && bcc.length > 0) {
+      payload.bcc = bcc
+    }
+
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: `${fromName} <offert@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
-        to: [to],
-        subject: subject,
-        html: htmlContent,
-        reply_to: replyTo,
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!response.ok) {
@@ -205,7 +212,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { quoteId, method } = await request.json()
+    const { quoteId, method, extraEmails, bccEmails } = await request.json()
 
     if (!quoteId) {
       return NextResponse.json({ error: 'Missing quoteId' }, { status: 400 })
@@ -310,12 +317,14 @@ Frågor? Ring ${business.phone_number}`
         const emailSubject = `Offert från ${business.business_name}: ${quote.title || 'Offert'}`
         const emailHTML = generateEmailHTML(quote, business, signUrl, trackingPixelUrl)
 
+        const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
         emailSent = await sendEmail(
-          quote.customer.email,
+          allRecipients,
           emailSubject,
           emailHTML,
           business.business_name,
-          business.contact_email || undefined
+          business.contact_email || undefined,
+          bccEmails?.length > 0 ? bccEmails : undefined
         )
 
         if (emailSent) {

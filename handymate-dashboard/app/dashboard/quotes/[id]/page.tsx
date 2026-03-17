@@ -127,6 +127,7 @@ interface Quote {
   version_number?: number
   parent_quote_id?: string
   version_label?: string
+  sign_token?: string
 }
 
 export default function QuoteDetailPage() {
@@ -145,6 +146,8 @@ export default function QuoteDetailPage() {
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
   const [generatingSignLink, setGeneratingSignLink] = useState(false)
+  const [extraEmails, setExtraEmails] = useState('')
+  const [bccEmails, setBccEmails] = useState('')
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
@@ -248,7 +251,9 @@ export default function QuoteDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           quoteId: quote.quote_id,
-          method: sendMethod
+          method: sendMethod,
+          extraEmails: extraEmails.split(',').map(e => e.trim()).filter(Boolean),
+          bccEmails: bccEmails.split(',').map(e => e.trim()).filter(Boolean),
         })
       })
 
@@ -469,9 +474,9 @@ export default function QuoteDetailPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-teal-600/20 text-teal-500 border-teal-500/30'
-      case 'opened': return 'bg-amber-500/20 text-amber-400 border-amber-500/30'
-      case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+      case 'sent': return 'bg-blue-100 text-blue-600 border-blue-300'
+      case 'opened': return 'bg-amber-100 text-amber-600 border-amber-300'
+      case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-300'
       case 'declined': return 'bg-red-100 text-red-600 border-red-500/30'
       case 'expired': return 'bg-gray-100 text-gray-400 border-gray-300'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
@@ -712,6 +717,17 @@ export default function QuoteDetailPage() {
               <Send className="w-4 h-4" />
               Skicka offert
             </button>
+          )}
+          {quote.sign_token && (
+            <a
+              href={`/quote/${quote.sign_token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            >
+              <Eye className="w-4 h-4" />
+              Förhandsgranska
+            </a>
           )}
           {['draft', 'sent', 'opened'].includes(quote.status) && (
             <button
@@ -1126,7 +1142,7 @@ export default function QuoteDetailPage() {
                 </div>
                 {quote.sent_at && (
                   <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-teal-600 rounded-full"></div>
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                     <span className="text-gray-500">Skickad {formatDate(quote.sent_at)}</span>
                   </div>
                 )}
@@ -1223,6 +1239,45 @@ export default function QuoteDetailPage() {
                 </button>
               )}
             </div>
+
+            {/* Extra mottagare */}
+            {(sendMethod === 'email' || sendMethod === 'both') && (
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Extra mottagare (kommaseparerade)</label>
+                  <input
+                    type="text"
+                    value={extraEmails}
+                    onChange={e => setExtraEmails(e.target.value)}
+                    placeholder="anna@firma.se, erik@firma.se"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Hemlig kopia (BCC)</label>
+                  <input
+                    type="text"
+                    value={bccEmails}
+                    onChange={e => setBccEmails(e.target.value)}
+                    placeholder="chef@firma.se"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Förhandsgranskning */}
+            {quote.sign_token && (
+              <a
+                href={`/quote/${quote.sign_token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 mb-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-100"
+              >
+                <Eye className="w-4 h-4" />
+                Förhandsgranska som kunden ser den
+              </a>
+            )}
 
             <div className="flex gap-3">
               <button
