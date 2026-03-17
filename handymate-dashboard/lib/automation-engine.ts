@@ -855,8 +855,8 @@ async function queryThresholdEntities(
       if (field === 'days_since_sent') {
         const cutoffDate = new Date(now.getTime() - value * 24 * 60 * 60 * 1000)
         const { data } = await supabase
-          .from('quote')
-          .select('quote_id, customer_id, total_amount, sent_at, status')
+          .from('quotes')
+          .select('quote_id, customer_id, total, sent_at, status')
           .eq('business_id', businessId)
           .eq('status', 'sent')
           .lte('sent_at', cutoffDate.toISOString())
@@ -864,7 +864,7 @@ async function queryThresholdEntities(
         return (data || []).map((q: Record<string, unknown>) => ({
           id: q.quote_id,
           customer_id: q.customer_id,
-          total_amount: q.total_amount,
+          total: q.total,
           days: Math.floor((now.getTime() - new Date(q.sent_at as string).getTime()) / (24 * 60 * 60 * 1000)),
         }))
       }
