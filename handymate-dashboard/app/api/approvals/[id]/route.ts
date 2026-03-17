@@ -261,6 +261,35 @@ async function executeApprovalPayload(
         return { action: 'autopilot_package', results }
       }
 
+      case 'time_attestation': {
+        const supabaseTime = (await import('@/lib/supabase')).getServerSupabase()
+        const plTime = payload as any
+        if (!plTime.checkin_id) return { action: 'time_attestation', skipped: 'no checkin_id' }
+
+        // Approve the checkin via the approve API logic
+        const minutes = plTime.duration_minutes || 0
+        await supabaseTime.from('time_checkins').update({
+          status: 'approved',
+          approved_by: 'via godkännanden',
+          approved_at: new Date().toISOString(),
+          duration_minutes: minutes,
+        }).eq('id', plTime.checkin_id)
+
+        // Create time_entry
+        const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
+        await supabaseTime.from('time_entry').insert({
+          time_entry_id: entryId,
+          business_id: businessId,
+          project_id: plTime.project_id || null,
+          description: `Incheckning ${plTime.checked_in_at ? new Date(plTime.checked_in_at).toLocaleDateString('sv-SE') : ''}${plTime.project_name ? ' · ' + plTime.project_name : ''}`,
+          duration_minutes: minutes,
+          work_date: plTime.checked_in_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+          is_billable: true,
+        })
+
+        return { action: 'time_attestation', time_entry_id: entryId, minutes }
+      }
+
       case 'seasonal_campaign': {
         const supabase = (await import('@/lib/supabase')).getServerSupabase()
         const pl = payload as any

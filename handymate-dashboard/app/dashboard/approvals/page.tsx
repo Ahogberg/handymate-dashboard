@@ -59,7 +59,9 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
   quote_nudge: { label: 'Nudge', icon: MessageSquare, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
+  low_stock_alert: { label: 'Lager', icon: Package, bgColor: 'bg-red-50', textColor: 'text-red-600' },
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
+  time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -539,6 +541,40 @@ export default function ApprovalsPage() {
                             )}
                           </div>
                         )}
+                        {/* Time attestation details */}
+                        {approval.approval_type === 'time_attestation' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          return (
+                            <div className="mt-2 bg-sky-50 rounded-lg p-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center text-xs font-semibold text-sky-700">
+                                  {(pl.user_name || '??').slice(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">{pl.user_name}</p>
+                                  <p className="text-xs text-gray-400">{pl.project_name || 'Inget projekt'}</p>
+                                </div>
+                                {pl.lat_in && (
+                                  <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">GPS</span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-3 gap-2 text-xs">
+                                <div>
+                                  <p className="text-gray-400">In</p>
+                                  <p className="font-medium text-gray-700">{pl.checked_in_at ? new Date(pl.checked_in_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-400">Ut</p>
+                                  <p className="font-medium text-gray-700">{pl.checked_out_at ? new Date(pl.checked_out_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' }) : '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-gray-400">Tid</p>
+                                  <p className="font-medium text-gray-700">{pl.duration_minutes ? `${Math.floor(pl.duration_minutes / 60)}h ${pl.duration_minutes % 60}min` : '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {messagePreview && !isEditing && (
                           <div className="mt-2 px-3 py-2 bg-gray-50 rounded-lg border-l-2 border-gray-200">
                             <p className="text-sm text-gray-600 italic line-clamp-3">"{messagePreview}"</p>
