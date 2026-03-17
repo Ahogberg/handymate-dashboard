@@ -261,6 +261,51 @@ async function executeApprovalPayload(
         return { action: 'autopilot_package', results }
       }
 
+      case 'seasonal_campaign': {
+        const supabase = (await import('@/lib/supabase')).getServerSupabase()
+        const pl = payload as any
+        const smsText = pl.sms_text || ''
+        const customers = pl.customers || []
+
+        if (customers.length === 0 || !smsText) {
+          return { action: 'seasonal_campaign', skipped: 'no customers or sms text' }
+        }
+
+        // Skapa sms_campaign
+        const campaignId = 'camp_' + Math.random().toString(36).substr(2, 9)
+        await supabase.from('sms_campaign').insert({
+          campaign_id: campaignId,
+          business_id: businessId,
+          name: `Säsong: ${pl.theme || pl.month_name}`,
+          message: smsText,
+          status: 'scheduled',
+          scheduled_at: new Date().toISOString(),
+          recipient_count: customers.length,
+          campaign_type: 'broadcast',
+        })
+
+        // Skapa mottagare
+        const recipients = customers.map((c: any) => ({
+          campaign_id: campaignId,
+          customer_id: c.customer_id,
+          phone_number: c.phone_number,
+          status: 'pending',
+        }))
+        await supabase.from('sms_campaign_recipient').insert(recipients)
+
+        // Uppdatera seasonal_campaigns status
+        if (pl.month && pl.year) {
+          await supabase
+            .from('seasonal_campaigns')
+            .update({ status: 'approved' })
+            .eq('business_id', businessId)
+            .eq('year', pl.year)
+            .eq('month', pl.month)
+        }
+
+        return { action: 'seasonal_campaign', campaign_id: campaignId, recipients: customers.length }
+      }
+
       default:
         return { action: approval_type, skipped: 'no handler for this type', payload }
     }

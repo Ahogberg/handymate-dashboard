@@ -59,6 +59,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
   quote_nudge: { label: 'Nudge', icon: MessageSquare, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
+  seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -519,6 +520,24 @@ export default function ApprovalsPage() {
                         )}
                         {approval.description && (
                           <p className="text-sm text-gray-500 mt-1">{approval.description}</p>
+                        )}
+                        {/* Seasonal campaign details */}
+                        {approval.approval_type === 'seasonal_campaign' && approval.payload && (
+                          <div className="mt-2 space-y-2">
+                            {(approval.payload as any).angle && (
+                              <p className="text-xs text-gray-500 italic">"{(approval.payload as any).angle}"</p>
+                            )}
+                            {(approval.payload as any).projectTypes?.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {((approval.payload as any).projectTypes as string[]).map((pt: string) => (
+                                  <span key={pt} className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{pt}</span>
+                                ))}
+                              </div>
+                            )}
+                            {(approval.payload as any).customer_count > 0 && (
+                              <p className="text-xs text-gray-400">{(approval.payload as any).customer_count} kunder kommer att kontaktas</p>
+                            )}
+                          </div>
                         )}
                         {messagePreview && !isEditing && (
                           <div className="mt-2 px-3 py-2 bg-gray-50 rounded-lg border-l-2 border-gray-200">
