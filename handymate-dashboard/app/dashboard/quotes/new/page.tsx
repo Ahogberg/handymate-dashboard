@@ -1260,13 +1260,22 @@ export default function NewQuotePage() {
 
                   {/* Text description */}
                   <div>
-                    <p className="text-[12px] text-[#64748B] mb-2">Beskriv jobbet — AI genererar offertrader</p>
+                    <p className="text-[12px] text-[#64748B] mb-1">Beskriv jobbet — AI genererar offertrader</p>
+                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mb-2">
+                      <p className="text-[11px] text-teal-700 font-medium mb-1">Tips för bästa resultat:</p>
+                      <ul className="text-[11px] text-teal-600 space-y-0.5 list-disc list-inside">
+                        <li>Ange rum/plats (kök, badrum, fasad)</li>
+                        <li>Beskriv yta eller antal (15 m², 3 uttag)</li>
+                        <li>Nämn material om du vet (klinker, gips, LED)</li>
+                        <li>Beskriv vad som ska göras (byta, installera, renovera)</li>
+                      </ul>
+                    </div>
                     <textarea
                       value={aiTextInput}
                       onChange={(e) => setAiTextInput(e.target.value)}
                       placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
                       rows={3}
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-y"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-y"
                     />
                     <button
                       type="button"

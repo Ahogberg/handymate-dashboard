@@ -2843,13 +2843,22 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
             <span className="text-[10px]">SMS</span>
           </button>
         )}
-        <Link href={deal.quote_id
-          ? `/dashboard/quotes/${deal.quote_id}`
-          : `/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`}
-          className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.quote_id ? 'Visa offert' : 'Skapa offert'} onClick={e => e.stopPropagation()}>
-          <FileText className="w-3.5 h-3.5" />
-          <span className="text-[10px]">{deal.quote_id ? 'Offert' : 'Ny offert'}</span>
-        </Link>
+        {deal.customer?.address_line ? (
+          <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deal.customer.address_line)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.customer.address_line} onClick={e => e.stopPropagation()}>
+            <MapPin className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Karta</span>
+          </a>
+        ) : (
+          <Link href={deal.quote_id
+            ? `/dashboard/quotes/${deal.quote_id}`
+            : `/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`}
+            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.quote_id ? 'Visa offert' : 'Skapa offert'} onClick={e => e.stopPropagation()}>
+            <FileText className="w-3.5 h-3.5" />
+            <span className="text-[10px]">{deal.quote_id ? 'Offert' : 'Ny offert'}</span>
+          </Link>
+        )}
         {onOpenTasks && (
           <button onClick={() => onOpenTasks(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-purple-600 transition-colors" title="Uppgifter">
             <CheckSquare className="w-3.5 h-3.5" />

@@ -3322,15 +3322,47 @@ export default function ProjectDetailPage() {
                   )}
                   {woDetail.materials_needed && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Material att ta med</p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-teal-600 uppercase">Material att ta med</p>
+                        {!woDetail.materials_needed.includes('[ ]') && !woDetail.materials_needed.includes('[x]') && (
+                          <button
+                            onClick={async () => {
+                              const lines = woDetail.materials_needed.split('\n').filter((l: string) => l.trim())
+                              const asChecklist = lines.map((l: string) => `[ ] ${l.replace(/^[-•*]\s*/, '')}`).join('\n')
+                              await supabase.from('work_order').update({ materials_needed: asChecklist }).eq('id', woDetail.id)
+                              fetchWorkOrders()
+                            }}
+                            className="text-[10px] text-teal-700 hover:underline"
+                          >
+                            Gör till checklista
+                          </button>
+                        )}
+                      </div>
                       <div className="space-y-1">
                         {woDetail.materials_needed.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => {
                           const isChecked = line.startsWith('[x]')
+                          const isCheckbox = line.startsWith('[x]') || line.startsWith('[ ]')
                           const text = line.replace(/^(\[x\]|\[ \])\s*/, '')
                           return (
                             <div key={i} className="flex items-center gap-2">
-                              {(line.startsWith('[x]') || line.startsWith('[ ]')) ? (
-                                <input type="checkbox" checked={isChecked} readOnly className="w-3.5 h-3.5 rounded border-gray-300 text-teal-600" />
+                              {isCheckbox ? (
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={async () => {
+                                    const lines = woDetail.materials_needed.split('\n')
+                                    const targetLine = lines.filter((l: string) => l.trim())[i]
+                                    const idx = lines.indexOf(targetLine)
+                                    if (idx >= 0) {
+                                      lines[idx] = isChecked
+                                        ? lines[idx].replace('[x]', '[ ]')
+                                        : lines[idx].replace('[ ]', '[x]')
+                                      await supabase.from('work_order').update({ materials_needed: lines.join('\n') }).eq('id', woDetail.id)
+                                      fetchWorkOrders()
+                                    }
+                                  }}
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-teal-600 cursor-pointer"
+                                />
                               ) : (
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
                               )}
