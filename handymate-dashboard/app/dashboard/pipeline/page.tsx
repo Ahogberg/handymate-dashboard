@@ -276,10 +276,10 @@ function getPriorityLabel(p: string): string {
 
 function getPriorityBadgeStyle(p: string): string {
   switch (p) {
-    case 'urgent': return 'bg-red-100 text-red-600 border-red-200'
-    case 'high': return 'bg-orange-100 text-orange-600 border-orange-200'
-    case 'medium': return 'bg-yellow-100 text-yellow-600 border-yellow-200'
-    case 'low': return 'bg-gray-100 text-gray-500 border-gray-200'
+    case 'urgent': return 'bg-gray-200 text-gray-700 border-gray-300'
+    case 'high': return 'bg-gray-150 text-gray-600 border-gray-200'
+    case 'medium': return 'bg-gray-100 text-gray-500 border-gray-200'
+    case 'low': return 'bg-gray-50 text-gray-400 border-gray-100'
     default: return 'bg-gray-100 text-gray-500 border-gray-200'
   }
 }
@@ -1604,9 +1604,25 @@ export default function PipelinePage() {
               <div className="flex-shrink-0 px-6 pt-5 pb-0">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0" style={{ backgroundColor: stage.color + '22', color: stage.color, border: `1px solid ${stage.color}44` }}>{stage.name}</span>) : null })()}
+                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 bg-teal-600 text-white">{stage.name}</span>) : null })()}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>{getPriorityLabel(selectedDeal.priority)}</span>
-                    <div className="flex-1 min-w-0 ml-2">
+                    {/* Flytta till dropdown */}
+                    <div className="relative ml-auto flex-shrink-0">
+                      <select
+                        value={selectedDeal.stage_id}
+                        onChange={e => {
+                          const target = stages.find(s => s.id === e.target.value)
+                          if (target) moveDealAction(selectedDeal.id, target.slug)
+                        }}
+                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:border-teal-300 cursor-pointer focus:outline-none focus:border-teal-400"
+                      >
+                        {stages.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <div className="flex-1 min-w-0">
                       {editingTitle ? (
                         <div className="flex items-center gap-2">
                           <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
@@ -1756,7 +1772,7 @@ export default function PipelinePage() {
                       <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5">
                         <Zap className="w-4 h-4 text-amber-500" />
                         <span className="text-sm text-gray-400">Svarstid:</span>
-                        <span className={`text-sm font-medium ${selectedDeal.response_time_seconds < 60 ? 'text-green-600' : selectedDeal.response_time_seconds < 900 ? 'text-amber-600' : 'text-red-600'}`}>
+                        <span className="text-sm font-medium text-teal-700">
                           {selectedDeal.response_time_seconds < 60
                             ? `${selectedDeal.response_time_seconds}s`
                             : selectedDeal.response_time_seconds < 3600
@@ -1767,18 +1783,7 @@ export default function PipelinePage() {
                       </div>
                     )}
 
-                    {/* Move to stage */}
-                    <div>
-                      <span className="text-sm text-gray-400 block mb-2">Flytta till</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {stages.filter(s => s.id !== selectedDeal.stage_id).map(s => (
-                          <button key={s.id} onClick={() => moveDealAction(selectedDeal.id, s.slug)}
-                            className="px-2.5 py-1 rounded-full text-xs font-medium border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50 transition-colors">
-                            <span className="inline-block w-1.5 h-1.5 rounded-full mr-1" style={{ backgroundColor: s.color }} />{s.name}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                    {/* Stage-byte hanteras nu via dropdown i header */}
 
                     <div className="flex items-center justify-between text-xs text-gray-400">
                       <span>Skapad {timeAgo(selectedDeal.created_at)}</span>
@@ -1888,29 +1893,27 @@ export default function PipelinePage() {
                     )}
 
                     {/* Quick actions */}
-                    <div className="space-y-2">
-                      <h4 className="text-xs text-gray-400 uppercase tracking-wider">Snabbåtgärder</h4>
+                    <div className="space-y-3 pt-2">
                       <div className="flex flex-wrap gap-2">
                         <Link href={selectedDeal.quote_id
                           ? `/dashboard/quotes/${selectedDeal.quote_id}`
                           : selectedDeal.customer_id
                             ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
                             : `/dashboard/quotes/new?deal_id=${selectedDeal.id}`}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-                          <FileText className="w-4 h-4 text-sky-700" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
+                          <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true }) }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-gray-700 hover:border-teal-300 hover:bg-teal-50 transition-colors">
-                          <Calendar className="w-4 h-4 text-teal-600" /> Platsbesök
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
+                          <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
-                        {!getStageForDeal(selectedDeal)?.is_lost && (
-                          <button onClick={() => markDealLost(selectedDeal.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200 text-sm text-red-600 hover:border-red-300 hover:bg-red-50 transition-colors">
-                            <XCircle className="w-4 h-4" /> Markera förlorad
-                          </button>
-                        )}
-                        {/* Visa offert-länk hanteras nu av knappen ovan */}
-                  </div>
-                </div>
+                      </div>
+                      {!getStageForDeal(selectedDeal)?.is_lost && (
+                        <button onClick={() => markDealLost(selectedDeal.id)} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                          Markera förlorad
+                        </button>
+                      )}
+                    </div>
 
                     {/* Activity log */}
                     <div>
@@ -1918,27 +1921,23 @@ export default function PipelinePage() {
                       {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-sky-700 animate-spin" /></div>
                         : detailActivities.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
                         : (
-                          <div className="space-y-2">
+                          <div className="space-y-1">
                             {detailActivities.map(act => (
-                              <div key={act.id} className={`flex items-start gap-3 p-3 rounded-lg border ${act.undone_at ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-gray-50/50 border-gray-200'}`}>
+                              <div key={act.id} className={`flex items-start gap-2.5 py-2 ${act.undone_at ? 'opacity-40' : ''}`}>
                                 <div className="mt-0.5">
-                                  {act.triggered_by === 'ai' ? <Bot className="w-4 h-4 text-sky-700" /> : act.triggered_by === 'system' ? <Sparkles className="w-4 h-4 text-gray-400" /> : <User className="w-4 h-4 text-gray-500" />}
+                                  {act.triggered_by === 'ai' ? <Bot className="w-3.5 h-3.5 text-teal-600" /> : <Clock className="w-3.5 h-3.5 text-gray-300" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm text-gray-900">{act.description || act.activity_type}</span>
-                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${getTriggeredByStyle(act.triggered_by)}`}>{getTriggeredByLabel(act.triggered_by)}</span>
-                                  </div>
+                                  <span className="text-sm text-gray-700">{act.description || act.activity_type}</span>
                                   {act.from_stage_name && act.to_stage_name && (
-                                    <div className="flex items-center gap-1 mt-1 text-xs text-gray-400"><span>{act.from_stage_name}</span><ArrowRight className="w-3 h-3" /><span>{act.to_stage_name}</span></div>
+                                    <span className="text-xs text-gray-400 ml-1">{act.from_stage_name} → {act.to_stage_name}</span>
                                   )}
-                                  {act.ai_reason && <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>}
-                                  <span className="text-xs text-gray-400 mt-1 block">{timeAgo(act.created_at)}</span>
+                                  {act.ai_reason && <p className="text-xs text-gray-400 mt-0.5">{act.ai_reason}</p>}
+                                  <span className="text-xs text-gray-300 ml-2">{timeAgo(act.created_at)}</span>
                                 </div>
                                 {act.triggered_by === 'ai' && !act.undone_at && (
-                                  <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 p-1.5 rounded-md bg-gray-100 border border-gray-200 text-gray-500 hover:text-gray-900 transition-colors" title="Ångra"><Undo2 className="w-3.5 h-3.5" /></button>
+                                  <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 p-1 rounded text-gray-300 hover:text-gray-600 transition-colors" title="Ångra"><Undo2 className="w-3 h-3" /></button>
                                 )}
-                                {act.undone_at && <span className="text-[10px] text-gray-400 italic flex-shrink-0">Ångrad</span>}
                               </div>
                             ))}
                           </div>
