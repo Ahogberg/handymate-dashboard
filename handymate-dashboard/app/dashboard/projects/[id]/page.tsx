@@ -60,6 +60,7 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import Link from 'next/link'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 
@@ -4723,7 +4724,13 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
           {/* Adress */}
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Adress</label>
-            <input type="text" value={address} onChange={e => setAddress(e.target.value)} placeholder="Storgatan 12, 123 45 Stockholm" className={inputCls} />
+            <AddressAutocomplete
+              value={address}
+              onChange={setAddress}
+              onSelect={(r) => setAddress(r.full_address)}
+              placeholder="Sök adress..."
+              className={inputCls}
+            />
           </div>
 
           {/* Tillträde / portkod */}

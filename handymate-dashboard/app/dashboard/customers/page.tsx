@@ -28,6 +28,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface Customer {
   customer_id: string
@@ -560,10 +561,11 @@ export default function CustomersPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Adress</label>
-                <input
-                  type="text"
+                <AddressAutocomplete
                   value={form.address_line}
-                  onChange={(e) => setForm({ ...form, address_line: e.target.value })}
+                  onChange={(val) => setForm({ ...form, address_line: val })}
+                  onSelect={(r) => setForm({ ...form, address_line: r.full_address })}
+                  placeholder="Sök adress..."
                   className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
                 />
               </div>

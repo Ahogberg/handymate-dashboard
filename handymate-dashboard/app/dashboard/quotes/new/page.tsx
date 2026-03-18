@@ -20,6 +20,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import TemplateSelector from '@/components/quotes/TemplateSelector'
 import QuotePreview from '@/components/quotes/QuotePreview'
@@ -1582,11 +1583,11 @@ export default function NewQuotePage() {
                     </div>
                     <div>
                       <label className="block text-[12px] text-[#64748B] mb-1">Arbetsplatsadress</label>
-                      <input
-                        type="text"
+                      <AddressAutocomplete
                         value={projectAddress}
-                        onChange={(e) => setProjectAddress(e.target.value)}
-                        placeholder="Adress"
+                        onChange={setProjectAddress}
+                        onSelect={(r) => setProjectAddress(r.full_address)}
+                        placeholder="Sök adress..."
                         className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
