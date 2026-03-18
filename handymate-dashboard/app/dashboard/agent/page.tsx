@@ -334,12 +334,27 @@ function humanizeResponse(text: string): string {
 // Simple markdown-to-HTML renderer for agent responses
 function renderSimpleMarkdown(text: string): string {
   return text
+    .replace(/^### (.+)$/gm, '<h4 class="font-semibold text-gray-800 mt-3 mb-1 text-sm">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 class="font-semibold text-gray-900 mt-3 mb-1">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3 class="font-bold text-gray-900 mt-3 mb-1">$1</h3>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^[-•] (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, '<ul class="list-disc list-inside space-y-1 my-1">$&</ul>')
+    .replace(/^[-•] (.+)$/gm, '<li class="text-gray-600">$1</li>')
+    .replace(/(<li[^>]*>.*<\/li>\n?)+/g, '<ul class="list-disc list-inside space-y-0.5 my-1 ml-1">$&</ul>')
     .replace(/\n{2,}/g, '</p><p class="mt-2">')
     .replace(/\n/g, '<br/>')
+}
+
+// Strip markdown for plain-text previews
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,3}\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/\*(.*?)\*/g, '$1')
+    .replace(/^[-•] /gm, '· ')
+    .replace(/\n{2,}/g, ' ')
+    .replace(/\n/g, ' ')
+    .trim()
 }
 
 const RULE_TYPE_CONFIG: Record<string, { label: string; icon: typeof FileText; color: string; bg: string }> = {
@@ -458,7 +473,7 @@ function ActivityItem({ run, isSelected, onClick }: {
             </span>
           </div>
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-            {humanizeResponse(run.final_response || '(Inget svar)')}
+            {stripMarkdown(humanizeResponse(run.final_response || '(Inget svar)'))}
           </p>
           <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
             <span className="flex items-center gap-1">
@@ -562,7 +577,7 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
           className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed [&_strong]:font-semibold [&_em]:italic [&_ul]:ml-2 [&_li]:text-gray-600"
           dangerouslySetInnerHTML={{
             __html: run.final_response
-              ? `<p>${renderSimpleMarkdown(run.final_response)}</p>`
+              ? `<p>${renderSimpleMarkdown(humanizeResponse(run.final_response))}</p>`
               : '<p class="text-gray-400 italic">(Inget svar)</p>'
           }}
         />
@@ -2087,7 +2102,7 @@ export default function AgentDashboardPage() {
                           <span className="font-medium">{toAgent?.name || msg.to_agent}</span>
                           <span className="text-gray-400 text-xs ml-2">{timeAgo}</span>
                         </p>
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{msg.content}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{stripMarkdown(humanizeResponse(msg.content))}</p>
                       </div>
                     </div>
                   )
