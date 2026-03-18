@@ -23,6 +23,8 @@ import {
   ClipboardCheck,
   Gift,
   Mail,
+  MessageSquare,
+  Megaphone,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -75,8 +77,14 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
+  {
+    type: 'group', key: 'marketing', label: 'Marknadsföring', icon: Megaphone,
+    children: [
+      { label: 'SMS-kampanjer', href: '/dashboard/campaigns' },
+      { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
+    ],
+  },
   { type: 'link', key: 'agent', label: 'AI-assistent', icon: Bot, href: '/dashboard/agent' },
-  { type: 'link', key: 'leads-outbound', label: 'Utskick', icon: Mail, href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
