@@ -49,6 +49,7 @@ import {
   Code2,
 } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 import {
   AreaChart,
   Area,
@@ -387,6 +388,17 @@ function formatDuration(ms: number): string {
 function formatCost(cost: number): string {
   if (cost < 0.01) return '<0.01 kr'
   return `${cost.toFixed(2)} kr`
+}
+
+function formatTimeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just nu'
+  if (mins < 60) return `${mins} min sedan`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h sedan`
+  const days = Math.floor(hours / 24)
+  return `${days}d sedan`
 }
 
 // ── Stat Card ──────────────────────────────────────────────────────────
@@ -1731,9 +1743,14 @@ export default function AgentDashboardPage() {
   const [chartData, setChartData] = useState<Array<{ day: string; runs: number; tools: number }>>([])
   const [selectedRun, setSelectedRun] = useState<AgentRun | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
+  const [showTeamUpgrade, setShowTeamUpgrade] = useState(false)
+  const plan = (business?.subscription_plan || 'starter') as PlanType
   const [loading, setLoading] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
+  const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
+  const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string }>>([])
+
   const [savingSettings, setSavingSettings] = useState(false)
   const [activeTab, setActiveTab] = useState<'overview' | 'automations' | 'pipeline'>('overview')
   const [googleStatus, setGoogleStatus] = useState<{
@@ -1799,6 +1816,14 @@ export default function AgentDashboardPage() {
     async function loadAll() {
       setLoading(true)
       await Promise.all([fetchRuns(), fetchStats(), fetchChartData(), fetchSettings()])
+      // Fetch team data (non-blocking)
+      fetch('/api/agent/data?type=team', { credentials: 'include' })
+        .then(r => r.json())
+        .then(data => {
+          if (data.memory_counts) setMemoryCounts(data.memory_counts)
+          if (data.messages) setTeamMessages(data.messages)
+        })
+        .catch(() => {})
       // Fetch Google status (non-blocking)
       fetch('/api/google/status')
         .then(r => r.json())
@@ -1883,35 +1908,54 @@ export default function AgentDashboardPage() {
 
       {/* Team Avatars */}
       <div className="flex gap-3 mb-6 overflow-x-auto pb-1">
-        {TEAM.map((agent) => (
+        {TEAM.map((agent) => {
+          const allowed = isAgentAllowed(plan, agent.id)
+          return (
           <button
             key={agent.id}
-            onClick={() => setFilterType(agent.id)}
+            onClick={() => {
+              if (!allowed) {
+                setShowTeamUpgrade(true)
+                return
+              }
+              setFilterType(agent.id)
+            }}
             className={`flex flex-col items-center gap-2 px-4 py-4 rounded-2xl border transition-all min-w-[110px] ${
-              filterType === agent.id
-                ? 'bg-white border-teal-300 shadow-md'
-                : filterType === 'all'
-                  ? 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
-                  : 'bg-gray-50 border-gray-100 opacity-50 hover:opacity-100'
+              !allowed
+                ? 'bg-gray-50 border-gray-100 opacity-50'
+                : filterType === agent.id
+                  ? 'bg-white border-teal-300 shadow-md'
+                  : filterType === 'all'
+                    ? 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                    : 'bg-gray-50 border-gray-100 opacity-50 hover:opacity-100'
             }`}
           >
             <div className="relative">
               {agent.avatar ? (
-                <img src={agent.avatar} alt={agent.name} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm" />
+                <img src={agent.avatar} alt={agent.name} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm ${!allowed ? 'grayscale' : ''}`} />
               ) : (
-                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl`}>
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl ${!allowed ? 'grayscale' : ''}`}>
                   {agent.initials}
                 </div>
               )}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+              {allowed ? (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+              ) : (
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white">🔒</div>
+              )}
             </div>
             <div className="text-center">
               <span className="text-sm font-semibold text-gray-900 block">{agent.name}</span>
               <span className="text-[11px] text-gray-500 block">{agent.role}</span>
-              {agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
+              {allowed && agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
+              {allowed && (memoryCounts[agent.id] || 0) > 0 && (
+                <span className="text-[10px] text-teal-600 block mt-0.5">🧠 {memoryCounts[agent.id]} lärdomar</span>
+              )}
+              {!allowed && <span className="text-[10px] text-amber-600 block mt-0.5">Pro-plan</span>}
             </div>
           </button>
-        ))}
+          )
+        })}
         <button
           onClick={() => setFilterType('all')}
           className={`flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all min-w-[80px] ${
@@ -2018,6 +2062,40 @@ export default function AgentDashboardPage() {
             />
           </div>
 
+          {/* Team Communication */}
+          {teamMessages.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
+              <h3 className="text-sm font-bold text-gray-900 mb-3">Teamkommunikation</h3>
+              <div className="space-y-2">
+                {teamMessages.slice(0, 5).map((msg, i) => {
+                  const fromAgent = TEAM.find(a => a.id === msg.from_agent)
+                  const toAgent = TEAM.find(a => a.id === msg.to_agent)
+                  const timeAgo = formatTimeAgo(msg.created_at)
+                  return (
+                    <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg bg-gray-50">
+                      {fromAgent?.avatar ? (
+                        <img src={fromAgent.avatar} alt={fromAgent.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className={`w-7 h-7 rounded-full ${fromAgent?.color || 'bg-gray-400'} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                          {fromAgent?.initials || '?'}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700">
+                          <span className="font-medium">{fromAgent?.name || msg.from_agent}</span>
+                          <span className="text-gray-400"> → </span>
+                          <span className="font-medium">{toAgent?.name || msg.to_agent}</span>
+                          <span className="text-gray-400 text-xs ml-2">{timeAgo}</span>
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{msg.content}</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Feed + Detail */}
           <div className={`grid gap-5 ${selectedRun ? 'grid-cols-1 lg:grid-cols-[400px_1fr]' : 'grid-cols-1'}`}>
             {/* Activity Feed */}
@@ -2060,6 +2138,30 @@ export default function AgentDashboardPage() {
         <PipelineTab businessId={business.business_id} />
       ) : (
         <AutomationTab businessId={business.business_id} />
+      )}
+
+      {showTeamUpgrade && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowTeamUpgrade(false)}>
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
+            <div className="text-4xl mb-4">⚡</div>
+            <h2 className="text-xl font-semibold mb-2">Uppgradera till Professional</h2>
+            <p className="text-gray-500 mb-6">
+              Karin, Hanna, Daniel och Lars ingår i Professional-planen. Uppgradera för att låsa upp hela backoffice-teamet.
+            </p>
+            <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
+              <div className="font-medium">Professional — 5 995 kr/mån</div>
+              <ul className="text-sm text-gray-500 mt-2 space-y-1">
+                <li>✓ Hela teamet (5 AI-medarbetare)</li>
+                <li>✓ 300 SMS/mån</li>
+                <li>✓ Alla automationer</li>
+                <li>✓ AI-minne</li>
+                <li>✓ AI-offertgenerering</li>
+              </ul>
+            </div>
+            <a href="/dashboard/settings/billing" className="block w-full bg-teal-600 text-white py-3 rounded-lg font-semibold">Uppgradera nu →</a>
+            <button onClick={() => setShowTeamUpgrade(false)} className="mt-3 text-sm text-gray-400">Inte nu</button>
+          </div>
+        </div>
       )}
     </div>
   )

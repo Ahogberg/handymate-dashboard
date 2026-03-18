@@ -67,52 +67,55 @@ const PLANS = [
     name: 'Starter',
     price: 2495,
     features: [
+      '50 SMS/mån (0,89 kr/extra)',
       '100 samtal/mån',
       '1 användare',
+      '3 offertmallar',
+      '3 automationer',
+      'Bara Matte (chefsassistent)',
       'AI-telefonassistent',
       'Offerter & fakturor',
       'Kundhantering (CRM)',
       'Pipeline',
       'Tidrapportering',
-      'Google Calendar-sync',
-      'SMS-bekräftelser',
     ],
-    limits: { sms: 200, calls: 100, ai: 500, storage: 5 },
+    limits: { sms: 50, calls: 100, automations: 3, users: 1, templates: 3 },
   },
   {
     id: 'professional',
     name: 'Professional',
     price: 5995,
     features: [
+      '300 SMS/mån (0,79 kr/extra)',
       '400 samtal/mån',
-      'Upp till 5 användare',
+      'Upp till 10 användare',
+      '10 offertmallar',
+      'Alla automationer + custom',
+      'Hela backoffice-teamet (5 agenter)',
+      'AI-minne (agenten lär sig)',
       'Allt i Starter',
       'Uppföljningssekvenser',
-      'Lead-generering',
-      'AI auto-pilot',
-      'Google Reviews-autopilot',
+      'AI-offertgenerering',
       'Fortnox-integration',
-      'CSV/Excel-export',
-      'Kampanjanalys',
     ],
-    limits: { sms: 600, calls: 400, ai: 2000, storage: 25 },
+    limits: { sms: 300, calls: 400, automations: null, users: 10, templates: 10 },
   },
   {
     id: 'business',
-    name: 'Business',
+    name: 'Enterprise',
     price: 11995,
     features: [
+      '1 000 SMS/mån (0,69 kr/extra)',
       'Obegränsade samtal',
       'Obegränsade användare',
+      'Obegränsade mallar',
       'Allt i Professional',
+      'Leads-addon inkluderat',
       'Anpassad AI-röst',
       'Dedikerad support',
-      'Gantt-vy & projektmallar',
-      'Lönsamhetsuppföljning (full)',
-      'Garanti-tracking',
-      'Lagerhantering',
+      'Egen domän',
     ],
-    limits: { sms: 2000, calls: 999999, ai: 10000, storage: 100 },
+    limits: { sms: 1000, calls: null, automations: null, users: null, templates: null },
   },
 ]
 
@@ -151,6 +154,7 @@ export default function BillingPage() {
   const business = useBusiness()
   const [billing, setBilling] = useState<BillingData | null>(null)
   const [usage, setUsage] = useState<UsageData | null>(null)
+  const [smsUsage, setSmsUsage] = useState<{ sent: number; quota: number; extraSent: number; extraCostSek: number; hardCap: number; percentUsed: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [portalLoading, setPortalLoading] = useState(false)
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
@@ -161,9 +165,10 @@ export default function BillingPage() {
     async function fetchData() {
       setLoading(true)
       try {
-        const [billingRes, usageRes] = await Promise.all([
+        const [billingRes, usageRes, smsRes] = await Promise.all([
           fetch('/api/billing'),
           fetch('/api/billing/usage'),
+          fetch('/api/sms/usage'),
         ])
 
         if (billingRes.ok) {
@@ -173,6 +178,10 @@ export default function BillingPage() {
         if (usageRes.ok) {
           const data = await usageRes.json()
           setUsage(data)
+        }
+        if (smsRes.ok) {
+          const data = await smsRes.json()
+          setSmsUsage(data)
         }
       } catch (err) {
         console.error('Failed to fetch billing data:', err)
@@ -350,30 +359,33 @@ export default function BillingPage() {
                 <UsageBar
                   icon={<MessageSquare className="w-4 h-4" />}
                   label="SMS"
-                  used={usage?.sms?.used ?? 0}
-                  limit={usage?.sms?.limit ?? currentPlan?.limits.sms ?? 200}
-                  unit="anvanda"
+                  used={smsUsage?.sent ?? usage?.sms?.used ?? 0}
+                  limit={smsUsage?.quota ?? currentPlan?.limits.sms ?? 50}
+                  unit="skickade"
+                  extraInfo={smsUsage && smsUsage.extraSent > 0
+                    ? `Extra SMS: ${smsUsage.extraSent} st = ${Math.round(smsUsage.extraCostSek)} kr`
+                    : undefined}
                 />
                 <UsageBar
                   icon={<Phone className="w-4 h-4" />}
-                  label="Samtalstid"
+                  label="Samtal"
                   used={usage?.calls?.used ?? 0}
-                  limit={usage?.calls?.limit ?? currentPlan?.limits.calls ?? 75}
+                  limit={currentPlan?.limits.calls ?? 100}
                   unit="minuter"
                 />
                 <UsageBar
                   icon={<Bot className="w-4 h-4" />}
-                  label="AI-forfragningar"
+                  label="Automationer"
                   used={usage?.ai?.used ?? 0}
-                  limit={usage?.ai?.limit ?? currentPlan?.limits.ai ?? 500}
-                  unit=""
+                  limit={currentPlan?.limits.automations ?? 3}
+                  unit="aktiva"
                 />
                 <UsageBar
                   icon={<HardDrive className="w-4 h-4" />}
-                  label="Lagring"
+                  label="Offertmallar"
                   used={usage?.storage?.used ?? 0}
-                  limit={usage?.storage?.limit ?? currentPlan?.limits.storage ?? 5}
-                  unit="GB"
+                  limit={currentPlan?.limits.templates ?? 3}
+                  unit="skapade"
                 />
               </div>
             </div>
@@ -513,16 +525,36 @@ function UsageBar({
   used,
   limit,
   unit,
+  extraInfo,
 }: {
   icon: React.ReactNode
   label: string
   used: number
-  limit: number
+  limit: number | null
   unit: string
+  extraInfo?: string
 }) {
+  if (limit === null || limit === undefined) {
+    return (
+      <div className="p-4 bg-gray-50 rounded-xl">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            {icon}
+            {label}
+          </div>
+          <span className="text-xs text-emerald-600 font-medium">Obegränsat</span>
+        </div>
+        <div className="w-full h-2 rounded-full bg-emerald-100">
+          <div className="h-2 rounded-full bg-emerald-400 w-0" />
+        </div>
+      </div>
+    )
+  }
+
   const percentage = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0
   const barColor = getProgressColor(percentage)
   const bgColor = getProgressBgColor(percentage)
+  const isAtLimit = percentage >= 100
 
   return (
     <div className="p-4 bg-gray-50 rounded-xl">
@@ -531,9 +563,16 @@ function UsageBar({
           {icon}
           {label}
         </div>
-        <span className="text-xs text-gray-500">
-          {used} / {limit} {unit}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500">
+            {used} / {limit} {unit}
+          </span>
+          {isAtLimit && (
+            <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full font-medium">
+              Full
+            </span>
+          )}
+        </div>
       </div>
       <div className={`w-full h-2 rounded-full ${bgColor}`}>
         <div
@@ -541,9 +580,26 @@ function UsageBar({
           style={{ width: `${percentage}%` }}
         />
       </div>
-      <div className="flex justify-end mt-1">
-        <span className="text-xs text-gray-400">{percentage}%</span>
+      <div className="flex items-center justify-between mt-1">
+        {extraInfo ? (
+          <span className="text-xs text-amber-600">{extraInfo}</span>
+        ) : (
+          <span />
+        )}
+        <span className={`text-xs ${percentage >= 80 ? 'text-amber-600 font-medium' : 'text-gray-400'}`}>
+          {percentage}%
+          {percentage >= 80 && percentage < 100 && ' ⚠️'}
+          {percentage >= 100 && ' 🔴'}
+        </span>
       </div>
+      {isAtLimit && (
+        <Link
+          href="/dashboard/settings/billing"
+          className="mt-2 text-xs text-teal-600 hover:underline flex items-center gap-1"
+        >
+          Uppgradera för mer <ChevronRight className="w-3 h-3" />
+        </Link>
+      )}
     </div>
   )
 }

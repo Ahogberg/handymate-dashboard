@@ -7,6 +7,58 @@ export interface FeatureGate {
   limit?: Record<PlanType, number | null>
 }
 
+// ---------------------------------------------------------------------------
+// SMS-kvoter & kostnader per plan
+// ---------------------------------------------------------------------------
+
+export interface SmsQuota {
+  monthlyQuota: number
+  extraCostSek: number
+  hardCap: number
+}
+
+export const SMS_QUOTAS: Record<PlanType, SmsQuota> = {
+  starter:      { monthlyQuota: 50,   extraCostSek: 0.89, hardCap: 200 },
+  professional: { monthlyQuota: 300,  extraCostSek: 0.79, hardCap: 1000 },
+  business:     { monthlyQuota: 1000, extraCostSek: 0.69, hardCap: 5000 },
+}
+
+export function getSmsQuota(plan: PlanType): SmsQuota {
+  return SMS_QUOTAS[plan] ?? SMS_QUOTAS.starter
+}
+
+// ---------------------------------------------------------------------------
+// Automations-gränser per plan
+// ---------------------------------------------------------------------------
+
+export const AUTOMATION_LIMITS: Record<PlanType, number | null> = {
+  starter: 3,
+  professional: null, // alla 9 + custom
+  business: null,     // obegränsat
+}
+
+export function getAutomationLimit(plan: PlanType): number | null {
+  return AUTOMATION_LIMITS[plan] ?? 3
+}
+
+// ---------------------------------------------------------------------------
+// Team-agenter per plan (Bas = bara Matte)
+// ---------------------------------------------------------------------------
+
+export const TEAM_AGENTS_ALLOWED: Record<PlanType, string[]> = {
+  starter:      ['matte'],
+  professional: ['matte', 'karin', 'hanna', 'daniel', 'lars'],
+  business:     ['matte', 'karin', 'hanna', 'daniel', 'lars'],
+}
+
+export function isAgentAllowed(plan: PlanType, agentId: string): boolean {
+  return TEAM_AGENTS_ALLOWED[plan]?.includes(agentId) ?? false
+}
+
+// ---------------------------------------------------------------------------
+// Feature gates
+// ---------------------------------------------------------------------------
+
 export const FEATURE_GATES: Record<string, FeatureGate> = {
   // === ALLA PLANER ===
   ai_phone_assistant: {
@@ -34,11 +86,6 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Tidrapportering',
     plans: ['starter', 'professional', 'business'],
   },
-  time_tracking_advanced: {
-    key: 'time_tracking_advanced',
-    name: 'GPS, reseersättning, löneexport',
-    plans: ['professional', 'business'],
-  },
   calendar_sync: {
     key: 'calendar_sync',
     name: 'Google Calendar-sync',
@@ -48,14 +95,63 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     key: 'sms_basic',
     name: 'SMS-bekräftelser',
     plans: ['starter', 'professional', 'business'],
+    limit: { starter: 50, professional: 300, business: 1000 },
   },
   documents: {
     key: 'documents',
     name: 'Dokument',
     plans: ['starter', 'professional', 'business'],
   },
+  storefront_basic: {
+    key: 'storefront_basic',
+    name: 'Hemsida (grundversion)',
+    plans: ['starter', 'professional', 'business'],
+  },
+
+  // === BEGRÄNSADE PER PLAN ===
+  quote_templates: {
+    key: 'quote_templates',
+    name: 'Offertmallar',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 3, professional: 10, business: null },
+  },
+  ai_photo_quote: {
+    key: 'ai_photo_quote',
+    name: 'AI prisberäkning foto/ritning',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 3, professional: 30, business: null },
+  },
+  team_members: {
+    key: 'team_members',
+    name: 'Teammedlemmar',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 1, professional: 10, business: null },
+  },
+  users: {
+    key: 'users',
+    name: 'Användare',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 1, professional: 10, business: null },
+  },
+  call_volume: {
+    key: 'call_volume',
+    name: 'Samtal per månad',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 100, professional: 400, business: null },
+  },
+  automations: {
+    key: 'automations',
+    name: 'Automationer',
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 3, professional: null, business: null },
+  },
 
   // === PROFESSIONAL + BUSINESS ===
+  time_tracking_advanced: {
+    key: 'time_tracking_advanced',
+    name: 'GPS, reseersättning, löneexport',
+    plans: ['professional', 'business'],
+  },
   nurture_sequences: {
     key: 'nurture_sequences',
     name: 'Uppföljningssekvenser',
@@ -136,11 +232,6 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Hemsida-widget',
     plans: ['professional', 'business'],
   },
-  storefront_basic: {
-    key: 'storefront_basic',
-    name: 'Hemsida (grundversion)',
-    plans: ['starter', 'professional', 'business'],
-  },
   storefront_chatbot: {
     key: 'storefront_chatbot',
     name: 'AI-chatbot på hemsidan',
@@ -161,11 +252,6 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Anpassning (färg, galleri)',
     plans: ['professional', 'business'],
   },
-  storefront_custom_domain: {
-    key: 'storefront_custom_domain',
-    name: 'Egen domän',
-    plans: ['business'],
-  },
   gmail_integration: {
     key: 'gmail_integration',
     name: 'Gmail-integration',
@@ -175,12 +261,6 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     key: 'ai_project_manager',
     name: 'AI Projektledare',
     plans: ['professional', 'business'],
-  },
-  quote_templates: {
-    key: 'quote_templates',
-    name: 'Offertmallar',
-    plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 10, business: null },
   },
   ai_quote_generator: {
     key: 'ai_quote_generator',
@@ -192,28 +272,23 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Deal-to-Delivery Autopilot',
     plans: ['professional', 'business'],
   },
-
-  // === BEGRÄNSADE PER PLAN ===
-  ai_photo_quote: {
-    key: 'ai_photo_quote',
-    name: 'AI prisberäkning foto/ritning',
-    plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 30, business: null },
+  agent_memory: {
+    key: 'agent_memory',
+    name: 'AI-minne (agenten lär sig)',
+    plans: ['professional', 'business'],
   },
-  team_members: {
-    key: 'team_members',
-    name: 'Teammedlemmar',
-    plans: ['starter', 'professional', 'business'],
-    limit: { starter: 1, professional: 5, business: null },
-  },
-  call_volume: {
-    key: 'call_volume',
-    name: 'Samtal per månad',
-    plans: ['starter', 'professional', 'business'],
-    limit: { starter: 100, professional: 400, business: null },
+  agent_team: {
+    key: 'agent_team',
+    name: 'Hela backoffice-teamet',
+    plans: ['professional', 'business'],
   },
 
   // === BUSINESS ONLY ===
+  storefront_custom_domain: {
+    key: 'storefront_custom_domain',
+    name: 'Egen domän',
+    plans: ['business'],
+  },
   custom_ai_voice: {
     key: 'custom_ai_voice',
     name: 'Anpassad AI-röst',
@@ -224,12 +299,16 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Dedikerad support',
     plans: ['business'],
   },
-  unlimited_users: {
-    key: 'unlimited_users',
-    name: 'Obegränsade användare',
+  leads_addon_included: {
+    key: 'leads_addon_included',
+    name: 'Leads-addon inkluderat',
     plans: ['business'],
   },
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 export function hasFeature(plan: PlanType, featureKey: string): boolean {
   const gate = FEATURE_GATES[featureKey]
@@ -268,7 +347,7 @@ export function getPlanLabel(plan: PlanType): string {
   const labels: Record<PlanType, string> = {
     starter: 'Starter',
     professional: 'Professional',
-    business: 'Business',
+    business: 'Enterprise',
   }
   return labels[plan]
 }

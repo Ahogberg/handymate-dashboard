@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness, checkSmsRateLimit, getBusinessPlanFromConfig } from '@/lib/auth'
+import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
+import { getServerSupabase } from '@/lib/supabase'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -12,10 +14,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Rate limit check
+    // Rate limit check (per-minute burst protection)
     const rateLimit = checkSmsRateLimit(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
+    }
+
+    // Hämta plan för kvot-check
+    const supabase = getServerSupabase()
+    const { data: bizConfig } = await supabase
+      .from('business_config')
+      .select('subscription_plan')
+      .eq('business_id', business.business_id)
+      .single()
+
+    const plan = getBusinessPlanFromConfig(bizConfig || {})
+
+    // SMS-kvot check
+    const smsCheck = await checkSmsAllowance(business.business_id, plan)
+    if (!smsCheck.allowed) {
+      return NextResponse.json({
+        error: smsCheck.error,
+        quota_exceeded: true,
+      }, { status: 429 })
     }
 
     const { to, message } = await request.json()
@@ -43,11 +64,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.message || 'SMS failed' }, { status: 500 })
     }
 
-    // V4 Automation Engine: fire 'contacted' event (outgoing SMS = kontaktad)
+    // Räkna upp SMS-usage
     try {
-      const { getServerSupabase } = await import('@/lib/supabase')
+      await trackSmsSent(business.business_id, plan)
+    } catch (trackErr) {
+      console.error('SMS tracking error (non-blocking):', trackErr)
+    }
+
+    // V4 Automation Engine: fire 'contacted' event
+    try {
       const { fireEvent } = await import('@/lib/automation-engine')
-      const supabase = getServerSupabase()
       await fireEvent(supabase, 'contacted', business.business_id, {
         phone: to,
         method: 'sms',
@@ -56,7 +82,13 @@ export async function POST(request: NextRequest) {
       console.error('fireEvent contacted error (non-blocking):', eventErr)
     }
 
-    return NextResponse.json({ success: true, id: result.id })
+    return NextResponse.json({
+      success: true,
+      id: result.id,
+      is_extra: smsCheck.isExtra,
+      extra_cost: smsCheck.isExtra ? smsCheck.extraCostSek : undefined,
+      warning_percent: smsCheck.warningPercent,
+    })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
