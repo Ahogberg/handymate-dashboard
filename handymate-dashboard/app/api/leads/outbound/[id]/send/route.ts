@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { sendLetter } from '@/lib/leads/api/postnord'
+import { sendLetter } from '@/lib/leads/api/brevutskick'
 
-/** POST — Skicka godkänt brev via PostNord */
+/** POST — Skicka godkänt brev via DR.se */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -52,7 +52,7 @@ export async function POST(
   const sent = usage?.letters_sent || 0
   const isOverQuota = sent >= quota
 
-  // Skicka via PostNord
+  // Skicka via DR.se
   const result = await sendLetter(
     lead.letter_content,
     lead.property_address,
@@ -69,13 +69,13 @@ export async function POST(
     .update({
       status: 'sent',
       sent_at: new Date().toISOString(),
-      cost_sek: result.costSek,
+      cost_sek: result.costCustomer,
       postnord_tracking_id: result.trackingId,
     })
     .eq('id', id)
 
-  // Uppdatera kvota
-  const extraCost = isOverQuota ? 10 : 0
+  // Uppdatera kvota — extra brev kostar 15 kr/st
+  const extraCost = isOverQuota ? result.costCustomer : 0
   await supabase
     .from('leads_monthly_usage')
     .upsert({
@@ -90,7 +90,7 @@ export async function POST(
   return NextResponse.json({
     success: true,
     trackingId: result.trackingId,
-    cost: result.costSek,
+    cost: result.costCustomer,
     overQuota: isOverQuota,
   })
 }

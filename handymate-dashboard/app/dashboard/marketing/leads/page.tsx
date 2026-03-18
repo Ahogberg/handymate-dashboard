@@ -12,7 +12,7 @@ import UpgradePrompt from '@/components/UpgradePrompt'
 import Link from 'next/link'
 import type { LeadOutbound, LeadMonthlyUsage } from '@/lib/leads/types'
 
-type Tab = 'outbound' | 'stats'
+type Tab = 'outbound' | 'neighbours' | 'stats'
 type StatusFilter = 'all' | 'draft' | 'approved' | 'sent'
 
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -166,7 +166,7 @@ export default function LeadsOutboundPage() {
           <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 text-left space-y-2">
             <div className="flex justify-between text-sm"><span className="text-gray-600">Starter</span><span className="font-semibold">499 kr/mån — 20 brev</span></div>
             <div className="flex justify-between text-sm"><span className="text-gray-600">Pro</span><span className="font-semibold">999 kr/mån — 50 brev</span></div>
-            <p className="text-xs text-gray-400">Extra brev utöver kvoten: 10 kr/st</p>
+            <p className="text-xs text-gray-400">Extra brev utöver kvoten: 15 kr/st</p>
           </div>
           <button className="px-6 py-3 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition-colors">
             Aktivera add-on
@@ -406,7 +406,7 @@ export default function LeadsOutboundPage() {
                     className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {sendingId === selectedLead.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    Skicka brev (8 kr)
+                    Skicka brev (15 kr)
                   </button>
                 )}
                 {selectedLead.postnord_tracking_id && (
