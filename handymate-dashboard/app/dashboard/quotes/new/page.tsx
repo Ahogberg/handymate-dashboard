@@ -297,6 +297,8 @@ export default function NewQuotePage() {
 
   // Attachments (documents linked to quote)
   const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
+  const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
+  const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
   const [uploadingFile, setUploadingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -572,6 +574,23 @@ export default function NewQuotePage() {
     }
     setUploadingFile(false)
   }
+
+  // Supplier price comparison (debounced)
+  useEffect(() => {
+    const materialItems = items.filter(i => i.item_type === 'item' && i.unit_price > 0)
+    if (materialItems.length === 0) { setPriceWarnings([]); setPriceAlts([]); return }
+    const timer = setTimeout(() => {
+      fetch('/api/suppliers/compare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: materialItems.map(i => ({ description: i.description, unit_price: i.unit_price, unit: i.unit })) }),
+      }).then(r => r.json()).then(data => {
+        setPriceWarnings(data.warnings || [])
+        setPriceAlts(data.alternatives || [])
+      }).catch(() => {})
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [items])
 
   // Auto-fill personnummer / fastighetsbeteckning + price list when customer selected
   useEffect(() => {
@@ -1828,6 +1847,26 @@ export default function NewQuotePage() {
 
             {/* Summary */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
+              {/* Prisvarningar */}
+              {priceWarnings.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 space-y-1.5">
+                  {priceWarnings.map((w, i) => (
+                    <p key={i} className="text-xs text-amber-800">
+                      ⚠️ {w.product_name} är {w.difference_pct}% dyrare än normalpris ({w.quote_price} kr vs {w.normal_price} kr — {w.supplier_name})
+                    </p>
+                  ))}
+                </div>
+              )}
+              {priceAlts.length > 0 && (
+                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 mb-4 space-y-1.5">
+                  {priceAlts.map((a, i) => (
+                    <p key={i} className="text-xs text-teal-800">
+                      💡 {a.cheaper_supplier} har {a.product_name} {a.savings_pct}% billigare ({a.cheaper_price} kr)
+                    </p>
+                  ))}
+                </div>
+              )}
+
               <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering <span className="normal-case">(exkl. moms)</span></div>
 
               <div className="space-y-1">
