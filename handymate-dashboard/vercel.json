@@ -2,64 +2,8 @@
   "framework": "nextjs",
   "crons": [
     {
-      "path": "/api/cron/nurture",
-      "schedule": "0 11 * * *"
-    },
-    {
-      "path": "/api/cron/check-overdue",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/communication-check",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/sync-calendars",
-      "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/invoices/remind-cron",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/quote-follow-up",
-      "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/cron/project-health",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/sync-phone-webhooks",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/gmail-lead-import",
-      "schedule": "0 7 * * *"
-    },
-    {
-      "path": "/api/cron/send-campaigns",
-      "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/cron/expire-approvals",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/evaluate-thresholds",
-      "schedule": "0 4 * * *"
-    },
-    {
       "path": "/api/cron/agent-context",
       "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/gmail-poll",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "path": "/api/cron/seasonality",
-      "schedule": "0 3 * * 1"
     }
   ]
 }
