@@ -238,6 +238,9 @@ export default function LeadsOutboundPage() {
           <button onClick={() => setTab('outbound')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'outbound' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
             <Mail className="w-4 h-4 inline mr-1.5 -mt-0.5" />Utskick
           </button>
+          <button onClick={() => setTab('neighbours')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'neighbours' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+            <Home className="w-4 h-4 inline mr-1.5 -mt-0.5" />Grannkampanjer
+          </button>
           <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
             <BarChart3 className="w-4 h-4 inline mr-1.5 -mt-0.5" />Statistik
           </button>
@@ -325,6 +328,10 @@ export default function LeadsOutboundPage() {
               </div>
             )}
           </>
+        )}
+
+        {tab === 'neighbours' && (
+          <NeighbourCampaignsTab />
         )}
 
         {tab === 'stats' && (
@@ -415,6 +422,113 @@ export default function LeadsOutboundPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Neighbour Campaigns Tab ─────────────────────────────────
+
+function NeighbourCampaignsTab() {
+  const [campaigns, setCampaigns] = useState<any[]>([])
+  const [stats, setStats] = useState({ totalSent: 0, totalConverted: 0, totalSpent: 0, totalRevenue: 0 })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/leads/neighbours')
+      .then(r => r.json())
+      .then(data => {
+        setCampaigns(data.campaigns || [])
+        setStats(data.stats || { totalSent: 0, totalConverted: 0, totalSpent: 0, totalRevenue: 0 })
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function markConverted(id: string, count: number) {
+    await fetch(`/api/leads/neighbours/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ converted_count: count }),
+    })
+    // Refresh
+    const res = await fetch('/api/leads/neighbours')
+    const data = await res.json()
+    setCampaigns(data.campaigns || [])
+    setStats(data.stats || stats)
+  }
+
+  if (loading) return <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 text-teal-700 animate-spin" /></div>
+
+  return (
+    <div className="space-y-4">
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">Skickade brev</p>
+          <p className="text-xl font-bold text-gray-900">{stats.totalSent}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">Konverterade</p>
+          <p className="text-xl font-bold text-teal-700">{stats.totalConverted}</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">Spenderat</p>
+          <p className="text-xl font-bold text-gray-900">{stats.totalSpent.toLocaleString('sv-SE')} kr</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <p className="text-xs text-gray-400">ROI</p>
+          <p className="text-xl font-bold text-emerald-600">
+            {stats.totalSpent > 0 ? `${Math.round((stats.totalRevenue / stats.totalSpent) * 100)}%` : '—'}
+          </p>
+          {stats.totalRevenue > 0 && (
+            <p className="text-xs text-gray-400 mt-0.5">{stats.totalRevenue.toLocaleString('sv-SE')} kr intäkter</p>
+          )}
+        </div>
+      </div>
+
+      {/* Campaign list */}
+      {campaigns.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <Home className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <p className="text-gray-500">Inga grannkampanjer ännu</p>
+          <p className="text-sm text-gray-400 mt-1">Kampanjer skapas automatiskt när jobb avslutas</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {campaigns.map((c: any) => (
+            <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900">{c.job_type || 'Jobb'} · {c.source_address}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      c.status === 'sent' ? 'bg-teal-100 text-teal-700' :
+                      c.status === 'approved' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>
+                      {c.status === 'sent' ? 'Skickad' : c.status === 'approved' ? 'Godkänd' : 'Utkast'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-gray-400">
+                    <span>{c.neighbour_count} brev</span>
+                    <span>{Number(c.cost_sek || 0)} kr</span>
+                    {c.sent_at && <span>{new Date(c.sent_at).toLocaleDateString('sv-SE')}</span>}
+                    {c.converted_count > 0 && <span className="text-teal-600 font-medium">{c.converted_count} jobb</span>}
+                  </div>
+                </div>
+                {c.status === 'sent' && (
+                  <button
+                    onClick={() => markConverted(c.id, (c.converted_count || 0) + 1)}
+                    className="text-xs text-teal-700 hover:underline shrink-0"
+                  >
+                    + Blev jobb
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

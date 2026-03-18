@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
 
   // Statistik
   const campaigns = data || []
-  const totalSent = campaigns.filter(c => c.status === 'sent').reduce((s, c) => s + (c.neighbour_count || 0), 0)
-  const totalConverted = campaigns.reduce((s, c) => s + (c.converted_count || 0), 0)
-  const totalSpent = campaigns.reduce((s, c) => s + Number(c.cost_sek || 0), 0)
-  const totalRevenue = campaigns.reduce((s, c) => s + Number(c.revenue_generated || 0), 0)
+  const totalSent = campaigns.filter((c: any) => c.status === 'sent').reduce((s: number, c: any) => s + (c.neighbour_count || 0), 0)
+  const totalConverted = campaigns.reduce((s: number, c: any) => s + (c.converted_count || 0), 0)
+  const totalSpent = campaigns.reduce((s: number, c: any) => s + Number(c.cost_sek || 0), 0)
+  const totalRevenue = campaigns.reduce((s: number, c: any) => s + Number(c.revenue_generated || 0), 0)
 
   return NextResponse.json({
     campaigns,
