@@ -116,7 +116,7 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
         <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 15px;">Redo att godkänna offerten?</p>
         <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">Klicka på knappen nedan för att granska och signera digitalt.</p>
         <a href="${signUrl}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
-          Signera offerten
+          Visa och signera offert →
         </a>
         <p style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">Eller kopiera länken: ${signUrl}</p>
       </div>`
@@ -140,6 +140,7 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
   <div style="max-width: 600px; margin: 0 auto;">
     <!-- Header -->
     <div style="background: #0d9488; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
+      ${business.logo_url ? `<img src="${business.logo_url}" alt="${business.business_name}" style="max-height: 48px; margin-bottom: 12px;" />` : ''}
       <h1 style="color: white; margin: 0; font-size: 28px;">${business.business_name}</h1>
       <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Offert</p>
     </div>
@@ -248,6 +249,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No customer on quote' }, { status: 400 })
     }
 
+    // Hämta logo_url och swish_number
+    const { data: bizConfig } = await supabase
+      .from('business_config')
+      .select('logo_url, swish_number')
+      .eq('business_id', business.business_id)
+      .single()
+    const businessWithLogo = { ...business, logo_url: bizConfig?.logo_url, swish_number: bizConfig?.swish_number }
+
     const formatCurrency = (amount: number) => {
       return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
     }
@@ -315,17 +324,39 @@ Frågor? Ring ${business.phone_number}`
         // Om both och ingen email, fortsätt med bara SMS
       } else {
         const emailSubject = `Offert från ${business.business_name}: ${quote.title || 'Offert'}`
-        const emailHTML = generateEmailHTML(quote, business, signUrl, trackingPixelUrl)
-
+        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl)
         const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
-        emailSent = await sendEmail(
-          allRecipients,
-          emailSubject,
-          emailHTML,
-          business.business_name,
-          business.contact_email || undefined,
-          bccEmails?.length > 0 ? bccEmails : undefined
-        )
+
+        // Försök Gmail först, fallback till Resend
+        try {
+          const { sendViaGmail, isGmailSendEnabled } = await import('@/lib/gmail-send')
+          const gmailStatus = await isGmailSendEnabled(business.business_id)
+          if (gmailStatus.enabled && gmailStatus.email) {
+            emailSent = await sendViaGmail(business.business_id, {
+              to: allRecipients,
+              subject: emailSubject,
+              html: emailHTML,
+              fromName: business.business_name,
+              fromEmail: gmailStatus.email,
+              replyTo: business.contact_email || undefined,
+              bcc: bccEmails?.length > 0 ? bccEmails : undefined,
+            })
+          }
+        } catch (gmailErr) {
+          console.error('Gmail send error (falling back to Resend):', gmailErr)
+        }
+
+        // Fallback: Resend
+        if (!emailSent) {
+          emailSent = await sendEmail(
+            allRecipients,
+            emailSubject,
+            emailHTML,
+            business.business_name,
+            business.contact_email || undefined,
+            bccEmails?.length > 0 ? bccEmails : undefined,
+          )
+        }
 
         if (emailSent) {
           // Logga email-aktivitet

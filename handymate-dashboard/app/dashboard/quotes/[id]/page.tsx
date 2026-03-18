@@ -258,16 +258,16 @@ export default function QuoteDetailPage() {
       })
 
       if (response.ok) {
-        await supabase
-          .from('quotes')
-          .update({ status: 'sent', sent_at: new Date().toISOString() })
-          .eq('quote_id', quote.quote_id)
-
-        showToast('Offert skickad!', 'success')
+        const result = await response.json()
+        const methods = []
+        if (result.smsSent) methods.push('SMS')
+        if (result.emailSent) methods.push('email')
+        showToast(`Offert skickad via ${methods.join(' och ')}!`, 'success')
         setShowSendModal(false)
         fetchQuote()
       } else {
-        showToast('Kunde inte skicka', 'error')
+        const err = await response.json().catch(() => ({}))
+        showToast(err.error || 'Kunde inte skicka', 'error')
       }
     } catch (error) {
       showToast('Något gick fel', 'error')
@@ -740,23 +740,13 @@ export default function QuoteDetailPage() {
             </button>
           )}
           {['sent', 'opened'].includes(quote.status) && (
-            <>
-              <button
-                onClick={markQuoteAccepted}
-                disabled={acceptingQuote}
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-              >
-                {acceptingQuote ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                Markera som accepterad
-              </button>
-              <button
-                onClick={() => setShowSendModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Skicka påminnelse
-              </button>
-            </>
+            <button
+              onClick={() => setShowSendModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Skicka påminnelse
+            </button>
           )}
           {quote.status === 'accepted' && (
             <>
@@ -1129,170 +1119,176 @@ export default function QuoteDetailPage() {
               </div>
             )}
 
-            {/* Timeline */}
+            {/* Signing link */}
+            {quote.sign_token && ['sent', 'opened'].includes(quote.status) && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Link2 className="w-5 h-5 text-teal-600" />
+                  Signeringslänk
+                </h2>
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                  <span className="text-xs text-gray-500 truncate flex-1">app.handymate.se/quote/{quote.sign_token.slice(0, 8)}...</span>
+                  <button onClick={() => { navigator.clipboard.writeText(`https://app.handymate.se/quote/${quote.sign_token}`); showToast('Kopierad!', 'success') }}
+                    className="flex-shrink-0 px-2.5 py-1 bg-teal-600 text-white text-xs rounded-md font-medium">Kopiera</button>
+                </div>
+              </div>
+            )}
+
+            {/* Progress indicator */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-sky-700" />
-                Historik
+                <Clock className="w-5 h-5 text-teal-600" />
+                Status
               </h2>
-              <div className="space-y-3 text-sm">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
-                  <span className="text-gray-500">Skapad {formatDate(quote.created_at)}</span>
-                </div>
-                {quote.sent_at && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-gray-500">Skickad {formatDate(quote.sent_at)}</span>
+              <div className="relative space-y-0">
+                {/* Connector line */}
+                <div className="absolute left-[7px] top-3 bottom-3 w-0.5 bg-gray-200" />
+                {[
+                  { label: 'Skapad', date: quote.created_at, done: true },
+                  { label: 'Skickad', date: quote.sent_at, done: !!quote.sent_at },
+                  { label: 'Öppnad', date: quote.opened_at, done: !!quote.opened_at },
+                  { label: quote.signed_at ? `Signerad av ${quote.signed_by_name}` : 'Signerad', date: quote.signed_at, done: !!quote.signed_at },
+                  { label: 'Utgår', date: quote.valid_until, done: false, isDeadline: true },
+                ].map((step, i) => (
+                  <div key={i} className="relative flex items-start gap-3 py-2">
+                    <div className={`relative z-10 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
+                      step.done ? 'bg-teal-500 border-teal-500' : step.isDeadline ? 'bg-white border-gray-300' : 'bg-white border-gray-300'
+                    }`}>
+                      {step.done && <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <span className={`text-sm ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
+                      {step.date && (
+                        <span className="text-xs text-gray-400 ml-2">{formatDate(step.date)}</span>
+                      )}
+                      {!step.date && !step.isDeadline && (
+                        <span className="text-xs text-gray-300 ml-2">—</span>
+                      )}
+                    </div>
                   </div>
-                )}
-                {quote.opened_at && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-amber-500 rounded-full"></div>
-                    <span className="text-gray-500">Öppnad {formatDate(quote.opened_at)}</span>
-                  </div>
-                )}
-                {quote.accepted_at && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-gray-500">Accepterad {formatDate(quote.accepted_at)}</span>
-                  </div>
-                )}
-                {quote.signed_at && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                    <span className="text-gray-500">Signerad av {quote.signed_by_name} {formatDate(quote.signed_at)}</span>
-                  </div>
-                )}
+                ))}
                 {quote.declined_at && (
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    <span className="text-gray-500">Nekad {formatDate(quote.declined_at)}</span>
+                  <div className="relative flex items-start gap-3 py-2">
+                    <div className="relative z-10 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-red-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <span className="text-sm text-red-600 font-medium">Nekad</span>
+                      <span className="text-xs text-gray-400 ml-2">{formatDate(quote.declined_at)}</span>
+                    </div>
                   </div>
                 )}
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-gray-200 rounded-full"></div>
-                  <span className="text-gray-400">Giltig till {formatDate(quote.valid_until)}</span>
-                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Send Modal */}
+      {/* Send Modal — mail-style */}
       {showSendModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Skicka offert</h2>
-            <p className="text-gray-500 text-sm mb-6">
-              Välj hur du vill skicka offerten till {quote.customer?.name}
-            </p>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => !sending && setShowSendModal(false)}>
+          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
+              <Mail className="w-5 h-5 text-teal-600" />
+              <h2 className="text-lg font-semibold text-gray-900">Skicka offert {quote.quote_number || ''}</h2>
+              <button onClick={() => !sending && setShowSendModal(false)} className="ml-auto text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
+            </div>
 
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={() => setSendMethod('sms')}
-                className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                  sendMethod === 'sms'
-                    ? 'bg-teal-100 border-teal-500 text-gray-900'
-                    : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
-                }`}
-              >
-                <MessageSquare className="w-5 h-5" />
-                <div className="text-left">
-                  <p className="font-medium">SMS</p>
-                  <p className="text-sm opacity-70">{quote.customer?.phone_number}</p>
+            <div className="px-6 py-4 space-y-4">
+              {/* Från */}
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Från</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{business?.business_name}</p>
+                  <p className="text-xs text-gray-400">offert@handymate.se · Svar till {business?.contact_email}</p>
                 </div>
-              </button>
+              </div>
 
-              {quote.customer?.email && (
-                <button
-                  onClick={() => setSendMethod('email')}
-                  className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                    sendMethod === 'email'
-                      ? 'bg-teal-100 border-teal-500 text-gray-900'
-                      : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  <Mail className="w-5 h-5" />
-                  <div className="text-left">
-                    <p className="font-medium">Email</p>
-                    <p className="text-sm opacity-70">{quote.customer?.email}</p>
+              {/* Leveransmetod */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0">Via</span>
+                <div className="flex gap-1.5">
+                  {['sms', 'email', 'both'].map(m => (
+                    <button key={m} onClick={() => setSendMethod(m as any)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                        sendMethod === m ? 'bg-teal-50 border-teal-300 text-teal-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                      }`}>
+                      {m === 'sms' ? 'SMS' : m === 'email' ? 'Email' : 'Båda'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Till */}
+              <div className="flex items-start gap-3">
+                <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Till</span>
+                <div className="flex-1 space-y-1.5">
+                  {(sendMethod === 'sms' || sendMethod === 'both') && (
+                    <div className="flex items-center gap-2">
+                      <MessageSquare className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-sm text-gray-700">{quote.customer?.phone_number || <span className="text-red-500">Telefonnummer saknas</span>}</span>
+                    </div>
+                  )}
+                  {(sendMethod === 'email' || sendMethod === 'both') && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-sm text-gray-700">{quote.customer?.email || <span className="text-red-500">Email saknas</span>}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Extra mottagare (email) */}
+              {(sendMethod === 'email' || sendMethod === 'both') && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Kopia</span>
+                    <input type="text" value={extraEmails} onChange={e => setExtraEmails(e.target.value)}
+                      placeholder="anna@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-teal-400 bg-gray-50" />
                   </div>
-                </button>
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">BCC</span>
+                    <input type="text" value={bccEmails} onChange={e => setBccEmails(e.target.value)}
+                      placeholder="chef@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-teal-400 bg-gray-50" />
+                  </div>
+                </>
               )}
 
-              {quote.customer?.email && (
-                <button
-                  onClick={() => setSendMethod('both')}
-                  className={`w-full flex items-center gap-3 p-4 rounded-xl border transition-all ${
-                    sendMethod === 'both'
-                      ? 'bg-teal-100 border-teal-500 text-gray-900'
-                      : 'bg-gray-100 border-gray-300 text-gray-500 hover:text-gray-900'
-                  }`}
-                >
-                  <Send className="w-5 h-5" />
-                  <div className="text-left">
-                    <p className="font-medium">Båda</p>
-                    <p className="text-sm opacity-70">SMS + Email</p>
-                  </div>
-                </button>
+              {/* Ämne (email) */}
+              {(sendMethod === 'email' || sendMethod === 'both') && (
+                <div className="flex items-start gap-3">
+                  <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Ämne</span>
+                  <p className="flex-1 text-sm text-gray-700 pt-1.5">Offert från {business?.business_name}: {quote.title || 'Offert'}</p>
+                </div>
+              )}
+
+              {/* Bifogat */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0"></span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <FileText className="w-4 h-4 text-teal-600" />
+                  <span className="text-xs text-gray-600">Offert {quote.quote_number || ''} · {quote.total ? new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(quote.total) + ' kr' : ''}</span>
+                </div>
+              </div>
+
+              {/* Validering */}
+              {sendMethod !== 'sms' && !quote.customer?.email && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+                  <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <span className="text-xs text-red-600">Kunden saknar e-postadress. Lägg till den i kundkortet först.</span>
+                </div>
               )}
             </div>
 
-            {/* Extra mottagare */}
-            {(sendMethod === 'email' || sendMethod === 'both') && (
-              <div className="space-y-3 mb-4">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Extra mottagare (kommaseparerade)</label>
-                  <input
-                    type="text"
-                    value={extraEmails}
-                    onChange={e => setExtraEmails(e.target.value)}
-                    placeholder="anna@firma.se, erik@firma.se"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Hemlig kopia (BCC)</label>
-                  <input
-                    type="text"
-                    value={bccEmails}
-                    onChange={e => setBccEmails(e.target.value)}
-                    placeholder="chef@firma.se"
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Förhandsgranskning */}
-            {quote.sign_token && (
-              <a
-                href={`/quote/${quote.sign_token}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 mb-4 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-100"
-              >
-                <Eye className="w-4 h-4" />
-                Förhandsgranska som kunden ser den
-              </a>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSendModal(false)}
-                className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
-              >
-                Avbryt
-              </button>
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
+              <button onClick={() => !sending && setShowSendModal(false)} className="text-sm text-gray-500 hover:text-gray-700">Avbryt</button>
               <button
                 onClick={sendQuote}
-                disabled={sending}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                disabled={sending || (sendMethod !== 'sms' && !quote.customer?.email)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-40 transition-all"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                Skicka
+                {sending ? 'Skickar...' : 'Skicka offert'}
               </button>
             </div>
           </div>

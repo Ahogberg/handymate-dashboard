@@ -1,6 +1,8 @@
 'use client'
 
-import { GripVertical, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { GripVertical, Trash2 } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { QuoteItem } from '@/lib/types/quote'
 
 // ---------------------------------------------------------------------------
@@ -88,13 +90,40 @@ export default function ItemRow({
   const displayTotal = item.item_type === 'subtotal' ? recalculatedTotal : item.total
   const isCreatingCategory = showNewCategoryInput === item.id && onCreateCategory
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  }
+
   return (
-    <div className={`group relative rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-slate-50/50 transition-colors ${rowStyle}`}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`group relative rounded-lg border hover:border-gray-300 hover:bg-slate-50/50 transition-colors ${rowStyle} ${isDragging ? 'border-teal-400 shadow-lg bg-white' : 'border-gray-200'}`}
+    >
 
       {/* ── Mobile layout (< md) ─────────────────────────────── */}
       <div className="md:hidden p-3 space-y-2">
         {/* Row 1: Description */}
         <div className="flex items-center gap-2">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-0.5 text-gray-300 touch-none shrink-0"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
           <span className={`shrink-0 px-1.5 py-0.5 text-[9px] rounded font-medium ${badge.cls}`}>
             {badge.label}
           </span>
@@ -133,17 +162,15 @@ export default function ItemRow({
       {/* ── Desktop layout (≥ md) ────────────────────────────── */}
       <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_100px_64px_28px] gap-1 items-center px-2 py-2">
 
-        {/* Drag handle — visible on hover */}
-        <div className="flex flex-col items-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onMove(index, 'up')} disabled={index === 0}
-            className="p-0 text-gray-300 hover:text-gray-600 disabled:opacity-0" title="Flytta upp">
-            <ChevronUp className="w-3.5 h-3.5" />
-          </button>
-          <button onClick={() => onMove(index, 'down')} disabled={index === itemCount - 1}
-            className="p-0 text-gray-300 hover:text-gray-600 disabled:opacity-0" title="Flytta ner">
-            <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Drag handle */}
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-0.5 text-gray-300 hover:text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity touch-none"
+          title="Dra för att flytta"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
 
         {/* Type badge */}
         <span className={`px-1.5 py-0.5 text-[9px] rounded font-medium text-center truncate ${badge.cls}`}>

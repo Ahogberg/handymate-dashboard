@@ -27,6 +27,20 @@ import QuotePreview from '@/components/quotes/QuotePreview'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import ItemRow from '@/components/quotes/ItemRow'
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
   QuoteItem,
   PaymentPlanEntry,
   QuoteStandardText,
@@ -929,6 +943,27 @@ export default function NewQuotePage() {
     })
   }, [])
 
+  // Drag-and-drop sensors
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  )
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setItems((prev) => {
+      const oldIndex = prev.findIndex((i) => i.id === active.id)
+      const newIndex = prev.findIndex((i) => i.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const newArr = [...prev]
+      const [moved] = newArr.splice(oldIndex, 1)
+      newArr.splice(newIndex, 0, moved)
+      return newArr.map((item, i) => ({ ...item, sort_order: i }))
+    })
+  }, [])
+
   const addFromGrossist = useCallback((product: SelectedProduct) => {
     const newItem: QuoteItem = {
       id: generateItemId(),
@@ -1432,26 +1467,30 @@ export default function NewQuotePage() {
                   <p>Inga rader ännu. Lägg till poster nedan eller använd AI-hjälp.</p>
                 </div>
               ) : (
-                <div className="space-y-1">
-                  {items.map((item, index) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      total={items.length}
-                      recalculatedTotal={recalculated[index]?.total ?? item.total}
-                      onUpdate={updateItem}
-                      onRemove={removeItem}
-                      onMove={moveItem}
-                      allCategories={allCategories}
-                      onCreateCategory={createCustomCategory}
-                      showNewCategoryInput={showNewCategoryInput}
-                      setShowNewCategoryInput={setShowNewCategoryInput}
-                      newCategoryLabel={newCategoryLabel}
-                      setNewCategoryLabel={setNewCategoryLabel}
-                    />
-                  ))}
-                </div>
+                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                  <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-1">
+                      {items.map((item, index) => (
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          total={items.length}
+                          recalculatedTotal={recalculated[index]?.total ?? item.total}
+                          onUpdate={updateItem}
+                          onRemove={removeItem}
+                          onMove={moveItem}
+                          allCategories={allCategories}
+                          onCreateCategory={createCustomCategory}
+                          showNewCategoryInput={showNewCategoryInput}
+                          setShowNewCategoryInput={setShowNewCategoryInput}
+                          newCategoryLabel={newCategoryLabel}
+                          setNewCategoryLabel={setNewCategoryLabel}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                </DndContext>
               )}
 
               {/* Add row button */}

@@ -47,6 +47,20 @@ import {
 } from '@/lib/types/quote'
 import SharedItemRow from '@/components/quotes/ItemRow'
 import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import {
   calculateQuoteTotals,
   generateItemId,
   createDefaultItem,
@@ -766,6 +780,26 @@ export default function EditQuotePage() {
     })
   }, [])
 
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  )
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setItems((prev) => {
+      const oldIndex = prev.findIndex((i) => i.id === active.id)
+      const newIndex = prev.findIndex((i) => i.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return prev
+      const newArr = [...prev]
+      const [moved] = newArr.splice(oldIndex, 1)
+      newArr.splice(newIndex, 0, moved)
+      return newArr.map((item, i) => ({ ...item, sort_order: i }))
+    })
+  }, [])
+
   const addFromGrossist = useCallback((product: SelectedProduct) => {
     const newItem: QuoteItem = {
       id: generateItemId(),
@@ -1284,19 +1318,23 @@ export default function EditQuotePage() {
                     <span />
                   </div>
 
-                  {items.map((item, index) => (
-                    <SharedItemRow
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      total={items.length}
-                      recalculatedTotal={recalculated[index]?.total ?? item.total}
-                      onUpdate={updateItem}
-                      onRemove={removeItem}
-                      onMove={moveItem}
-                      allCategories={allCategories}
-                    />
-                  ))}
+                  <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                    <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                      {items.map((item, index) => (
+                        <SharedItemRow
+                          key={item.id}
+                          item={item}
+                          index={index}
+                          total={items.length}
+                          recalculatedTotal={recalculated[index]?.total ?? item.total}
+                          onUpdate={updateItem}
+                          onRemove={removeItem}
+                          onMove={moveItem}
+                          allCategories={allCategories}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                 </div>
               )}
 
