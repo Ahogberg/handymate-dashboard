@@ -178,15 +178,18 @@ interface TeamAgent {
   role: string
   initials: string
   color: string
+  avatar?: string
   greeting: string
 }
 
+const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
+
 const TEAM: TeamAgent[] = [
-  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', greeting: 'Hej! Här är läget för idag ☀️' },
-  { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', greeting: 'Jag har koll på ekonomin — kollar fakturorna' },
-  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', greeting: 'Dags att nå fler kunder!' },
-  { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', greeting: 'Jag följer upp offerten idag' },
-  { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', greeting: 'Alla projekt löper på — inga förseningar' },
+  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️' },
+  { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', avatar: `${AVATAR_BASE}/Karin.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvS2FyaW4ucG5nIiwiaWF0IjoxNzczODU1NjE4LCJleHAiOjI2Mzc4NTU2MTh9.bmvCwfi8Rry-5dGsJ1Zyyco--CYT6ZG3gXBPqHRiVdA`, greeting: 'Jag har koll på ekonomin — kollar fakturorna' },
+  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!' },
+  { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag' },
+  { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar' },
 ]
 
 function getAgentForAction(actionType: string): TeamAgent {
@@ -416,7 +419,10 @@ function ActivityItem({ run, isSelected, onClick }: {
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+        {agent.avatar ? (
+          <img src={agent.avatar} alt={agent.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden') }} />
+        ) : null}
+        <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${agent.avatar ? 'hidden' : ''}`}>
           {agent.initials}
         </div>
         <div className="flex-1 min-w-0">
@@ -1626,7 +1632,11 @@ function ManualTrigger({ businessId, onTriggered }: {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-3">
-        <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-xs">M</div>
+        {TEAM[0].avatar ? (
+          <img src={TEAM[0].avatar} alt="Matte" className="w-7 h-7 rounded-full object-cover" />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-xs">M</div>
+        )}
         <h3 className="text-sm font-bold text-gray-900">Prata med Matte</h3>
       </div>
 
@@ -1926,9 +1936,13 @@ export default function AgentDashboardPage() {
             }`}
           >
             <div className="relative">
-              <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm`}>
-                {agent.initials}
-              </div>
+              {agent.avatar ? (
+                <img src={agent.avatar} alt={agent.name} className="w-10 h-10 rounded-full object-cover" />
+              ) : (
+                <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm`}>
+                  {agent.initials}
+                </div>
+              )}
               <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
             </div>
             <span className="text-xs font-medium text-gray-900">{agent.name}</span>
