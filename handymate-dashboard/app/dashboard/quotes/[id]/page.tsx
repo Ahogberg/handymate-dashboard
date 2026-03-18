@@ -436,8 +436,10 @@ export default function QuoteDetailPage() {
     if (!quote) return
     setGeneratingSignLink(true)
     try {
-      const response = await fetch(`/api/quotes/${quote.quote_id}/sign-link`, {
+      const response = await fetch('/api/quotes/sign-link', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote.quote_id }),
       })
       if (!response.ok) throw new Error('Kunde inte generera länk')
       const data = await response.json()
