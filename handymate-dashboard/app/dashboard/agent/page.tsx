@@ -1529,49 +1529,58 @@ function ManualTrigger({ businessId, onTriggered }: {
 }) {
   const [instruction, setInstruction] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [elapsed, setElapsed] = useState(0)
   const [placeholderIdx, setPlaceholderIdx] = useState(0)
+  const [agentResponse, setAgentResponse] = useState<{ type: 'success' | 'error'; text: string; meta?: string } | null>(null)
+  const [history, setHistory] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Rotate placeholder every 3 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setPlaceholderIdx(prev => (prev + 1) % PLACEHOLDER_EXAMPLES.length)
-    }, 3000)
+    const interval = setInterval(() => setPlaceholderIdx(prev => (prev + 1) % PLACEHOLDER_EXAMPLES.length), 3000)
     return () => clearInterval(interval)
   }, [])
 
   async function handleTrigger() {
     if (!instruction.trim()) return
+    const query = instruction.trim()
     setLoading(true)
-    setResult(null)
+    setAgentResponse(null)
     setElapsed(0)
     const timer = setInterval(() => setElapsed(s => s + 1), 1000)
+
+    // Add to history (max 5, no duplicates)
+    setHistory(prev => {
+      const filtered = prev.filter(h => h !== query)
+      return [query, ...filtered].slice(0, 5)
+    })
+
     try {
       const response = await fetch('/api/agent/trigger', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({
-          trigger_type: 'manual',
-          trigger_data: { instruction: instruction.trim() },
-        }),
+        body: JSON.stringify({ trigger_type: 'manual', trigger_data: { instruction: query } }),
       })
       const data = await response.json()
       if (response.ok) {
-        setResult({ type: 'success', message: `Klart — ${data.tool_calls || 0} steg, ${((data.duration_ms || 0) / 1000).toFixed(1)}s` })
+        const text = data.final_response || `Klart — ${data.tool_calls || 0} steg`
+        const meta = `${data.tool_calls || 0} steg · ${((data.duration_ms || 0) / 1000).toFixed(1)}s`
+        setAgentResponse({ type: 'success', text, meta })
         setInstruction('')
         onTriggered()
       } else {
-        setResult({ type: 'error', message: data.error || `Fel (${response.status})` })
+        setAgentResponse({ type: 'error', text: data.error || `Fel (${response.status})` })
       }
     } catch (err: any) {
-      setResult({ type: 'error', message: err.message || 'Nätverksfel — kunde inte nå servern' })
+      setAgentResponse({ type: 'error', text: err.message || 'Nätverksfel' })
     } finally {
       clearInterval(timer)
       setLoading(false)
     }
+  }
+
+  function removeFromHistory(query: string) {
+    setHistory(prev => prev.filter(h => h !== query))
   }
 
   return (
@@ -1580,55 +1589,75 @@ function ManualTrigger({ businessId, onTriggered }: {
         <Bot className="w-5 h-5 text-teal-600" />
         <h3 className="text-sm font-bold text-gray-900">Ge agenten en uppgift</h3>
       </div>
+
+      {/* History chips */}
+      {history.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2.5">
+          {history.map(q => (
+            <button key={q} onClick={() => { setInstruction(q); inputRef.current?.focus() }}
+              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-500 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              <span className="truncate max-w-[180px]">{q}</span>
+              <span onClick={(e) => { e.stopPropagation(); removeFromHistory(q) }}
+                className="text-gray-300 hover:text-red-400 ml-0.5">×</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input */}
       <div className="flex gap-2">
-        <input
-          ref={inputRef}
-          type="text"
-          value={instruction}
+        <input ref={inputRef} type="text" value={instruction}
           onChange={e => setInstruction(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
           placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
           className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
-          disabled={loading}
-        />
-        <button
-          onClick={handleTrigger}
-          disabled={loading || !instruction.trim()}
-          className="px-4 py-2.5 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 shadow-sm shadow-teal-500/20"
-        >
-          {loading ? (
-            <RefreshCw className="w-4 h-4 animate-spin" />
-          ) : (
-            <Send className="w-4 h-4" />
-          )}
+          disabled={loading} />
+        <button onClick={handleTrigger} disabled={loading || !instruction.trim()}
+          className="px-4 py-2.5 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-teal-500/20">
+          {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {loading ? `${elapsed}s…` : 'Kör'}
         </button>
       </div>
+
       {/* Quick buttons */}
       <div className="flex flex-wrap gap-1.5 mt-2.5">
-        {QUICK_BUTTONS.map((btn) => (
-          <button
-            key={btn.label}
-            type="button"
-            onClick={() => {
-              setInstruction(btn.text)
-              inputRef.current?.focus()
-            }}
+        {QUICK_BUTTONS.map(btn => (
+          <button key={btn.label} type="button"
+            onClick={() => { setInstruction(btn.text); inputRef.current?.focus() }}
             disabled={loading}
-            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors disabled:opacity-50"
-          >
+            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors disabled:opacity-50">
             {btn.emoji} {btn.label}
           </button>
         ))}
       </div>
-      {result && (
-        <div className={`mt-3 px-3 py-2 rounded-lg text-sm ${
-          result.type === 'success'
-            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-            : 'bg-red-50 text-red-700 border border-red-200'
+
+      {/* Agent response */}
+      {agentResponse && (
+        <div className={`mt-4 rounded-xl border p-4 ${
+          agentResponse.type === 'success'
+            ? 'bg-white border-gray-200'
+            : 'bg-red-50 border-red-200'
         }`}>
-          {result.type === 'success' ? <CheckCircle2 className="w-4 h-4 inline mr-1.5" /> : <XCircle className="w-4 h-4 inline mr-1.5" />}
-          {result.message}
+          {agentResponse.type === 'success' ? (
+            <>
+              <div className="flex items-start gap-2.5">
+                <div className="w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="w-3.5 h-3.5 text-teal-700" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{agentResponse.text}</div>
+                  {agentResponse.meta && (
+                    <p className="text-[10px] text-gray-400 mt-2">{agentResponse.meta}</p>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-red-700">
+              <XCircle className="w-4 h-4 shrink-0" />
+              {agentResponse.text}
+            </div>
+          )}
         </div>
       )}
     </div>

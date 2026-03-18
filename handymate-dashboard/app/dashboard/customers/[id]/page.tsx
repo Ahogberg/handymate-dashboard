@@ -61,6 +61,11 @@ interface Customer {
   reference?: string
   apartment_count?: number
   customer_number?: string
+  lifetime_value?: number
+  job_count?: number
+  last_job_date?: string
+  avg_job_value?: number
+  avg_payment_days?: number
 }
 
 interface CustomerDocument {
@@ -488,6 +493,35 @@ export default function CustomerDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Vänster kolumn - Kundinfo + Snabbåtgärder */}
           <div className="space-y-6">
+            {/* Livstidsvärde */}
+            {(customer.lifetime_value || 0) > 0 && (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  {(customer.lifetime_value || 0) >= 50000 && <span className="text-lg">👑</span>}
+                  <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Livstidsvärde</h2>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-gray-900">{Math.round(customer.lifetime_value || 0).toLocaleString('sv-SE')} kr</span>
+                    <span className="text-sm text-gray-400">({customer.job_count || 0} jobb)</span>
+                  </div>
+                  {customer.avg_job_value ? (
+                    <p className="text-xs text-gray-500">Snitt per jobb: {Math.round(customer.avg_job_value).toLocaleString('sv-SE')} kr</p>
+                  ) : null}
+                  {customer.avg_payment_days !== undefined && customer.avg_payment_days !== 0 && (
+                    <p className="text-xs text-gray-500">
+                      Betalar snitt {customer.avg_payment_days > 0 ? `${customer.avg_payment_days} dagar efter förfall` : `${Math.abs(customer.avg_payment_days)} dagar före förfall`}
+                    </p>
+                  )}
+                  {customer.last_job_date && (
+                    <p className="text-xs text-gray-500">
+                      Senaste jobb: {new Date(customer.last_job_date).toLocaleDateString('sv-SE')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Kundinfo */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Kontaktinfo</h2>

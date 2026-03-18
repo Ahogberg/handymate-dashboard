@@ -47,6 +47,9 @@ interface Customer {
   personal_number?: string | null
   property_designation?: string | null
   customer_number?: string | null
+  lifetime_value?: number
+  job_count?: number
+  last_job_date?: string | null
 }
 
 interface CustomerTag {
@@ -106,6 +109,8 @@ export default function CustomersPage() {
   const [tags, setTags] = useState<CustomerTag[]>([])
   const [customerTags, setCustomerTags] = useState<Map<string, string[]>>(new Map()) // customer_id → tag_ids
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('')
+  const [ltvFilter, setLtvFilter] = useState<'' | 'vip' | 'inactive_vip'>('')
+  const [sortBy, setSortBy] = useState<'name' | 'ltv' | 'recent'>('name')
   const [showTagModal, setShowTagModal] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState('#6366f1')
@@ -424,7 +429,17 @@ export default function CustomersPage() {
     const matchesTag = !selectedTagFilter ||
       (customerTags.get(customer.customer_id) || []).includes(selectedTagFilter)
 
-    return matchesSearch && matchesTag
+    const ltv = customer.lifetime_value || 0
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000)
+    const matchesLtv = !ltvFilter ||
+      (ltvFilter === 'vip' && ltv >= 50000) ||
+      (ltvFilter === 'inactive_vip' && ltv >= 50000 && customer.last_job_date && new Date(customer.last_job_date) < sixMonthsAgo)
+
+    return matchesSearch && matchesTag && matchesLtv
+  }).sort((a, b) => {
+    if (sortBy === 'ltv') return (b.lifetime_value || 0) - (a.lifetime_value || 0)
+    if (sortBy === 'recent') return (b.created_at || '').localeCompare(a.created_at || '')
+    return (a.name || '').localeCompare(b.name || '')
   })
 
   const filteredCampaigns = campaigns.filter(c => {
@@ -862,6 +877,23 @@ export default function CustomersPage() {
                       <span className="opacity-60">({tag.customer_count})</span>
                     </button>
                   ))}
+                  {/* LTV filters */}
+                  <span className="w-px h-4 bg-gray-200 mx-1" />
+                  <button onClick={() => setLtvFilter(ltvFilter === 'vip' ? '' : 'vip')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${ltvFilter === 'vip' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                    👑 VIP
+                  </button>
+                  <button onClick={() => setLtvFilter(ltvFilter === 'inactive_vip' ? '' : 'inactive_vip')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${ltvFilter === 'inactive_vip' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                    Inaktiva VIP
+                  </button>
+                  <span className="w-px h-4 bg-gray-200 mx-1" />
+                  <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
+                    className="px-2 py-1 rounded-lg text-xs border border-gray-200 text-gray-500 focus:outline-none">
+                    <option value="name">Namn A-Ö</option>
+                    <option value="ltv">Livstidsvärde</option>
+                    <option value="recent">Senast skapad</option>
+                  </select>
                 </div>
               )}
               <button
@@ -969,7 +1001,7 @@ export default function CustomersPage() {
                       </div>
                       <div className="ml-3 sm:ml-4">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{customer.name || 'Okänd'}</h3>
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">{(customer.lifetime_value || 0) >= 50000 && '👑 '}{customer.name || 'Okänd'}</h3>
                           {customer.customer_type === 'company' && (
                             <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 rounded-md">Företag</span>
                           )}
@@ -977,7 +1009,11 @@ export default function CustomersPage() {
                             <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
                           )}
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-400">{customer.customer_number && <span className="text-gray-500 font-medium">{customer.customer_number} · </span>}Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
+                        <p className="text-xs sm:text-sm text-gray-400">
+                          {customer.customer_number && <span className="text-gray-500 font-medium">{customer.customer_number} · </span>}
+                          {(customer.lifetime_value || 0) > 0 && <span className="text-teal-600 font-medium">{Math.round(customer.lifetime_value || 0).toLocaleString('sv-SE')} kr · </span>}
+                          Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}
+                        </p>
                       </div>
                     </div>
                     <div className="flex space-x-1">

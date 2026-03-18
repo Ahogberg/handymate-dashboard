@@ -4,6 +4,7 @@ import { generateAgentContext, updateBusinessPreferences } from '@/lib/agent/con
 import { sendMorningReport } from '@/lib/agent/morning-report'
 import { updatePricingIntelligence } from '@/lib/agent/pricing-engine'
 import { analyzePriceAdjustments } from '@/lib/agent/price-analysis'
+import { calculateCustomerLTV } from '@/lib/customer-ltv'
 
 export const maxDuration = 60
 
@@ -48,6 +49,7 @@ async function runAgentContext() {
     preferences: { success: boolean; error?: string }
     pricing: { success: boolean; jobTypesAnalyzed?: number; error?: string }
     priceAnalysis: { success: boolean; suggestions?: number; error?: string }
+    ltv: { success: boolean; updated?: number; reactivations?: number; error?: string }
   }> = []
 
   for (const biz of businesses) {
@@ -85,6 +87,14 @@ async function runAgentContext() {
       priceAnalysisResult = { success: false, error: err.message }
     }
 
+    // Beräkna kundlivstidsvärde
+    let ltvResult: { success: boolean; updated?: number; reactivations?: number; error?: string } = { success: false, error: 'Skipped' }
+    try {
+      ltvResult = await calculateCustomerLTV(biz.business_id)
+    } catch (err: any) {
+      ltvResult = { success: false, error: err.message }
+    }
+
     results.push({
       business_id: biz.business_id,
       context: contextResult,
@@ -92,10 +102,11 @@ async function runAgentContext() {
       preferences: preferencesResult,
       pricing: pricingResult,
       priceAnalysis: priceAnalysisResult,
+      ltv: ltvResult,
     })
 
     console.log(
-      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, prefs=${preferencesResult.success}, pricing=${pricingResult.success}, priceAnalysis=${priceAnalysisResult.success}(${priceAnalysisResult.suggestions || 0} suggestions)`
+      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, pricing=${pricingResult.success}, ltv=${ltvResult.success}(${ltvResult.updated || 0} updated, ${ltvResult.reactivations || 0} reactivations)`
     )
   }
 
