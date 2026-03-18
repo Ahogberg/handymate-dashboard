@@ -172,12 +172,22 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ business_id: businessId, subscription_plan: plan }),
       })
-      if (res.ok) {
-        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, subscription_plan: plan } : c))
+      const data = await res.json()
+      if (res.ok && data.updated) {
+        setCustomers(prev => prev.map(c => c.business_id === businessId
+          ? { ...c, subscription_plan: data.updated.subscription_plan }
+          : c))
         const biz = customers.find(c => c.business_id === businessId)
-        setToast(`Plan uppdaterad för ${biz?.business_name || businessId}`)
+        setToast(`Plan uppdaterad till ${plan} för ${biz?.business_name || businessId}`)
+      } else {
+        setToast(`Fel: ${data.error || 'Kunde inte uppdatera'}`)
+        // Revert dropdown by refetching
+        await fetchCustomers()
       }
-    } catch { /* ignore */ }
+    } catch {
+      setToast('Nätverksfel — försök igen')
+      await fetchCustomers()
+    }
     setUpdatingPlan(null)
   }
 
@@ -188,9 +198,12 @@ export default function AdminDashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ business_id: businessId, leads_addon: !current }),
       })
-      if (res.ok) {
-        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, leads_addon: !current } : c))
-        setToast(`Leads add-on ${!current ? 'aktiverad' : 'avaktiverad'}`)
+      const data = await res.json()
+      if (res.ok && data.updated) {
+        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, leads_addon: data.updated.leads_addon } : c))
+        setToast(`Leads add-on ${data.updated.leads_addon ? 'aktiverad' : 'avaktiverad'}`)
+      } else {
+        setToast(`Fel: ${data.error || 'Kunde inte uppdatera'}`)
       }
     } catch { /* ignore */ }
   }
@@ -210,13 +223,18 @@ export default function AdminDashboardPage() {
 
   async function setEnterpriseAll(businessId: string) {
     try {
-      await fetch('/api/admin/customers', {
+      const res = await fetch('/api/admin/customers', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ business_id: businessId, subscription_plan: 'business', leads_addon: true }),
       })
-      setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, subscription_plan: 'business', leads_addon: true } : c))
-      setToast('Enterprise + alla add-ons aktiverat!')
+      const data = await res.json()
+      if (res.ok && data.updated) {
+        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, subscription_plan: 'business', leads_addon: true } : c))
+        setToast('Enterprise + alla add-ons aktiverat!')
+      } else {
+        setToast(`Fel: ${data.error || 'Kunde inte uppdatera'}`)
+      }
     } catch { /* ignore */ }
   }
 

@@ -62,16 +62,23 @@ export async function PATCH(request: NextRequest) {
   if (subscription_plan !== undefined) updates.subscription_plan = subscription_plan
   if (leads_addon !== undefined) updates.leads_addon = leads_addon
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from('business_config')
     .update(updates)
     .eq('business_id', business_id)
+    .select('business_id, subscription_plan, leads_addon')
+    .single()
 
   if (error) {
+    console.error('Admin update error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  if (!updated) {
+    return NextResponse.json({ error: 'Företag hittades inte' }, { status: 404 })
   }
 
   await logAdminAction('update_plan', adminCheck.userId!, business_id, updates)
 
-  return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true, updated })
 }
