@@ -65,7 +65,7 @@ export default function OnboardingChecklist({
 
   const groups: ChecklistGroup[] = [
     {
-      title: 'Grundinställningar',
+      title: 'Fas 1 — Grunduppsättning ✅',
       items: [
         {
           id: 'company',
@@ -74,39 +74,33 @@ export default function OnboardingChecklist({
           link: '/dashboard/settings',
         },
         {
-          id: 'pricing',
-          label: 'Prislista ifylld',
-          completed: priceListCount > 0,
-          link: '/dashboard/settings/my-prices',
+          id: 'phone',
+          label: 'Telefonnummer aktiverat',
+          completed: !!businessConfig.assigned_phone_number,
+          link: '/dashboard/settings?tab=phone',
         },
         {
           id: 'logo',
           label: 'Logotyp uppladdad',
           completed: !!businessConfig.logo_url,
-          link: '/dashboard/settings',
+          link: '/dashboard/settings?tab=company',
         },
       ],
     },
     {
-      title: 'Anslutningar',
+      title: 'Fas 2 — Automationer',
       items: [
         {
-          id: 'phone',
-          label: 'Telefonnummer aktiverat',
-          completed: !!businessConfig.assigned_phone_number,
-          link: '/dashboard/settings',
-        },
-        {
           id: 'calendar',
-          label: 'Google Calendar kopplad',
+          label: 'Koppla Google Kalender',
           completed: !!(businessConfig.google_connected || businessConfig.google_calendar_connected),
-          link: '/dashboard/settings',
+          link: '/dashboard/settings?tab=integrations',
         },
         {
           id: 'gmail',
-          label: 'Gmail kopplad',
+          label: 'Koppla Gmail',
           completed: !!businessConfig.gmail_enabled,
-          link: '/dashboard/settings',
+          link: '/dashboard/settings?tab=integrations',
         },
         {
           id: 'website',
@@ -118,19 +112,20 @@ export default function OnboardingChecklist({
       ],
     },
     {
-      title: 'Anpassa AI:n',
+      title: 'Fas 3 — Anpassa',
       items: [
         {
-          id: 'ai_style',
-          label: 'AI-jobbstil konfigurerad',
-          completed: !!businessConfig.working_hours,
-          link: '/dashboard/settings/knowledge',
+          id: 'pricing',
+          label: 'Lägg till prislista',
+          completed: priceListCount > 0,
+          link: '/dashboard/settings/pricing',
         },
         {
-          id: 'automations',
-          label: 'Automationer aktiverade',
-          completed: callCount > 0,
-          link: '/dashboard/automations',
+          id: 'templates',
+          label: 'Skapa offertmall',
+          completed: false,
+          optional: true,
+          link: '/dashboard/settings/quote-templates',
         },
         {
           id: 'invite',
