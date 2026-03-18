@@ -72,6 +72,7 @@ interface AgentRun {
   estimated_cost: number
   duration_ms: number
   status: string
+  agent_id?: string
   created_at: string
 }
 
@@ -180,16 +181,17 @@ interface TeamAgent {
   color: string
   avatar?: string
   greeting: string
+  description?: string
 }
 
 const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
 
 const TEAM: TeamAgent[] = [
-  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️' },
-  { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', avatar: `${AVATAR_BASE}/Karin.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvS2FyaW4ucG5nIiwiaWF0IjoxNzczODU1NjE4LCJleHAiOjI2Mzc4NTU2MTh9.bmvCwfi8Rry-5dGsJ1Zyyco--CYT6ZG3gXBPqHRiVdA`, greeting: 'Jag har koll på ekonomin — kollar fakturorna' },
-  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!' },
-  { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag' },
-  { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar' },
+  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️', description: 'Koordinerar teamet och pratar med dig' },
+  { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', avatar: `${AVATAR_BASE}/Karin.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvS2FyaW4ucG5nIiwiaWF0IjoxNzczODU1NjE4LCJleHAiOjI2Mzc4NTU2MTh9.bmvCwfi8Rry-5dGsJ1Zyyco--CYT6ZG3gXBPqHRiVdA`, greeting: 'Jag har koll på ekonomin — kollar fakturorna', description: 'Håller koll på fakturor och betalningar' },
+  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
+  { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag', description: 'Följer upp offerter och leads' },
+  { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar', description: 'Koordinerar projekt och bokningar' },
 ]
 
 function getAgentForAction(actionType: string): TeamAgent {
@@ -200,8 +202,14 @@ function getAgentForAction(actionType: string): TeamAgent {
   return TEAM[0] // Matte (default)
 }
 
-function getAgentForRun(run: { trigger_type: string; tool_calls: number; final_response?: string }): TeamAgent {
-  if (run.trigger_type === 'phone_call' || run.trigger_type === 'incoming_sms') return TEAM[0] // Matte handles comms
+function getAgentForRun(run: { trigger_type: string; tool_calls: number; final_response?: string; agent_id?: string }): TeamAgent {
+  // Use real agent_id if available (V21+)
+  if (run.agent_id) {
+    const match = TEAM.find(a => a.id === run.agent_id)
+    if (match) return match
+  }
+  // Fallback: infer from trigger type and response content
+  if (run.trigger_type === 'phone_call' || run.trigger_type === 'incoming_sms') return TEAM[0]
   if (run.trigger_type === 'cron') {
     const resp = (run.final_response || '').toLowerCase()
     if (resp.includes('faktur') || resp.includes('betalning')) return TEAM[1]
@@ -1830,7 +1838,7 @@ export default function AgentDashboardPage() {
   const filteredRuns = filterType === 'all'
     ? runs
     : TEAM.some(a => a.id === filterType)
-      ? runs.filter(r => getAgentForRun(r).id === filterType)
+      ? runs.filter(r => (r.agent_id || getAgentForRun(r).id) === filterType)
       : runs.filter(r => r.trigger_type === filterType)
 
   // ── Success rate ─────────────────────────────────────────────────
@@ -1870,55 +1878,7 @@ export default function AgentDashboardPage() {
             <h1 className="text-xl font-bold text-gray-900">Ditt backoffice-team</h1>
             <p className="text-sm text-gray-500">5 AI-medarbetare jobbar för dig dygnet runt</p>
           </div>
-          <div className="flex items-center gap-1.5 ml-4 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
-            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-semibold text-emerald-700"> Realtid</span>
-          </div>
-          {/* Google integration status badges */}
-          {googleStatus && (
-            <div className="flex items-center gap-2 ml-2">
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
-                googleStatus.connected
-                  ? 'bg-teal-50 border-teal-200 text-teal-800'
-                  : 'bg-gray-50 border-gray-200 text-gray-400'
-              }`}>
-                <Calendar className="w-3 h-3" />
-                {googleStatus.connected ? 'Kalender' : 'Kalender av'}
-              </div>
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${
-                googleStatus.gmailSyncEnabled
-                  ? googleStatus.gmailSendEnabled
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                    : 'bg-teal-50 border-teal-200 text-teal-800'
-                  : 'bg-gray-50 border-gray-200 text-gray-400'
-              }`}>
-                <MailCheck className="w-3 h-3" />
-                {googleStatus.gmailSendEnabled
-                  ? 'Gmail R+S'
-                  : googleStatus.gmailSyncEnabled
-                    ? 'Gmail läs'
-                    : 'Gmail av'}
-              </div>
-              {!googleStatus.connected && (
-                <a href="/dashboard/settings?tab=integrations" className="text-xs text-teal-700 hover:underline flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" />
-                  Koppla
-                </a>
-              )}
-            </div>
-          )}
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
-            showSettings
-              ? 'bg-teal-50 border-teal-200 text-teal-800'
-              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-          }`}
-        >
-          <Shield className="w-4 h-4" />
-          AI-inställningar
-        </button>
       </div>
 
       {/* Team Avatars */}
@@ -1927,26 +1887,29 @@ export default function AgentDashboardPage() {
           <button
             key={agent.id}
             onClick={() => setFilterType(agent.id)}
-            className={`flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all min-w-[80px] ${
+            className={`flex flex-col items-center gap-2 px-4 py-4 rounded-2xl border transition-all min-w-[110px] ${
               filterType === agent.id
-                ? 'bg-white border-teal-300 shadow-sm'
+                ? 'bg-white border-teal-300 shadow-md'
                 : filterType === 'all'
-                  ? 'bg-white border-gray-200 hover:border-gray-300'
-                  : 'bg-gray-50 border-gray-100 opacity-60 hover:opacity-100'
+                  ? 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
+                  : 'bg-gray-50 border-gray-100 opacity-50 hover:opacity-100'
             }`}
           >
             <div className="relative">
               {agent.avatar ? (
-                <img src={agent.avatar} alt={agent.name} className="w-10 h-10 rounded-full object-cover" />
+                <img src={agent.avatar} alt={agent.name} className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm" />
               ) : (
-                <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm`}>
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl`}>
                   {agent.initials}
                 </div>
               )}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
             </div>
-            <span className="text-xs font-medium text-gray-900">{agent.name}</span>
-            <span className="text-[10px] text-gray-400">{agent.role}</span>
+            <div className="text-center">
+              <span className="text-sm font-semibold text-gray-900 block">{agent.name}</span>
+              <span className="text-[11px] text-gray-500 block">{agent.role}</span>
+              {agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
+            </div>
           </button>
         ))}
         <button

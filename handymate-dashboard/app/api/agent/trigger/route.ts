@@ -8,6 +8,7 @@ import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
 import { getBusinessPreferences } from '@/lib/business-preferences'
+import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -247,7 +248,10 @@ export async function POST(request: NextRequest) {
       learnedPreferences = prefs
     } catch { /* non-blocking */ }
 
-    const systemPrompt = buildSystemPrompt(
+    // Route to specialist agent
+    const agentId = body.agent_id || routeToAgent(trigger_type, trigger_data?.cron_type || trigger_data?.event_name)
+
+    const baseSystemPrompt = buildSystemPrompt(
       {
         ...bizConfig,
         google_calendar_connected: !!googleConnection?.sync_enabled,
@@ -264,6 +268,9 @@ export async function POST(request: NextRequest) {
       trigger_type,
       trigger_data
     )
+
+    // Inject agent personality
+    const systemPrompt = baseSystemPrompt + '\n\n' + getAgentPromptSuffix(agentId)
 
     const context = {
       businessName: bizConfig.business_name || 'Handymate',
@@ -286,6 +293,7 @@ export async function POST(request: NextRequest) {
       content?: string
       tool_calls?: Array<{ tool: string; input: unknown; result: unknown }>
     }> = []
+    const agentAllowedTools = getAgentTools(agentId)
     let totalTokens = 0
     let toolCallCount = 0
     let finalResponse = ''
@@ -297,7 +305,7 @@ export async function POST(request: NextRequest) {
         model: MODEL,
         max_tokens: 4096,
         system: systemPrompt,
-        tools: toolDefinitions as any,
+        tools: (agentAllowedTools === 'all' ? toolDefinitions : toolDefinitions.filter((t: any) => agentAllowedTools.includes(t.name))) as any,
         messages,
       })
 
@@ -382,6 +390,7 @@ export async function POST(request: NextRequest) {
           duration_ms: durationMs,
           status: 'completed',
           idempotency_key: idempotency_key || null,
+          agent_id: agentId,
           created_at: new Date().toISOString(),
         })
     } catch (insertErr: any) {
@@ -390,6 +399,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       run_id: runId,
+      agent_id: agentId,
       trigger_type,
       steps: steps.length,
       tool_calls: toolCallCount,
