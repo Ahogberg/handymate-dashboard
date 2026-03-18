@@ -150,30 +150,9 @@ export default function LeadsOutboundPage() {
 
   useEffect(() => { fetchLeads() }, [statusFilter])
 
-  // Addon gate
+  // Addon gate — visa upgrade-sida
   if (!hasAddon && !loading) {
-    return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <div className="max-w-lg text-center">
-          <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Mail className="w-8 h-8 text-teal-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">Handymate Leads</h1>
-          <p className="text-gray-500 mb-2">Nå rätt kunder vid rätt tidpunkt automatiskt</p>
-          <p className="text-sm text-gray-400 mb-6">
-            Skicka professionella brev till fastighetsägare som sannolikt behöver dina tjänster — baserat på offentlig data om fastighetsförsäljningar och energideklarationer.
-          </p>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6 text-left space-y-2">
-            <div className="flex justify-between text-sm"><span className="text-gray-600">Starter</span><span className="font-semibold">499 kr/mån — 20 brev</span></div>
-            <div className="flex justify-between text-sm"><span className="text-gray-600">Pro</span><span className="font-semibold">999 kr/mån — 50 brev</span></div>
-            <p className="text-xs text-gray-400">Extra brev utöver kvoten: 15 kr/st</p>
-          </div>
-          <button className="px-6 py-3 bg-teal-600 text-white font-semibold rounded-xl hover:bg-teal-700 transition-colors">
-            Aktivera add-on
-          </button>
-        </div>
-      </div>
-    )
+    return <LeadsUpgradePage />
   }
 
   const filteredLeads = leads
@@ -531,6 +510,111 @@ function NeighbourCampaignsTab() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Upgrade Landing Page ────────────────────────────────────
+
+function LeadsUpgradePage() {
+  const [activating, setActivating] = useState<string | null>(null)
+
+  const features = [
+    { emoji: '📬', title: 'Lagfarter — nå nyinflyttade', desc: 'Skicka brev till fastighetsägare som nyligen köpt bostad i ditt område.' },
+    { emoji: '🏘️', title: 'Granneffekten', desc: 'Följ upp varje avslutat jobb med brev till grannar automatiskt.' },
+    { emoji: '🤖', title: 'AI-skrivna brev', desc: 'Personliga och professionella brev genererade av AI, anpassade efter din bransch.' },
+  ]
+
+  const plans = [
+    { tier: 'starter', name: 'Starter', price: 499, quota: 20, perLetter: 15, popular: false },
+    { tier: 'pro', name: 'Pro', price: 999, quota: 50, perLetter: 12, popular: true },
+  ]
+
+  async function activate(tier: string) {
+    setActivating(tier)
+    try {
+      const res = await fetch('/api/billing/leads-addon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      const data = await res.json()
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url
+      } else if (data.success) {
+        window.location.reload()
+      }
+    } catch { /* silent */ }
+    setActivating(null)
+  }
+
+  return (
+    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+      <div className="max-w-3xl mx-auto">
+        {/* Hero */}
+        <div className="text-center mb-10 pt-8">
+          <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <Mail className="w-8 h-8 text-teal-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Handymate Leads</h1>
+          <p className="text-lg text-gray-500 max-w-md mx-auto">Nå rätt kunder automatiskt — direkt i brevlådan</p>
+        </div>
+
+        {/* Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+          {features.map(f => (
+            <div key={f.title} className="bg-white border border-gray-200 rounded-xl p-5 text-center">
+              <div className="text-3xl mb-3">{f.emoji}</div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">{f.title}</h3>
+              <p className="text-xs text-gray-500">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Pricing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+          {plans.map(plan => (
+            <div key={plan.tier} className={`bg-white rounded-xl border-2 p-6 relative ${
+              plan.popular ? 'border-teal-500 shadow-lg' : 'border-gray-200'
+            }`}>
+              {plan.popular && (
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                  Populärast
+                </span>
+              )}
+              <h3 className="text-lg font-bold text-gray-900 mb-1">{plan.name}</h3>
+              <div className="flex items-baseline gap-1 mb-4">
+                <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
+                <span className="text-gray-500 text-sm">kr/mån</span>
+              </div>
+              <ul className="text-sm text-gray-600 space-y-2 mb-6">
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />{plan.quota} brev/månad inkluderade</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />Extra brev: {plan.perLetter} kr/st</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />AI-genererade brev</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />Lagfarter + Granneffekten</li>
+              </ul>
+              <button
+                onClick={() => activate(plan.tier)}
+                disabled={activating !== null}
+                className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors ${
+                  plan.popular
+                    ? 'bg-teal-700 text-white hover:bg-teal-800'
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                } disabled:opacity-50`}
+              >
+                {activating === plan.tier ? 'Aktiverar...' : 'Aktivera nu'}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Guarantee */}
+        <div className="text-center">
+          <p className="text-sm text-gray-400">
+            🛡️ 30 dagars pengarna-tillbaka-garanti. Avsluta när du vill.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
