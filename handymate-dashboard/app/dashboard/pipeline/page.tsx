@@ -2784,9 +2784,10 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <span className="text-[10px] text-gray-400 font-mono ml-3.5">
+          <span className="text-sm font-medium text-teal-700 font-mono">
             D-{deal.id.slice(0, 6)}
-            {deal.customer?.customer_number && ` · ${deal.customer.customer_number}`}
+            {deal.customer?.customer_number && <span className="text-gray-400 font-sans"> · </span>}
+            {deal.customer?.customer_number && <span className="text-teal-600">{deal.customer.customer_number}</span>}
           </span>
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
