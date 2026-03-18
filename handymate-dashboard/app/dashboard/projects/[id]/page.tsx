@@ -1260,24 +1260,35 @@ export default function ProjectDetailPage() {
 
   // --- Tab definitions ---
 
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: 'overview', label: 'Oversikt' },
-    { key: 'team', label: 'Team' },
-    { key: 'schedule', label: 'Schema' },
-    { key: 'milestones', label: 'Delmoment' },
-    { key: 'changes', label: 'ATA' },
-    { key: 'arbetsorder', label: 'Arbetsorder' },
-    { key: 'time', label: 'Tidrapporter' },
-    { key: 'material', label: 'Material' },
-    { key: 'documents', label: 'Dokument' },
-    { key: 'log', label: 'Byggdagbok' },
-    { key: 'checklists', label: 'Checklistor' },
-    { key: 'canvas', label: 'Rityta' },
-    { key: 'field_reports', label: 'Fältrapporter' },
-    { key: 'leverantorer', label: 'Leverantorer' },
-    { key: 'economy', label: 'Ekonomi' },
-    { key: 'ai_log', label: 'Projektanalys' }
+  const tabGroups: { group: string; items: { key: TabKey; label: string }[] }[] = [
+    { group: 'ÖVERSIKT', items: [
+      { key: 'overview', label: 'Översikt' },
+      { key: 'economy', label: 'Ekonomi' },
+      { key: 'ai_log', label: 'Projektanalys' },
+    ]},
+    { group: 'PLANERING', items: [
+      { key: 'schedule', label: 'Schema' },
+      { key: 'milestones', label: 'Delmoment' },
+      { key: 'changes', label: 'ÄTA' },
+    ]},
+    { group: 'FÄLT', items: [
+      { key: 'arbetsorder', label: 'Arbetsorder' },
+      { key: 'time', label: 'Tidrapporter' },
+      { key: 'field_reports', label: 'Fältrapporter' },
+      { key: 'checklists', label: 'Checklistor' },
+      { key: 'canvas', label: 'Rityta' },
+    ]},
+    { group: 'RESURSER', items: [
+      { key: 'team', label: 'Team' },
+      { key: 'material', label: 'Material' },
+      { key: 'leverantorer', label: 'Leverantörer' },
+    ]},
+    { group: 'DOKUMENTATION', items: [
+      { key: 'documents', label: 'Dokument' },
+      { key: 'log', label: 'Byggdagbok' },
+    ]},
   ]
+  const allTabs = tabGroups.flatMap(g => g.items)
 
   // --- Render ---
 
@@ -1352,22 +1363,53 @@ export default function ProjectDetailPage() {
           <div className="fixed inset-0 z-10" onClick={() => setStatusDropdownOpen(false)} />
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {tabs.map(tab => (
+        {/* Mobile: horizontal scroll tabs */}
+        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 md:hidden">
+          {allTabs.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
                   ? 'bg-teal-600 text-white'
-                  : 'bg-gray-100 text-gray-500 hover:text-white'
+                  : 'bg-gray-100 text-gray-500'
               }`}
             >
               {tab.label}
             </button>
           ))}
         </div>
+
+        {/* Desktop: sidebar + content grid */}
+        <div className="flex gap-6">
+          {/* Vertical sidebar nav — desktop only */}
+          <nav className="hidden md:block w-[200px] flex-shrink-0">
+            <div className="sticky top-4 space-y-4">
+              {tabGroups.map(group => (
+                <div key={group.group}>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-3">{group.group}</p>
+                  <div className="space-y-0.5">
+                    {group.items.map(tab => (
+                      <button
+                        key={tab.key}
+                        onClick={() => setActiveTab(tab.key)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
+                          activeTab === tab.key
+                            ? 'text-teal-700 bg-teal-50 font-medium border-l-2 border-teal-600'
+                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-l-2 border-transparent'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </nav>
+
+          {/* Content area */}
+          <div className="flex-1 min-w-0">
 
         {/* === TAB: Oversikt === */}
         {activeTab === 'overview' && (
@@ -3626,6 +3668,9 @@ export default function ProjectDetailPage() {
           </div>
         )}
       </div>
+
+          </div>{/* /content area */}
+        </div>{/* /flex wrapper */}
 
       {/* === Milestone Modal === */}
       {milestoneModal.open && (
