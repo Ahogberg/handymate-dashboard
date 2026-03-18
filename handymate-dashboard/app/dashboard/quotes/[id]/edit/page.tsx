@@ -1271,16 +1271,16 @@ export default function EditQuotePage() {
               ) : (
                 <div className="space-y-2">
                   {/* Table header (desktop) */}
-                  <div className="hidden md:grid md:grid-cols-[28px_minmax(52px,5fr)_minmax(0,22fr)_minmax(0,6fr)_minmax(0,6fr)_minmax(0,8fr)_minmax(0,8fr)_minmax(0,12fr)_minmax(0,6fr)_28px] gap-1 px-3 py-1 text-xs text-gray-400 font-medium">
+                  <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_100px_64px_28px] gap-1 px-2 py-1 text-gray-400">
                     <span />
-                    <span>Typ</span>
-                    <span>Beskrivning</span>
-                    <span className="text-center">Antal</span>
-                    <span className="text-center">Enhet</span>
-                    <span className="text-right">Pris</span>
-                    <span className="text-right">Summa</span>
-                    <span className="text-center">Kategori</span>
-                    <span className="text-center">ROT/RUT</span>
+                    <span className="text-[9px] tracking-wider uppercase text-center">Typ</span>
+                    <span className="text-[9px] tracking-wider uppercase">Beskrivning</span>
+                    <span className="text-[9px] tracking-wider uppercase text-center">Antal</span>
+                    <span className="text-[9px] tracking-wider uppercase text-center">Enhet</span>
+                    <span className="text-[9px] tracking-wider uppercase text-right">Pris</span>
+                    <span className="text-[9px] tracking-wider uppercase text-right">Summa</span>
+                    <span className="text-[9px] tracking-wider uppercase text-center">Kategori</span>
+                    <span className="text-[9px] tracking-wider uppercase text-center">ROT</span>
                     <span />
                   </div>
 

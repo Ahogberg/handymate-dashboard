@@ -1413,16 +1413,16 @@ export default function NewQuotePage() {
 
               {/* Table header (desktop) */}
               {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[28px_minmax(52px,5fr)_minmax(0,22fr)_minmax(0,6fr)_minmax(0,6fr)_minmax(0,8fr)_minmax(0,8fr)_minmax(0,12fr)_minmax(0,6fr)_28px] gap-1 pb-2 border-b border-gray-200 mb-1">
+                <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_100px_64px_28px] gap-1 px-2 pb-2 border-b border-gray-100 mb-1">
                   <span />
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Typ</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400">Beskrivning</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Antal</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Enhet</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-right">Pris</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-right">Summa</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">Kategori</span>
-                  <span className="text-[10px] tracking-[0.08em] uppercase text-gray-400 text-center">ROT/RUT</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Typ</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400">Beskrivning</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Antal</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Enhet</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-right">Pris</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-right">Summa</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Kategori</span>
+                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">ROT</span>
                   <span />
                 </div>
               )}
