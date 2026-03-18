@@ -18,7 +18,26 @@ import {
   UserPlus,
   ArrowRight,
   Calendar,
+  Search,
+  ExternalLink,
+  Shield,
+  Zap,
+  ChevronDown,
 } from 'lucide-react'
+
+interface Customer {
+  business_id: string
+  business_name: string
+  contact_email: string | null
+  contact_name: string | null
+  subscription_plan: string
+  subscription_status: string | null
+  leads_addon: boolean | null
+  created_at: string
+  user_id: string | null
+  sms_sent: number
+  sms_quota: number
+}
 
 interface Metrics {
   total_businesses: number
@@ -80,10 +99,24 @@ export default function AdminDashboardPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [metrics, setMetrics] = useState<Metrics | null>(null)
   const [error, setError] = useState('')
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [planFilter, setPlanFilter] = useState<string>('all')
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers'>('overview')
+  const [updatingPlan, setUpdatingPlan] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
 
   useEffect(() => {
     fetchMetrics()
+    fetchCustomers()
   }, [])
+
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3000)
+      return () => clearTimeout(t)
+    }
+  }, [toast])
 
   async function fetchMetrics() {
     try {
@@ -115,9 +148,86 @@ export default function AdminDashboardPage() {
   async function handleRefresh() {
     setRefreshing(true)
     setError('')
-    await fetchMetrics()
+    await Promise.all([fetchMetrics(), fetchCustomers()])
     setRefreshing(false)
   }
+
+  async function fetchCustomers() {
+    try {
+      const res = await fetch('/api/admin/customers')
+      if (res.ok) {
+        const data = await res.json()
+        setCustomers(data.customers || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch customers:', err)
+    }
+  }
+
+  async function updateCustomerPlan(businessId: string, plan: string) {
+    setUpdatingPlan(businessId)
+    try {
+      const res = await fetch('/api/admin/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: businessId, subscription_plan: plan }),
+      })
+      if (res.ok) {
+        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, subscription_plan: plan } : c))
+        const biz = customers.find(c => c.business_id === businessId)
+        setToast(`Plan uppdaterad för ${biz?.business_name || businessId}`)
+      }
+    } catch { /* ignore */ }
+    setUpdatingPlan(null)
+  }
+
+  async function toggleLeadsAddon(businessId: string, current: boolean) {
+    try {
+      const res = await fetch('/api/admin/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: businessId, leads_addon: !current }),
+      })
+      if (res.ok) {
+        setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, leads_addon: !current } : c))
+        setToast(`Leads add-on ${!current ? 'aktiverad' : 'avaktiverad'}`)
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function impersonateBusiness(businessId: string, businessName: string) {
+    try {
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: businessId, business_name: businessName }),
+      })
+      if (res.ok) {
+        window.location.href = '/dashboard'
+      }
+    } catch { /* ignore */ }
+  }
+
+  async function setEnterpriseAll(businessId: string) {
+    try {
+      await fetch('/api/admin/customers', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ business_id: businessId, subscription_plan: 'business', leads_addon: true }),
+      })
+      setCustomers(prev => prev.map(c => c.business_id === businessId ? { ...c, subscription_plan: 'business', leads_addon: true } : c))
+      setToast('Enterprise + alla add-ons aktiverat!')
+    } catch { /* ignore */ }
+  }
+
+  const filteredCustomers = customers.filter(c => {
+    if (planFilter !== 'all' && c.subscription_plan !== planFilter) return false
+    if (customerSearch) {
+      const q = customerSearch.toLowerCase()
+      return (c.business_name || '').toLowerCase().includes(q) || (c.contact_email || '').toLowerCase().includes(q)
+    }
+    return true
+  })
 
   // --- Loading state ---
   if (loading) {
@@ -186,6 +296,18 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+          {(['overview', 'customers'] as const).map(tab => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}>
+              {tab === 'overview' ? 'Översikt' : `Kunder (${customers.length})`}
+            </button>
+          ))}
+        </div>
+
         {/* Error state */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
@@ -193,7 +315,100 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {metrics && (
+        {/* CUSTOMER TABLE TAB */}
+        {activeTab === 'customers' && (
+          <div className="space-y-4">
+            {/* Search + Filter */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
+                  placeholder="Sök företag eller mail..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
+              </div>
+              <select value={planFilter} onChange={e => setPlanFilter(e.target.value)}
+                className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-teal-400">
+                <option value="all">Alla planer</option>
+                <option value="starter">Starter</option>
+                <option value="professional">Professional</option>
+                <option value="business">Enterprise</option>
+              </select>
+            </div>
+
+            {/* Table */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Företag</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Plan</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase">Leads</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">SMS</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Registrerad</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-400 uppercase">Åtgärder</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredCustomers.map(c => (
+                      <tr key={c.business_id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-gray-900 text-sm">{c.business_name || '—'}</p>
+                          <p className="text-xs text-gray-400">{c.contact_email || '—'}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={c.subscription_plan || 'starter'}
+                            onChange={e => updateCustomerPlan(c.business_id, e.target.value)}
+                            disabled={updatingPlan === c.business_id}
+                            className={`text-xs font-medium px-2 py-1 rounded-lg border bg-white cursor-pointer focus:outline-none focus:border-teal-400 ${
+                              updatingPlan === c.business_id ? 'opacity-50' : ''
+                            }`}
+                          >
+                            <option value="starter">Starter</option>
+                            <option value="professional">Professional</option>
+                            <option value="business">Enterprise</option>
+                          </select>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => toggleLeadsAddon(c.business_id, !!c.leads_addon)}
+                            className={`w-9 h-5 rounded-full transition-colors relative ${c.leads_addon ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                            <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${c.leads_addon ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                          </button>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-500">{c.sms_sent}/{c.sms_quota}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-gray-500">{formatDate(c.created_at)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {c.contact_email === 'andreashogberg93@gmail.com' && (
+                              <button onClick={() => setEnterpriseAll(c.business_id)}
+                                title="Sätt Enterprise + alla add-ons"
+                                className="px-2 py-1 text-[10px] font-medium bg-amber-100 text-amber-700 rounded-md hover:bg-amber-200 transition-colors">
+                                🔧 Enterprise
+                              </button>
+                            )}
+                            <button onClick={() => impersonateBusiness(c.business_id, c.business_name)}
+                              className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+                              Impersonera
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {filteredCustomers.length === 0 && (
+                <div className="p-12 text-center text-gray-400 text-sm">Inga kunder matchar sökningen</div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'overview' && metrics && (
           <>
             {/* Key metric cards - grid of 4 */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -417,6 +632,13 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-4 py-3 rounded-xl shadow-lg text-sm z-50 animate-in fade-in slide-in-from-bottom-2">
+            {toast}
+          </div>
         )}
       </div>
     </div>

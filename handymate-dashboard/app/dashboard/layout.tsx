@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
@@ -66,6 +66,7 @@ export default function DashboardLayout({
               <div className="flex min-h-screen bg-slate-50">
                 <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
                 <main className="flex-1 md:ml-64">
+                  <ImpersonationBanner />
                   {children}
                 </main>
                 <Jobbkompisen />
@@ -78,5 +79,32 @@ export default function DashboardLayout({
         </JobbuddyProvider>
       </CurrentUserProvider>
     </BusinessContext.Provider>
+  )
+}
+
+function ImpersonationBanner() {
+  const [businessName, setBusinessName] = useState<string | null>(null)
+
+  useEffect(() => {
+    const name = document.cookie.match(/impersonate_business_name=([^;]+)/)
+    if (name) {
+      setBusinessName(decodeURIComponent(name[1]))
+    }
+  }, [])
+
+  if (!businessName) return null
+
+  const endImpersonation = async () => {
+    await fetch('/api/admin/impersonate', { method: 'DELETE' })
+    window.location.href = '/admin'
+  }
+
+  return (
+    <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between text-sm z-50 sticky top-0">
+      <span>Du impersonerar <strong>{businessName}</strong></span>
+      <button onClick={endImpersonation} className="px-3 py-1 bg-white text-red-600 rounded-lg font-medium text-xs hover:bg-red-50">
+        Avsluta impersonering
+      </button>
+    </div>
   )
 }
