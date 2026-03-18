@@ -63,6 +63,8 @@ interface BusinessConfig {
   subscription_plan: string
   subscription_status: string
   trial_ends_at: string
+  logo_url: string | null
+  leads_addon: boolean
   // Telefoni
   assigned_phone_number: string | null
   forward_phone_number: string | null
@@ -1358,7 +1360,59 @@ export default function SettingsPage() {
         {activeTab === 'company' && (
           <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-6">
             <h2 className="text-lg font-semibold text-gray-900">Företagsinformation</h2>
-            
+
+            {/* Logotyp-upload */}
+            <div className="border border-gray-200 rounded-xl p-4">
+              <label className="flex items-center gap-2 text-sm text-gray-500 mb-3">
+                <Upload className="w-4 h-4" />
+                Företagslogga
+              </label>
+              <div className="flex items-center gap-4">
+                {config.logo_url ? (
+                  <img
+                    src={config.logo_url}
+                    alt="Logga"
+                    className="w-16 h-16 object-contain rounded-lg border border-gray-200 bg-white"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-100 rounded-lg border border-dashed border-gray-300 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-gray-300" />
+                  </div>
+                )}
+                <div>
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-100 transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    {config.logo_url ? 'Byt logga' : 'Ladda upp'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept=".png,.jpg,.jpeg,.svg,.webp"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        const formData = new FormData()
+                        formData.append('file', file)
+                        try {
+                          const res = await fetch('/api/business/logo', { method: 'POST', body: formData })
+                          const data = await res.json()
+                          if (res.ok && data.logo_url) {
+                            setConfig({ ...config, logo_url: data.logo_url })
+                            showToast('Logga uppladdad!', 'success')
+                          } else {
+                            showToast(data.error || 'Kunde inte ladda upp', 'error')
+                          }
+                        } catch {
+                          showToast('Uppladdning misslyckades', 'error')
+                        }
+                        e.target.value = ''
+                      }}
+                    />
+                  </label>
+                  <p className="text-xs text-gray-400 mt-1">PNG, JPG eller SVG, max 2 MB</p>
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">

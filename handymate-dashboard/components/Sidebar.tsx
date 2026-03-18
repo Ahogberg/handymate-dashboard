@@ -22,6 +22,7 @@ import {
   Bot,
   ClipboardCheck,
   Gift,
+  Mail,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -75,6 +76,7 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'AI-assistent', icon: Bot, href: '/dashboard/agent' },
+  { type: 'link', key: 'leads-outbound', label: 'Utskick', icon: Mail, href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
@@ -458,7 +460,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
-  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings'])
+  const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound'])
   const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   function filterNavForRole(items: NavItem[]): NavItem[] {

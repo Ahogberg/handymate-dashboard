@@ -126,6 +126,11 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     name: 'Lead Intelligence & Analys',
     plans: ['professional', 'business'],
   },
+  leads_outbound: {
+    key: 'leads_outbound',
+    name: 'Utskick till fastighetsägare',
+    plans: ['professional', 'business'],
+  },
   website_widget: {
     key: 'website_widget',
     name: 'Hemsida-widget',
