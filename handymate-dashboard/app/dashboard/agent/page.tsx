@@ -170,6 +170,45 @@ interface AutomationHistoryItem {
   attempt_number: number
 }
 
+// ── Team Members ──────────────────────────────────────────────────────
+
+interface TeamAgent {
+  id: string
+  name: string
+  role: string
+  initials: string
+  color: string
+  greeting: string
+}
+
+const TEAM: TeamAgent[] = [
+  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', greeting: 'Hej! Här är läget för idag ☀️' },
+  { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', greeting: 'Jag har koll på ekonomin — kollar fakturorna' },
+  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', greeting: 'Dags att nå fler kunder!' },
+  { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', greeting: 'Jag följer upp offerten idag' },
+  { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', greeting: 'Alla projekt löper på — inga förseningar' },
+]
+
+function getAgentForAction(actionType: string): TeamAgent {
+  if (['create_invoice', 'get_invoices', 'send_invoice_reminder'].includes(actionType)) return TEAM[1] // Karin
+  if (['send_sms', 'send_email', 'create_campaign'].includes(actionType)) return TEAM[2] // Hanna
+  if (['create_quote', 'get_quotes', 'qualify_lead', 'update_lead_status'].includes(actionType)) return TEAM[3] // Daniel
+  if (['create_booking', 'update_project', 'check_calendar', 'log_time'].includes(actionType)) return TEAM[4] // Lars
+  return TEAM[0] // Matte (default)
+}
+
+function getAgentForRun(run: { trigger_type: string; tool_calls: number; final_response?: string }): TeamAgent {
+  if (run.trigger_type === 'phone_call' || run.trigger_type === 'incoming_sms') return TEAM[0] // Matte handles comms
+  if (run.trigger_type === 'cron') {
+    const resp = (run.final_response || '').toLowerCase()
+    if (resp.includes('faktur') || resp.includes('betalning')) return TEAM[1]
+    if (resp.includes('kampanj') || resp.includes('lead') || resp.includes('kund')) return TEAM[2]
+    if (resp.includes('offert') || resp.includes('pipeline')) return TEAM[3]
+    if (resp.includes('projekt') || resp.includes('bokning')) return TEAM[4]
+  }
+  return TEAM[0]
+}
+
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color: string; bg: string }> = {
@@ -367,7 +406,7 @@ function ActivityItem({ run, isSelected, onClick }: {
   run: AgentRun; isSelected: boolean; onClick: () => void
 }) {
   const trigger = TRIGGER_CONFIG[run.trigger_type] || TRIGGER_CONFIG.manual
-  const TriggerIcon = trigger.icon
+  const agent = getAgentForRun(run)
 
   return (
     <button
@@ -377,12 +416,13 @@ function ActivityItem({ run, isSelected, onClick }: {
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center flex-shrink-0 ${trigger.bg}`}>
-          <TriggerIcon className={`w-5 h-5 ${trigger.color}`} />
+        <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+          {agent.initials}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-semibold text-gray-900">{trigger.label}</span>
+            <span className="text-sm font-semibold text-gray-900">{agent.name}</span>
+            <span className="text-xs text-gray-400">{trigger.label}</span>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
               run.status === 'completed'
                 ? 'bg-emerald-100 text-emerald-700'
@@ -1586,8 +1626,8 @@ function ManualTrigger({ businessId, onTriggered }: {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center gap-2 mb-3">
-        <Bot className="w-5 h-5 text-teal-600" />
-        <h3 className="text-sm font-bold text-gray-900">Ge agenten en uppgift</h3>
+        <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-xs">M</div>
+        <h3 className="text-sm font-bold text-gray-900">Prata med Matte</h3>
       </div>
 
       {/* History chips */}
@@ -1779,7 +1819,9 @@ export default function AgentDashboardPage() {
 
   const filteredRuns = filterType === 'all'
     ? runs
-    : runs.filter(r => r.trigger_type === filterType)
+    : TEAM.some(a => a.id === filterType)
+      ? runs.filter(r => getAgentForRun(r).id === filterType)
+      : runs.filter(r => r.trigger_type === filterType)
 
   // ── Success rate ─────────────────────────────────────────────────
   const successRate = stats && stats.total_runs > 0
@@ -1812,14 +1854,11 @@ export default function AgentDashboardPage() {
   return (
     <div className="p-4 sm:p-8 max-w-[1440px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-sm shadow-teal-500/20">
-            <Bot className="w-5 h-5 text-white" />
-          </div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">AI-assistent</h1>
-            <p className="text-sm text-gray-500">Realtidsöversikt</p>
+            <h1 className="text-xl font-bold text-gray-900">Ditt backoffice-team</h1>
+            <p className="text-sm text-gray-500">5 AI-medarbetare jobbar för dig dygnet runt</p>
           </div>
           <div className="flex items-center gap-1.5 ml-4 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">
             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -1869,6 +1908,44 @@ export default function AgentDashboardPage() {
         >
           <Shield className="w-4 h-4" />
           AI-inställningar
+        </button>
+      </div>
+
+      {/* Team Avatars */}
+      <div className="flex gap-3 mb-6 overflow-x-auto pb-1">
+        {TEAM.map((agent) => (
+          <button
+            key={agent.id}
+            onClick={() => setFilterType(agent.id)}
+            className={`flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all min-w-[80px] ${
+              filterType === agent.id
+                ? 'bg-white border-teal-300 shadow-sm'
+                : filterType === 'all'
+                  ? 'bg-white border-gray-200 hover:border-gray-300'
+                  : 'bg-gray-50 border-gray-100 opacity-60 hover:opacity-100'
+            }`}
+          >
+            <div className="relative">
+              <div className={`w-10 h-10 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-sm`}>
+                {agent.initials}
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+            </div>
+            <span className="text-xs font-medium text-gray-900">{agent.name}</span>
+            <span className="text-[10px] text-gray-400">{agent.role}</span>
+          </button>
+        ))}
+        <button
+          onClick={() => setFilterType('all')}
+          className={`flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all min-w-[80px] ${
+            filterType === 'all' ? 'bg-teal-50 border-teal-300' : 'bg-white border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
+            <Bot className="w-5 h-5" />
+          </div>
+          <span className="text-xs font-medium text-gray-900">Alla</span>
+          <span className="text-[10px] text-gray-400">Hela teamet</span>
         </button>
       </div>
 
@@ -1969,27 +2046,10 @@ export default function AgentDashboardPage() {
             {/* Activity Feed */}
             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                <span className="text-sm font-bold text-gray-900">Agentaktivitet</span>
-                <div className="flex gap-1">
-                  {[
-                    { key: 'all', label: 'Alla' },
-                    { key: 'phone_call', label: 'Samtal', icon: Phone },
-                    { key: 'incoming_sms', label: 'SMS', icon: MessageSquare },
-                    { key: 'manual', label: 'Manuell', icon: Settings2 },
-                  ].map(f => (
-                    <button
-                      key={f.key}
-                      onClick={() => setFilterType(f.key)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                        filterType === f.key
-                          ? 'bg-teal-50 text-teal-700 border border-teal-200'
-                          : 'text-gray-500 border border-transparent hover:bg-gray-50'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                <span className="text-sm font-bold text-gray-900">Teamaktivitet</span>
+                <span className="text-xs text-gray-400">
+                  {filterType !== 'all' ? TEAM.find(a => a.id === filterType)?.name || 'Alla' : 'Alla'}
+                </span>
               </div>
               <div className="max-h-[600px] overflow-y-auto">
                 {filteredRuns.length > 0 ? (

@@ -84,7 +84,7 @@ const NAV: NavItem[] = [
       { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
     ],
   },
-  { type: 'link', key: 'agent', label: 'AI-assistent', icon: Bot, href: '/dashboard/agent' },
+  { type: 'link', key: 'agent', label: 'Mitt team', icon: Users, href: '/dashboard/agent' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
