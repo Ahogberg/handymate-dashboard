@@ -46,6 +46,9 @@ jobs:
       - name: Determine which agent to run
         id: agent
         run: |
+          echo "Event: ${{ github.event_name }}"
+          echo "Hour: $(date -u +%H)"
+          echo "Day: $(date -u +%u)"
           if [ "${{ github.event_name }}" = "push" ]; then
             echo "agent=qa" >> $GITHUB_OUTPUT
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -61,6 +64,7 @@ jobs:
               echo "agent=strategy" >> $GITHUB_OUTPUT
             fi
           fi
+          echo "Agent: $(cat $GITHUB_OUTPUT 2>/dev/null | grep agent | cut -d= -f2 || echo 'none')"
 
       - name: Run Agent
         env:
@@ -70,6 +74,14 @@ jobs:
         run: |
           AGENT="${{ steps.agent.outputs.agent }}"
           echo "Kör agent: $AGENT"
+          if [ -z "$AGENT" ]; then
+            echo "Ingen agent definierad, hoppar över"
+            exit 0
+          fi
+          if [ ! -f "agents/orchestrator.md" ]; then
+            echo "FEL: agents/orchestrator.md saknas!"
+            exit 1
+          fi
           claude --dangerously-skip-permissions \
             "Läs agents/orchestrator.md och kör $AGENT"
 
