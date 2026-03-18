@@ -28,6 +28,7 @@ interface ToolContext {
   businessName: string
   contactEmail: string
   googleConnection: GoogleConnection | null
+  agentId?: string
 }
 
 function generateId(prefix: string): string {
@@ -102,6 +103,10 @@ export async function executeTool(
         return await triggerFortnoxSyncTool(businessId, input)
       case 'get_pricing_suggestion':
         return await getPricingSuggestionTool(businessId, input)
+      case 'send_agent_message':
+        return await sendAgentMessageTool(supabase, businessId, context, input)
+      case 'get_agent_messages':
+        return await getAgentMessagesTool(supabase, businessId, context)
       default:
         return { success: false, error: `Okänt verktyg: ${name}` }
     }
@@ -1433,5 +1438,99 @@ async function getPricingSuggestionTool(
     }
   } catch (err: any) {
     return { success: false, error: `Prisförslag misslyckades: ${err.message}` }
+  }
+}
+
+// ── Inter-agent communication tools ──
+
+async function sendAgentMessageTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  context: ToolContext,
+  input: Record<string, unknown>
+): Promise<ToolResult> {
+  const toAgent = input.to_agent as string
+  const messageType = input.message_type as string
+  const content = input.content as string
+  const fromAgent = context.agentId || 'matte'
+
+  if (!toAgent || !content) {
+    return { success: false, error: 'Saknar mottagare eller meddelande' }
+  }
+
+  const validAgents = ['matte', 'karin', 'hanna', 'daniel', 'lars']
+  if (!validAgents.includes(toAgent)) {
+    return { success: false, error: `Okänd agent: ${toAgent}. Giltiga: ${validAgents.join(', ')}` }
+  }
+
+  const { error } = await supabase.from('agent_messages').insert({
+    business_id: businessId,
+    from_agent: fromAgent,
+    to_agent: toAgent,
+    message_type: messageType || 'request',
+    content,
+  })
+
+  if (error) {
+    return { success: false, error: `Kunde inte skicka meddelande: ${error.message}` }
+  }
+
+  const agentNames: Record<string, string> = {
+    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars',
+  }
+
+  return {
+    success: true,
+    data: {
+      message: `Meddelande skickat till ${agentNames[toAgent]}`,
+      to: toAgent,
+      type: messageType,
+    },
+  }
+}
+
+async function getAgentMessagesTool(
+  supabase: SupabaseClient,
+  businessId: string,
+  context: ToolContext
+): Promise<ToolResult> {
+  const agentId = context.agentId || 'matte'
+
+  const { data, error } = await supabase
+    .from('agent_messages')
+    .select('id, from_agent, message_type, content, created_at')
+    .eq('business_id', businessId)
+    .eq('to_agent', agentId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (error) {
+    return { success: false, error: `Kunde inte hämta meddelanden: ${error.message}` }
+  }
+
+  // Mark as read
+  if (data && data.length > 0) {
+    await supabase
+      .from('agent_messages')
+      .update({ status: 'read' })
+      .in('id', data.map((m: any) => m.id))
+  }
+
+  const agentNames: Record<string, string> = {
+    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars',
+  }
+
+  return {
+    success: true,
+    data: {
+      messages: (data || []).map((m: any) => ({
+        from: agentNames[m.from_agent] || m.from_agent,
+        type: m.message_type,
+        content: m.content,
+        time: m.created_at,
+      })),
+      count: data?.length || 0,
+    },
   }
 }

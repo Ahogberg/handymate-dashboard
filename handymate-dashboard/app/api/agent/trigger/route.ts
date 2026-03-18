@@ -9,6 +9,7 @@ import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
+import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
 
 // Central AI agent endpoint — handles ALL inbound triggers:
 // - Manual (dashboard), phone_call (46elks/Vapi), incoming_sms, cron
@@ -269,13 +270,25 @@ export async function POST(request: NextRequest) {
       trigger_data
     )
 
-    // Inject agent personality
-    const systemPrompt = baseSystemPrompt + '\n\n' + getAgentPromptSuffix(agentId)
+    // Inject agent personality + memories + messages
+    let memorySuffix = ''
+    let messagesSuffix = ''
+    try {
+      const [memories, agentMsgs] = await Promise.all([
+        getRelevantMemories(businessId, agentId),
+        fetchAgentMessages(businessId, agentId),
+      ])
+      memorySuffix = buildMemoryPrompt(memories)
+      messagesSuffix = buildMessagesPrompt(agentMsgs)
+    } catch { /* non-blocking */ }
+
+    const systemPrompt = baseSystemPrompt + '\n\n' + getAgentPromptSuffix(agentId) + memorySuffix + messagesSuffix
 
     const context = {
       businessName: bizConfig.business_name || 'Handymate',
       contactEmail: bizConfig.contact_email || '',
       googleConnection,
+      agentId,
     }
 
     // Build initial user message
@@ -396,6 +409,9 @@ export async function POST(request: NextRequest) {
     } catch (insertErr: any) {
       console.error('[agent] Failed to insert agent_run:', insertErr?.message || insertErr)
     }
+
+    // Extract and save memory (fire-and-forget)
+    extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}).catch(() => {})
 
     return NextResponse.json({
       run_id: runId,

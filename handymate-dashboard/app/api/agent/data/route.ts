@@ -106,6 +106,42 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ settings: data?.settings || null })
     }
 
+    case 'team': {
+      // Fetch memory counts per agent + recent inter-agent messages
+      const [memoriesRes, messagesRes] = await Promise.all([
+        supabase.rpc('count_by_group', { _table: 'agent_memories', _group_col: 'agent_id', _filter_col: 'business_id', _filter_val: businessId }).catch(() => null),
+        supabase
+          .from('agent_messages')
+          .select('id, from_agent, to_agent, message_type, content, status, created_at')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ])
+
+      // Fallback: direct count per agent if rpc doesn't exist
+      let memoryCounts: Record<string, number> = {}
+      if (memoriesRes?.data) {
+        for (const row of memoriesRes.data) {
+          memoryCounts[row.agent_id] = row.count
+        }
+      } else {
+        // Manual count
+        for (const agentId of ['matte', 'karin', 'hanna', 'daniel', 'lars']) {
+          const { count } = await supabase
+            .from('agent_memories')
+            .select('*', { count: 'exact', head: true })
+            .eq('business_id', businessId)
+            .eq('agent_id', agentId)
+          memoryCounts[agentId] = count || 0
+        }
+      }
+
+      return NextResponse.json({
+        memory_counts: memoryCounts,
+        messages: messagesRes?.data || [],
+      })
+    }
+
     default:
       return NextResponse.json({ error: 'Invalid type parameter' }, { status: 400 })
   }

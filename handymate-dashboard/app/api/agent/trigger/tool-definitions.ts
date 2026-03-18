@@ -426,4 +426,38 @@ export const toolDefinitions = [
       required: ["job_type"],
     },
   },
+
+  // Inter-agent communication
+  {
+    name: "send_agent_message",
+    description: "Skicka ett meddelande till en annan agent i teamet. Använd för att delegera, informera eller begära hjälp.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to_agent: {
+          type: "string",
+          description: "Mottagande agent: matte, karin, hanna, daniel, eller lars",
+          enum: ["matte", "karin", "hanna", "daniel", "lars"],
+        },
+        message_type: {
+          type: "string",
+          description: "Meddelandetyp: request (begäran), insight (insikt), alert (varning), handoff (överlämning)",
+          enum: ["request", "insight", "alert", "handoff"],
+        },
+        content: {
+          type: "string",
+          description: "Meddelandet till agenten, på svenska",
+        },
+      },
+      required: ["to_agent", "message_type", "content"],
+    },
+  },
+  {
+    name: "get_agent_messages",
+    description: "Hämta olästa meddelanden från andra agenter i teamet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+    },
+  },
 ] as const
