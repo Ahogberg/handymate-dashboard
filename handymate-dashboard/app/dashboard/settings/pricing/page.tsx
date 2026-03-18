@@ -369,7 +369,7 @@ export default function PricingSettingsPage() {
           ))}
 
           {segments.length === 0 && (
-            <p className="text-center text-gray-400 py-8">Inga kundtyper ännu. Kör SQL-migrationen först.</p>
+            <p className="text-center text-gray-400 py-8">Du har inga kundtyper än — lägg till din första ovan.</p>
           )}
         </div>
       )}
@@ -428,7 +428,7 @@ export default function PricingSettingsPage() {
           ))}
 
           {contractTypes.length === 0 && (
-            <p className="text-center text-gray-400 py-8">Inga avtalsformer ännu. Kör SQL-migrationen först.</p>
+            <p className="text-center text-gray-400 py-8">Du har inga avtalsformer än — lägg till din första ovan.</p>
           )}
         </div>
       )}

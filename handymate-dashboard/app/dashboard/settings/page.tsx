@@ -697,7 +697,7 @@ export default function SettingsPage() {
       const authHeaders = await getAuthHeaders()
       const res = await fetch('/api/phone/settings', { method: 'POST', headers: authHeaders })
       if (res.ok) {
-        setWebhookSyncMsg({ text: 'Webhook-URL:er synkade med 46elks!', ok: true })
+        setWebhookSyncMsg({ text: 'Telefonikoppling uppdaterad!', ok: true })
       } else {
         const data = await res.json()
         setWebhookSyncMsg({ text: data.error || 'Synkfel', ok: false })
@@ -1841,10 +1841,10 @@ export default function SettingsPage() {
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <RefreshCw className="w-5 h-5 text-gray-400" />
-                  <h2 className="text-base font-semibold text-gray-900">Webhook-diagnostik</h2>
+                  <h2 className="text-base font-semibold text-gray-900">Felsökning telefoni</h2>
                 </div>
                 <p className="text-xs text-gray-400 mb-4">
-                  Webhook-URL:er synkas automatiskt dagligen. Använd denna knapp bara om SMS- eller röst-webhook slutade fungera.
+                  Kopplingar uppdateras automatiskt varje dag. Använd knappen nedan bara om SMS eller samtal slutat fungera.
                 </p>
                 <div className="flex items-center gap-4">
                   <button
@@ -1853,7 +1853,7 @@ export default function SettingsPage() {
                     className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncingWebhooks ? 'animate-spin' : ''}`} />
-                    Synka webhook-URL:er med 46elks
+                    Uppdatera telefonikoppling
                   </button>
                   {webhookSyncMsg && (
                     <span className={`text-sm font-medium ${webhookSyncMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -2537,7 +2537,7 @@ export default function SettingsPage() {
                   <div className="text-center py-8 text-gray-400">
                     <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">Inga arbetstyper ännu</p>
-                    <p className="text-xs mt-1">Kör SQL-migrationen för att skapa standardtyper</p>
+                    <p className="text-xs mt-1">Kontakta support för att aktivera arbetstyper</p>
                   </div>
                 )}
               </div>

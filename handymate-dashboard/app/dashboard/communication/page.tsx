@@ -93,7 +93,7 @@ const toneLabels: Record<string, string> = {
 const settingsCheckboxes: Array<{ key: keyof CommunicationSettings; label: string }> = [
   { key: 'send_booking_confirmation', label: 'Bekräftelse vid bokning' },
   { key: 'send_day_before_reminder', label: 'Påminnelse dagen innan besök' },
-  { key: 'send_on_the_way', label: '"Vi är på väg" (manuell trigger)' },
+  { key: 'send_on_the_way', label: '"Vi är på väg" (skickas manuellt)' },
   { key: 'send_quote_followup', label: 'Uppföljning efter offert (om ej svar på 3 dagar)' },
   { key: 'send_job_completed', label: 'Tack efter avslutat jobb' },
   { key: 'send_invoice_reminder', label: 'Påminnelse vid förfallen faktura' },

@@ -245,7 +245,7 @@ export default function PhoneSettingsPage() {
     try {
       const res = await fetch('/api/phone/settings', { method: 'POST' })
       if (res.ok) {
-        setSyncMsg({ text: 'Webhook-URL:er synkade med 46elks!', ok: true })
+        setSyncMsg({ text: 'Telefonikoppling uppdaterad!', ok: true })
       } else {
         const data = await res.json()
         setSyncMsg({ text: data.error || 'Synkfel', ok: false })
@@ -897,7 +897,7 @@ export default function PhoneSettingsPage() {
               {config?.elks_number_id && (
                 <div className="border-t border-gray-100 pt-4">
                   <p className="text-xs text-gray-400 mb-2">
-                    Webhook-URL:er synkas automatiskt dagligen. Använd denna knapp bara om SMS eller röst-webhook slutade fungera.
+                    Kopplingar uppdateras automatiskt varje dag. Använd knappen nedan bara om SMS eller samtal slutat fungera.
                   </p>
                   <div className="flex items-center gap-3">
                     <button
@@ -906,7 +906,7 @@ export default function PhoneSettingsPage() {
                       className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
                     >
                       <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-                      Synka webhook-URL:er med 46elks
+                      Uppdatera telefonikoppling
                     </button>
                     {syncMsg && (
                       <span className={`text-sm font-medium ${syncMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>

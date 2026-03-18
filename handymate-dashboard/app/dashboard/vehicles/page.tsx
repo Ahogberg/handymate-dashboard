@@ -533,7 +533,7 @@ function ReportModal({
         setDistanceUnit('km')
         if (data.google_maps_url) setGoogleMapsUrl(data.google_maps_url)
       } else if (data.manual) {
-        alert('Google Maps API-nyckel saknas. Fyll i avståndet manuellt.')
+        alert('Automatisk avståndsberäkning är inte aktiverad. Fyll i avståndet manuellt.')
       } else {
         alert(data.error || 'Kunde inte beräkna avstånd')
       }
