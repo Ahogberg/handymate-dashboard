@@ -91,6 +91,7 @@ jobs:
           git add -A
           if ! git diff --staged --quiet; then
             git commit -m "🤖 Agent [${{ steps.agent.outputs.agent }}] $(date -u +%Y-%m-%d)"
+            git pull --rebase origin main || true
             git push
           else
             echo "Inga ändringar att committa"
