@@ -57,6 +57,29 @@ interface Metrics {
   }>
 }
 
+interface Partner {
+  id: string
+  name: string
+  email: string
+  company: string | null
+  referral_code: string | null
+  referral_url: string | null
+  commission_rate: number | null
+  total_earned_sek: number | null
+  total_pending_sek: number | null
+  total_referred: number | null
+  total_converted: number | null
+  status: string
+  approved_at: string | null
+  created_at: string
+}
+
+const PARTNER_STATUS: Record<string, { label: string; cls: string }> = {
+  pending_approval: { label: 'Väntar', cls: 'bg-amber-100 text-amber-700' },
+  active: { label: 'Aktiv', cls: 'bg-green-100 text-green-700' },
+  suspended: { label: 'Pausad', cls: 'bg-red-100 text-red-700' },
+}
+
 const PLAN_LABELS: Record<string, string> = {
   starter: 'Starter',
   professional: 'Professional',
@@ -102,13 +125,16 @@ export default function AdminDashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [planFilter, setPlanFilter] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners'>('overview')
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  const [partners, setPartners] = useState<Partner[]>([])
+  const [partnerFilter, setPartnerFilter] = useState<string>('all')
 
   useEffect(() => {
     fetchMetrics()
     fetchCustomers()
+    fetchPartners()
   }, [])
 
   useEffect(() => {
@@ -161,6 +187,34 @@ export default function AdminDashboardPage() {
       }
     } catch (err) {
       console.error('Failed to fetch customers:', err)
+    }
+  }
+
+  async function fetchPartners() {
+    try {
+      const res = await fetch('/api/admin/partners')
+      if (res.ok) {
+        const data = await res.json()
+        setPartners(data.partners || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch partners:', err)
+    }
+  }
+
+  async function handlePartnerAction(id: string, action: 'approve' | 'suspend' | 'reactivate') {
+    try {
+      const res = await fetch('/api/admin/partners', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, action }),
+      })
+      if (res.ok) {
+        setToast(action === 'approve' ? 'Partner godkänd!' : action === 'suspend' ? 'Partner pausad' : 'Partner återaktiverad')
+        fetchPartners()
+      }
+    } catch (err) {
+      console.error('Partner action failed:', err)
     }
   }
 
@@ -316,12 +370,12 @@ export default function AdminDashboardPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-          {(['overview', 'customers'] as const).map(tab => (
+          {(['overview', 'customers', 'partners'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}>
-              {tab === 'overview' ? 'Översikt' : `Kunder (${customers.length})`}
+              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : `Partners (${partners.length})`}
             </button>
           ))}
         </div>
@@ -650,6 +704,100 @@ export default function AdminDashboardPage() {
               </div>
             </div>
           </>
+        )}
+
+        {/* PARTNERS TAB */}
+        {activeTab === 'partners' && (
+          <div className="space-y-4">
+            {/* Filter */}
+            <div className="flex gap-2">
+              {['all', 'pending_approval', 'active', 'suspended'].map(f => (
+                <button key={f} onClick={() => setPartnerFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    partnerFilter === f ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}>
+                  {f === 'all' ? 'Alla' : PARTNER_STATUS[f]?.label || f}
+                  {f === 'pending_approval' && partners.filter(p => p.status === 'pending_approval').length > 0 && (
+                    <span className="ml-1.5 bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                      {partners.filter(p => p.status === 'pending_approval').length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Partner list */}
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {partners.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 text-sm">Inga partners registrerade ännu</div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-500 text-xs uppercase">
+                      <th className="text-left px-4 py-3">Partner</th>
+                      <th className="text-left px-4 py-3">Referralkod</th>
+                      <th className="text-center px-4 py-3">Hänvisade</th>
+                      <th className="text-center px-4 py-3">Konverterade</th>
+                      <th className="text-right px-4 py-3">Intjänat</th>
+                      <th className="text-center px-4 py-3">Status</th>
+                      <th className="text-right px-4 py-3">Åtgärd</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {partners
+                      .filter(p => partnerFilter === 'all' || p.status === partnerFilter)
+                      .map(partner => {
+                        const status = PARTNER_STATUS[partner.status] || { label: partner.status, cls: 'bg-gray-100 text-gray-600' }
+                        return (
+                          <tr key={partner.id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-gray-900">{partner.name}</p>
+                                <p className="text-xs text-gray-400">{partner.email}</p>
+                                {partner.company && <p className="text-xs text-gray-400">{partner.company}</p>}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{partner.referral_code || '—'}</code>
+                            </td>
+                            <td className="px-4 py-3 text-center">{partner.total_referred || 0}</td>
+                            <td className="px-4 py-3 text-center">{partner.total_converted || 0}</td>
+                            <td className="px-4 py-3 text-right">{formatSEK(partner.total_earned_sek || 0)}</td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${status.cls}`}>
+                                {status.label}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex gap-1.5 justify-end">
+                                {partner.status === 'pending_approval' && (
+                                  <button onClick={() => handlePartnerAction(partner.id, 'approve')}
+                                    className="px-3 py-1 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700">
+                                    Godkänn
+                                  </button>
+                                )}
+                                {partner.status === 'active' && (
+                                  <button onClick={() => handlePartnerAction(partner.id, 'suspend')}
+                                    className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg text-xs font-medium hover:bg-gray-200">
+                                    Pausa
+                                  </button>
+                                )}
+                                {partner.status === 'suspended' && (
+                                  <button onClick={() => handlePartnerAction(partner.id, 'reactivate')}
+                                    className="px-3 py-1 bg-teal-100 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-200">
+                                    Återaktivera
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Toast */}
