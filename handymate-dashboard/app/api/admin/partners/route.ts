@@ -1,26 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSupabase } from '@/lib/supabase'
-
-const ADMIN_EMAILS = ['andreas@handymate.se', 'andreashogberg93@gmail.com']
-
-async function verifyAdmin(request: NextRequest) {
-  const supabase = getServerSupabase()
-  const cookieHeader = request.headers.get('cookie') || ''
-  const token = cookieHeader.match(/sb-[^=]+-auth-token=([^;]+)/)?.[1]
-  if (!token) return false
-  const { data: { user } } = await supabase.auth.getUser(decodeURIComponent(token))
-  return user && ADMIN_EMAILS.includes(user.email || '')
-}
+import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
 
 /**
  * GET /api/admin/partners — Lista alla partners
  */
 export async function GET(request: NextRequest) {
-  if (!(await verifyAdmin(request))) {
+  const adminCheck = await isAdmin(request)
+  if (!adminCheck.isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const supabase = getServerSupabase()
+  const supabase = getAdminSupabase()
 
   const { data: partners, error } = await supabase
     .from('partners')
@@ -39,11 +29,12 @@ export async function GET(request: NextRequest) {
  * Body: { id, action: 'approve' | 'suspend' | 'reactivate' }
  */
 export async function PATCH(request: NextRequest) {
-  if (!(await verifyAdmin(request))) {
+  const adminCheck = await isAdmin(request)
+  if (!adminCheck.isAdmin) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const supabase = getServerSupabase()
+  const supabase = getAdminSupabase()
   const { id, action } = await request.json()
 
   if (!id || !action) {
