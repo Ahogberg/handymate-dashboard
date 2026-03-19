@@ -48,6 +48,7 @@ import {
   ChevronUp,
   Code2,
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { useBusiness } from '@/lib/BusinessContext'
 import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 import {
@@ -321,6 +322,20 @@ function humanizeResponse(text: string): string {
     .replace(/Kommunikation:\s*0 samtal,?\s*0 SMS/gi, 'Inga samtal eller meddelanden idag')
     .replace(/check_pending_approvals/gi, 'Kontrollerade godkännanden')
     .replace(/pending_approvals/gi, 'godkännanden')
+    .replace(/log_automation_action/gi, 'Loggade åtgärd')
+    .replace(/get_daily_stats/gi, 'Hämtade daglig statistik')
+    .replace(/search_customers/gi, 'Sökte bland kunder')
+    .replace(/search_leads/gi, 'Sökte bland leads')
+    .replace(/get_customer/gi, 'Hämtade kundinfo')
+    .replace(/get_lead/gi, 'Hämtade lead-info')
+    .replace(/get_quotes/gi, 'Hämtade offerter')
+    .replace(/create_approval_request/gi, 'Skapade godkännandeförfrågan')
+    .replace(/send_sms/gi, 'Skickade SMS')
+    .replace(/send_email/gi, 'Skickade e-post')
+    .replace(/create_booking/gi, 'Skapade bokning')
+    .replace(/check_calendar/gi, 'Kollade kalendern')
+    .replace(/qualify_lead/gi, 'Kvalificerade lead')
+    .replace(/update_lead_status/gi, 'Uppdaterade lead-status')
     .replace(/\btrigger\b/gi, 'händelse')
     .replace(/\bcron\b/gi, 'automatisk')
     .replace(/Could not find the table/gi, 'Kunde inte kontrollera')
@@ -494,8 +509,8 @@ function ActivityItem({ run, isSelected, onClick }: {
 
 // ── Tool Step ──────────────────────────────────────────────────────────
 
-function ToolStep({ call, index, total }: {
-  call: NonNullable<AgentStep['tool_calls']>[0]; index: number; total: number
+function ToolStep({ call, index, total, count = 1 }: {
+  call: NonNullable<AgentStep['tool_calls']>[0]; index: number; total: number; count?: number
 }) {
   const config = TOOL_CONFIG[call.tool] || { label: call.tool, icon: Zap, friendlyLabel: call.tool }
   const ToolIcon = config.icon
@@ -523,6 +538,9 @@ function ToolStep({ call, index, total }: {
       <div className="flex-1 mb-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-gray-900">{config.friendlyLabel}</span>
+          {count > 1 && (
+            <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">({count} gånger)</span>
+          )}
           {!call.result.success && (
             <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-700">Fel</span>
           )}
@@ -545,6 +563,17 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   // Flatten all tool calls from steps
   const allToolCalls = run.steps.flatMap(s => s.tool_calls || [])
   const successCount = allToolCalls.filter(c => c.result.success).length
+
+  // Deduplicate consecutive identical tool calls
+  const deduplicatedCalls = allToolCalls.reduce<Array<{ call: typeof allToolCalls[0]; count: number }>>((acc, call) => {
+    const last = acc[acc.length - 1]
+    if (last && last.call.tool === call.tool) {
+      last.count++
+      return acc
+    }
+    acc.push({ call, count: 1 })
+    return acc
+  }, [])
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in">
@@ -572,15 +601,14 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
           </button>
         </div>
 
-        {/* Summary — rendered as formatted text */}
-        <div
-          className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed [&_strong]:font-semibold [&_em]:italic [&_ul]:ml-2 [&_li]:text-gray-600"
-          dangerouslySetInnerHTML={{
-            __html: run.final_response
-              ? `<p>${renderSimpleMarkdown(humanizeResponse(run.final_response))}</p>`
-              : '<p class="text-gray-400 italic">(Inget svar)</p>'
-          }}
-        />
+        {/* Summary — rendered as proper markdown */}
+        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-teal-600">
+          {run.final_response ? (
+            <ReactMarkdown>{humanizeResponse(run.final_response)}</ReactMarkdown>
+          ) : (
+            <p className="text-gray-400 italic">(Inget svar)</p>
+          )}
+        </div>
 
         {/* Meta — only user-friendly info */}
         <div className="flex gap-6 mt-3">
@@ -602,9 +630,9 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
         <p className="text-sm font-bold text-gray-900 mb-4">
           Vad AI-assistenten gjorde ({allToolCalls.length} steg)
         </p>
-        {allToolCalls.length > 0 ? (
-          allToolCalls.map((call, i) => (
-            <ToolStep key={i} call={call} index={i} total={allToolCalls.length} />
+        {deduplicatedCalls.length > 0 ? (
+          deduplicatedCalls.map((item, i) => (
+            <ToolStep key={i} call={item.call} index={i} total={deduplicatedCalls.length} count={item.count} />
           ))
         ) : (
           <p className="text-sm text-gray-400 italic">Inga steg utförda</p>
