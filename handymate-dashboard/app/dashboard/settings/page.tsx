@@ -350,6 +350,7 @@ export default function SettingsPage() {
   const [provisioning, setProvisioning] = useState(false)
   const [savingPhone, setSavingPhone] = useState(false)
   const [syncingWebhooks, setSyncingWebhooks] = useState(false)
+  const [sendingTestSms, setSendingTestSms] = useState(false)
   const [webhookSyncMsg, setWebhookSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
 
   // Fortnox integration state
@@ -732,6 +733,38 @@ export default function SettingsPage() {
     } finally {
       setSyncingWebhooks(false)
       setTimeout(() => setWebhookSyncMsg(null), 5000)
+    }
+  }
+
+  const handleTestSms = async () => {
+    const testPhone = config?.forward_phone_number
+    if (!testPhone) {
+      setWebhookSyncMsg({ text: 'Inget vidarekopplingsnummer inställt', ok: false })
+      setTimeout(() => setWebhookSyncMsg(null), 5000)
+      return
+    }
+    setSendingTestSms(true)
+    setWebhookSyncMsg(null)
+    try {
+      const res = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: testPhone,
+          message: `Test från Handymate! Om du ser detta fungerar SMS korrekt. ${new Date().toLocaleTimeString('sv-SE')}`,
+        }),
+      })
+      if (res.ok) {
+        setWebhookSyncMsg({ text: `Test-SMS skickat till ${testPhone}`, ok: true })
+      } else {
+        const data = await res.json()
+        setWebhookSyncMsg({ text: data.error || 'Kunde inte skicka test-SMS', ok: false })
+      }
+    } catch {
+      setWebhookSyncMsg({ text: 'Nätverksfel', ok: false })
+    } finally {
+      setSendingTestSms(false)
+      setTimeout(() => setWebhookSyncMsg(null), 8000)
     }
   }
 
@@ -1861,24 +1894,57 @@ export default function SettingsPage() {
               <CallHandlingModeSection businessId={business.business_id} />
             )}
 
-            {/* Webhook-synk — visas bara när 46elks-nummer är tilldelat */}
+            {/* SMS-webhook & Felsökning */}
             {config.assigned_phone_number && (
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <RefreshCw className="w-5 h-5 text-gray-400" />
-                  <h2 className="text-base font-semibold text-gray-900">Felsökning telefoni</h2>
+              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-5">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900 mb-1">SMS-webhook</h2>
+                  <p className="text-xs text-gray-400">Status för inkommande SMS och samtal</p>
                 </div>
-                <p className="text-xs text-gray-400 mb-4">
-                  Kopplingar uppdateras automatiskt varje dag. Använd knappen nedan bara om SMS eller samtal slutat fungera.
+
+                <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-400 w-28 shrink-0">Webhook-URL:</span>
+                    <code className="text-gray-600 bg-white px-2 py-0.5 rounded border text-[11px] truncate">
+                      {(process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se')}/api/sms/incoming
+                    </code>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-400 w-28 shrink-0">Nummer:</span>
+                    <span className="text-gray-700 font-medium">{config.assigned_phone_number}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-400 w-28 shrink-0">Vidarekopplas till:</span>
+                    <span className="text-gray-700">{config.forward_phone_number || '—'}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-gray-400 w-28 shrink-0">Status:</span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      <span className="text-emerald-600 font-medium">Aktiv</span>
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400">
+                  Kopplingar uppdateras automatiskt. Använd knapparna nedan vid problem.
                 </p>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={handleSyncWebhooks}
                     disabled={syncingWebhooks}
                     className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncingWebhooks ? 'animate-spin' : ''}`} />
-                    Uppdatera telefonikoppling
+                    Synka webhook
+                  </button>
+                  <button
+                    onClick={handleTestSms}
+                    disabled={sendingTestSms}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-teal-300 text-teal-700 rounded-xl text-sm font-medium hover:bg-teal-50 disabled:opacity-50 transition-colors"
+                  >
+                    {sendingTestSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
+                    Skicka test-SMS
                   </button>
                   {webhookSyncMsg && (
                     <span className={`text-sm font-medium ${webhookSyncMsg.ok ? 'text-emerald-600' : 'text-red-600'}`}>
