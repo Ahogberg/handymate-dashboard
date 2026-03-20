@@ -186,6 +186,15 @@ const TEMPLATES: AutomationTemplate[] = [
     category: 'bookings',
     matchRuleNames: ['job_report', 'jobbrapport', 'job_report_followup'],
   },
+  {
+    key: 'on_my_way',
+    icon: '🚗',
+    title: 'På väg-notis till kund',
+    description: 'Skicka SMS med beräknad ankomsttid när du är på väg till kunden',
+    category: 'bookings',
+    matchRuleNames: ['on_my_way', 'on_my_way_sms', 'på väg'],
+    previewText: 'Hej! Vi är nu på väg till dig. Beräknad ankomst: 14:30. Vi ses snart!',
+  },
 
   // ── Pipeline & Säljtratt ──
   {
@@ -250,7 +259,7 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Fortnox: Synka faktura',
     description: 'Nya fakturor synkas automatiskt till Fortnox',
     category: 'pipeline',
-    matchRuleNames: ['Fortnox', 'fortnox_sync', 'Synka Fortnox', 'fortnox_invoice'],
+    matchRuleNames: ['Fortnox', 'fortnox_sync', 'Synka Fortnox', 'fortnox_invoice', 'Fortnox: registrera betalning', 'registrera betalning'],
     requiresIntegration: 'Kräver Fortnox-integration',
   },
 ]
@@ -258,19 +267,33 @@ const TEMPLATES: AutomationTemplate[] = [
 // ── Helpers ──
 
 function matchRuleToTemplate(rule: AutomationRule): string | null {
-  const nameLower = rule.name.toLowerCase()
-  // Also check trigger_config.event_name if available
+  const nameLower = rule.name.toLowerCase().trim()
   const eventName = (rule.trigger_config as any)?.event_name?.toLowerCase() || ''
 
+  // Pass 1: Exakt match (prio)
   for (const tmpl of TEMPLATES) {
     for (const matchName of tmpl.matchRuleNames) {
-      const matchLower = matchName.toLowerCase()
-      if (nameLower.includes(matchLower) || matchLower.includes(nameLower) || eventName === matchLower) {
+      const matchLower = matchName.toLowerCase().trim()
+      if (nameLower === matchLower || eventName === matchLower) {
         return tmpl.key
       }
     }
   }
-  return null
+
+  // Pass 2: Längsta partial match vinner (undviker att "Ny lead" matchar "Pipeline: Ny lead")
+  let bestMatch: { key: string; len: number } | null = null
+  for (const tmpl of TEMPLATES) {
+    for (const matchName of tmpl.matchRuleNames) {
+      const matchLower = matchName.toLowerCase().trim()
+      if (nameLower.includes(matchLower) || matchLower.includes(nameLower)) {
+        const matchLen = matchLower.length
+        if (!bestMatch || matchLen > bestMatch.len) {
+          bestMatch = { key: tmpl.key, len: matchLen }
+        }
+      }
+    }
+  }
+  return bestMatch?.key || null
 }
 
 function formatDate(dateStr: string | null): string {
