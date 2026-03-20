@@ -45,6 +45,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing to or message' }, { status: 400 })
     }
 
+    // Formatera till E.164 (+46...)
+    const formatPhone = (num: string): string => {
+      const clean = num.replace(/[\s\-()]/g, '')
+      if (clean.startsWith('0')) return '+46' + clean.slice(1)
+      return clean.startsWith('+') ? clean : '+' + clean
+    }
+    const formattedTo = formatPhone(to)
+
     const response = await fetch('https://api.46elks.com/a1/sms', {
       method: 'POST',
       headers: {
@@ -53,15 +61,25 @@ export async function POST(request: NextRequest) {
       },
       body: new URLSearchParams({
         from: (business.business_name || 'Handymate').substring(0, 11),
-        to: to,
+        to: formattedTo,
         message: message,
       }),
     })
 
-    const result = await response.json()
+    // 46elks returnerar ibland plaintext, inte JSON
+    const responseText = await response.text()
+    let result: any
+    try {
+      result = JSON.parse(responseText)
+    } catch {
+      if (!response.ok) {
+        return NextResponse.json({ error: responseText || 'SMS failed' }, { status: 500 })
+      }
+      result = { id: 'unknown' }
+    }
 
     if (!response.ok) {
-      return NextResponse.json({ error: result.message || 'SMS failed' }, { status: 500 })
+      return NextResponse.json({ error: result.message || responseText || 'SMS failed' }, { status: 500 })
     }
 
     // Räkna upp SMS-usage
