@@ -746,9 +746,10 @@ export default function SettingsPage() {
     setSendingTestSms(true)
     setWebhookSyncMsg(null)
     try {
+      const authHeaders = await getAuthHeaders()
       const res = await fetch('/api/sms/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
         body: JSON.stringify({
           to: testPhone,
           message: `Test från Handymate! Om du ser detta fungerar SMS korrekt. ${new Date().toLocaleTimeString('sv-SE')}`,
@@ -757,8 +758,10 @@ export default function SettingsPage() {
       if (res.ok) {
         setWebhookSyncMsg({ text: `Test-SMS skickat till ${testPhone}`, ok: true })
       } else {
-        const data = await res.json()
-        setWebhookSyncMsg({ text: data.error || 'Kunde inte skicka test-SMS', ok: false })
+        const text = await res.text()
+        let errMsg = 'Kunde inte skicka test-SMS'
+        try { errMsg = JSON.parse(text).error || errMsg } catch { errMsg = text || errMsg }
+        setWebhookSyncMsg({ text: errMsg, ok: false })
       }
     } catch {
       setWebhookSyncMsg({ text: 'Nätverksfel', ok: false })
@@ -1894,23 +1897,17 @@ export default function SettingsPage() {
               <CallHandlingModeSection businessId={business.business_id} />
             )}
 
-            {/* SMS-webhook & Felsökning */}
+            {/* SMS-koppling & Felsökning */}
             {config.assigned_phone_number && (
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-5">
                 <div>
-                  <h2 className="text-base font-semibold text-gray-900 mb-1">SMS-webhook</h2>
+                  <h2 className="text-base font-semibold text-gray-900 mb-1">SMS-koppling</h2>
                   <p className="text-xs text-gray-400">Status för inkommande SMS och samtal</p>
                 </div>
 
                 <div className="bg-gray-50 rounded-xl p-4 space-y-2">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-400 w-28 shrink-0">Webhook-URL:</span>
-                    <code className="text-gray-600 bg-white px-2 py-0.5 rounded border text-[11px] truncate">
-                      {(process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se')}/api/sms/incoming
-                    </code>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-gray-400 w-28 shrink-0">Nummer:</span>
+                    <span className="text-gray-400 w-28 shrink-0">Ditt nummer:</span>
                     <span className="text-gray-700 font-medium">{config.assigned_phone_number}</span>
                   </div>
                   <div className="flex items-center gap-2 text-xs">
@@ -1936,7 +1933,7 @@ export default function SettingsPage() {
                     className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50 transition-colors"
                   >
                     <RefreshCw className={`w-4 h-4 ${syncingWebhooks ? 'animate-spin' : ''}`} />
-                    Synka webhook
+                    Uppdatera koppling
                   </button>
                   <button
                     onClick={handleTestSms}
