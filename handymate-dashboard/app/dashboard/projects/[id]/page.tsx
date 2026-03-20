@@ -62,6 +62,7 @@ import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
+import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
@@ -435,6 +436,7 @@ export default function ProjectDetailPage() {
   // Saving states
   const [savingStatus, setSavingStatus] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false)
 
   const showToast = useCallback((message: string, type: 'success' | 'error') => {
     setToast({ show: true, message, type })
@@ -3131,16 +3133,11 @@ export default function ProjectDetailPage() {
                 {/* Create invoice button */}
                 {profitability.invoicing.uninvoiced_amount > 0 && (
                   <button
-                    onClick={createInvoiceFromTime}
-                    disabled={creatingInvoice}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                    onClick={() => setShowInvoiceModal(true)}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
                   >
-                    {creatingInvoice ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Receipt className="w-5 h-5" />
-                    )}
-                    Skapa faktura ({formatCurrency(profitability.invoicing.uninvoiced_amount)})
+                    <Receipt className="w-5 h-5" />
+                    Fakturera projekt ({formatCurrency(profitability.invoicing.uninvoiced_amount)})
                   </button>
                 )}
               </>
@@ -3783,6 +3780,14 @@ export default function ProjectDetailPage() {
         onBookingChange={handleTimeBookingChange}
         onWorkTypeChange={handleTimeWorkTypeChange}
       />
+
+      {/* Fakturera projekt-modal */}
+      {showInvoiceModal && project && (
+        <ProjectInvoiceModal
+          projectId={project.project_id}
+          onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
     </div>
   )
 }
@@ -5841,6 +5846,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
           </div>
         </div>
       )}
+
     </div>
   )
 }
