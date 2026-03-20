@@ -36,6 +36,7 @@ interface AutomationTemplate {
   matchRuleNames: string[] // Matchar mot rule.name i DB
   defaultTiming?: string
   previewText?: string
+  requiresIntegration?: string // Visas grått om ej konfigurerad
 }
 
 const CATEGORIES = [
@@ -44,6 +45,7 @@ const CATEGORIES = [
   { id: 'invoices', icon: '💰', label: 'Fakturor & Betalning' },
   { id: 'relations', icon: '⭐', label: 'Kundrelationer' },
   { id: 'bookings', icon: '📅', label: 'Bokningar & Projekt' },
+  { id: 'pipeline', icon: '🔄', label: 'Pipeline & Säljtratt' },
 ]
 
 const TEMPLATES: AutomationTemplate[] = [
@@ -175,6 +177,81 @@ const TEMPLATES: AutomationTemplate[] = [
     matchRuleNames: ['Bokningspåminnelse', 'booking_reminder', 'appointment_reminder'],
     defaultTiming: '24 timmar innan',
     previewText: 'Hej! Påminnelse om din bokade tid imorgon. Välkommen!',
+  },
+  {
+    key: 'job_report',
+    icon: '📋',
+    title: 'Jobbrapport efter avslutat arbete',
+    description: 'Lars föreslår att skicka en professionell jobbrapport med foton och garantiinfo när ett jobb är klart',
+    category: 'bookings',
+    matchRuleNames: ['job_report', 'jobbrapport', 'job_report_followup'],
+  },
+
+  // ── Pipeline & Säljtratt ──
+  {
+    key: 'pipeline_new_lead',
+    icon: '🆕',
+    title: 'Pipeline: Ny lead',
+    description: 'Leadet flyttas automatiskt till "Ny lead" när det skapas',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Ny lead', 'pipeline_new_lead', 'Ny lead pipeline'],
+  },
+  {
+    key: 'pipeline_contacted',
+    icon: '📱',
+    title: 'Pipeline: Kontaktad',
+    description: 'Leadet flyttas till "Kontaktad" vid utgående SMS eller samtal',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Kontaktad', 'pipeline_contacted', 'Kontaktad pipeline'],
+  },
+  {
+    key: 'pipeline_quote_sent',
+    icon: '📤',
+    title: 'Pipeline: Offert skickad',
+    description: 'Leadet flyttas automatiskt när offert skickas',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Offert skickad', 'pipeline_quote_sent', 'Offert skickad pipeline'],
+  },
+  {
+    key: 'pipeline_quote_opened',
+    icon: '👀',
+    title: 'Pipeline: Offert öppnad',
+    description: 'Leadet flyttas och du får en push-notis när kunden öppnar offerten',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Offert öppnad', 'pipeline_quote_opened', 'Offert öppnad', 'quote_opened'],
+  },
+  {
+    key: 'pipeline_invoiced',
+    icon: '🧾',
+    title: 'Pipeline: Fakturerad',
+    description: 'Leadet flyttas automatiskt när faktura skapas',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Fakturerad', 'pipeline_invoiced', 'Fakturerad pipeline'],
+  },
+  {
+    key: 'pipeline_closed',
+    icon: '✔️',
+    title: 'Pipeline: Avslutad',
+    description: 'Leadet markeras som avslutat vid mottagen betalning',
+    category: 'pipeline',
+    matchRuleNames: ['Pipeline: Avslutad', 'pipeline_closed', 'Avslutad pipeline', 'deal_won'],
+  },
+  {
+    key: 'notify_quote_opened',
+    icon: '🔔',
+    title: 'Notis: Offert öppnad',
+    description: 'Du får en push-notis när kunden öppnar offerten — bra läge att ringa',
+    category: 'pipeline',
+    matchRuleNames: ['Notis: Offert öppnad', 'notify_quote_opened', 'quote_viewed_notify'],
+  },
+  {
+    key: 'fortnox_sync',
+    icon: '🔗',
+    title: 'Fortnox: Synka faktura',
+    description: 'Nya fakturor synkas automatiskt till Fortnox',
+    category: 'pipeline',
+    matchRuleNames: ['Fortnox', 'fortnox_sync', 'Synka Fortnox', 'fortnox_invoice'],
+    requiresIntegration: 'Kräver Fortnox-integration',
   },
 ]
 
@@ -373,6 +450,10 @@ export default function AutomationsPage() {
                                 />
                                 <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
                               </label>
+                            ) : tmpl.requiresIntegration ? (
+                              <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1 italic">
+                                {tmpl.requiresIntegration}
+                              </span>
                             ) : (
                               <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1">
                                 Ej aktiverad

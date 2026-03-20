@@ -386,6 +386,13 @@ async function executeApprovalPayload(
         return { action: 'warranty_followup', sms_sent: smsRes.ok, customer: pl.customer_name }
       }
 
+      case 'job_report': {
+        const { approveJobReport } = await import('@/lib/job-report')
+        const reportPayload = payload as any
+        const result = await approveJobReport(businessId, reportPayload.projectId || '', reportPayload)
+        return { action: 'job_report', ...result }
+      }
+
       default:
         return { action: approval_type, skipped: 'no handler for this type', payload }
     }
