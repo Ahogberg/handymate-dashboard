@@ -91,9 +91,9 @@ const TEMPLATES: AutomationTemplate[] = [
     key: 'quote_signed_confirm',
     icon: '✅',
     title: 'Bekräftelsemail vid godkänd offert',
-    description: 'Kunden får ett mail med nästa steg efter signering',
+    description: 'Kunden får ett mail med faktura- och ROT-uppgifter att granska direkt vid signering',
     category: 'quotes',
-    matchRuleNames: ['quote_signed', 'quote_accepted', 'quote_confirmation'],
+    matchRuleNames: ['quote_signed', 'quote_accepted', 'quote_confirmation', 'quote_signed_confirmation'],
   },
 
   // ── Fakturor & Betalning ──
@@ -149,7 +149,7 @@ const TEMPLATES: AutomationTemplate[] = [
     key: 'warranty_followup',
     icon: '🔧',
     title: 'Garantiuppföljning efter 12 månader',
-    description: 'Kontrollera att allt fungerar ett år efter avslutat jobb',
+    description: 'Matte skickar en uppföljning ett år efter avslutat jobb för att säkerställa att allt fungerar',
     category: 'relations',
     matchRuleNames: ['warranty_followup', 'warranty_check', 'annual_followup'],
     defaultTiming: '12 månader',
