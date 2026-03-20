@@ -5,6 +5,7 @@ import { sendMorningReport } from '@/lib/agent/morning-report'
 import { updatePricingIntelligence } from '@/lib/agent/pricing-engine'
 import { analyzePriceAdjustments } from '@/lib/agent/price-analysis'
 import { calculateCustomerLTV } from '@/lib/customer-ltv'
+import { checkWarrantyFollowups } from '@/lib/warranty-followup'
 
 export const maxDuration = 60
 
@@ -50,6 +51,7 @@ async function runAgentContext() {
     pricing: { success: boolean; jobTypesAnalyzed?: number; error?: string }
     priceAnalysis: { success: boolean; suggestions?: number; error?: string }
     ltv: { success: boolean; updated?: number; reactivations?: number; error?: string }
+    warranty: { success: boolean; followupsCreated?: number; error?: string }
   }> = []
 
   for (const biz of businesses) {
@@ -95,6 +97,14 @@ async function runAgentContext() {
       ltvResult = { success: false, error: err.message }
     }
 
+    // Garantiuppföljning (12 mån efter avslutat jobb)
+    let warrantyResult: { success: boolean; followupsCreated?: number; error?: string } = { success: false, error: 'Skipped' }
+    try {
+      warrantyResult = await checkWarrantyFollowups(biz.business_id)
+    } catch (err: any) {
+      warrantyResult = { success: false, error: err.message }
+    }
+
     results.push({
       business_id: biz.business_id,
       context: contextResult,
@@ -103,10 +113,11 @@ async function runAgentContext() {
       pricing: pricingResult,
       priceAnalysis: priceAnalysisResult,
       ltv: ltvResult,
+      warranty: warrantyResult,
     })
 
     console.log(
-      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, pricing=${pricingResult.success}, ltv=${ltvResult.success}(${ltvResult.updated || 0} updated, ${ltvResult.reactivations || 0} reactivations)`
+      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, pricing=${pricingResult.success}, ltv=${ltvResult.success}(${ltvResult.updated || 0} updated, ${ltvResult.reactivations || 0} reactivations), warranty=${warrantyResult.success}(${warrantyResult.followupsCreated || 0} created)`
     )
   }
 

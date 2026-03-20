@@ -357,6 +357,35 @@ async function executeApprovalPayload(
         return { action: 'seasonal_campaign', campaign_id: campaignId, recipients: customers.length }
       }
 
+      case 'warranty_followup': {
+        const pl = payload as any
+        if (!pl.customer_phone || !pl.suggested_sms) {
+          return { action: 'warranty_followup', skipped: 'no phone or message' }
+        }
+        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            to: pl.customer_phone,
+            message: pl.suggested_sms,
+          }),
+        })
+
+        // Logga i automation_logs
+        const supabaseW = (await import('@/lib/supabase')).getServerSupabase()
+        await supabaseW.from('automation_logs').insert({
+          business_id: businessId,
+          rule_name: 'warranty_followup',
+          trigger_type: 'approval_executed',
+          status: smsRes.ok ? 'completed' : 'failed',
+          input: { project_id: pl.project_id, customer_name: pl.customer_name },
+          output: { sms_sent: smsRes.ok },
+        }).catch(() => {})
+
+        return { action: 'warranty_followup', sms_sent: smsRes.ok, customer: pl.customer_name }
+      }
+
       default:
         return { action: approval_type, skipped: 'no handler for this type', payload }
     }
