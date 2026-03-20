@@ -51,41 +51,50 @@ const TEMPLATES: AutomationTemplate[] = [
   {
     key: 'lead_response',
     icon: '⚡',
-    title: 'Svara på nya leads inom 30 min',
-    description: 'När någon kontaktar dig skickar Matte ett SMS inom 30 minuter',
+    title: 'Svara på nya leads',
+    description: 'Skickar bekräftelse-SMS till nya leads inom 5 minuter',
     category: 'leads',
-    matchRuleNames: ['lead_response', 'new_lead', 'sms_auto_reply', 'lead_auto_reply'],
-    defaultTiming: '30 minuter',
-    previewText: 'Hej! Tack för att du hörde av dig. Jag återkommer inom kort. /[Företag]',
+    matchRuleNames: ['Ny lead', 'lead_response', 'bekräftelse'],
+    defaultTiming: '5 minuter',
+    previewText: 'Hej! Tack för din förfrågan. Vi återkommer inom kort med mer information.',
   },
   {
-    key: 'lead_qualify',
-    icon: '🎯',
-    title: 'Kvalificera leads automatiskt',
-    description: 'Matte ställer 2-3 frågor för att förstå vad kunden behöver',
+    key: 'missed_call',
+    icon: '📞',
+    title: 'Missat samtal — SMS',
+    description: 'Skickar SMS vid missat inkommande samtal',
     category: 'leads',
-    matchRuleNames: ['lead_qualify', 'qualify_lead', 'lead_scoring', 'lead_classification'],
+    matchRuleNames: ['Missat samtal', 'missed_call'],
+    previewText: 'Hej! Vi missade ditt samtal och ringer upp så snart vi kan.',
   },
   {
-    key: 'lead_nurture',
+    key: 'sms_received',
     icon: '💬',
-    title: 'Automatisk uppföljning av kalla leads',
-    description: 'Leads som inte svarat får en vänlig påminnelse efter 48h',
+    title: 'Inkommande SMS — notifiera',
+    description: 'Loggar och notifierar dig när ett SMS tas emot',
     category: 'leads',
-    matchRuleNames: ['lead_nurture', 'nurture', 'cold_lead_followup'],
-    defaultTiming: '48 timmar',
+    matchRuleNames: ['Inkommande SMS', 'sms_received', 'notifiera'],
   },
 
   // ── Offerter ──
   {
-    key: 'quote_reminder',
+    key: 'quote_followup_5',
     icon: '📨',
-    title: 'Påminn om osvarad offert',
-    description: 'Om kunden inte svarat skickar Matte en vänlig påminnelse',
+    title: 'Offertuppföljning dag 5',
+    description: 'Följer upp obesvarade offerter efter 5 dagar',
     category: 'quotes',
-    matchRuleNames: ['quote_follow_up', 'quote_reminder', 'quote_nudge', 'offert_paminnelse'],
+    matchRuleNames: ['Offertuppföljning dag 5', 'quote_followup_day1', 'quote_follow_up'],
     defaultTiming: 'dag 5',
-    previewText: 'Hej [namn]! Jag ville bara kolla om du hunnit titta på offerten? Hör av dig om du har frågor!',
+    previewText: 'Hej! Vi skickade en offert för 5 dagar sedan. Har du hunnit titta på den?',
+  },
+  {
+    key: 'quote_followup_10',
+    icon: '📞',
+    title: 'Offertuppföljning dag 10',
+    description: 'Andra uppföljningen — kräver godkännande för att ringa',
+    category: 'quotes',
+    matchRuleNames: ['Offertuppföljning dag 10', 'quote_followup_day2'],
+    defaultTiming: 'dag 10',
   },
   {
     key: 'quote_signed_confirm',
@@ -93,37 +102,28 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Bekräftelsemail vid godkänd offert',
     description: 'Kunden får ett mail med faktura- och ROT-uppgifter att granska direkt vid signering',
     category: 'quotes',
-    matchRuleNames: ['quote_signed', 'quote_accepted', 'quote_confirmation', 'quote_signed_confirmation'],
+    matchRuleNames: ['quote_signed', 'quote_accepted', 'quote_signed_confirmation'],
   },
 
   // ── Fakturor & Betalning ──
   {
     key: 'invoice_reminder_1',
     icon: '🔔',
-    title: 'Påminnelse dag 1 efter förfall',
-    description: 'En vänlig påminnelse skickas dagen efter förfallodatum',
+    title: 'Fakturapåminnelse dag 1',
+    description: 'Vänlig påminnelse första dagen efter förfallodatum',
     category: 'invoices',
-    matchRuleNames: ['invoice_reminder', 'invoice_overdue', 'payment_reminder_1'],
+    matchRuleNames: ['Fakturapåminnelse dag 1', 'invoice_reminder_day1', 'Fakturapåminnelse'],
     defaultTiming: 'dag 1',
-    previewText: 'Hej! En vänlig påminnelse om faktura [nummer] som förföll igår. Betala gärna vid tillfälle.',
-  },
-  {
-    key: 'invoice_reminder_7',
-    icon: '⏰',
-    title: 'Påminnelse dag 7 efter förfall',
-    description: 'En tydligare påminnelse en vecka efter förfall',
-    category: 'invoices',
-    matchRuleNames: ['invoice_reminder_7', 'payment_reminder_7', 'invoice_followup'],
-    defaultTiming: 'dag 7',
+    previewText: 'Hej! Din faktura förföll igår. Vänligen betala så snart du kan.',
   },
   {
     key: 'invoice_escalation',
     icon: '🚨',
-    title: 'Eskalering dag 14',
-    description: 'Karin flaggar obetalda fakturor äldre än 14 dagar',
+    title: 'Faktura eskalering dag 7',
+    description: 'Striktare påminnelse efter 7 dagar — kräver godkännande',
     category: 'invoices',
-    matchRuleNames: ['invoice_escalation', 'payment_escalation', 'overdue_escalation'],
-    defaultTiming: 'dag 14',
+    matchRuleNames: ['Faktura eskalering dag 7', 'invoice_reminder_day2', 'eskalering'],
+    defaultTiming: 'dag 7',
   },
 
   // ── Kundrelationer ──
@@ -133,8 +133,8 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Be om Google-recension efter betalning',
     description: 'Kunden får ett vänligt SMS med länk till Google Reviews',
     category: 'relations',
-    matchRuleNames: ['review_request', 'google_review', 'ask_review'],
-    previewText: 'Tack för förtroendet! Vi uppskattar om du kunde lämna en recension: [länk]',
+    matchRuleNames: ['review_request', 'google_review', 'recension'],
+    previewText: 'Tack för förtroendet! Vi uppskattar om du kunde lämna en recension.',
   },
   {
     key: 'reactivation',
@@ -142,38 +142,39 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Reaktivering efter 6 månaders inaktivitet',
     description: 'Kunder som inte anlitat dig på 6 månader får en hälsning',
     category: 'relations',
-    matchRuleNames: ['reactivation', 'customer_reactivation', 'win_back', 'inactive_customer'],
+    matchRuleNames: ['Reaktivering 6 månader', 'reaktivering', 'reactivation', 'inactive_customer'],
     defaultTiming: '6 månader',
   },
   {
     key: 'warranty_followup',
     icon: '🔧',
     title: 'Garantiuppföljning efter 12 månader',
-    description: 'Matte skickar en uppföljning ett år efter avslutat jobb för att säkerställa att allt fungerar',
+    description: 'Uppföljning ett år efter avslutat jobb för att säkerställa att allt fungerar',
     category: 'relations',
-    matchRuleNames: ['warranty_followup', 'warranty_check', 'annual_followup'],
+    matchRuleNames: ['warranty_followup', 'garantiuppföljning', 'annual_followup'],
     defaultTiming: '12 månader',
     previewText: 'Hej! Det är ett år sedan vi avslutade jobbet hos dig. Allt fungerar som det ska?',
   },
 
   // ── Bokningar & Projekt ──
   {
-    key: 'booking_reminder',
-    icon: '📅',
-    title: 'Påminnelse till kund 24h innan bokning',
-    description: 'Kunden får en bekräftelse dagen innan bokad tid',
+    key: 'morning_report',
+    icon: '☀️',
+    title: 'Morgonrapport',
+    description: 'Daglig sammanfattning med bokningar, offerter och insikter varje vardag kl 07:00',
     category: 'bookings',
-    matchRuleNames: ['booking_reminder', 'appointment_reminder', 'booking_confirmation'],
-    defaultTiming: '24 timmar innan',
-    previewText: 'Hej! Påminnelse om din bokade tid imorgon kl [tid]. Välkommen!',
+    matchRuleNames: ['Morgonrapport', 'morning_report'],
+    defaultTiming: 'vardagar 07:00',
   },
   {
-    key: 'vacation_notice',
-    icon: '🌴',
-    title: 'Semesternotis till aktiva kunder',
-    description: 'Informera kunder med pågående ärenden om semesterperioder',
+    key: 'booking_reminder',
+    icon: '📅',
+    title: 'Bokningspåminnelse 24h innan',
+    description: 'Kunden får en påminnelse dagen innan bokad tid',
     category: 'bookings',
-    matchRuleNames: ['vacation_notice', 'holiday_notice', 'office_closed'],
+    matchRuleNames: ['Bokningspåminnelse', 'booking_reminder', 'appointment_reminder'],
+    defaultTiming: '24 timmar innan',
+    previewText: 'Hej! Påminnelse om din bokade tid imorgon. Välkommen!',
   },
 ]
 
@@ -181,9 +182,15 @@ const TEMPLATES: AutomationTemplate[] = [
 
 function matchRuleToTemplate(rule: AutomationRule): string | null {
   const nameLower = rule.name.toLowerCase()
+  // Also check trigger_config.event_name if available
+  const eventName = (rule.trigger_config as any)?.event_name?.toLowerCase() || ''
+
   for (const tmpl of TEMPLATES) {
     for (const matchName of tmpl.matchRuleNames) {
-      if (nameLower.includes(matchName.toLowerCase())) return tmpl.key
+      const matchLower = matchName.toLowerCase()
+      if (nameLower.includes(matchLower) || matchLower.includes(nameLower) || eventName === matchLower) {
+        return tmpl.key
+      }
     }
   }
   return null
@@ -367,8 +374,8 @@ export default function AutomationsPage() {
                                 <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
                               </label>
                             ) : (
-                              <span className="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded-lg shrink-0 mt-1">
-                                Ej konfigurerad
+                              <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1">
+                                Ej aktiverad
                               </span>
                             )}
                           </div>
