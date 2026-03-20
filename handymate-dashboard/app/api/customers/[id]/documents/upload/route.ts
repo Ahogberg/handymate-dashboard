@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { ensureBucket } from '@/lib/storage'
 
 /**
  * POST /api/customers/[id]/documents/upload
@@ -19,6 +20,7 @@ export async function POST(
 
     const { id: customerId } = await params
     const supabase = getServerSupabase()
+    await ensureBucket(supabase, 'customer-documents', { public: true })
 
     const formData = await request.formData()
     const file = formData.get('file') as File | null

@@ -336,9 +336,14 @@ export default function CustomerDetailPage() {
     if (!files || files.length === 0) return
 
     setUploading(true)
+    let successCount = 0
+    let failCount = 0
+
     for (const file of Array.from(files)) {
       if (file.size > 10 * 1024 * 1024) {
-        continue // Skip files > 10MB
+        failCount++
+        alert(`${file.name} är för stor (max 10 MB)`)
+        continue
       }
 
       try {
@@ -354,14 +359,21 @@ export default function CustomerDetailPage() {
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           console.error('Upload error:', err)
+          failCount++
+        } else {
+          successCount++
         }
       } catch (err) {
         console.error('Upload error:', err)
+        failCount++
       }
     }
 
     setUploading(false)
     e.target.value = ''
+    if (failCount > 0 && successCount === 0) {
+      alert('Kunde inte ladda upp filen. Försök igen.')
+    }
     fetchData()
   }
 

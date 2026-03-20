@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { ensureBucket } from '@/lib/storage'
 
 /**
  * GET /api/projects/[id]/documents - Lista projektdokument
@@ -56,6 +57,7 @@ export async function POST(
     }
 
     const supabase = getServerSupabase()
+    await ensureBucket(supabase, 'project-files')
     const projectId = params.id
 
     const formData = await request.formData()
