@@ -111,5 +111,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     }
   }
 
+  // Trigger job report when project marked as done
+  if (stage === 'done') {
+    try {
+      const { triggerJobReport } = await import('@/lib/job-report')
+      await triggerJobReport(business.business_id, params.id)
+    } catch { /* non-blocking */ }
+  }
+
   return NextResponse.json({ success: true })
 }
