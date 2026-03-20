@@ -32,6 +32,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
+import OnMyWayButton from '@/components/OnMyWayButton'
 
 interface Booking {
   booking_id: string
@@ -962,18 +963,30 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </div>
-                      <div className="text-right flex-shrink-0 ml-2">
-                        <p className="font-medium text-gray-900 text-sm">
-                          {formatTime(booking.scheduled_start)}
-                        </p>
-                        <span className={`inline-flex px-2 py-0.5 text-xs rounded-full ${
-                          booking.status === 'confirmed'
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                            : 'bg-amber-50 text-amber-600 border border-amber-200'
-                        }`}>
-                          {booking.status === 'confirmed' ? 'Bekräftad' :
-                           booking.status === 'pending' ? 'Väntar' : booking.status}
-                        </span>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        {booking.customer?.phone_number && (
+                          <OnMyWayButton
+                            customerName={booking.customer?.name || ''}
+                            customerPhone={booking.customer?.phone_number}
+                            bookingId={booking.booking_id}
+                            businessName={business?.business_name}
+                            contactName={business?.contact_name}
+                            compact
+                          />
+                        )}
+                        <div className="text-right">
+                          <p className="font-medium text-gray-900 text-sm">
+                            {formatTime(booking.scheduled_start)}
+                          </p>
+                          <span className={`inline-flex px-2 py-0.5 text-xs rounded-full ${
+                            booking.status === 'confirmed'
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-600 border border-amber-200'
+                          }`}>
+                            {booking.status === 'confirmed' ? 'Bekräftad' :
+                             booking.status === 'pending' ? 'Väntar' : booking.status}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
