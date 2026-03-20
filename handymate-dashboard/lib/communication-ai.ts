@@ -26,6 +26,8 @@ interface CustomerCommunicationState {
   overdueInvoice: { id: string; number: string; amount: number; dueDate: string } | null
   paidInvoiceNoReview: { id: string; paidAt: string } | null
   recentCallSummary: string | null
+  googleReviewUrl?: string
+  businessName?: string
 }
 
 export interface AIDecision {
@@ -156,9 +158,18 @@ function evaluateSimpleRules(
       )
       const threshold = rule.trigger_config?.days_since || 2
       if (daysSince >= threshold) {
+        const reviewUrl = state.googleReviewUrl || ''
+        const bizName = state.businessName || 'oss'
+        const firstName = state.customerName?.split(' ')[0] || ''
+
+        const smsText = reviewUrl
+          ? `Hej ${firstName}! Tack för att du valde ${bizName}. Vi hoppas du är nöjd! Har du en minut att lämna ett omdöme? Det hjälper oss växa: ${reviewUrl}`
+          : `Hej ${firstName}! Tack för att du valde ${bizName}. Vi hoppas du är nöjd med jobbet!`
+
         return {
           shouldSend: true,
           ruleId: rule.id,
+          customMessage: smsText,
           reason: `Faktura betald för ${daysSince} dagar sedan - be om recension`,
           confidence: 85,
         }
@@ -391,6 +402,13 @@ async function buildCustomerState(
     .limit(1)
     .single()
 
+  // Business config for review URL
+  const { data: bizForReview } = await supabase
+    .from('business_config')
+    .select('business_name, google_review_url')
+    .eq('business_id', businessId)
+    .single()
+
   const daysSinceContact = lastActivity?.created_at
     ? Math.floor((Date.now() - new Date(lastActivity.created_at).getTime()) / 86400000)
     : null
@@ -423,6 +441,8 @@ async function buildCustomerState(
       : null,
     paidInvoiceNoReview: paidInvoiceNoReview,
     recentCallSummary: recentCall?.transcript_summary || null,
+    googleReviewUrl: bizForReview?.google_review_url || undefined,
+    businessName: bizForReview?.business_name || undefined,
   }
 }
 

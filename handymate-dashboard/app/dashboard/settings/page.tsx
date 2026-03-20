@@ -379,6 +379,7 @@ export default function SettingsPage() {
   const [googleReviewUrl, setGoogleReviewUrl] = useState('')
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
   const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
+  const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0 })
   const [savingReview, setSavingReview] = useState(false)
 
   // Lead Sources state
@@ -507,6 +508,18 @@ export default function SettingsPage() {
       setGoogleReviewUrl(data.google_review_url || '')
       setReviewRequestEnabled(data.review_request_enabled ?? true)
       setReviewRequestDelayDays(data.review_request_delay_days ?? 3)
+
+      // Fetch review request stats
+      const { count: sentCount } = await supabase
+        .from('review_request')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', data.business_id)
+      const { count: clickedCount } = await supabase
+        .from('review_request')
+        .select('*', { count: 'exact', head: true })
+        .eq('business_id', data.business_id)
+        .not('clicked_at', 'is', null)
+      setReviewStats({ sent: sentCount || 0, clicked: clickedCount || 0 })
 
       if (data.working_hours && typeof data.working_hours === 'object') {
         setWorkingHours(prev => {
@@ -2964,6 +2977,18 @@ export default function SettingsPage() {
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Förhandsvisning SMS</p>
                     <p className="text-sm text-gray-700">
                       Hej {'{'}<span className="text-sky-700">kundnamn</span>{'}'}! Tack för att du valde {config?.business_name || 'oss'}. Vi hoppas du är nöjd med resultatet! Om du har en minut skulle vi uppskatta en recension: {googleReviewUrl.substring(0, 30)}... /Mvh {config?.business_name || 'oss'}
+                    </p>
+                  </div>
+                )}
+
+                {reviewStats.sent > 0 && (
+                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl">
+                    <p className="text-xs text-teal-600 uppercase tracking-wider font-semibold mb-1">Statistik</p>
+                    <p className="text-sm text-teal-800">
+                      {reviewStats.sent} förfrågningar skickade · {reviewStats.clicked} klickade på länken
+                      {reviewStats.sent > 0 && (
+                        <span className="text-teal-600"> ({Math.round((reviewStats.clicked / reviewStats.sent) * 100)}%)</span>
+                      )}
                     </p>
                   </div>
                 )}
