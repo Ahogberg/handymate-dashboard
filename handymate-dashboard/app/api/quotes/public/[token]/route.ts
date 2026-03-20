@@ -242,6 +242,12 @@ export async function POST(
       await triggerAutopilot(quote.business_id, quote.quote_id)
     } catch { /* non-blocking */ }
 
+    // Bekräftelsemail till kund (non-blocking)
+    try {
+      const { sendQuoteSignedConfirmation } = await import('@/lib/quote-confirmation-email')
+      await sendQuoteSignedConfirmation(quote.business_id, quote.quote_id)
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({ success: true })
 
   } catch (error: any) {

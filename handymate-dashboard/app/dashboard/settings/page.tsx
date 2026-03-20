@@ -35,7 +35,8 @@ import {
   UsersRound,
   Star,
   RefreshCw,
-  Zap
+  Zap,
+  MailCheck
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -380,6 +381,7 @@ export default function SettingsPage() {
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
   const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
   const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0 })
+  const [quoteSignedEmailEnabled, setQuoteSignedEmailEnabled] = useState(true)
   const [savingReview, setSavingReview] = useState(false)
 
   // Lead Sources state
@@ -508,6 +510,16 @@ export default function SettingsPage() {
       setGoogleReviewUrl(data.google_review_url || '')
       setReviewRequestEnabled(data.review_request_enabled ?? true)
       setReviewRequestDelayDays(data.review_request_delay_days ?? 3)
+
+      // Fetch quote signed email toggle from v3_automation_settings
+      try {
+        const { data: autoSettings } = await supabase
+          .from('v3_automation_settings')
+          .select('quote_signed_email_enabled')
+          .eq('business_id', data.business_id)
+          .single()
+        if (autoSettings) setQuoteSignedEmailEnabled(autoSettings.quote_signed_email_enabled ?? true)
+      } catch { /* table may not exist */ }
 
       // Fetch review request stats
       const { count: sentCount } = await supabase
@@ -2913,6 +2925,36 @@ export default function SettingsPage() {
               <p className="text-sm text-teal-700">
                 <strong>Om e-post:</strong> Utgående e-post skickas via Handymate (Resend). Med Gmail-koppling kan du se inkommande kundmail direkt i kundkortet.
               </p>
+            </div>
+
+            {/* Bekräftelsemail vid godkänd offert */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-teal-100">
+                    <MailCheck className="w-5 h-5 text-teal-600" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Bekräftelsemail vid godkänd offert</p>
+                    <p className="text-xs text-gray-500 mt-0.5">Skickar automatiskt ett mail med faktura- och ROT-uppgifter när kund signerar offert</p>
+                  </div>
+                </div>
+                <button
+                  onClick={async () => {
+                    const newVal = !quoteSignedEmailEnabled
+                    setQuoteSignedEmailEnabled(newVal)
+                    try {
+                      const { supabase: sb } = await import('@/lib/supabase')
+                      await sb
+                        .from('v3_automation_settings')
+                        .upsert({ business_id: config?.business_id, quote_signed_email_enabled: newVal }, { onConflict: 'business_id' })
+                    } catch { /* non-blocking */ }
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${quoteSignedEmailEnabled ? 'bg-teal-700' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${quoteSignedEmailEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
             </div>
 
             {/* Google Reviews */}
