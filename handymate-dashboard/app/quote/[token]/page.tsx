@@ -531,6 +531,15 @@ export default function QuoteSignPage() {
                   {formatSEK(quote.customer_pays ?? quote.total)}
                 </span>
               </p>
+              <a
+                href={`/api/quotes/pdf?quoteId=${quote.quote_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                Ladda ner PDF
+              </a>
             </div>
           )}
         </div>
@@ -908,6 +917,17 @@ export default function QuoteSignPage() {
               </>
             )}
           </button>
+
+          {/* PDF download */}
+          <a
+            href={`/api/quotes/pdf?quoteId=${quote.quote_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 mt-3"
+          >
+            <FileText className="w-4 h-4" />
+            Ladda ner offert som PDF
+          </a>
 
           {/* Validation hint */}
           {!canSubmit && !submitting && (

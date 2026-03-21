@@ -692,5 +692,5 @@ async function generateQuoteNumber(supabase: any, businessId: string): Promise<s
     .eq('business_id', businessId)
     .gte('created_at', `${year}-01-01`)
 
-  return `OFF-${year}-${String((count || 0) + 1).padStart(3, '0')}`
+  return `#${String((count || 0) + 1).padStart(3, '0')}`
 }

@@ -279,6 +279,8 @@ export async function POST(request: NextRequest) {
 
     let smsSent = false
     let emailSent = false
+    let sentVia = ''
+    let gmailError = ''
 
     // SMS
     if (method === 'sms' || method === 'both') {
@@ -323,7 +325,7 @@ Frågor? Ring ${business.phone_number}`
         }
         // Om both och ingen email, fortsätt med bara SMS
       } else {
-        const emailSubject = `Offert från ${business.business_name}: ${quote.title || 'Offert'}`
+        const emailSubject = `Offert från ${business.business_name} — ${quote.title || 'Offert'}`
         const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl)
         const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
 
@@ -341,9 +343,15 @@ Frågor? Ring ${business.phone_number}`
               replyTo: business.contact_email || undefined,
               bcc: bccEmails?.length > 0 ? bccEmails : undefined,
             })
+            if (emailSent) {
+              sentVia = gmailStatus.email
+            } else {
+              gmailError = 'Gmail-token kan ha gått ut — återanslut Gmail i Inställningar'
+            }
           }
-        } catch (gmailErr) {
+        } catch (gmailErr: any) {
           console.error('Gmail send error (falling back to Resend):', gmailErr)
+          gmailError = gmailErr?.message || 'Gmail-fel'
         }
 
         // Fallback: Resend
@@ -356,6 +364,9 @@ Frågor? Ring ${business.phone_number}`
             business.contact_email || undefined,
             bccEmails?.length > 0 ? bccEmails : undefined,
           )
+          if (emailSent) {
+            sentVia = `offert@${process.env.RESEND_DOMAIN || 'handymate.se'}`
+          }
         }
 
         if (emailSent) {
@@ -375,8 +386,11 @@ Frågor? Ring ${business.phone_number}`
 
     // Kontrollera att minst en metod lyckades
     if (!smsSent && !emailSent) {
+      const hint = gmailError
+        ? `Gmail misslyckades: ${gmailError}. `
+        : ''
       return NextResponse.json({
-        error: 'Kunde inte skicka offerten. Kontrollera att SMS/Email är konfigurerat.'
+        error: `${hint}Kunde inte skicka offerten. Kontrollera att Gmail är kopplad i Inställningar eller att kundens mailadress stämmer.`
       }, { status: 500 })
     }
 
@@ -444,7 +458,8 @@ Frågor? Ring ${business.phone_number}`
       success: true,
       message: `Offert skickad via ${sentMethods.join(' och ')}!`,
       smsSent,
-      emailSent
+      emailSent,
+      sentVia: sentVia || undefined,
     })
 
   } catch (error: any) {

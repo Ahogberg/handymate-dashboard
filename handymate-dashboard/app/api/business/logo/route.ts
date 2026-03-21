@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { ensureBucket } from '@/lib/storage'
 
 /** POST — Ladda upp företagslogga */
 export async function POST(request: NextRequest) {
@@ -29,6 +30,9 @@ export async function POST(request: NextRequest) {
 
   const arrayBuffer = await file.arrayBuffer()
   const buffer = Buffer.from(arrayBuffer)
+
+  // Säkerställ att bucket finns
+  await ensureBucket(supabase, 'business-assets', { public: true })
 
   // Upload (upsert to replace old logo)
   const { error: uploadError } = await supabase.storage

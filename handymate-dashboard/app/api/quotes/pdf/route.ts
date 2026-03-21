@@ -373,7 +373,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
   ].filter(Boolean).join('\n')
 
   return wrapInPage(
-    `Offert ${escapeHtml(quoteNumber)} — ${escapeHtml(business?.business_name || '')}`,
+    `Offert — ${escapeHtml(quote.title || quoteNumber)} | ${escapeHtml(business?.business_name || '')}`,
     '',
     bodyHtml,
   )
