@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
       // gmail_scope_granted is defined in gmail_integration.sql — always include it
       const { error: updateErr } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, gmail_scope_granted: true })
+        .update({ ...coreFields, gmail_scope_granted: true, gmail_send_scope_granted: true })
         .eq('id', existing.id)
 
       if (updateErr) return errorRedirect('Kunde inte uppdatera anslutningen: ' + updateErr.message)
@@ -106,10 +106,22 @@ export async function GET(request: NextRequest) {
           provider: 'google',
           ...coreFields,
           gmail_scope_granted: true,
+          gmail_send_scope_granted: true,
         })
 
       if (insertErr) return errorRedirect('Kunde inte spara anslutningen: ' + insertErr.message)
     }
+
+    // Synka Gmail-sändning till business_config så att gmail-send.ts hittar det
+    await supabase
+      .from('business_config')
+      .update({
+        gmail_send_enabled: true,
+        gmail_email: tokens.email,
+        google_access_token: tokens.access_token,
+        google_refresh_token: tokens.refresh_token,
+      })
+      .eq('business_id', state.business_id)
 
     return NextResponse.redirect(
       `${APP_URL}/dashboard/settings?tab=integrations&google=connected`
