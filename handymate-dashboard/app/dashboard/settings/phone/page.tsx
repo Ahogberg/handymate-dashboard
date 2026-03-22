@@ -88,6 +88,7 @@ export default function PhoneSettingsPage() {
   const [syncing, setSyncing] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
   const [syncMsg, setSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [smsLogs, setSmsLogs] = useState<any[]>([])
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
   useEffect(() => {
@@ -983,6 +984,66 @@ export default function PhoneSettingsPage() {
             </div>
           </div>
         )}
+
+        {/* SMS-logg */}
+        <div className="mt-8 border-t pt-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">SMS-logg</h3>
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch('/api/sms/log?limit=30')
+                  const data = await res.json()
+                  setSmsLogs(data.logs || [])
+                } catch { setSmsLogs([]) }
+              }}
+              className="text-sm text-teal-600 hover:text-teal-700"
+            >
+              Uppdatera
+            </button>
+          </div>
+          {smsLogs.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-6">
+              Inga SMS-loggar ännu.{' '}
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/sms/log?limit=30')
+                    const data = await res.json()
+                    setSmsLogs(data.logs || [])
+                  } catch { setSmsLogs([]) }
+                }}
+                className="text-teal-600 hover:underline"
+              >
+                Ladda
+              </button>
+            </p>
+          ) : (
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {smsLogs.map((log: any) => (
+                <div key={log.sms_id} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-white">
+                  <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${log.status === 'sent' ? 'bg-emerald-500' : log.status === 'failed' ? 'bg-red-500' : 'bg-gray-300'}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <span>{log.direction === 'inbound' ? '← Inkommande' : '→ Utgående'}</span>
+                      <span>·</span>
+                      <span>{log.phone_to || log.phone_from}</span>
+                      <span>·</span>
+                      <span>{new Date(log.created_at).toLocaleString('sv-SE', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 mt-0.5 truncate">{log.message}</p>
+                    {log.status === 'failed' && log.error_message && (
+                      <p className="text-xs text-red-500 mt-0.5">Fel: {log.error_message}</p>
+                    )}
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${log.status === 'sent' ? 'bg-emerald-50 text-emerald-700' : log.status === 'failed' ? 'bg-red-50 text-red-700' : 'bg-gray-50 text-gray-500'}`}>
+                    {log.status === 'sent' ? 'Skickat' : log.status === 'failed' ? 'Misslyckat' : log.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

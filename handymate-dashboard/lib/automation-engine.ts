@@ -218,18 +218,77 @@ async function handleSendSms(
     return { success: false, error: 'Inget telefonnummer i kontext' }
   }
 
-  // Use the internal SMS API
+  // Skicka direkt via 46elks (ej via auth-skyddad API-route)
+  const ELKS_USER = process.env.ELKS_API_USER
+  const ELKS_PASS = process.env.ELKS_API_PASSWORD
+  if (!ELKS_USER || !ELKS_PASS) {
+    return { success: false, error: '46elks-credentials saknas i miljövariabler' }
+  }
+
+  // Formatera telefonnummer till E.164
+  const formatPhone = (num: string): string => {
+    const clean = num.replace(/[\s\-()]/g, '')
+    if (clean.startsWith('0')) return '+46' + clean.slice(1)
+    return clean.startsWith('+') ? clean : '+' + clean
+  }
+
   try {
-    const res = await fetch(`${APP_URL}/api/sms/send`, {
+    const res = await fetch('https://api.46elks.com/a1/sms', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ business_id: businessId, to, message }),
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${ELKS_USER}:${ELKS_PASS}`).toString('base64'),
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        from: (business?.business_name || 'Handymate').substring(0, 11),
+        to: formatPhone(to),
+        message,
+      }),
     })
-    const result = await res.json().catch(() => ({}))
-    if (!res.ok) return { success: false, error: result.error || `HTTP ${res.status}` }
-    return { success: true, data: { to, message_preview: message.substring(0, 80) } }
+
+    const responseText = await res.text()
+    let result: any
+    try { result = JSON.parse(responseText) } catch { result = { raw: responseText } }
+
+    if (!res.ok) {
+      console.error('[automation-engine] SMS failed:', res.status, responseText)
+      return { success: false, error: result.message || responseText || `46elks HTTP ${res.status}` }
+    }
+
+    // Logga i sms_log
+    try {
+      await supabase.from('sms_log').insert({
+        sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
+        business_id: businessId,
+        direction: 'outbound',
+        phone_from: (business?.business_name || 'Handymate').substring(0, 11),
+        phone_to: formatPhone(to),
+        message,
+        status: 'sent',
+        elks_id: result.id,
+        created_at: new Date().toISOString(),
+      }).then(() => {}).catch(() => {})
+    } catch { /* non-blocking */ }
+
+    return { success: true, data: { to: formatPhone(to), elks_id: result.id, message_preview: message.substring(0, 80) } }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'SMS send failed'
+    console.error('[automation-engine] SMS exception:', msg)
+
+    // Logga misslyckade SMS också
+    try {
+      await supabase.from('sms_log').insert({
+        sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
+        business_id: businessId,
+        direction: 'outbound',
+        phone_to: to,
+        message,
+        status: 'failed',
+        error_message: msg,
+        created_at: new Date().toISOString(),
+      }).then(() => {}).catch(() => {})
+    } catch { /* non-blocking */ }
+
     return { success: false, error: msg }
   }
 }
