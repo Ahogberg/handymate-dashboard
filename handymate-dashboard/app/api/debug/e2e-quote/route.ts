@@ -72,7 +72,9 @@ export async function POST(request: NextRequest) {
     // ── STEG 2: Skapa testoffert ──
     const quoteId = 'e2e_' + Date.now()
     const signToken = crypto.randomUUID()
-    const { error: quoteErr } = await supabase.from('quotes').insert({
+
+    // Insert utan sign_token först (kolumnen kanske inte finns ännu)
+    const insertData: any = {
       quote_id: quoteId,
       business_id: business.business_id,
       customer_id: testCustomerId,
@@ -83,21 +85,39 @@ export async function POST(request: NextRequest) {
       vat: 11250,
       subtotal: 33750,
       valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-      sign_token: signToken,
       quote_number: '#E2E',
-    })
+    }
+
+    const { error: quoteErr } = await supabase.from('quotes').insert(insertData)
 
     if (quoteErr) {
       steps.push({ step: '2. Skapa offert', status: 'fail', detail: quoteErr.message })
       return NextResponse.json({ success: false, steps })
     }
+
+    // Sätt sign_token via update (fungerar oavsett om kolumnen finns vid insert)
+    const { error: tokenErr } = await supabase
+      .from('quotes')
+      .update({ sign_token: signToken })
+      .eq('quote_id', quoteId)
+
+    if (tokenErr) {
+      steps.push({
+        step: '2. Skapa offert',
+        status: 'ok',
+        detail: `Offert skapad: ${quoteId} (45 000 kr) — sign_token kunde inte sättas: ${tokenErr.message}. Kör SQL: ALTER TABLE quotes ADD COLUMN IF NOT EXISTS sign_token TEXT UNIQUE;`,
+        data: { quote_id: quoteId, sign_token_error: tokenErr.message },
+      })
+    } else {
+      steps.push({
+        step: '2. Skapa offert',
+        status: 'ok',
+        detail: `Offert skapad: ${quoteId} (45 000 kr)`,
+        data: { quote_id: quoteId, sign_token: signToken },
+      })
+    }
+
     testQuoteId = quoteId
-    steps.push({
-      step: '2. Skapa offert',
-      status: 'ok',
-      detail: `Offert skapad: ${quoteId} (45 000 kr)`,
-      data: { quote_id: quoteId, sign_token: signToken },
-    })
 
     // ── STEG 3: Verifiera att offerten kan hämtas ──
     const { data: fetchedQuote, error: fetchErr } = await supabase
