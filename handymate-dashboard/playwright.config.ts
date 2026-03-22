@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
-import dotenv from 'dotenv'
 
-dotenv.config({ path: '.env.test' })
+// Ladda .env.test lokalt (i CI sätts env vars direkt)
+try { require('dotenv').config({ path: '.env.test' }) } catch { /* dotenv optional */ }
 
 export default defineConfig({
   testDir: './tests',
