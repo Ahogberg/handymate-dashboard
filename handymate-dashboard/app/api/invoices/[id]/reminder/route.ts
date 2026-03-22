@@ -151,7 +151,7 @@ export async function POST(
         total_with_fees: totalWithFees,
         message: message,
       })
-      .catch((err: any) => console.error('Failed to create reminder record:', err))
+    // Log errors but don't block
 
     // Update invoice with reminder info
     await supabase
@@ -176,7 +176,7 @@ export async function POST(
         message_type: 'invoice_reminder',
         related_id: invoiceId,
         status: 'sent'
-      }).catch(() => {})
+      })
     }
 
     if (!smsSent) {

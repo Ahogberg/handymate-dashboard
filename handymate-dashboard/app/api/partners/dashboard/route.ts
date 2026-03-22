@@ -96,11 +96,11 @@ export async function GET(request: NextRequest) {
     .reduce((sum, r) => sum + r.monthly_commission, 0)
 
   // Group events by business_id for timeline
-  const eventsByBusiness: Record<string, typeof events> = {}
+  const eventsByBusiness: Record<string, NonNullable<typeof events>> = {}
   for (const evt of events || []) {
     const bizId = evt.business_id || 'unknown'
     if (!eventsByBusiness[bizId]) eventsByBusiness[bizId] = []
-    eventsByBusiness[bizId].push(evt)
+    eventsByBusiness[bizId]!.push(evt)
   }
 
   return NextResponse.json({

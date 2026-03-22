@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
           follow_up_round: followUpCount + 1,
           channel,
         },
-      }).then(() => {}).catch(() => {})
+      })
 
       const list = byBusiness.get(quote.business_id) || []
       list.push({ quote, daysSinceSent, channel })

@@ -109,7 +109,7 @@ async function getStorefrontData(slug: string) {
     storefront: storefront as StorefrontData,
     business: business as BusinessData,
     priceItems: (priceItems || []) as PriceItem[],
-    reviews: (reviews || []) as Review[],
+    reviews: (reviews || []) as unknown as Review[],
   }
 }
 

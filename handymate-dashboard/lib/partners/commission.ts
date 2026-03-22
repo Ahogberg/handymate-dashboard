@@ -43,7 +43,7 @@ export async function processMonthlyCommissions(): Promise<{
       // Check if customer is still active (has subscription)
       const { data: business } = await supabase
         .from('business_config')
-        .select('business_id, stripe_subscription_id, plan')
+        .select('business_id, stripe_subscription_id, subscription_plan')
         .eq('business_id', ref.referred_business_id)
         .maybeSingle()
 

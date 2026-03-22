@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
         headers: {
           'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64')
         }
-      }).catch(() => {})
+      })
 
       return NextResponse.json({
         error: 'Failed to save number to database',

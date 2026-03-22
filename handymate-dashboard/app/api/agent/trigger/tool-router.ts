@@ -572,21 +572,25 @@ async function sendSms(
   if (!response.ok) return { success: false, error: `46elks-fel: ${result.message || response.statusText}` }
 
   // Log SMS
-  await supabase.from('sms_log').insert({
-    sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
-    business_id: businessId, direction: 'outbound',
-    phone_from: senderName, phone_to: to, message,
-    status: 'sent', elks_id: result.id, created_at: new Date().toISOString(),
-  }).catch(() => {})
+  try {
+    await supabase.from('sms_log').insert({
+      sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
+      business_id: businessId, direction: 'outbound',
+      phone_from: senderName, phone_to: to, message,
+      status: 'sent', elks_id: result.id, created_at: new Date().toISOString(),
+    })
+  } catch { /* non-blocking */ }
 
   // Also log to sms_conversation for conversation history continuity
-  await supabase.from('sms_conversation').insert({
-    business_id: businessId,
-    phone_number: to,
-    role: 'assistant',
-    content: message,
-    created_at: new Date().toISOString(),
-  }).catch(() => {})
+  try {
+    await supabase.from('sms_conversation').insert({
+      business_id: businessId,
+      phone_number: to,
+      role: 'assistant',
+      content: message,
+      created_at: new Date().toISOString(),
+    })
+  } catch { /* non-blocking */ }
 
   return { success: true, data: { message: `SMS skickat till ${to}`, sms_id: result.id } }
 }
@@ -779,7 +783,7 @@ async function qualifyLead(
       activity_id: generateId('la'), lead_id: existingLead.lead_id, business_id: businessId,
       activity_type: 'score_updated', description: `Score uppdaterad: ${score}, urgency ${urgency}`,
       created_at: now,
-    }).catch(() => {})
+    })
 
     return { success: true, data: { lead_id: existingLead.lead_id, action: 'updated', score, urgency, job_type: jobType, estimated_value: estimatedValue } }
   }
@@ -799,7 +803,7 @@ async function qualifyLead(
     activity_id: generateId('la'), lead_id: leadId, business_id: businessId,
     activity_type: 'created', description: `Ny lead: ${contactName || phone || 'Okänd'} (${leadNumber}), score ${score}`,
     created_at: now,
-  }).catch(() => {})
+  })
 
   // V3 Automation Engine: fire lead_created event
   try {
@@ -831,7 +835,7 @@ async function updateLeadStatus(
     activity_id: generateId('la'), lead_id: params.lead_id as string, business_id: businessId,
     activity_type: 'status_changed', description: `Status → ${params.status}`,
     created_at: new Date().toISOString(),
-  }).catch(() => {})
+  })
 
   return { success: true, data: { message: `Lead status → ${params.status}`, lead: data } }
 }
@@ -1106,7 +1110,7 @@ async function createApprovalRequest(
       body: title,
       url: '/dashboard/approvals',
     }),
-  }).catch(() => {})
+  })
 
   return {
     success: true,

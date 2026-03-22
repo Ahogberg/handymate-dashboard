@@ -267,7 +267,7 @@ async function handleSendSms(
         status: 'sent',
         elks_id: result.id,
         created_at: new Date().toISOString(),
-      }).then(() => {}).catch(() => {})
+      })
     } catch { /* non-blocking */ }
 
     return { success: true, data: { to: formatPhone(to), elks_id: result.id, message_preview: message.substring(0, 80) } }
@@ -286,7 +286,7 @@ async function handleSendSms(
         status: 'failed',
         error_message: msg,
         created_at: new Date().toISOString(),
-      }).then(() => {}).catch(() => {})
+      })
     } catch { /* non-blocking */ }
 
     return { success: false, error: msg }

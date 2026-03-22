@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
     case 'team': {
       // Fetch memory counts per agent + recent inter-agent messages
       const [memoriesRes, messagesRes] = await Promise.all([
-        supabase.rpc('count_by_group', { _table: 'agent_memories', _group_col: 'agent_id', _filter_col: 'business_id', _filter_val: businessId }).catch(() => null),
+        supabase.from('agent_memories').select('agent_id').eq('business_id', businessId),
         supabase
           .from('agent_messages')
           .select('id, from_agent, to_agent, message_type, content, status, created_at')
@@ -118,11 +118,11 @@ export async function GET(request: NextRequest) {
           .limit(20),
       ])
 
-      // Fallback: direct count per agent if rpc doesn't exist
+      // Count memories per agent
       let memoryCounts: Record<string, number> = {}
-      if (memoriesRes?.data) {
+      if (memoriesRes?.data && memoriesRes.data.length > 0) {
         for (const row of memoriesRes.data) {
-          memoryCounts[row.agent_id] = row.count
+          memoryCounts[row.agent_id] = (memoryCounts[row.agent_id] || 0) + 1
         }
       } else {
         // Manual count

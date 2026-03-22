@@ -21,24 +21,21 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Increment page_views
-    await supabase.rpc('increment_storefront_views', { bid: business_id }).catch(() => {
-      // Fallback if RPC doesn't exist
-      supabase
+    // Increment page_views — try RPC, fallback to manual update
+    const rpcRes = await supabase.rpc('increment_storefront_views', { bid: business_id })
+    if (rpcRes.error) {
+      const { data } = await supabase
         .from('storefront')
         .select('page_views')
         .eq('business_id', business_id)
         .single()
-        .then(({ data }: { data: Record<string, number> | null }) => {
-          if (data) {
-            supabase
-              .from('storefront')
-              .update({ page_views: (data.page_views || 0) + 1 })
-              .eq('business_id', business_id)
-              .then(() => {})
-          }
-        })
-    })
+      if (data) {
+        await supabase
+          .from('storefront')
+          .update({ page_views: ((data as any).page_views || 0) + 1 })
+          .eq('business_id', business_id)
+      }
+    }
 
     return NextResponse.json({ ok: true }, { headers: CORS_HEADERS })
   } catch {

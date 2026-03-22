@@ -52,12 +52,12 @@ async function checkOverdueInvoices() {
     }
 
     // Update status to overdue (simple DB op — keep here)
-    const invoiceIds = (overdueInvoices as OverdueInvoice[]).map(inv => inv.invoice_id)
+    const invoiceIds = (overdueInvoices as unknown as OverdueInvoice[]).map(inv => inv.invoice_id)
     await supabase.from('invoice').update({ status: 'overdue' }).in('invoice_id', invoiceIds)
 
     // Group by business and trigger agent per business
     const byBusiness = new Map<string, OverdueInvoice[]>()
-    for (const inv of overdueInvoices as OverdueInvoice[]) {
+    for (const inv of overdueInvoices as unknown as OverdueInvoice[]) {
       const list = byBusiness.get(inv.business_id) || []
       list.push(inv)
       byBusiness.set(inv.business_id, list)

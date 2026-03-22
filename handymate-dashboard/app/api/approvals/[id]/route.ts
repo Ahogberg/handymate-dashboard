@@ -381,7 +381,7 @@ async function executeApprovalPayload(
           status: smsRes.ok ? 'completed' : 'failed',
           input: { project_id: pl.project_id, customer_name: pl.customer_name },
           output: { sms_sent: smsRes.ok },
-        }).catch(() => {})
+        })
 
         return { action: 'warranty_followup', sms_sent: smsRes.ok, customer: pl.customer_name }
       }

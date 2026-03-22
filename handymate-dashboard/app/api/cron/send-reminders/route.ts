@@ -253,7 +253,7 @@ async function sendAutoReminders() {
             message_type: 'invoice_reminder',
             related_id: inv.invoice_id,
             status: 'sent',
-          }).catch(() => {})
+          })
         }
 
         // Logga aktivitet
@@ -263,7 +263,7 @@ async function sendAutoReminders() {
           activity_type: 'auto_reminder_sent',
           description: `Automatisk påminnelse ${currentCount + 1} skickad för faktura ${inv.invoice_number}${smsSent ? ' (SMS)' : ''}${emailSent ? ' (email)' : ''}`,
           metadata: { invoice_id: inv.invoice_id, level: scheduleEntry.level, reminder_count: currentCount + 1 },
-        }).catch(() => {})
+        })
 
         remindersSent++
         results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level: scheduleEntry.level, success: true })

@@ -128,7 +128,7 @@ export async function checkWarrantyFollowups(businessId: string): Promise<Warran
       status: 'pending_approval',
       input: { project_id: project.id, customer_name: customer.name },
       output: { approval_id: approvalId },
-    }).catch(() => {}) // Ignorera om tabellen inte finns
+    }) // Ignorera om tabellen inte finns
 
     followupsCreated++
   }

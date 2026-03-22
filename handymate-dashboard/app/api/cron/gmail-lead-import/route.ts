@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
               userId: 'me',
               id: msg.id,
               requestBody: { removeLabelIds: [] }, // don't strip UNREAD — not our email
-            }).catch(() => {})
+            })
             skipped++
             continue
           }
@@ -308,7 +308,7 @@ export async function GET(request: NextRequest) {
             userId: 'me',
             id: msg.id,
             requestBody: { removeLabelIds: ['UNREAD'] },
-          }).catch(() => {})
+          })
 
           // Trigger agent notification
           try {

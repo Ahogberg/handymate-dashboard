@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
           body: title,
           url: '/dashboard/approvals',
         }),
-      }).catch(() => {})
+      })
     } catch { /* non-fatal */ }
 
     return NextResponse.json({ approval: data }, { status: 201 })

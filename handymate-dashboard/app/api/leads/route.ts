@@ -134,7 +134,7 @@ export async function PATCH(request: NextRequest) {
       activity_type: 'status_changed',
       description: `Status ändrad till ${updates.status}`,
       created_at: new Date().toISOString(),
-    }).catch(() => {})
+    })
   }
 
   return NextResponse.json({ lead: data })
