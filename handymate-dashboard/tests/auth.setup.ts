@@ -1,13 +1,22 @@
 import { test as setup } from '@playwright/test'
 import { createClient } from '@supabase/supabase-js'
+import * as fs from 'fs'
+import * as path from 'path'
 
 setup('authenticate', async ({ page }) => {
+  // Skapa auth-katalog om den saknas
+  const authDir = path.join(process.cwd(), 'playwright', '.auth')
+  if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true })
+
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
+  console.log('Auth setup — SUPABASE_URL:', supabaseUrl ? 'SET' : 'MISSING')
+  console.log('Auth setup — SERVICE_ROLE_KEY:', serviceKey ? 'SET' : 'MISSING')
+
   if (!supabaseUrl || !serviceKey) {
     throw new Error(
-      'SUPABASE_URL och SUPABASE_SERVICE_ROLE_KEY måste vara satta i .env.test'
+      `SUPABASE_URL (${supabaseUrl ? 'SET' : 'MISSING'}) och SUPABASE_SERVICE_ROLE_KEY (${serviceKey ? 'SET' : 'MISSING'}) måste vara satta`
     )
   }
 
