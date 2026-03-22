@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const quoteId = 'e2e_' + Date.now()
     const signToken = crypto.randomUUID()
 
-    // Insert utan sign_token först (kolumnen kanske inte finns ännu)
+    // Insert med bara kolumner som garanterat finns
     const insertData: any = {
       quote_id: quoteId,
       business_id: business.business_id,
@@ -82,9 +82,6 @@ export async function POST(request: NextRequest) {
       description: 'Automatiskt genererad testoffert för E2E-verifiering',
       status: 'draft',
       total: 45000,
-      vat: 11250,
-      subtotal: 33750,
-      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       quote_number: '#E2E',
     }
 
