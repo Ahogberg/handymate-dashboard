@@ -233,20 +233,44 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Hämta offert med kundinfo och verifiera ägarskap
-    const { data: quote } = await supabase
+    // Hämta offert och verifiera ägarskap
+    const { data: quote, error: quoteError } = await supabase
       .from('quotes')
-      .select('*, sign_token, customer(*)')
+      .select('*, sign_token')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
       .single()
 
-    if (!quote) {
+    if (quoteError || !quote) {
+      console.error('Quote fetch error:', quoteError, 'quoteId:', quoteId, 'business_id:', business.business_id)
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    if (!quote.customer) {
-      return NextResponse.json({ error: 'No customer on quote' }, { status: 400 })
+    // Hämta kund separat (FK-relation osäker)
+    let customer: any = null
+    if (quote.customer_id) {
+      const { data: c } = await supabase
+        .from('customer')
+        .select('*')
+        .eq('customer_id', quote.customer_id)
+        .single()
+      if (!c) {
+        // Försök med customers-tabellen
+        const { data: c2 } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', quote.customer_id)
+          .single()
+        customer = c2
+      } else {
+        customer = c
+      }
+    }
+    // Sätt customer på quote-objektet för bakåtkompatibilitet
+    ;(quote as any).customer = customer
+
+    if (!customer) {
+      return NextResponse.json({ error: 'Ingen kund kopplad till offerten' }, { status: 400 })
     }
 
     // Hämta logo_url och swish_number
