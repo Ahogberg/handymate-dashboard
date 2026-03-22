@@ -21,16 +21,27 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Verify quote belongs to business
+    // Hämta offert (service role)
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('quote_id, status, sign_token, customer_id')
+      .select('quote_id, status, sign_token, customer_id, business_id')
       .eq('quote_id', quoteId)
-      .eq('business_id', business.business_id)
       .single()
 
     if (fetchError || !quote) {
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
+    }
+
+    // Verifiera ägarskap (multi-account safe)
+    const { data: ownerCheck } = await supabase
+      .from('business_config')
+      .select('business_id')
+      .eq('business_id', quote.business_id)
+      .or(`user_id.eq.${business.user_id},contact_email.eq.${business.contact_email}`)
+      .maybeSingle()
+
+    if (!ownerCheck) {
+      return NextResponse.json({ error: 'Ingen behörighet' }, { status: 403 })
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -57,7 +68,6 @@ export async function POST(request: NextRequest) {
       .from('quotes')
       .update(updates)
       .eq('quote_id', quoteId)
-      .eq('business_id', business.business_id)
 
     if (updateError) throw updateError
 

@@ -233,17 +233,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Hämta offert och verifiera ägarskap
+    // Hämta offert (service role, ej RLS)
     const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select('*, sign_token')
       .eq('quote_id', quoteId)
-      .eq('business_id', business.business_id)
       .single()
 
     if (quoteError || !quote) {
-      console.error('Quote fetch error:', quoteError, 'quoteId:', quoteId, 'business_id:', business.business_id)
+      console.error('Quote fetch error:', quoteError, 'quoteId:', quoteId)
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
+    }
+
+    // Verifiera ägarskap: kolla att offertens business tillhör inloggad användare
+    const { data: ownerCheck } = await supabase
+      .from('business_config')
+      .select('business_id')
+      .eq('business_id', quote.business_id)
+      .eq('user_id', business.user_id)
+      .maybeSingle()
+
+    if (!ownerCheck) {
+      // Fallback: kolla om det är samma e-post (multi-account scenario)
+      const { data: emailCheck } = await supabase
+        .from('business_config')
+        .select('business_id')
+        .eq('business_id', quote.business_id)
+        .eq('contact_email', business.contact_email)
+        .maybeSingle()
+
+      if (!emailCheck) {
+        return NextResponse.json({ error: 'Ingen behörighet för denna offert' }, { status: 403 })
+      }
     }
 
     // Hämta kund separat (FK-relation osäker)
