@@ -532,7 +532,7 @@ export default function QuoteSignPage() {
                 </span>
               </p>
               <a
-                href={`/api/quotes/pdf?quoteId=${quote.quote_id}`}
+                href={`/api/quotes/pdf?token=${token}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mt-3 w-full py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
@@ -920,7 +920,7 @@ export default function QuoteSignPage() {
 
           {/* PDF download */}
           <a
-            href={`/api/quotes/pdf?quoteId=${quote.quote_id}`}
+            href={`/api/quotes/pdf?token=${token}`}
             target="_blank"
             rel="noopener noreferrer"
             className="w-full py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 mt-3"

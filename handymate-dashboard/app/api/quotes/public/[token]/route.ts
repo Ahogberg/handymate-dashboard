@@ -17,7 +17,7 @@ export async function GET(
       return NextResponse.json({ error: 'Token saknas' }, { status: 400 })
     }
 
-    // Fetch quote by sign_token
+    // Fetch quote by sign_token (utan FK-join som kan misslyckas)
     const { data: quote, error } = await supabase
       .from('quotes')
       .select(`
@@ -46,19 +46,27 @@ export async function GET(
         attachments,
         created_at,
         business_id,
-        customer:customer_id (
-          name,
-          phone_number,
-          email,
-          address_line
-        )
+        customer_id
       `)
       .eq('sign_token', token)
       .single()
 
     if (error || !quote) {
+      console.error('[quote/public] Fetch error:', error?.message, 'token:', token)
       return NextResponse.json({ error: 'Offert hittades inte eller länken är ogiltig' }, { status: 404 })
     }
+
+    // Hämta kund separat (FK-relation kan saknas)
+    let customer: any = null
+    if (quote.customer_id) {
+      const { data: c } = await supabase
+        .from('customer')
+        .select('name, phone_number, email, address_line')
+        .eq('customer_id', quote.customer_id)
+        .single()
+      customer = c
+    }
+    ;(quote as any).customer = customer
 
     // Fetch business info
     const { data: business } = await supabase

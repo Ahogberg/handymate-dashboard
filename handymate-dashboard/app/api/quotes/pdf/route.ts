@@ -73,24 +73,36 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const supabase = getServerSupabase()
     const quoteId = request.nextUrl.searchParams.get('id')
+    const signToken = request.nextUrl.searchParams.get('token')
 
-    if (!quoteId) {
-      return NextResponse.json({ error: 'Missing quote ID' }, { status: 400 })
+    // Stöd för publik åtkomst via sign_token (signeringssidan)
+    let quote: any = null
+
+    if (signToken) {
+      const { data } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('sign_token', signToken)
+        .single()
+      quote = data
+    } else if (quoteId) {
+      // Auth krävs för id-baserad åtkomst
+      const business = await getAuthenticatedBusiness(request)
+      if (!business) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      const { data } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('quote_id', quoteId)
+        .eq('business_id', business.business_id)
+        .single()
+      quote = data
+    } else {
+      return NextResponse.json({ error: 'Missing quote ID or token' }, { status: 400 })
     }
-
-    const { data: quote } = await supabase
-      .from('quotes')
-      .select('*')
-      .eq('quote_id', quoteId)
-      .eq('business_id', business.business_id)
-      .single()
 
     if (!quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
@@ -115,10 +127,10 @@ export async function GET(request: NextRequest) {
     const { data: config } = await supabase
       .from('business_config')
       .select('accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website')
-      .eq('business_id', business.business_id)
+      .eq('business_id', quote.business_id)
       .single()
 
-    const html = generateQuoteHTML(quote, business, config)
+    const html = generateQuoteHTML(quote, config, config)
 
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },

@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       description: 'Automatiskt genererad testoffert för E2E-verifiering',
       status: 'draft',
       total: 45000,
+      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       quote_number: '#E2E',
     }
 
@@ -216,7 +217,7 @@ export async function POST(request: NextRequest) {
 
     // ── STEG 7: Verifiera PDF-generering ──
     try {
-      const pdfRes = await fetch(`${APP_URL}/api/quotes/pdf?quoteId=${quoteId}`, {
+      const pdfRes = await fetch(`${APP_URL}/api/quotes/pdf?id=${quoteId}`, {
         headers: { 'Cookie': request.headers.get('cookie') || '' },
       })
       if (pdfRes.ok) {

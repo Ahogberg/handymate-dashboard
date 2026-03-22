@@ -174,7 +174,7 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
 
       <!-- Valid Until -->
       <p style="color: #666; font-size: 14px; text-align: center; margin: 20px 0;">
-        Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>
+        ${quote.valid_until ? `Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>` : ''}
       </p>
 
       ${signBlock}
@@ -339,7 +339,7 @@ Här kommer din offert från ${business.business_name}:
 
 ${quote.title || 'Offert'}
 Totalt: ${formatCurrency(quote.total)} kr${rotText}
-Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}
+${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}` : ''}
 
 Granska och signera här:
 ${signUrl}
