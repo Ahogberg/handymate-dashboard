@@ -43,6 +43,16 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 | V5 | Kontextmotor | agent_context, per-företags-inlärning, prediktiv schemaläggning | ✅ Klar |
 | V6 | Subagenter | Multi-agent-arkitektur, Cowork-integration, dokumentflöde | ✅ Klar |
 | V7 | Full autonomi | Prissättningsintelligens, leverantörskommunikation, Fortnox-djup | 🔄 Pågår |
+| V14 | Prisstruktur | Segment, avtalsformer, prislistor per kundtyp (price_lists_v2) | ✅ Klar |
+| V15 | Autopilot | Zero-touch deal-to-delivery, godkännandepaket | ✅ Klar |
+| V16 | Quote Tracking | Pixel-tracking, offert-visningar, AI-nudge SMS | ✅ Klar |
+| V17 | Lager & Roller | Servicebil-lager, rollhantering (admin/PM/personal), GPS check-in | ✅ Klar |
+| V18 | AI-intelligens | Mänskligt språk i loggen, morgonrapport push/popup | ✅ Klar |
+| V19 | Leads Outbound | Handymate Leads, DR.se brevutskick, kvothantering | ✅ Klar |
+| V20 | Granneffekt + LTV | Neighbour campaigns, kundlivstidsvärde, VIP-reaktivering | ✅ Klar |
+| V21 | Agent-team | 5 specialiserade agenter, persistent memory, inter-agent kommunikation | ✅ Klar |
+| V23 | Automationer | Automationsbibliotek, bekräftelsemail, jobbrapport, garantiuppföljning | ✅ Klar |
+| V24 | Dokument & Debug | ensureBucket(), debug-endpoints, E2E-test, Gmail OAuth-fix | ✅ Klar |
 
 ---
 
@@ -306,18 +316,156 @@ grep -r "fireEvent(" app/ | grep -v "await"
 
 ## 11. Stack-referens
 
-| Tjänst | Användning | Miljövariabel |
-|--------|-----------|---------------|
-| Next.js (Vercel) | Primär runtime — ALL agent-logik | — |
-| Supabase | Databas + auth | `NEXT_PUBLIC_SUPABASE_URL` |
-| 46elks | Telefoni + SMS | `ELKS_API_KEY` |
-| Vapi | Röst-agent | `VAPI_API_KEY` |
-| Anthropic Claude | Haiku (snabba beslut) + Sonnet (strategiska) | `ANTHROPIC_API_KEY` |
-| Google Calendar/Gmail | Kalender + e-post | OAuth |
+Se sektion 17 för komplett lista med alla miljövariabler.
 
 > **Arkitekturprincip:** Next.js (Vercel) är primär runtime för ALL agent-logik.
 > Supabase Edge Functions används bara som sekundära webhook-mottagare.
 > Denna gräns får aldrig suddas ut.
+
+---
+
+## 12. Automationsbiblioteket
+
+> Inställningar → Automationer visar alla regler som ett bibliotek med 6 kategorier.
+> Varje template matchas mot befintlig `automation_rules` via `matchRuleNames[]`.
+
+### 12.1 Kategorier (CATEGORIES[])
+
+| Slug | Label | Ikon |
+|------|-------|------|
+| `leads` | Leads & Kontakt | Phone |
+| `quotes` | Offerter | FileText |
+| `invoices` | Fakturor & Betalning | Receipt |
+| `bookings` | Bokningar & Projekt | Calendar |
+| `customers` | Kundvård | Users |
+| `marketing` | Marknadsföring | Megaphone |
+
+### 12.2 Alla templates (TEMPLATES[])
+
+| Rule Name | Kategori | Beskrivning |
+|-----------|----------|-------------|
+| `lead_response` | Leads | Bekräftelse-SMS vid ny lead |
+| `missed_call_response` | Leads | SMS vid missat samtal |
+| `lead_qualification` | Leads | AI kvalificerar och prioriterar |
+| `quote_followup_day1` | Offerter | Uppföljning dag 5 |
+| `quote_followup_day2` | Offerter | Andra uppföljning dag 10 |
+| `quote_signed_confirmation` | Offerter | Bekräftelsemail vid signering |
+| `invoice_reminder_day1` | Fakturor | Påminnelse dag 1 |
+| `invoice_reminder_day2` | Fakturor | Eskalering dag 7 |
+| `booking_reminder` | Bokningar | 24h-påminnelse |
+| `on_my_way_sms` | Bokningar | "På väg"-SMS med ETA |
+| `job_report_followup` | Bokningar | Jobbrapport PDF |
+| `warranty_followup` | Bokningar | Garantiuppföljning 12 mån |
+| `customer_reactivation` | Kundvård | Reaktivering efter 6 mån |
+| `review_request` | Kundvård | Google Reviews-förfrågan |
+| `birthday_greeting` | Kundvård | Födelsedagshälsning |
+| `seasonal_campaign` | Marknadsföring | Säsongskampanjer |
+| `neighbour_campaign` | Marknadsföring | Granneffekt-utskick |
+
+---
+
+## 13. Backoffice-teamet (V21)
+
+> 5 specialiserade AI-agenter med egna systemprompts och tool-subsets.
+
+| Agent | Roll | Triggers | Tools |
+|-------|------|----------|-------|
+| **Matte** | Chefsassistent (orchestrator) | manual, phone_call, incoming_sms, morning_report | alla |
+| **Karin** | Ekonom | invoice_overdue, payment_received, invoice_created | invoices, reminders, stats |
+| **Hanna** | Marknadschef | customer_inactive, job_completed, leads_batch_ready | campaigns, SMS, segmentation |
+| **Daniel** | Säljare | lead_created, quote_sent, quote_opened, quote_expired | leads, quotes, pipeline |
+| **Lars** | Projektledare | booking_created, job_completed, work_order_created | bookings, projects, dispatch |
+
+### 13.1 Routing
+`lib/agents/personalities.ts` → `routeToAgent(triggerType, eventName)` väljer agent automatiskt.
+`agent_runs.agent_id` sparar vilken agent som körde.
+
+### 13.2 Persistent Memory (agent_memories)
+- pgvector med 1536-dimensional embeddings
+- Cosine similarity search för relevanta minnen
+- Top-5 injiceras i systemprompt per körning
+
+### 13.3 Inter-agent kommunikation (agent_messages)
+- `send_agent_message(to, type, content)` tool
+- `get_agent_messages(agent_id)` tool
+- Typer: request, insight, alert, handoff
+
+---
+
+## 14. Handymate Mobile
+
+> Separat React Native-repo. Kommunicerar via dessa API-endpoints.
+
+| Endpoint | Funktion |
+|----------|----------|
+| `POST /api/matte/chat` | Chat med Matte via Claude Haiku. `{messages, context}` → `{reply, action?}` |
+| `POST /api/matte/transcribe` | Röst → text via OpenAI Whisper. FormData `audio` → `{text}` |
+| `POST /api/sms/on-my-way` | "På väg"-SMS med GPS + Google Maps ETA |
+| `GET /api/quotes/pdf` | PDF-generering av offert |
+| `POST /api/debug/sms` | Test-SMS med diagnostik |
+| `POST /api/debug/mail` | Test-mail med Gmail/Resend diagnostik |
+| `POST /api/debug/e2e-quote` | E2E-test av hela offertflödet |
+
+---
+
+## 15. Dokumenthantering
+
+### 15.1 Storage buckets (Supabase)
+
+| Bucket | Användning | Auto-skapas via |
+|--------|-----------|-----------------|
+| `customer-documents` | Kundkorts-filer, deal-bilagor | `ensureBucket()` |
+| `project-files` | Projektdokument, ritningar | `ensureBucket()` |
+| `business-assets` | Företagsloggor | `ensureBucket()` |
+| `quote-images` | AI-genererade offertbilder | fallback |
+
+### 15.2 ensureBucket()
+`lib/storage.ts` — kollar om bucket finns, skapar om den saknas.
+Anropas i alla upload-routes innan `supabase.storage.upload()`.
+
+---
+
+## 16. Nya SQL-migrationer (V14–V24)
+
+| Fil | Innehåll |
+|-----|----------|
+| `v14_lead_sources.sql` | Lead-källor + leverantörsportal |
+| `v14_pricing_structure.sql` | Segment, avtalsformer, price_lists_v2 |
+| `v15_autopilot.sql` | Autopilot-inställningar + paket i approvals |
+| `v16_quote_tracking.sql` | quote_tracking_events + view_count på quotes |
+| `v17_inventory.sql` | Lagerplatser, artiklar, rörelser |
+| `v17_roles.sql` | Rollhantering på business_users |
+| `v17_checkin.sql` | GPS check-in/out med attestering |
+| `v17_dispatch.sql` | Smart dispatch — skills + tilldelning |
+| `v18_quote_ux.sql` | Kundspecifika betalningsvillkor |
+| `v18_morning_report.sql` | morning_report_sms_enabled |
+| `v19_leads_outbound.sql` | Outbound-leads + kvothantering |
+| `v20_neighbour_campaigns.sql` | Granneffekt-kampanjer |
+| `v20_customer_ltv.sql` | Kundlivstidsvärde-kolumner |
+| `v21_agent_specialization.sql` | agent_id på agent_runs + automation |
+| `v21_agent_memory.sql` | pgvector agent_memories + agent_messages |
+| `v23_quote_signed_email.sql` | Toggle för bekräftelsemail |
+| `v23_job_report.sql` | Jobbrapport-automation toggle |
+| `v23_review_requests.sql` | Komplettera review_request |
+| `v24_documents_fix.sql` | customer_document + project_document fix |
+
+---
+
+## 17. Stack-referens (utökad)
+
+| Tjänst | Användning | Miljövariabel |
+|--------|-----------|---------------|
+| Next.js (Vercel) | Primär runtime — ALL agent-logik | — |
+| Supabase | Databas + auth + storage | `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| 46elks | Telefoni + SMS | `ELKS_API_USER`, `ELKS_API_PASSWORD` |
+| Vapi | Röst-agent | `VAPI_API_KEY` |
+| Anthropic Claude | Haiku (snabba) + Sonnet (agent) | `ANTHROPIC_API_KEY` |
+| Google Calendar/Gmail | Kalender + e-post OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| Resend | E-post fallback | `RESEND_API_KEY`, `RESEND_DOMAIN` |
+| Google Maps | Distance Matrix (ETA) | `GOOGLE_MAPS_API_KEY` |
+| OpenAI | Whisper transkribering | `OPENAI_API_KEY` |
+| DR.se | Fysiska brevutskick (mock) | — |
+| Stripe | Betalning + prenumerationer | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` |
 
 ---
 
