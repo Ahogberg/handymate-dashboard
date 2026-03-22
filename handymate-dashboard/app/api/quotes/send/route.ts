@@ -114,9 +114,9 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
       <!-- Sign CTA -->
       <div style="text-align: center; margin: 30px 0; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
         <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 15px;">Redo att godkänna offerten?</p>
-        <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">Klicka på knappen nedan för att granska och signera digitalt.</p>
+        <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">I din kundportal kan du granska offerten, signera digitalt och följa ditt projekt.</p>
         <a href="${signUrl}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
-          Visa och signera offert →
+          Öppna din kundportal →
         </a>
         <p style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">Eller kopiera länken: ${signUrl}</p>
       </div>`
@@ -318,8 +318,26 @@ export async function POST(request: NextRequest) {
         .update({ sign_token: signToken })
         .eq('quote_id', quoteId)
     }
+
+    // Auto-skapa kundportal om den saknas
+    let portalToken = customer.portal_token
+    if (!portalToken) {
+      portalToken = crypto.randomUUID()
+      await supabase
+        .from('customer')
+        .update({ portal_token: portalToken, portal_enabled: true })
+        .eq('customer_id', quote.customer_id)
+    } else if (!customer.portal_enabled) {
+      await supabase
+        .from('customer')
+        .update({ portal_enabled: true })
+        .eq('customer_id', quote.customer_id)
+    }
+
     const trackingSessionId = crypto.randomUUID()
-    const signUrl = `${APP_URL}/quote/${signToken}?s=${trackingSessionId}`
+    // Länka till kundportalen med offerter-flik öppen
+    const portalUrl = `${APP_URL}/portal/${portalToken}?tab=quotes`
+    const signUrl = portalUrl
     const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&e=opened&s=${trackingSessionId}`
 
     let smsSent = false
@@ -339,10 +357,9 @@ Här kommer din offert från ${business.business_name}:
 
 ${quote.title || 'Offert'}
 Totalt: ${formatCurrency(quote.total)} kr${rotText}
-${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}` : ''}
-
-Granska och signera här:
-${signUrl}
+${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}\n` : ''}
+Öppna din kundportal:
+${portalUrl}
 
 Frågor? Ring ${business.phone_number}`
 

@@ -145,10 +145,15 @@ export default function CustomerPortalPage() {
   const token = params?.token as string
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Läs ?tab= från URL för att öppna rätt flik automatiskt
+  const initialTab = (typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('tab') as Tab
+    : null) || 'projects'
+
   const [portal, setPortal] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<Tab>('projects')
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab)
 
   // Data
   const [projects, setProjects] = useState<Project[]>([])
@@ -169,6 +174,17 @@ export default function CustomerPortalPage() {
   const [signingSaving, setSigningSaving] = useState(false)
   const ataCanvasRef = useRef<HTMLCanvasElement>(null)
   const [ataDrawing, setAtaDrawing] = useState(false)
+
+  // Quote signing state
+  const [signingQuoteId, setSigningQuoteId] = useState<string | null>(null)
+  const [quoteSignerName, setQuoteSignerName] = useState('')
+  const [quoteSigningSaving, setQuoteSigningSaving] = useState(false)
+  const [quoteSignatureDrawn, setQuoteSignatureDrawn] = useState(false)
+  const [quoteTermsAccepted, setQuoteTermsAccepted] = useState(false)
+  const [quoteSignSuccess, setQuoteSignSuccess] = useState<string | null>(null)
+  const quoteCanvasRef = useRef<HTMLCanvasElement>(null)
+  const quoteDrawingRef = useRef(false)
+  const quoteLastPointRef = useRef<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     fetchPortal()
@@ -336,6 +352,97 @@ export default function CustomerPortalPage() {
       alert('Kunde inte signera ÄTA')
     }
     setSigningSaving(false)
+  }
+
+  // Quote signing functions
+  function initQuoteCanvas() {
+    setTimeout(() => {
+      const canvas = quoteCanvasRef.current
+      if (!canvas) return
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      const rect = canvas.getBoundingClientRect()
+      canvas.width = rect.width * 2
+      canvas.height = rect.height * 2
+      ctx.scale(2, 2)
+      ctx.strokeStyle = '#1a1a1a'
+      ctx.lineWidth = 2
+      ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+    }, 100)
+  }
+
+  function quoteCanvasPointerDown(e: React.PointerEvent) {
+    const canvas = quoteCanvasRef.current
+    if (!canvas) return
+    quoteDrawingRef.current = true
+    const rect = canvas.getBoundingClientRect()
+    quoteLastPointRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    canvas.setPointerCapture(e.pointerId)
+  }
+
+  function quoteCanvasPointerMove(e: React.PointerEvent) {
+    if (!quoteDrawingRef.current) return
+    const canvas = quoteCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx || !quoteLastPointRef.current) return
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    ctx.beginPath()
+    ctx.moveTo(quoteLastPointRef.current.x, quoteLastPointRef.current.y)
+    ctx.lineTo(x, y)
+    ctx.stroke()
+    quoteLastPointRef.current = { x, y }
+    setQuoteSignatureDrawn(true)
+  }
+
+  function quoteCanvasPointerUp() {
+    quoteDrawingRef.current = false
+    quoteLastPointRef.current = null
+  }
+
+  function clearQuoteCanvas() {
+    const canvas = quoteCanvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    setQuoteSignatureDrawn(false)
+  }
+
+  async function signQuote(signToken: string) {
+    if (!quoteSignerName.trim() || !quoteSignatureDrawn || !quoteTermsAccepted) return
+    setQuoteSigningSaving(true)
+    try {
+      const canvas = quoteCanvasRef.current
+      if (!canvas) return
+      const signatureData = canvas.toDataURL('image/png')
+      const res = await fetch(`/api/quotes/public/${signToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'sign',
+          name: quoteSignerName.trim(),
+          signature_data: signatureData,
+        })
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error || 'Kunde inte signera offerten')
+      } else {
+        setQuoteSignSuccess(signingQuoteId)
+        setSigningQuoteId(null)
+        setQuoteSignerName('')
+        setQuoteSignatureDrawn(false)
+        setQuoteTermsAccepted(false)
+        fetchTabData('quotes')
+      }
+    } catch {
+      alert('Kunde inte signera offerten')
+    }
+    setQuoteSigningSaving(false)
   }
 
   const formatDate = (date: string) => new Date(date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -747,11 +854,14 @@ export default function CustomerPortalPage() {
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-gray-900">{q.title || 'Offert'}</h3>
                       <span className={`text-xs px-2 py-1 rounded-full border ${getQuoteStatusColor(q.status)}`}>
-                        {getQuoteStatusText(q.status)}
+                        {quoteSignSuccess === q.quote_id ? 'Signerad!' : getQuoteStatusText(q.status)}
                       </span>
                     </div>
                     <div className="text-sm text-gray-500 mb-3">
                       {q.sent_at ? `Skickad: ${formatDate(q.sent_at)}` : `Skapad: ${formatDate(q.created_at)}`}
+                      {q.valid_until && (
+                        <span className="ml-2">· Giltig till: {formatDate(q.valid_until)}</span>
+                      )}
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
@@ -763,22 +873,99 @@ export default function CustomerPortalPage() {
                       <div className="flex gap-2">
                         {q.sign_token && (
                           <a
-                            href={`/quote/${q.sign_token}`}
-                            className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                            href={`/api/quotes/pdf?token=${q.sign_token}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center gap-1"
                           >
-                            Visa offert
+                            <Download className="w-3.5 h-3.5" />
+                            PDF
                           </a>
                         )}
                         {['sent', 'opened'].includes(q.status) && q.sign_token && (
-                          <a
-                            href={`/quote/${q.sign_token}`}
-                            className="px-3 py-2 text-sm bg-teal-600 text-gray-900 rounded-lg hover:bg-teal-700 font-medium"
+                          <button
+                            onClick={() => { setSigningQuoteId(q.quote_id); setQuoteSignerName(portal?.customer.name || ''); initQuoteCanvas() }}
+                            className="px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium flex items-center gap-1"
                           >
-                            Godkann
-                          </a>
+                            <PenTool className="w-3.5 h-3.5" />
+                            Godkänn och signera
+                          </button>
                         )}
                       </div>
                     </div>
+
+                    {/* Inline signing */}
+                    {signingQuoteId === q.quote_id && q.sign_token && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
+                        <h4 className="font-semibold text-gray-900 text-sm">Signera offerten</h4>
+
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Ditt namn</label>
+                          <input
+                            type="text"
+                            value={quoteSignerName}
+                            onChange={e => setQuoteSignerName(e.target.value)}
+                            placeholder="Förnamn Efternamn"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-gray-500 block mb-1">Din signatur</label>
+                          <div className="relative border border-gray-200 rounded-lg overflow-hidden bg-white">
+                            <canvas
+                              ref={quoteCanvasRef}
+                              className="w-full h-28 cursor-crosshair touch-none"
+                              onPointerDown={quoteCanvasPointerDown}
+                              onPointerMove={quoteCanvasPointerMove}
+                              onPointerUp={quoteCanvasPointerUp}
+                              onPointerLeave={quoteCanvasPointerUp}
+                            />
+                            {!quoteSignatureDrawn && (
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-gray-300 text-sm">
+                                Rita din signatur här
+                              </div>
+                            )}
+                          </div>
+                          {quoteSignatureDrawn && (
+                            <button
+                              onClick={clearQuoteCanvas}
+                              className="mt-1 text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+                            >
+                              <Eraser className="w-3 h-3" />
+                              Rensa
+                            </button>
+                          )}
+                        </div>
+
+                        <label className="flex items-start gap-2 text-sm text-gray-600 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={quoteTermsAccepted}
+                            onChange={e => setQuoteTermsAccepted(e.target.checked)}
+                            className="mt-0.5 rounded border-gray-300"
+                          />
+                          Jag godkänner offerten och dess villkor
+                        </label>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => signQuote(q.sign_token!)}
+                            disabled={!quoteSignerName.trim() || !quoteSignatureDrawn || !quoteTermsAccepted || quoteSigningSaving}
+                            className="flex-1 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          >
+                            {quoteSigningSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                            {quoteSigningSaving ? 'Signerar...' : 'Godkänn offert'}
+                          </button>
+                          <button
+                            onClick={() => { setSigningQuoteId(null); setQuoteTermsAccepted(false); setQuoteSignatureDrawn(false) }}
+                            className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-500 hover:bg-gray-50"
+                          >
+                            Avbryt
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
