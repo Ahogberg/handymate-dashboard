@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -38,7 +38,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        run: npx playwright test --project=chromium
+        run: npx playwright test --project=chromium --reporter=list
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
@@ -47,6 +47,7 @@ jobs:
           name: playwright-report
           path: handymate-dashboard/playwright-report/
           retention-days: 14
+          if-no-files-found: ignore
 
       - name: Notify on failure
         if: failure()
