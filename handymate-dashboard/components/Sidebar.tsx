@@ -112,7 +112,7 @@ const NAV: NavItem[] = [
 // Bottom section: Inställningar + Bjud in kollega (rendered below separator)
 const BOTTOM_NAV: NavItem[] = [
   { type: 'link', key: 'settings', label: 'Inställningar', icon: Settings, href: '/dashboard/settings', paths: ['/dashboard/settings', '/dashboard/billing', '/dashboard/automations'] },
-  { type: 'link', key: 'referral', label: 'Bjud in kollega', icon: Gift, href: '/dashboard/referral' },
+  { type: 'link', key: 'referral', label: 'Bjud in en vän', icon: Gift, href: '/dashboard/referral' },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────

@@ -93,9 +93,9 @@ export default function ReferralPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-zinc-900">Bjud in en kollega</h1>
+        <h1 className="text-2xl font-bold text-zinc-900">Bjud in en vän</h1>
         <p className="text-zinc-500 mt-1">
-          Dela din länk och få 50% rabatt på nästa månads faktura när din kollega aktiverar sitt konto.
+          Dela din länk och få 50% rabatt på nästa månads faktura när din vän aktiverar sitt konto.
         </p>
       </div>
 
@@ -196,9 +196,9 @@ export default function ReferralPage() {
         <h2 className="font-semibold text-zinc-900 mb-4">Så fungerar det</h2>
         <div className="space-y-3">
           {[
-            'Dela din unika länk med en kollega',
-            'Din kollega registrerar sig och provar Handymate',
-            'När kollegan aktiverar sin prenumeration får du 50% rabatt på nästa faktura',
+            'Dela din unika länk med en vän',
+            'Din vän registrerar sig och provar Handymate',
+            'När din vän aktiverar sin prenumeration får du 50% rabatt på nästa faktura',
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className="flex-shrink-0 w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold">
