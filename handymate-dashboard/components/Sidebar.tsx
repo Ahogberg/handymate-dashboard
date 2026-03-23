@@ -662,7 +662,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
       {/* Sidebar - Mobile */}
       <div
-        className={`fixed left-0 top-0 h-screen w-72 bg-gradient-to-b from-[#1a3a4a] to-[#0f2a35] border-r border-white/10 flex flex-col z-50 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-screen w-72 bg-[#1a3a4a] border-r border-white/10 flex flex-col z-50 transition-transform duration-300 md:hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -677,7 +677,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-[#1a3a4a] to-[#0f2a35] border-r border-white/10 flex-col">
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-[#1a3a4a] border-r border-white/10 flex-col">
         {sidebarContent}
       </div>
     </>
