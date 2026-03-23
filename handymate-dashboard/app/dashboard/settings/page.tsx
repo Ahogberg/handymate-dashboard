@@ -345,6 +345,10 @@ export default function SettingsPage() {
   const [workingHours, setWorkingHours] = useState(DEFAULT_HOURS)
   const [newService, setNewService] = useState('')
 
+  // Ekonomi-inställningar
+  const [econPrefs, setEconPrefs] = useState<{ hourly_cost_sek: number; overhead_monthly_sek: number; margin_target_percent: number }>({ hourly_cost_sek: 450, overhead_monthly_sek: 0, margin_target_percent: 50 })
+  const [econSaving, setEconSaving] = useState(false)
+
   // Phone provisioning state
   const [forwardNumber, setForwardNumber] = useState('')
   const [provisioning, setProvisioning] = useState(false)
@@ -533,6 +537,23 @@ export default function SettingsPage() {
         .eq('business_id', data.business_id)
         .not('clicked_at', 'is', null)
       setReviewStats({ sent: sentCount || 0, clicked: clickedCount || 0 })
+
+      // Ekonomi-inställningar från custom_preferences
+      try {
+        const { data: bpData } = await supabase
+          .from('business_preferences')
+          .select('custom_preferences')
+          .eq('business_id', data.business_id)
+          .single()
+        if (bpData?.custom_preferences) {
+          const cp = bpData.custom_preferences as Record<string, any>
+          setEconPrefs({
+            hourly_cost_sek: Number(cp.hourly_cost_sek) || 450,
+            overhead_monthly_sek: Number(cp.overhead_monthly_sek) || 0,
+            margin_target_percent: Number(cp.margin_target_percent) || 50,
+          })
+        }
+      } catch { /* table may not exist */ }
 
       if (data.working_hours && typeof data.working_hours === 'object') {
         setWorkingHours(prev => {
@@ -1300,6 +1321,7 @@ export default function SettingsPage() {
       tabs: [
         { id: 'team', label: 'Team', icon: UsersRound },
         { id: 'time', label: 'Tidrapport', icon: Clock },
+        { id: 'economics', label: 'Ekonomi', icon: TrendingUp },
         { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
         { id: '_link_automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations' },
         { id: '_link_leads', label: 'Lead-källor', icon: Link2, href: '/dashboard/settings/lead-sources' },
@@ -4031,6 +4053,85 @@ export default function SettingsPage() {
         )}
 
         {/* Preferences Tab */}
+        {activeTab === 'economics' && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Ekonomi</h2>
+              <p className="text-sm text-gray-500 mt-1">Används för lönsamhetsberäkningar och estimat på dashboarden</p>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Din timkostnad</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={econPrefs.hourly_cost_sek}
+                    onChange={e => setEconPrefs(p => ({ ...p, hourly_cost_sek: Number(e.target.value) || 0 }))}
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    min={0}
+                  />
+                  <span className="text-sm text-gray-400">kr/h</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Vad din tid kostar — används för att beräkna din faktiska vinst per jobb</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Månatlig overhead</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={econPrefs.overhead_monthly_sek}
+                    onChange={e => setEconPrefs(p => ({ ...p, overhead_monthly_sek: Number(e.target.value) || 0 }))}
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    min={0}
+                  />
+                  <span className="text-sm text-gray-400">kr/månad</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Bil, verktyg, försäkringar och andra fasta månadskostnader</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Marginalmål</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={econPrefs.margin_target_percent}
+                    onChange={e => setEconPrefs(p => ({ ...p, margin_target_percent: Number(e.target.value) || 0 }))}
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    min={0}
+                    max={100}
+                  />
+                  <span className="text-sm text-gray-400">%</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Din målmarginal — visar om du är över eller under mål</p>
+              </div>
+              <button
+                onClick={async () => {
+                  setEconSaving(true)
+                  try {
+                    // Hämta befintliga custom_preferences
+                    const { data: existing } = await supabase
+                      .from('business_preferences')
+                      .select('custom_preferences')
+                      .eq('business_id', business.business_id)
+                      .single()
+                    const merged = { ...(existing?.custom_preferences as Record<string, any> || {}), ...econPrefs }
+                    await supabase
+                      .from('business_preferences')
+                      .upsert({ business_id: business.business_id, custom_preferences: merged }, { onConflict: 'business_id' })
+                    showToast('Ekonomi-inställningar sparade', 'success')
+                  } catch {
+                    showToast('Kunde inte spara', 'error')
+                  }
+                  setEconSaving(false)
+                }}
+                disabled={econSaving}
+                className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors"
+              >
+                {econSaving ? 'Sparar...' : 'Spara'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'preferences' && (
           <PreferencesTab businessId={business.business_id} />
         )}
