@@ -915,11 +915,10 @@ export default function DashboardPage() {
               )}
             </div>
           ) : todayLoaded ? (
-            <div className="flex items-center justify-center py-6 text-gray-400">
+            <div className="flex items-center justify-center py-5 text-gray-400">
               <div className="text-center">
-                <p className="text-2xl mb-1">✅</p>
-                <p className="text-sm font-medium text-gray-500">Inget att göra just nu</p>
-                <p className="text-xs text-gray-400 mt-0.5">Uppgifter, bokningar och godkännanden visas här</p>
+                <p className="text-sm text-gray-400">Inget att göra just nu</p>
+                <p className="text-xs text-gray-300 mt-0.5">Uppgifter, bokningar och godkännanden visas här</p>
               </div>
             </div>
           ) : (
@@ -930,7 +929,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Main 2-column grid (50/50) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6">
 
           {/* ═══ Säljtratt ═══ */}
           {!pipelineLoaded ? (
