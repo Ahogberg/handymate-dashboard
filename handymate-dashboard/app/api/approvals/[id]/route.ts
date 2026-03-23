@@ -357,6 +357,46 @@ async function executeApprovalPayload(
         return { action: 'seasonal_campaign', campaign_id: campaignId, recipients: customers.length }
       }
 
+      case 'proactive_care': {
+        const pl = payload as any
+        if (!pl.customer_phone || !pl.suggested_sms) {
+          return { action: 'proactive_care', skipped: 'no phone or message' }
+        }
+        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            to: pl.customer_phone,
+            message: pl.suggested_sms,
+          }),
+        })
+
+        // Logga i v3_automation_logs
+        const supabasePC = (await import('@/lib/supabase')).getServerSupabase()
+        await supabasePC.from('v3_automation_logs').insert({
+          business_id: businessId,
+          rule_name: 'proactive_customer_care',
+          trigger_type: 'approval_executed',
+          action_type: 'send_sms',
+          status: smsRes.ok ? 'success' : 'failed',
+          context: {
+            customer_id: pl.customer_id,
+            customer_name: pl.customer_name,
+            project_id: pl.project_id,
+            job_type: pl.job_type,
+            suggested_service: pl.suggested_service,
+          },
+        })
+
+        return {
+          action: 'proactive_care',
+          sms_sent: smsRes.ok,
+          customer: pl.customer_name,
+          suggested_service: pl.suggested_service,
+        }
+      }
+
       case 'warranty_followup': {
         const pl = payload as any
         if (!pl.customer_phone || !pl.suggested_sms) {

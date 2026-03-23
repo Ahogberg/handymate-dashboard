@@ -28,6 +28,7 @@ import {
   ThumbsDown,
   Lightbulb,
   ChevronDown as ChevronDownIcon,
+  Loader2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -862,26 +863,24 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Sparad tid widget */}
-        {savedTimeText && (
-          <div className="mb-4 px-4 py-2.5 bg-teal-50 border border-teal-100 rounded-xl">
-            <p className="text-sm text-teal-700">
-              <Zap className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-              {savedTimeText}
-            </p>
-          </div>
-        )}
-
-        {/* Att göra idag */}
-        {todayLoaded && todayItems.length > 0 && (
-          <div className="mb-6 bg-white shadow-sm rounded-xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <ClipboardList className="w-4 h-4 text-teal-600" />
-                Att göra idag
+        {/* ═══ Att göra idag (alltid synlig) ═══ */}
+        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <ClipboardList className="w-4 h-4 text-teal-600" />
+              Att göra idag
+              {todayItems.filter(i => i.status === 'pending').length > 0 && (
                 <span className="text-xs font-normal bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{todayItems.filter(i => i.status === 'pending').length}</span>
-              </h2>
-            </div>
+              )}
+            </h2>
+            {savedTimeText && (
+              <span className="text-xs text-teal-600 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                {savedTimeText}
+              </span>
+            )}
+          </div>
+          {todayLoaded && todayItems.length > 0 ? (
             <div className="space-y-1.5">
               {todayItems.slice(0, 8).map(item => (
                 <a
@@ -915,8 +914,20 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-400 text-center pt-1">+{todayItems.length - 8} till</p>
               )}
             </div>
-          </div>
-        )}
+          ) : todayLoaded ? (
+            <div className="flex items-center justify-center py-6 text-gray-400">
+              <div className="text-center">
+                <p className="text-2xl mb-1">✅</p>
+                <p className="text-sm font-medium text-gray-500">Inget att göra just nu</p>
+                <p className="text-xs text-gray-400 mt-0.5">Uppgifter, bokningar och godkännanden visas här</p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+            </div>
+          )}
+        </div>
 
         {/* Speed-to-Lead Widget */}
         {speedData && speedData.total_leads > 0 && (

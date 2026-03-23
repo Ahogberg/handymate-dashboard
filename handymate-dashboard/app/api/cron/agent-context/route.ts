@@ -6,6 +6,7 @@ import { updatePricingIntelligence } from '@/lib/agent/pricing-engine'
 import { analyzePriceAdjustments } from '@/lib/agent/price-analysis'
 import { calculateCustomerLTV } from '@/lib/customer-ltv'
 import { checkWarrantyFollowups } from '@/lib/warranty-followup'
+import { checkProactiveCare } from '@/lib/proactive-care'
 
 export const maxDuration = 60
 
@@ -52,6 +53,7 @@ async function runAgentContext() {
     priceAnalysis: { success: boolean; suggestions?: number; error?: string }
     ltv: { success: boolean; updated?: number; reactivations?: number; error?: string }
     warranty: { success: boolean; followupsCreated?: number; error?: string }
+    proactiveCare: { success: boolean; contactsCreated?: number; error?: string }
   }> = []
 
   for (const biz of businesses) {
@@ -105,6 +107,14 @@ async function runAgentContext() {
       warrantyResult = { success: false, error: err.message }
     }
 
+    // Proaktiv kundvård (jobbtyp-baserad livscykelkontakt)
+    let proactiveCareResult: { success: boolean; contactsCreated?: number; error?: string } = { success: false, error: 'Skipped' }
+    try {
+      proactiveCareResult = await checkProactiveCare(biz.business_id)
+    } catch (err: any) {
+      proactiveCareResult = { success: false, error: err.message }
+    }
+
     results.push({
       business_id: biz.business_id,
       context: contextResult,
@@ -114,10 +124,11 @@ async function runAgentContext() {
       priceAnalysis: priceAnalysisResult,
       ltv: ltvResult,
       warranty: warrantyResult,
+      proactiveCare: proactiveCareResult,
     })
 
     console.log(
-      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, pricing=${pricingResult.success}, ltv=${ltvResult.success}(${ltvResult.updated || 0} updated, ${ltvResult.reactivations || 0} reactivations), warranty=${warrantyResult.success}(${warrantyResult.followupsCreated || 0} created)`
+      `[AgentContext Cron] ${biz.business_id}: context=${contextResult.success}, report=${reportResult.success}, pricing=${pricingResult.success}, ltv=${ltvResult.success}(${ltvResult.updated || 0} updated, ${ltvResult.reactivations || 0} reactivations), warranty=${warrantyResult.success}(${warrantyResult.followupsCreated || 0} created), proactiveCare=${proactiveCareResult.success}(${proactiveCareResult.contactsCreated || 0} created)`
     )
   }
 

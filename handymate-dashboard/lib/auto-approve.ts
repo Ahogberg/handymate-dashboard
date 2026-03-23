@@ -104,15 +104,33 @@ export async function tryAutoApprove(params: {
     }
   }
 
-  // 4. Check confidence threshold
+  // 4. Check confidence threshold — with learning boost
+  let effectiveConfidence = confidencePercent
+  let learningReason = ''
+
   if (confidencePercent < actionConfig.min_confidence) {
-    return {
-      suggestion_id: suggestionId,
-      action_type: actionType,
-      auto_approved: false,
-      reason: `Konfidens ${confidencePercent}% < tröskel ${actionConfig.min_confidence}%`,
-      confidence: confidencePercent,
+    // Try learning boost before rejecting
+    try {
+      const { getLearnedConfidence } = await import('@/lib/auto-approve-learning')
+      const learned = await getLearnedConfidence(businessId, actionType)
+      if (learned.boost !== 0) {
+        effectiveConfidence = confidencePercent + learned.boost
+        learningReason = learned.reason
+      }
+    } catch { /* learning module unavailable — proceed without boost */ }
+
+    if (effectiveConfidence < actionConfig.min_confidence) {
+      return {
+        suggestion_id: suggestionId,
+        action_type: actionType,
+        auto_approved: false,
+        reason: learningReason
+          ? `Konfidens ${confidencePercent}% + boost ${effectiveConfidence - confidencePercent} = ${effectiveConfidence}% < tröskel ${actionConfig.min_confidence}% (${learningReason})`
+          : `Konfidens ${confidencePercent}% < tröskel ${actionConfig.min_confidence}%`,
+        confidence: effectiveConfidence,
+      }
     }
+    // Boosted past threshold — continue to execution
   }
 
   // 5. Check daily limit
