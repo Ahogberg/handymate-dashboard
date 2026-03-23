@@ -31,6 +31,8 @@ import {
   Settings,
   Trash2,
   Lock,
+  Eye,
+  ChevronLeft,
   MoveUp,
   MoveDown,
   Upload,
@@ -1347,8 +1349,27 @@ export default function PipelinePage() {
 
   function getStageForDeal(deal: Deal): Stage | undefined { return stages.find(s => s.id === deal.stage_id) }
 
-  const activeStages = stages.filter(s => !s.is_lost)
+  const [hideEmpty, setHideEmpty] = useState(() => {
+    if (typeof window !== 'undefined') return localStorage.getItem('hm_pipeline_hide_empty') === '1'
+    return false
+  })
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  const toggleHideEmpty = () => {
+    const next = !hideEmpty
+    setHideEmpty(next)
+    localStorage.setItem('hm_pipeline_hide_empty', next ? '1' : '0')
+  }
+
+  const scrollPipeline = (dir: 'left' | 'right') => {
+    scrollContainerRef.current?.scrollBy({ left: dir === 'right' ? 300 : -300, behavior: 'smooth' })
+  }
+
+  const allActiveStages = stages.filter(s => !s.is_lost)
   const lostStage = stages.find(s => s.is_lost)
+  const activeStages = hideEmpty
+    ? allActiveStages.filter(s => dealsForStage(s.id).length > 0 || s.sort_order === 1)
+    : allActiveStages
 
   // ------------------------------------------
   // Render
@@ -1461,6 +1482,52 @@ export default function PipelinePage() {
           </div>
         </header>
 
+        {/* Funnel bar + controls */}
+        <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-white/60 border-b border-gray-100">
+          {/* Funnel mini-bar */}
+          <div className="flex-1 flex items-center gap-0.5">
+            {allActiveStages.map(stage => {
+              const count = dealsForStage(stage.id).length
+              return (
+                <button key={stage.id} onClick={() => {
+                  const el = document.getElementById(`stage-${stage.id}`)
+                  el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+                }}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-all hover:opacity-100 ${count === 0 ? 'opacity-40' : 'opacity-80'}`}
+                  style={{ backgroundColor: stage.color + '20', color: stage.color }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: stage.color }} />
+                  {stage.name.split(' ')[0]}
+                  {count > 0 && <span className="font-bold">{count}</span>}
+                </button>
+              )
+            })}
+            {lostStage && (
+              <button onClick={() => {
+                const el = document.getElementById(`stage-${lostStage.id}`)
+                el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
+              }}
+                className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-red-600 bg-red-50 opacity-80 hover:opacity-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                Förlorad
+                {dealsForStage(lostStage.id).length > 0 && <span className="font-bold">{dealsForStage(lostStage.id).length}</span>}
+              </button>
+            )}
+          </div>
+          {/* Toggle hide empty */}
+          <button onClick={toggleHideEmpty}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hideEmpty ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
+            <Eye className="w-3.5 h-3.5" />
+            {hideEmpty ? 'Visa alla steg' : 'Dölj tomma'}
+          </button>
+          {/* Scroll arrows */}
+          <button onClick={() => scrollPipeline('left')} className="p-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button onClick={() => scrollPipeline('right')} className="p-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
         {/* Kanban / Timeline */}
         <div className="flex-1 overflow-hidden">
           {pipelineView === 'timeline' ? (
@@ -1472,14 +1539,14 @@ export default function PipelinePage() {
           ) : (
           <>
           {/* Desktop */}
-          <div className="hidden lg:flex h-full overflow-x-auto px-4 py-4 gap-3">
+          <div ref={scrollContainerRef} className="hidden lg:flex h-full overflow-x-auto px-4 py-4 gap-2 scroll-smooth">
             {activeStages.map(stage => {
               const stageDeals = dealsForStage(stage.id)
               const total = stageValue(stage.id)
               const isDropTarget = dragOverStageId === stage.id
               return (
-                <div key={stage.id}
-                  className={`flex-shrink-0 w-[280px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
+                <div key={stage.id} id={`stage-${stage.id}`}
+                  className={`flex-shrink-0 w-[200px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
                   onDragOver={e => handleDragOver(e, stage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, stage)}>
                   <div className="flex-shrink-0 px-3 py-2.5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
@@ -1505,8 +1572,8 @@ export default function PipelinePage() {
 
             {/* Lost column - collapsed by default */}
             {lostStage && (
-              <div
-                className={`flex-shrink-0 flex flex-col rounded-xl border transition-all duration-200 ${lostExpanded ? 'w-[280px]' : 'w-[52px]'} ${dragOverStageId === lostStage.id ? 'border-dashed border-red-400 bg-red-50/50' : 'border-gray-200 bg-gray-50/50'}`}
+              <div id={`stage-${lostStage.id}`}
+                className={`flex-shrink-0 flex flex-col rounded-xl border transition-all duration-200 ${lostExpanded ? 'w-[200px]' : 'w-[52px]'} ${dragOverStageId === lostStage.id ? 'border-dashed border-red-400 bg-red-50/50' : 'border-gray-200 bg-gray-50/50'}`}
                 onDragOver={e => handleDragOver(e, lostStage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, lostStage)}>
                 {lostExpanded ? (
                   <>
