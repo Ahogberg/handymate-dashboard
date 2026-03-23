@@ -184,6 +184,7 @@ interface TeamAgent {
   avatar?: string
   greeting: string
   description?: string
+  training?: boolean
 }
 
 const AVATAR_BASE_SIGNED = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
@@ -197,7 +198,7 @@ const TEAM: TeamAgent[] = [
   { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
   { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag', description: 'Följer upp offerter och leads' },
   { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar', description: 'Koordinerar projekt och bokningar' },
-  { id: 'lisa', name: 'Lisa', role: 'Kundservice & Telefonist', initials: 'Li', color: 'bg-sky-500', avatar: `${AVATAR_BASE}/Lisa.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGlzYS5wbmciLCJpYXQiOjE3NzQyNTk4MTYsImV4cCI6MTA0MTQyNTk4MTZ9.ZQag6FV2my_vy7rq1tFPBYK2MuwlmhFeDtU16SLA3Ak`, greeting: 'Hej! Hur kan jag hjälpa dig idag?', description: 'Svarar i telefon och hanterar kundförfrågningar' },
+  { id: 'lisa', name: 'Lisa', role: 'Kundservice & Telefonist', initials: 'Li', color: 'bg-sky-500', avatar: `${AVATAR_BASE}/Lisa.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGlzYS5wbmciLCJpYXQiOjE3NzQyNTk4MTYsImV4cCI6MTA0MTQyNTk4MTZ9.ZQag6FV2my_vy7rq1tFPBYK2MuwlmhFeDtU16SLA3Ak`, greeting: 'Hej! Hur kan jag hjälpa dig idag?', description: 'Svarar i telefon och hanterar kundförfrågningar', training: true },
 ]
 
 function getAgentForAction(actionType: string): TeamAgent {
@@ -1958,10 +1959,13 @@ export default function AgentDashboardPage() {
       <div className="flex gap-3 mb-6 overflow-x-auto pb-1">
         {TEAM.map((agent) => {
           const allowed = isAgentAllowed(plan, agent.id)
+          const isTraining = agent.training === true
+          const isDisabled = !allowed || isTraining
           return (
           <button
             key={agent.id}
             onClick={() => {
+              if (isTraining) return
               if (!allowed) {
                 setShowTeamUpgrade(true)
                 return
@@ -1969,8 +1973,8 @@ export default function AgentDashboardPage() {
               setFilterType(agent.id)
             }}
             className={`flex flex-col items-center gap-2 px-4 py-4 rounded-2xl border transition-all min-w-[110px] ${
-              !allowed
-                ? 'bg-gray-50 border-gray-100 opacity-50'
+              isDisabled
+                ? 'bg-gray-50 border-gray-100 opacity-60 cursor-default'
                 : filterType === agent.id
                   ? 'bg-white border-teal-300 shadow-md'
                   : filterType === 'all'
@@ -1980,13 +1984,15 @@ export default function AgentDashboardPage() {
           >
             <div className="relative">
               {agent.avatar ? (
-                <img src={agent.avatar} alt={agent.name} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm ${!allowed ? 'grayscale' : ''}`} />
+                <img src={agent.avatar} alt={agent.name} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm ${isDisabled ? 'grayscale opacity-60' : ''}`} />
               ) : (
-                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl ${!allowed ? 'grayscale' : ''}`}>
+                <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl ${isDisabled ? 'grayscale opacity-60' : ''}`}>
                   {agent.initials}
                 </div>
               )}
-              {allowed ? (
+              {isTraining ? (
+                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center text-[8px]">📚</div>
+              ) : allowed ? (
                 <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
               ) : (
                 <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-gray-400 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white">🔒</div>
@@ -1999,7 +2005,8 @@ export default function AgentDashboardPage() {
               {allowed && (memoryCounts[agent.id] || 0) > 0 && (
                 <span className="text-[10px] text-teal-600 block mt-0.5">🧠 {memoryCounts[agent.id]} lärdomar</span>
               )}
-              {!allowed && <span className="text-[10px] text-amber-600 block mt-0.5">Pro-plan</span>}
+              {isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Under utbildning</span>}
+              {!allowed && !isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Pro-plan</span>}
             </div>
           </button>
           )
