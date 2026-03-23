@@ -54,10 +54,10 @@ export interface PipelineActivity {
 }
 
 export const DEFAULT_STAGES = [
-  { slug: 'lead', name: 'Ny lead', color: '#5EEAD4', sort_order: 1, is_system: false, is_won: false, is_lost: false },
-  { slug: 'contacted', name: 'Kontaktad', color: '#14B8A6', sort_order: 2, is_system: false, is_won: false, is_lost: false },
-  { slug: 'quote_sent', name: 'Offert skickad', color: '#F59E0B', sort_order: 3, is_system: false, is_won: false, is_lost: false },
-  { slug: 'negotiation', name: 'Förhandling', color: '#0F766E', sort_order: 4, is_system: false, is_won: false, is_lost: false },
+  { slug: 'new_inquiry', name: 'Ny förfrågan', color: '#6B7280', sort_order: 1, is_system: true, is_won: false, is_lost: false },
+  { slug: 'contacted', name: 'Kontaktad', color: '#0F766E', sort_order: 2, is_system: true, is_won: false, is_lost: false },
+  { slug: 'quote_sent', name: 'Offert skickad', color: '#0D9488', sort_order: 3, is_system: true, is_won: false, is_lost: false },
+  { slug: 'quote_accepted', name: 'Offert accepterad', color: '#0F766E', sort_order: 4, is_system: true, is_won: false, is_lost: false },
   { slug: 'won', name: 'Vunnen', color: '#22C55E', sort_order: 5, is_system: true, is_won: true, is_lost: false },
   { slug: 'lost', name: 'Förlorad', color: '#EF4444', sort_order: 99, is_system: true, is_won: false, is_lost: true },
 ]

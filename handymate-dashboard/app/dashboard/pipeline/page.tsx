@@ -58,6 +58,7 @@ import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
 import { TimelineView } from '@/components/pipeline/TimelineView'
 import { CopyId } from '@/components/CopyId'
+import { DealTimeline } from '@/components/pipeline/DealTimeline'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -888,9 +889,17 @@ export default function PipelinePage() {
       const res = await fetch(`/api/pipeline/deals/${dealId}/move`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ toStageSlug, business_id: business.business_id })
+        body: JSON.stringify({
+          toStageSlug,
+          business_id: business.business_id,
+          ...(extraData?.loss_reason ? { lost_reason: extraData.loss_reason } : {}),
+        })
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        if (errData.error) alert(errData.error)
+        return
+      }
 
       if (targetStage) {
         setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: targetStage.id, updated_at: new Date().toISOString() } : d))
@@ -1463,12 +1472,7 @@ export default function PipelinePage() {
                 <Eye className="w-4 h-4" />
                 <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
               </button>
-              <button onClick={openStageSettings}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
-                title="Hantera steg">
-                <Settings className="w-4 h-4" />
-                <span className="hidden sm:inline text-sm">Steg</span>
-              </button>
+              {/* Stage settings removed — stages are locked */}
               <button onClick={() => { setShowNewDeal(true); fetchCustomers() }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
@@ -2010,18 +2014,22 @@ export default function PipelinePage() {
 
                     {/* Activity log */}
                     <div>
-                      <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Aktivitetslogg</h4>
-                      {detailLoading ? <div className="flex items-center justify-center py-6"><Loader2 className="w-5 h-5 text-sky-700 animate-spin" /></div>
-                        : detailActivities.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Ingen aktivitet ännu</p>
-                        : (
+                      <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Tidslinje</h4>
+                      {selectedDeal && (
+                        <DealTimeline dealId={selectedDeal.id} customerId={selectedDeal.customer_id} businessId={business.business_id} />
+                      )}
+                      {/* Legacy activity log preserved below for undo support */}
+                      {detailActivities.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-2">Stegändringar</h4>
                           <div className="space-y-1">
-                            {detailActivities.map(act => (
-                              <div key={act.id} className={`flex items-start gap-2.5 py-2 ${act.undone_at ? 'opacity-40' : ''}`}>
+                            {detailActivities.filter(act => !act.undone_at).slice(0, 5).map(act => (
+                              <div key={act.id} className="flex items-start gap-2.5 py-1.5">
                                 <div className="mt-0.5">
                                   {act.triggered_by === 'ai' ? <Bot className="w-3.5 h-3.5 text-teal-600" /> : <Clock className="w-3.5 h-3.5 text-gray-300" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-sm text-gray-700">{act.description || act.activity_type}</span>
+                                  <span className="text-xs text-gray-600">{act.description || act.activity_type}</span>
                                   {act.from_stage_name && act.to_stage_name && (
                                     <span className="text-xs text-gray-400 ml-1">{act.from_stage_name} → {act.to_stage_name}</span>
                                   )}
@@ -2034,7 +2042,8 @@ export default function PipelinePage() {
                               </div>
                             ))}
                           </div>
-                        )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
