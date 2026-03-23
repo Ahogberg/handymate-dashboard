@@ -1556,7 +1556,7 @@ export default function PipelinePage() {
               const isDropTarget = dragOverStageId === stage.id
               return (
                 <div key={stage.id} id={`stage-${stage.id}`}
-                  className={`flex-shrink-0 w-[200px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
+                  className={`flex-1 min-w-[160px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
                   onDragOver={e => handleDragOver(e, stage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, stage)}>
                   <div className="flex-shrink-0 px-3 py-2.5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
@@ -1575,6 +1575,12 @@ export default function PipelinePage() {
                       <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
                         onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
                     ))}
+                    {stage.id === 'won' && (
+                      <a href="/dashboard/projects" className="flex items-center justify-center gap-1.5 py-3 mt-1 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors">
+                        <span>🚀</span>
+                        <span>Vunna deals blir projekt →</span>
+                      </a>
+                    )}
                   </div>
                 </div>
               )
@@ -1583,7 +1589,7 @@ export default function PipelinePage() {
             {/* Lost column - collapsed by default */}
             {lostStage && (
               <div id={`stage-${lostStage.id}`}
-                className={`flex-shrink-0 flex flex-col rounded-xl border transition-all duration-200 ${lostExpanded ? 'w-[200px]' : 'w-[52px]'} ${dragOverStageId === lostStage.id ? 'border-dashed border-red-400 bg-red-50/50' : 'border-gray-200 bg-gray-50/50'}`}
+                className={`flex-shrink-0 flex flex-col rounded-xl border transition-all duration-200 ${lostExpanded ? 'w-[200px]' : 'w-[52px]'} ${dragOverStageId === lostStage?.id ? 'border-dashed border-red-400 bg-red-50/50' : 'border-gray-200 bg-gray-50/50'}`}
                 onDragOver={e => handleDragOver(e, lostStage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, lostStage)}>
                 {lostExpanded ? (
                   <>
