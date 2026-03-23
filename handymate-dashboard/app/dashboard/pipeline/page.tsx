@@ -2785,8 +2785,8 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <span className="text-[11px] font-medium text-teal-600 font-mono">
-            #{deal.deal_number || deal.id.slice(0, 6)}
+          <span className="text-xs font-semibold text-teal-600 font-mono">
+            Ärende #{deal.deal_number || deal.id.slice(0, 6)}
           </span>
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
@@ -2809,7 +2809,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
               </span>
             )}
           </div>
-          {deal.customer?.name && <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer.customer_number && <span className="font-medium">{deal.customer.customer_number} · </span>}{deal.customer.name}</p>}
+          {deal.customer?.name && <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer.customer_number && <span className="font-medium">Kund {deal.customer.customer_number} · </span>}{deal.customer.name}</p>}
           {deal.description && !deal.customer?.name && <p className="text-xs text-gray-400 mt-0.5 truncate ml-3.5">{deal.description}</p>}
         </div>
         <GripVertical className="w-4 h-4 text-gray-200 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
