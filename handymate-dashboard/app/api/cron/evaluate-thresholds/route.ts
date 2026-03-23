@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { evaluateThresholds, executeCronRules } from '@/lib/automation-engine'
+import { checkProfitabilityWarnings } from '@/lib/profitability'
 
 /**
  * GET /api/cron/evaluate-thresholds
@@ -36,6 +37,11 @@ export async function GET(request: NextRequest) {
         evaluateThresholds(supabase, biz.business_id),
         executeCronRules(supabase, biz.business_id),
       ])
+
+      // Karin: lönsamhetsvarningar
+      await checkProfitabilityWarnings(biz.business_id).catch((e) =>
+        console.error(`[profitability] Warning check failed for ${biz.business_id}:`, e)
+      )
 
       results.push({
         businessId: biz.business_id,

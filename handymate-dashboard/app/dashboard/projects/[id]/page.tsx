@@ -1462,6 +1462,57 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
+            {/* Lönsamhets-widget (V25) */}
+            {profitability && profitability.budget.amount > 0 && (() => {
+              const costPct = profitability.budget.amount_usage_percent
+              const budgetTotal = profitability.budget.amount_with_ata
+              const costTotal = profitability.costs.total
+              const hoursPct = profitability.budget.hours_usage_percent
+              const barColor = costPct > 95 ? 'bg-red-500' : costPct > 75 ? 'bg-amber-500' : 'bg-teal-500'
+              const statusLabel = costPct > 95 ? '🔴 Över budget' : costPct > 75 ? '⚠️ Håll koll' : '✅ Inom budget'
+              const projectedCost = hoursPct > 10 ? Math.round(costTotal / (hoursPct / 100)) : costTotal
+              return (
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                  <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-sky-700" />
+                    Lönsamhet
+                  </h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-gray-400">Budget</p>
+                      <p className="text-lg font-bold text-gray-900">{formatCurrency(budgetTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Kostnad</p>
+                      <p className="text-lg font-bold text-gray-900">{formatCurrency(costTotal)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Tid</p>
+                      <p className="text-sm text-gray-700">{profitability.costs.actual_hours}h / {profitability.budget.hours_with_ata}h</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Material</p>
+                      <p className="text-sm text-gray-700">{formatCurrency(profitability.costs.material_purchase)}</p>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-3 mb-2">
+                    <div className={`h-3 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(costPct, 100)}%` }} />
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">{costPct}% använt</span>
+                    <span className={costPct > 95 ? 'text-red-600 font-medium' : costPct > 75 ? 'text-amber-600 font-medium' : 'text-teal-600 font-medium'}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                  {hoursPct > 10 && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      Prognos: {formatCurrency(projectedCost)} {projectedCost <= budgetTotal ? '(inom budget)' : `(${formatCurrency(projectedCost - budgetTotal)} över)`}
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Progress bar */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-3">
