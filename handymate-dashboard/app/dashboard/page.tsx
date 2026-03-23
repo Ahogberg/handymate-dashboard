@@ -374,18 +374,17 @@ export default function DashboardPage() {
       })
       .catch(() => setProfitLoaded(true))
 
-    // Ekonomisammanfattning
+    // Ekonomisammanfattning — läser från business_config
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
     Promise.all([
       supabase.from('invoices').select('total_amount').eq('business_id', business.business_id).neq('status', 'draft').gte('created_at', startOfMonth),
       supabase.from('invoices').select('id, total_amount').eq('business_id', business.business_id).eq('status', 'sent'),
-      supabase.from('business_preferences').select('custom_preferences').eq('business_id', business.business_id).single(),
-    ]).then(([invRes, unpaidRes, prefsRes]) => {
-      const prefs = (prefsRes.data?.custom_preferences as Record<string, any>) || {}
+      supabase.from('business_config').select('overhead_monthly_sek, margin_target_percent').eq('business_id', business.business_id).single(),
+    ]).then(([invRes, unpaidRes, bizRes]) => {
       const invoiced = (invRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)
       const unpaidCount = unpaidRes.data?.length || 0
       const unpaidAmount = (unpaidRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)
-      const overhead = Number(prefs.overhead_monthly_sek) || 0
+      const overhead = Number(bizRes.data?.overhead_monthly_sek) || 0
       const estimatedMargin = invoiced > 0 ? Math.round(((invoiced - overhead) / invoiced) * 100) : null
       setEconomics({ invoiced, unpaidCount, unpaidAmount, estimatedMargin, overheadSet: overhead > 0 })
     }).catch(() => {})

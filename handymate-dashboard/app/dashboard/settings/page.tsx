@@ -114,6 +114,10 @@ interface BusinessConfig {
   review_request_enabled: boolean
   review_request_delay_days: number
   website_api_key: string | null
+  // Ekonomi
+  pricing_settings: Record<string, any> | null
+  overhead_monthly_sek: number
+  margin_target_percent: number
   // Autopilot
   autopilot_enabled: boolean
   autopilot_auto_book: boolean
@@ -538,22 +542,13 @@ export default function SettingsPage() {
         .not('clicked_at', 'is', null)
       setReviewStats({ sent: sentCount || 0, clicked: clickedCount || 0 })
 
-      // Ekonomi-inställningar från custom_preferences
-      try {
-        const { data: bpData } = await supabase
-          .from('business_preferences')
-          .select('custom_preferences')
-          .eq('business_id', data.business_id)
-          .single()
-        if (bpData?.custom_preferences) {
-          const cp = bpData.custom_preferences as Record<string, any>
-          setEconPrefs({
-            hourly_cost_sek: Number(cp.hourly_cost_sek) || 450,
-            overhead_monthly_sek: Number(cp.overhead_monthly_sek) || 0,
-            margin_target_percent: Number(cp.margin_target_percent) || 50,
-          })
-        }
-      } catch { /* table may not exist */ }
+      // Ekonomi-inställningar från business_config
+      const ps = (data.pricing_settings as Record<string, any>) || {}
+      setEconPrefs({
+        hourly_cost_sek: Number(ps.hourly_rate) || 450,
+        overhead_monthly_sek: Number(data.overhead_monthly_sek) || 0,
+        margin_target_percent: Number(data.margin_target_percent) || 50,
+      })
 
       if (data.working_hours && typeof data.working_hours === 'object') {
         setWorkingHours(prev => {
@@ -4107,17 +4102,19 @@ export default function SettingsPage() {
                 onClick={async () => {
                   setEconSaving(true)
                   try {
-                    // Hämta befintliga custom_preferences
-                    const { data: existing } = await supabase
-                      .from('business_preferences')
-                      .select('custom_preferences')
-                      .eq('business_id', business.business_id)
-                      .single()
-                    const merged = { ...(existing?.custom_preferences as Record<string, any> || {}), ...econPrefs }
+                    // Spara timkostnad i pricing_settings, overhead + marginal direkt på business_config
+                    const currentPricing = (config?.pricing_settings as Record<string, any>) || {}
+                    const updatedPricing = { ...currentPricing, hourly_rate: econPrefs.hourly_cost_sek }
                     await supabase
-                      .from('business_preferences')
-                      .upsert({ business_id: business.business_id, custom_preferences: merged }, { onConflict: 'business_id' })
+                      .from('business_config')
+                      .update({
+                        pricing_settings: updatedPricing,
+                        overhead_monthly_sek: econPrefs.overhead_monthly_sek,
+                        margin_target_percent: econPrefs.margin_target_percent,
+                      })
+                      .eq('business_id', business.business_id)
                     showToast('Ekonomi-inställningar sparade', 'success')
+                    fetchConfig()
                   } catch {
                     showToast('Kunde inte spara', 'error')
                   }

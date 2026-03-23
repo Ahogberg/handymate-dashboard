@@ -14,25 +14,25 @@ export async function GET(req: NextRequest) {
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString()
 
   try {
-    const [invRes, unpaidRes, prefsRes, monthlyRes, timeRes] = await Promise.all([
+    const [invRes, unpaidRes, bizRes, monthlyRes, timeRes] = await Promise.all([
       // Fakturerat denna månad
       supabase.from('invoices').select('total_amount').eq('business_id', businessId).neq('status', 'draft').gte('created_at', startOfMonth),
       // Obetalda
       supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).eq('status', 'sent'),
-      // Ekonomi-inställningar från custom_preferences JSONB
-      supabase.from('business_preferences').select('custom_preferences').eq('business_id', businessId).single(),
+      // Ekonomi-inställningar från business_config
+      supabase.from('business_config').select('pricing_settings, overhead_monthly_sek, margin_target_percent').eq('business_id', businessId).single(),
       // Senaste 6 månader
       supabase.from('invoices').select('total_amount, created_at').eq('business_id', businessId).neq('status', 'draft').gte('created_at', sixMonthsAgo).order('created_at', { ascending: true }),
       // Tid denna månad
       supabase.from('time_entry').select('duration_minutes').eq('business_id', businessId).gte('created_at', startOfMonth),
     ])
 
-    const prefs = (prefsRes.data?.custom_preferences as Record<string, any>) || {}
+    const pricingSettings = (bizRes.data?.pricing_settings as Record<string, any>) || {}
     const invoiced = (invRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
     const unpaidCount = unpaidRes.data?.length || 0
     const unpaidAmount = (unpaidRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
-    const overhead = Number(prefs.overhead_monthly_sek) || 0
-    const hourlyRate = Number(prefs.hourly_cost_sek) || 450
+    const overhead = Number(bizRes.data?.overhead_monthly_sek) || 0
+    const hourlyRate = Number(pricingSettings.hourly_rate) || 450
     const totalMinutes = (timeRes.data || []).reduce((s, t) => s + (Number(t.duration_minutes) || 0), 0)
     const laborCost = (totalMinutes / 60) * hourlyRate
     const materialCost = Math.round(invoiced * 0.2) // estimat: 20% material (förbättra later med faktiska data)
