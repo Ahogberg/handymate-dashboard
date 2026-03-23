@@ -30,6 +30,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Prepare auth state
+        run: |
+          mkdir -p playwright/.auth
+          echo '{"cookies":[],"origins":[]}' > playwright/.auth/user.json
+
       - name: Run Playwright tests
         env:
           BASE_URL: https://app.handymate.se
@@ -38,7 +43,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-        run: npx playwright test --project=chromium --reporter=list
+        run: npx playwright test --project=setup --project=chromium --reporter=list
 
       - name: Upload test report
         uses: actions/upload-artifact@v4
