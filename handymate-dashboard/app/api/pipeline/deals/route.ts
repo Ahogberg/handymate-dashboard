@@ -74,6 +74,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Stage '${slug}' not found` }, { status: 404 })
     }
 
+    // Get next deal number for this business
+    const { data: maxDeal } = await supabase
+      .from('deal')
+      .select('deal_number')
+      .eq('business_id', business.business_id)
+      .not('deal_number', 'is', null)
+      .order('deal_number', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const nextNumber = (maxDeal?.deal_number || 1000) + 1
+
     // Insert deal
     const { data: deal, error: insertError } = await supabase
       .from('deal')
@@ -86,6 +98,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         priority: priority || 'medium',
         source: 'manual',
+        deal_number: nextNumber,
       })
       .select()
       .single()

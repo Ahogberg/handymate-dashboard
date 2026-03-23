@@ -80,6 +80,7 @@ interface Stage {
 
 interface Deal {
   id: string
+  deal_number: number | null
   title: string
   description: string | null
   value: number | null
@@ -1632,6 +1633,7 @@ export default function PipelinePage() {
                         </div>
                       ) : (
                         <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full min-w-0">
+                          <span className="text-sm font-mono text-teal-600 flex-shrink-0">#{selectedDeal.deal_number || selectedDeal.id.slice(0, 6)}</span>
                           <h2 className="text-lg font-bold text-gray-900 truncate">{selectedDeal.title}</h2>
                           <Edit3 className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                         </button>
@@ -2784,7 +2786,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <span className="text-sm font-medium text-teal-700 font-mono">
-            D-{deal.id.slice(0, 6)}
+            #{deal.deal_number || deal.id.slice(0, 6)}
             {deal.customer?.customer_number && <span className="text-gray-400 font-sans"> · </span>}
             {deal.customer?.customer_number && <span className="text-teal-600">{deal.customer.customer_number}</span>}
           </span>
