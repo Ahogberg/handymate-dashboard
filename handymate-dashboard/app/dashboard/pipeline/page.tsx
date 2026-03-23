@@ -30,6 +30,7 @@ import {
   Sparkles,
   Settings,
   Trash2,
+  Lock,
   MoveUp,
   MoveDown,
   Upload,
@@ -1485,6 +1486,7 @@ export default function PipelinePage() {
                       <div className="flex items-center gap-2">
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: stage.color }} />
                         <h3 className="text-sm font-semibold text-gray-900">{stage.name}</h3>
+                        {stage.is_system && <span title="Systemsteg — används av automationer"><Lock className="w-3 h-3 text-gray-300" /></span>}
                         <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full font-medium">{stageDeals.length}</span>
                       </div>
                       <span className="text-xs text-gray-400 font-medium">{formatColumnValue(total)}</span>
@@ -2563,12 +2565,19 @@ export default function PipelinePage() {
                   />
 
                   {/* Name input */}
-                  <input
-                    type="text"
-                    value={stageEdits[stage.id]?.name || stage.name}
-                    onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], name: e.target.value } }))}
-                    className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
-                  />
+                  {stage.is_system ? (
+                    <span className="flex-1 flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500">
+                      <Lock className="w-3 h-3" />
+                      {stage.name}
+                    </span>
+                  ) : (
+                    <input
+                      type="text"
+                      value={stageEdits[stage.id]?.name || stage.name}
+                      onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], name: e.target.value } }))}
+                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    />
+                  )}
 
                   {/* Reorder */}
                   <button onClick={() => moveStageOrder(stage.id, 'up')} disabled={idx === 0}
@@ -2580,12 +2589,16 @@ export default function PipelinePage() {
                     <MoveDown className="w-4 h-4" />
                   </button>
 
-                  {/* Delete */}
-                  <button onClick={() => deleteStage(stage.id)}
-                    className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
-                    title="Ta bort steg">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {/* Delete — only for custom stages */}
+                  {!stage.is_system ? (
+                    <button onClick={() => deleteStage(stage.id)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-all"
+                      title="Ta bort steg">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <span className="w-7" />
+                  )}
                 </div>
               ))}
 
@@ -2839,6 +2852,11 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
               <Zap className="w-2.5 h-2.5" />{deal.response_time_seconds < 60 ? `${deal.response_time_seconds}s` : deal.response_time_seconds < 3600 ? `${Math.round(deal.response_time_seconds / 60)}m` : `${Math.round(deal.response_time_seconds / 3600)}h`}
             </span>
           )}
+          {(() => {
+            const days = Math.floor((Date.now() - new Date(deal.created_at).getTime()) / 86400000)
+            const ageDot = days <= 3 ? 'bg-green-400' : days <= 7 ? 'bg-amber-400' : 'bg-red-400'
+            return <span className={`w-1.5 h-1.5 rounded-full ${ageDot}`} title={`${days}d gammal`} />
+          })()}
           <span className="text-[10px] text-gray-400 flex items-center gap-1"><Clock className="w-3 h-3" />{timeAgo(deal.updated_at)}</span>
         </div>
       </div>
