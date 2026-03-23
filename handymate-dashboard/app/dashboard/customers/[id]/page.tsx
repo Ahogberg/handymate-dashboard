@@ -43,6 +43,7 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
+import { CopyId } from '@/components/CopyId'
 
 interface Customer {
   customer_id: string
@@ -491,7 +492,11 @@ export default function CustomerDetailPage() {
                 <span className="px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
               )}
             </div>
-            <p className="text-sm text-gray-500">{customer.customer_number && <span className="font-medium text-gray-600">{customer.customer_number} · </span>}Kund sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</p>
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              {customer.customer_number && <CopyId value={customer.customer_number} label={`K-${customer.customer_number}`} />}
+              {customer.customer_number && <span>·</span>}
+              <span>Kund sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</span>
+            </div>
           </div>
           <button
             onClick={startEditing}

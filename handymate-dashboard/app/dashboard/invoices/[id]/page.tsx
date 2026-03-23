@@ -26,6 +26,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import Link from 'next/link'
+import { CopyId } from '@/components/CopyId'
 
 interface InvoiceItem {
   description: string
@@ -651,8 +652,9 @@ export default function InvoiceDetailPage() {
             </Link>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-gray-900">
-                  {invoice.is_credit_note ? 'Kreditfaktura' : 'Faktura'} #{invoice.invoice_number}
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  {invoice.is_credit_note ? 'Kreditfaktura' : 'Faktura'}
+                  <CopyId value={`${invoice.invoice_number}`} label={`#${invoice.invoice_number}`} />
                 </h1>
                 <span className={`px-3 py-1 text-xs rounded-full border ${getStatusStyle(invoice.status)}`}>
                   {getStatusText(invoice.status)}

@@ -35,6 +35,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
+import { CopyId } from '@/components/CopyId'
 
 interface QuoteItem {
   id: string
@@ -684,7 +685,7 @@ export default function QuoteDetailPage() {
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {quote.title || 'Offert'}
                 {quote.quote_number && (
-                  <span className="ml-2 text-sm font-normal text-gray-400">{quote.quote_number}</span>
+                  <span className="ml-2"><CopyId value={quote.quote_number} /></span>
                 )}
               </h1>
               <p className="text-sm text-gray-500">Skapad {formatDate(quote.created_at)}</p>

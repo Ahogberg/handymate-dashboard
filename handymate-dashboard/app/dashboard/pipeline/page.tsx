@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   FolderKanban,
   Plus,
@@ -53,6 +54,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
 import { TimelineView } from '@/components/pipeline/TimelineView'
+import { CopyId } from '@/components/CopyId'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -309,6 +311,7 @@ function getTriggeredByStyle(t: string): string {
 
 export default function PipelinePage() {
   const business = useBusiness()
+  const searchParams = useSearchParams()
 
   const [stages, setStages] = useState<Stage[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
@@ -848,6 +851,19 @@ export default function PipelinePage() {
     }
     load()
   }, [fetchPipeline, fetchAiActivities, fetchTeamMembers])
+
+  // Öppna ny deal-modal om redirect från kundregistrering
+  useEffect(() => {
+    if (searchParams?.get('newDeal') === 'true') {
+      const custId = searchParams.get('customer_id') || ''
+      const custName = searchParams.get('customer_name') || ''
+      setShowNewDeal(true)
+      setNewDealForm(prev => ({ ...prev, customer_id: custId, title: custName ? `Jobb för ${custName}` : '' }))
+      fetchCustomers()
+      // Rensa URL:en
+      window.history.replaceState(null, '', '/dashboard/pipeline')
+    }
+  }, [searchParams])
 
   // ------------------------------------------
   // Deal actions
@@ -2476,8 +2492,8 @@ export default function PipelinePage() {
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
-                  <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={2}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-none" />
+                  <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={3}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-y min-h-[80px] max-h-[300px]" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Dokument (valfritt)</label>
@@ -2785,9 +2801,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <span className="text-xs font-semibold text-teal-600 font-mono">
-            Ärende #{deal.deal_number || deal.id.slice(0, 6)}
-          </span>
+          <CopyId value={`D-${deal.deal_number || deal.id.slice(0, 6)}`} label={`Ärende #${deal.deal_number || deal.id.slice(0, 6)}`} className="text-teal-600" />
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
             <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>

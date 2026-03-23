@@ -260,9 +260,19 @@ export default function CustomersPage() {
 
       if (!response.ok) throw new Error('Något gick fel')
 
+      const result = await response.json().catch(() => null)
       showToast(editingCustomer ? 'Kund uppdaterad!' : 'Kund skapad!', 'success')
       setModalOpen(false)
       fetchData()
+
+      // Fråga om att skapa deal efter ny kund
+      if (!editingCustomer && result?.customer) {
+        const customerName = form.name || result.customer.name || 'kunden'
+        const customerId = result.customer.customer_id || result.customer.id
+        if (customerId && confirm(`Vill du skapa en affär för ${customerName}?`)) {
+          window.location.href = `/dashboard/pipeline?newDeal=true&customer_id=${customerId}&customer_name=${encodeURIComponent(customerName)}`
+        }
+      }
     } catch {
       showToast('Något gick fel', 'error')
     } finally {
