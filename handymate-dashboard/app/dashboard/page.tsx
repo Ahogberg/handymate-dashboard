@@ -20,6 +20,7 @@ import {
   Activity,
   Phone,
   Zap,
+  ClipboardList,
   Mail,
   Globe,
   X,
@@ -107,6 +108,8 @@ export default function DashboardPage() {
     invoiced: number; unpaidCount: number; unpaidAmount: number
     estimatedMargin: number | null; overheadSet: boolean
   } | null>(null)
+  const [todayItems, setTodayItems] = useState<{ id: string; type: string; title: string; subtitle?: string; priority: string; status: string; link?: string; icon: string }[]>([])
+  const [todayLoaded, setTodayLoaded] = useState(false)
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
   const [projectsAtRisk, setProjectsAtRisk] = useState<{ project_id: string; name: string; ai_health_score: number | null; ai_health_summary: string | null; status: string }[]>([])
@@ -373,6 +376,12 @@ export default function DashboardPage() {
         setProfitLoaded(true)
       })
       .catch(() => setProfitLoaded(true))
+
+    // Att göra idag
+    fetch('/api/dashboard/today')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setTodayItems(data.items || []); setTodayLoaded(true) })
+      .catch(() => setTodayLoaded(true))
 
     // Ekonomisammanfattning — läser från business_config
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
@@ -860,6 +869,52 @@ export default function DashboardPage() {
               <Zap className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
               {savedTimeText}
             </p>
+          </div>
+        )}
+
+        {/* Att göra idag */}
+        {todayLoaded && todayItems.length > 0 && (
+          <div className="mb-6 bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <ClipboardList className="w-4 h-4 text-teal-600" />
+                Att göra idag
+                <span className="text-xs font-normal bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{todayItems.filter(i => i.status === 'pending').length}</span>
+              </h2>
+            </div>
+            <div className="space-y-1.5">
+              {todayItems.slice(0, 8).map(item => (
+                <a
+                  key={item.id}
+                  href={item.link || '#'}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                    item.status === 'done' ? 'opacity-40' : 'hover:bg-gray-50'
+                  } ${item.priority === 'high' ? 'border-l-2 border-red-400' : ''}`}
+                >
+                  <span className="text-base shrink-0">{item.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm text-gray-900 truncate ${item.status === 'done' ? 'line-through' : ''}`}>{item.title}</p>
+                    {item.subtitle && <p className="text-xs text-gray-400 truncate">{item.subtitle}</p>}
+                  </div>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                    item.type === 'booking' ? 'bg-blue-50 text-blue-600' :
+                    item.type === 'approval' ? 'bg-teal-50 text-teal-600' :
+                    item.type === 'overdue_invoice' ? 'bg-red-50 text-red-600' :
+                    item.type === 'work_order' ? 'bg-amber-50 text-amber-600' :
+                    'bg-gray-50 text-gray-500'
+                  }`}>
+                    {item.type === 'booking' ? 'Bokning' :
+                     item.type === 'approval' ? 'Godkännande' :
+                     item.type === 'overdue_invoice' ? 'Förfallen' :
+                     item.type === 'work_order' ? 'Arbetsorder' :
+                     item.type === 'overdue_task' ? 'Förfallen' : 'Uppgift'}
+                  </span>
+                </a>
+              ))}
+              {todayItems.length > 8 && (
+                <p className="text-xs text-gray-400 text-center pt-1">+{todayItems.length - 8} till</p>
+              )}
+            </div>
           </div>
         )}
 
