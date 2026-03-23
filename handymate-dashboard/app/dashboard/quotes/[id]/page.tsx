@@ -152,6 +152,17 @@ export default function QuoteDetailPage() {
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
+  const [quoteIntelligence, setQuoteIntelligence] = useState<{
+    show_warning: boolean
+    analysis: {
+      similar_jobs: number
+      overrun_percent: number
+      suggested_price: number
+      current_price: number
+      confidence: string
+      message: string
+    } | null
+  } | null>(null)
   const [versions, setVersions] = useState<QuoteVersion[]>([])
   const [creatingVersion, setCreatingVersion] = useState(false)
   const [acceptingQuote, setAcceptingQuote] = useState(false)
@@ -713,7 +724,13 @@ export default function QuoteDetailPage() {
         <div className="flex flex-wrap gap-2 mb-6">
           {quote.status === 'draft' && (
             <button
-              onClick={() => setShowSendModal(true)}
+              onClick={() => {
+                setShowSendModal(true)
+                fetch(`/api/quotes/intelligence?quoteId=${quote.quote_id}`)
+                  .then(r => r.json())
+                  .then(data => setQuoteIntelligence(data))
+                  .catch(() => {})
+              }}
               className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
             >
               <Send className="w-4 h-4" />
@@ -1196,6 +1213,39 @@ export default function QuoteDetailPage() {
             </div>
 
             <div className="px-6 py-4 space-y-4">
+              {/* Daniel's intelligence warning */}
+              {quoteIntelligence?.show_warning && quoteIntelligence.analysis && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-600 flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">D</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1 mb-1">
+                        <span className="text-sm font-semibold text-gray-900">Daniel</span>
+                        <span className="text-xs text-gray-400">· Säljare</span>
+                      </div>
+                      <p className="text-sm text-amber-800 mb-3">{quoteIntelligence.analysis.message}</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            // TODO: Justera pris-logik
+                            setQuoteIntelligence(null)
+                          }}
+                          className="px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-medium hover:bg-amber-700"
+                        >
+                          Justera till {new Intl.NumberFormat('sv-SE').format(quoteIntelligence.analysis.suggested_price)} kr
+                        </button>
+                        <button
+                          onClick={() => setQuoteIntelligence(null)}
+                          className="px-3 py-1.5 border border-amber-300 text-amber-700 rounded-lg text-xs font-medium hover:bg-amber-100"
+                        >
+                          Skicka ändå
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Från */}
               <div className="flex items-start gap-3">
                 <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Från</span>
