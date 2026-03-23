@@ -47,8 +47,8 @@ export function getAutomationLimit(plan: PlanType): number | null {
 
 export const TEAM_AGENTS_ALLOWED: Record<PlanType, string[]> = {
   starter:      ['matte'],
-  professional: ['matte', 'karin', 'hanna', 'daniel', 'lars'],
-  business:     ['matte', 'karin', 'hanna', 'daniel', 'lars'],
+  professional: ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa'],
+  business:     ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa'],
 }
 
 export function isAgentAllowed(plan: PlanType, agentId: string): boolean {
