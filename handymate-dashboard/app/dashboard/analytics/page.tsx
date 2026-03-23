@@ -91,6 +91,12 @@ export default function AnalyticsPage() {
   const [winLossData, setWinLossData] = useState<WinLossData | null>(null)
   const [insights, setInsights] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [econ, setEcon] = useState<{
+    invoiced: number; unpaidCount: number; unpaidAmount: number
+    estimatedMargin: number | null; overheadSet: boolean
+    monthlyTrend: { month: string; amount: number }[]
+    materialCost: number; laborCost: number; overhead: number
+  } | null>(null)
 
   if (!canAccess('lead_intelligence')) {
     return <UpgradePrompt featureKey="lead_intelligence" />
@@ -103,10 +109,11 @@ export default function AnalyticsPage() {
   async function fetchAll() {
     setLoading(true)
     try {
-      const [speedRes, winLossRes, insightsRes] = await Promise.all([
+      const [speedRes, winLossRes, insightsRes, econRes] = await Promise.all([
         fetch(`/api/analytics/speed-to-lead?period=${period}&business_id=${business.business_id}`),
         fetch(`/api/analytics/win-loss?period=${period}&business_id=${business.business_id}`),
         fetch(`/api/analytics/insights?business_id=${business.business_id}`),
+        fetch(`/api/analytics/economics?business_id=${business.business_id}`),
       ])
 
       if (speedRes.ok) setSpeedData(await speedRes.json())
@@ -115,6 +122,7 @@ export default function AnalyticsPage() {
         const data = await insightsRes.json()
         setInsights(data.insights || [])
       }
+      if (econRes.ok) setEcon(await econRes.json())
     } catch { /* ignore */ }
     setLoading(false)
   }
@@ -144,9 +152,9 @@ export default function AnalyticsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
               <BarChart3 className="w-6 h-6 text-sky-700" />
-              Analys
+              Analys &amp; Ekonomi
             </h1>
-            <p className="text-sm text-gray-500 mt-1">Försäljningsinsikter och lead-analys</p>
+            <p className="text-sm text-gray-500 mt-1">Försäljningsinsikter och ekonomiöversikt</p>
           </div>
           <select
             value={period}
@@ -165,6 +173,92 @@ export default function AnalyticsPage() {
           </div>
         ) : (
           <>
+            {/* ═══ Ekonomi ═══ */}
+            {econ && (
+              <>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Ekonomi</h2>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                {/* Topprad: 3 metrikkort */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">Fakturerat denna månad</span>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">~{econ.invoiced.toLocaleString('sv-SE')} kr</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad vinst</span>
+                    <p className="text-2xl font-bold text-gray-900 mt-1">~{Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead).toLocaleString('sv-SE')} kr</p>
+                  </div>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad marginal</span>
+                    <p className={`text-2xl font-bold mt-1 ${(econ.estimatedMargin ?? 0) >= 50 ? 'text-emerald-600' : (econ.estimatedMargin ?? 0) >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {econ.estimatedMargin !== null ? `~${econ.estimatedMargin}%` : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Kostnadsfördelning */}
+                {econ.invoiced > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Kostnadsfördelning</h3>
+                    <div className="space-y-2.5">
+                      {[
+                        { label: 'Din vinst (est.)', value: Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead), color: 'bg-emerald-500' },
+                        { label: 'Material', value: econ.materialCost, color: 'bg-sky-500' },
+                        { label: 'Din tid', value: econ.laborCost, color: 'bg-teal-500' },
+                        { label: 'Overhead', value: econ.overhead, color: 'bg-gray-400' },
+                      ].filter(r => r.value > 0).map(row => {
+                        const pct = Math.round((row.value / econ.invoiced) * 100)
+                        return (
+                          <div key={row.label} className="flex items-center gap-3">
+                            <span className="text-xs text-gray-500 w-28 shrink-0">{row.label}</span>
+                            <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${row.color}`} style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-xs text-gray-500 w-10 text-right">{pct}%</span>
+                            <span className="text-xs text-gray-400 w-16 text-right">~{(row.value / 1000).toFixed(0)}k kr</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <p className="text-[10px] text-gray-300 mt-3">Estimat baserat på dina kostnadsinställningar</p>
+                  </div>
+                )}
+
+                {/* Månadsöversikt */}
+                {econ.monthlyTrend.length > 1 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Fakturerat per månad</h3>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={econ.monthlyTrend}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                          <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} />
+                          <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                          <Tooltip formatter={(v: any) => [`${Number(v).toLocaleString('sv-SE')} kr`, 'Fakturerat']} />
+                          <Bar dataKey="amount" fill="#0F766E" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+
+                {!econ.overheadSet && (
+                  <a href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-teal-600 transition-colors">
+                    Justera kostnadsinställningar för bättre estimat →
+                  </a>
+                )}
+              </>
+            )}
+
+            {/* ═══ Försäljningsinsikter ═══ */}
+            <div className="flex items-center gap-3 pt-2">
+              <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">Försäljningsinsikter</h2>
+              <div className="flex-1 h-px bg-gray-200" />
+            </div>
+
             {/* Overview KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-4">

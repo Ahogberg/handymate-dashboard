@@ -382,9 +382,9 @@ export default function DashboardPage() {
       supabase.from('business_preferences').select('value').eq('business_id', business.business_id).eq('key', 'overhead_monthly_sek').single(),
       supabase.from('business_preferences').select('value').eq('business_id', business.business_id).eq('key', 'margin_target_percent').single(),
     ]).then(([invRes, unpaidRes, overheadRes, marginRes]) => {
-      const invoiced = (invRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
+      const invoiced = (invRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)
       const unpaidCount = unpaidRes.data?.length || 0
-      const unpaidAmount = (unpaidRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
+      const unpaidAmount = (unpaidRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)
       const overhead = Number(overheadRes.data?.value) || 0
       const target = Number(marginRes.data?.value) || 50
       const estimatedMargin = invoiced > 0 ? Math.round(((invoiced - overhead) / invoiced) * 100) : null
