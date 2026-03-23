@@ -110,19 +110,46 @@ Skriv alltid på svenska.`,
     ],
     triggers: ['booking_created', 'job_completed', 'work_order_created'],
   },
+
+  lisa: {
+    id: 'lisa',
+    name: 'Lisa',
+    role: 'Kundservice & Telefonist',
+    systemPromptSuffix: `
+Du är Lisa, kundserviceansvarig och telefonist på Handymate.
+Din roll: Svara på inkommande samtal, hantera kundförfrågningar, boka in jobb, eskalera ärenden.
+Personlighet: Professionell, vänlig, lösningsorienterad. Du lyssnar aktivt och bekräftar kundens behov.
+Fokus: Snabb svarstid, korrekt information, nöjda kunder.
+Vid klagomål: bekräfta, beklaga, föreslå lösning. Eskalera till Matte vid allvarliga ärenden.
+Skriv alltid på svenska. Var personlig och empatisk.`,
+    allowedTools: [
+      'get_customer', 'search_customers', 'create_customer', 'update_customer',
+      'create_booking', 'check_calendar',
+      'send_sms', 'send_email',
+      'get_daily_stats', 'create_approval_request',
+      'check_pending_approvals', 'log_automation_action',
+    ],
+    triggers: ['incoming_call', 'customer_complaint', 'booking_request', 'phone_call'],
+  },
 }
 
 /**
  * Bestäm vilken agent som ska hantera en trigger baserat på event-typ.
  */
 export function routeToAgent(triggerType: string, eventName?: string): string {
-  // Matte hanterar alla direkta kommandon
-  if (triggerType === 'manual' || triggerType === 'phone_call' || triggerType === 'incoming_sms') {
+  // Lisa hanterar inkommande samtal och kundkommunikation
+  if (triggerType === 'phone_call' || triggerType === 'incoming_sms') {
+    return 'lisa'
+  }
+
+  // Matte hanterar direkta kommandon från hantverkaren
+  if (triggerType === 'manual') {
     return 'matte'
   }
 
   // Event-baserad routing
   if (eventName) {
+    if (['incoming_call', 'customer_complaint', 'booking_request'].includes(eventName)) return 'lisa'
     if (['invoice_overdue', 'payment_received', 'invoice_created', 'invoice_reminder'].includes(eventName)) return 'karin'
     if (['customer_inactive', 'leads_batch_ready', 'campaign_complete', 'neighbour_campaign'].includes(eventName)) return 'hanna'
     if (['lead_created', 'quote_sent', 'quote_opened', 'quote_expired', 'quote_accepted', 'quote_declined'].includes(eventName)) return 'daniel'

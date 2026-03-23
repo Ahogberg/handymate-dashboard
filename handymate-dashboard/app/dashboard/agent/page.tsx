@@ -194,13 +194,15 @@ const TEAM: TeamAgent[] = [
   { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
   { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag', description: 'Följer upp offerter och leads' },
   { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar', description: 'Koordinerar projekt och bokningar' },
+  { id: 'lisa', name: 'Lisa', role: 'Kundservice & Telefonist', initials: 'Li', color: 'bg-sky-500', greeting: 'Hej! Hur kan jag hjälpa dig idag?', description: 'Svarar i telefon och hanterar kundförfrågningar' },
 ]
 
 function getAgentForAction(actionType: string): TeamAgent {
   if (['create_invoice', 'get_invoices', 'send_invoice_reminder'].includes(actionType)) return TEAM[1] // Karin
-  if (['send_sms', 'send_email', 'create_campaign'].includes(actionType)) return TEAM[2] // Hanna
+  if (['create_campaign', 'create_leads_outbound'].includes(actionType)) return TEAM[2] // Hanna
   if (['create_quote', 'get_quotes', 'qualify_lead', 'update_lead_status'].includes(actionType)) return TEAM[3] // Daniel
   if (['create_booking', 'update_project', 'check_calendar', 'log_time'].includes(actionType)) return TEAM[4] // Lars
+  if (['send_sms', 'send_email', 'get_customer', 'search_customers'].includes(actionType)) return TEAM[5] // Lisa
   return TEAM[0] // Matte (default)
 }
 

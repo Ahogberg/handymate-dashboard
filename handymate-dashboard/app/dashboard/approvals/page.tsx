@@ -22,6 +22,31 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 
+// Agent avatar lookup
+const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
+const AGENT_INFO: Record<string, { name: string; role: string; color: string; initials: string }> = {
+  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-teal-600', initials: 'M' },
+  karin: { name: 'Karin', role: 'Ekonom', color: 'bg-blue-600', initials: 'K' },
+  hanna: { name: 'Hanna', role: 'Marknadschef', color: 'bg-purple-600', initials: 'H' },
+  daniel: { name: 'Daniel', role: 'Säljare', color: 'bg-amber-600', initials: 'D' },
+  lars: { name: 'Lars', role: 'Projektledare', color: 'bg-emerald-600', initials: 'L' },
+  lisa: { name: 'Lisa', role: 'Kundservice', color: 'bg-sky-500', initials: 'Li' },
+}
+
+function getAgentFromApproval(approval: Approval): { name: string; role: string; color: string; initials: string } | null {
+  const agentId = (approval.payload?.agent_id as string) || null
+  if (agentId && AGENT_INFO[agentId]) return AGENT_INFO[agentId]
+
+  // Infer from approval_type
+  const type = approval.approval_type
+  if (type.includes('invoice') || type.includes('payment') || type === 'profitability_warning') return AGENT_INFO.karin
+  if (type.includes('campaign') || type.includes('neighbour') || type.includes('reactivat')) return AGENT_INFO.hanna
+  if (type.includes('quote') || type.includes('lead') || type.includes('pipeline')) return AGENT_INFO.daniel
+  if (type.includes('booking') || type.includes('project') || type.includes('dispatch') || type.includes('job_report') || type.includes('warranty')) return AGENT_INFO.lars
+  if (type.includes('call') || type.includes('sms')) return AGENT_INFO.lisa
+  return null
+}
+
 interface Approval {
   id: string
   business_id: string
@@ -468,6 +493,7 @@ export default function ApprovalsPage() {
               // Standard approval card
               const config = TYPE_CONFIG[approval.approval_type] || TYPE_CONFIG.other
               const Icon = config.icon
+              const agent = getAgentFromApproval(approval)
               const isExpiringSoon =
                 approval.status === 'pending' &&
                 new Date(approval.expires_at).getTime() - Date.now() < 3600000
@@ -486,11 +512,20 @@ export default function ApprovalsPage() {
                 >
                   <div className="p-4">
                     <div className="flex items-start gap-3">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bgColor}`}>
-                        <Icon className={`w-4 h-4 ${config.textColor}`} />
-                      </div>
+                      {agent ? (
+                        <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center flex-shrink-0 text-white text-xs font-bold`}>
+                          {agent.initials}
+                        </div>
+                      ) : (
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${config.bgColor}`}>
+                          <Icon className={`w-4 h-4 ${config.textColor}`} />
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
+                          {agent && (
+                            <span className="text-xs text-gray-400">{agent.name} · {agent.role}</span>
+                          )}
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${config.bgColor} ${config.textColor}`}>
                             {config.label}
                           </span>
