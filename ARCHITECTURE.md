@@ -127,31 +127,136 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 
 ## 5. Pipeline — säljtrattens steg
 
-> Automationer refererar alltid till `key`, aldrig till `label`.
-> `label` kan bytas av hantverkaren i UI utan att automationer påverkas.
+> **Designprincip:** Pipeline är ett säljverktyg, inte ett projektverktyg.
+> Tratten slutar när affären är vunnen. Allt efter — platsbesök, jobb, faktura, betalning —
+> lever i respektive modul och visas i deal-detaljvyns tidslinje, inte som pipeline-steg.
 
-| key | Default label | Order | Auto-trigger | is_system |
-|-----|--------------|-------|--------------|-----------|
-| `new_lead` | Ny lead | 1 | `event: lead_created` | true |
-| `contacted` | Kontaktad | 2 | `event: contacted` | true |
-| `quote_sent` | Offert skickad | 3 | `event: quote_sent` | true |
-| `quote_opened` | Offert öppnad | 4 | `event: quote_opened` | true |
-| `active_job` | Pågående jobb | 5 | `event: quote_signed` | true |
-| `invoiced` | Fakturerad | 6 | `event: invoice_created` | true |
-| `completed` | Avslutat | 7 | `event: payment_received` | true |
-| `lost` | Ej aktuell | 8 | Manuell (hantverkaren) | true |
+> Automationer refererar alltid till `stage_id` (internt ID), aldrig till `label`.
+> `label` kan visas annorlunda i UI men ändrar aldrig automation-beteende.
+> Stegen är **globalt låsta** — hantverkaren kan inte lägga till, ta bort eller byta ID.
 
-### Skyddade övergångar
-En automation får **aldrig** flytta ett lead bakåt (lägre `order`).
-Bara hantverkaren kan flytta bakåt manuellt.
-Om `update_status`-actionen försöker flytta bakåt returnerar den `status: skipped` med förklaring i `automation_logs`.
+### 5.1 Stegdefinition (V28)
 
-### Manuellt "Ej aktuell"-flöde
-När hantverkaren markerar ett lead som ej aktuellt:
-1. Modal öppnas med orsak-dropdown: `Kunden valde annan / Kunden avvaktade / Priset passade inte / Annat`
-2. Valfritt avslutsmeddelande till kunden
-3. Om meddelande skrivs: `create_approval` — hantverkaren godkänner innan SMS skickas
-4. Orsaken sparas i `leads.lost_reason TEXT` för framtida analys
+| stage_id | Default label | Order | Auto-trigger | Terminal |
+|----------|--------------|-------|--------------|----------|
+| `new_inquiry` | Ny förfrågan | 1 | `event: lead_created` | false |
+| `contacted` | Kontaktad | 2 | `event: contacted` | false |
+| `quote_sent` | Offert skickad | 3 | `event: quote_sent` | false |
+| `quote_accepted` | Offert accepterad | 4 | `event: quote_signed` (automatisk) | false |
+| `won` | Vunnen | 5 | Automatisk vid `quote_accepted` → projekt skapat | true |
+| `lost` | Förlorad | 6 | Manuell (hantverkaren) | true |
+
+### 5.2 Implementation
+
+Stegen är **inte** lagrade i `pipeline_stages`-tabellen per företag.
+De definieras i `lib/pipeline/stages.ts` som en låst konstant:
+
+```typescript
+export const PIPELINE_STAGES = [
+  { id: 'new_inquiry',     label: 'Ny förfrågan',      color: 'gray',  isTerminal: false },
+  { id: 'contacted',       label: 'Kontaktad',          color: 'teal',  isTerminal: false },
+  { id: 'quote_sent',      label: 'Offert skickad',     color: 'teal',  isTerminal: false },
+  { id: 'quote_accepted',  label: 'Offert accepterad',  color: 'teal',  isTerminal: false },
+  { id: 'won',             label: 'Vunnen',             color: 'green', isTerminal: true  },
+  { id: 'lost',            label: 'Förlorad',           color: 'red',   isTerminal: true  },
+] as const;
+
+export type PipelineStageId = typeof PIPELINE_STAGES[number]['id'];
+```
+
+Databas: `deals.pipeline_stage TEXT` med CHECK-constraint:
+```sql
+CONSTRAINT pipeline_stage_valid CHECK (
+  pipeline_stage IN ('new_inquiry','contacted','quote_sent','quote_accepted','won','lost')
+)
+```
+
+### 5.3 Tillåtna övergångar
+
+```typescript
+const VALID_TRANSITIONS: Record<PipelineStageId, PipelineStageId[]> = {
+  new_inquiry:    ['contacted', 'lost'],
+  contacted:      ['quote_sent', 'lost'],
+  quote_sent:     ['quote_accepted', 'lost'],
+  quote_accepted: ['won', 'lost'],
+  won:            [],   // terminal — ingen vidare flytt
+  lost:           [],   // terminal — ingen vidare flytt
+};
+```
+
+- Automationer får **aldrig** flytta en deal bakåt (lägre order)
+- Hantverkaren kan flytta till `lost` från vilket aktivt steg som helst
+- Flytt till `lost` kräver `lost_reason` — modal öppnas med dropdown
+- API returnerar `400` vid ogiltig övergång
+
+### 5.4 Manuellt "Förlorad"-flöde
+
+1. Hantverkaren drar deal till Förlorad-kolumnen (eller klickar "Markera förlorad")
+2. Modal öppnas med orsak-dropdown:
+   `Priset för högt / Valde konkurrent / Fel timing / Ingen respons / Annat`
+3. Valfritt: skriv ett avslutsmeddelande till kunden
+4. Om meddelande skrivs → `create_approval` — hantverkaren godkänner innan SMS skickas
+5. `lost_reason` sparas i `deals.lost_reason TEXT` för analys
+6. 90-dagars reaktiveringstimer startar automatiskt
+
+### 5.5 Automatisk projekt-skapelse (quote_accepted → won)
+
+När kund signerar offert digitalt:
+1. `quote_signed`-event triggas → deal flyttas automatiskt till `quote_accepted`
+2. Automation skapar projekt i `projects`-tabellen med kunddata, adress, offertbelopp
+3. Deal flyttas automatiskt till `won`
+4. Bekräftelse-SMS skickas till kund
+5. Notis skickas till hantverkaren: "🎉 Affär vunnen! Projekt skapat i Jobb-modulen."
+
+Vunnen-kolumnen i kanban visar länk i botten: **"Vunna deals blir projekt →"** (`/dashboard/projects`)
+
+### 5.6 Platsbesök — inte ett pipeline-steg
+
+Platsbesök hanteras som en **kalenderhändelse kopplad till dealen**, inte som ett steg.
+Statusen visas på deal-kortet i kanban:
+
+- 🟢 Grön punkt — platsbesök genomfört
+- 🟡 Gul punkt — platsbesök bokat (datum visas)
+- ⚫ Grå punkt — inget platsbesök bokat
+
+### 5.7 Deal-detaljvy: Tidslinje
+
+All aktivitet på en deal aggregeras i en tidslinje (DealTimeline-komponent).
+Datakällor: SMS-logg, samtalslogg, Google Calendar, offertmodul,
+signeringsmodul, Gmail, Jobb-modulen, fakturamodul.
+
+```
+● Lead mottaget via Gmail          — 15 mars 14:22
+● SMS skickat automatiskt          — 15 mars 14:23
+📅 Platsbesök bokat                — 18 mars kl 10:00  [länk]
+✅ Platsbesök genomfört            — 18 mars 10:47
+● Offert skapad (#O-2026-047)      — 19 mars 16:30
+👁 Offert öppnad av kund           — 20 mars 08:12
+✅ Offert signerad digitalt        — 21 mars 11:05
+🚀 Projekt skapat automatiskt      — 21 mars 11:05
+```
+
+### 5.8 UI-implementation
+
+- Kanban-kolumner: `flex-1 min-w-[160px]` — fyller tillgänglig skärmbredd
+- Aktiva steg (order 1–4) renderas som scrollbara kolumner
+- `won` och `lost` renderas till höger, visuellt separerade
+- Steg-CRUD-kontroller finns inte i UI — pipeline är read-only för hantverkaren
+- Källfil: `lib/pipeline/stages.ts` — enda sanningskällan för stegdefinitioner
+
+### 5.9 Kolumner att rensa bort
+
+`pipeline_stages`-tabellen existerar fortfarande i databasen men används inte längre.
+Läses inte av frontend eller automationer efter V28.
+Ta bort tabellen i nästa städ-sprint när V28 är verifierad stabil.
+
+---
+
+> **Migrationshistorik:**
+> V28 (`sql/v28_pipeline_locked.sql`) — konsoliderade till 6 låsta steg,
+> migrerade alla deals, skapade `deal_automation_tasks`, lade till
+> `won_at`, `lost_at`, `stage_updated_at` på deals-tabellen.
+> Fixade bug: `'accepted'` → `'quote_accepted'` i signeringsflödet.
 
 ---
 
