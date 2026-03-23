@@ -1457,6 +1457,12 @@ export default function PipelinePage() {
                   </div>
                 )}
               </div>
+              <button onClick={toggleHideEmpty}
+                className={`hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${hideEmpty ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-white text-gray-500 border-gray-200 hover:text-gray-900'}`}
+                title={hideEmpty ? 'Visa alla steg' : 'Dölj tomma steg'}>
+                <Eye className="w-4 h-4" />
+                <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
+              </button>
               <button onClick={openStageSettings}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
                 title="Hantera steg">
@@ -2884,7 +2890,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
           <CopyId value={`D-${deal.deal_number || deal.id.slice(0, 6)}`} label={`Ärende #${deal.deal_number || deal.id.slice(0, 6)}`} className="text-teal-600" />
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
-            <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title}</h4>
+            <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title ? deal.title.charAt(0).toUpperCase() + deal.title.slice(1) : 'Utan titel'}</h4>
             {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" /></span>}
             {deal.lead_source_platform && <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 ${
               deal.lead_source_platform === 'offerta' ? 'bg-orange-100 text-orange-700' :
@@ -2903,7 +2909,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
               </span>
             )}
           </div>
-          {deal.customer?.name && <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer.customer_number && <span className="font-medium">Kund {deal.customer.customer_number} · </span>}{deal.customer.name}</p>}
+          <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer?.customer_number && <span className="font-medium">Kund {deal.customer.customer_number} · </span>}{deal.customer?.name || <span className="italic text-gray-400">Okänd kund</span>}</p>
           {deal.description && !deal.customer?.name && <p className="text-xs text-gray-400 mt-0.5 truncate ml-3.5">{deal.description}</p>}
         </div>
         <GripVertical className="w-4 h-4 text-gray-200 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
