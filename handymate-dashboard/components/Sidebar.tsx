@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Phone,
@@ -119,6 +119,7 @@ const BOTTOM_NAV: NavItem[] = [
 export default function Sidebar({ businessName, businessId, onLogout }: SidebarProps) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const business = useBusiness()
   const plan: PlanType = business.subscription_plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
@@ -434,7 +435,15 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
     return (
       <div key={item.key}>
         <button
-          onClick={() => toggleGroup(item.key)}
+          onClick={() => {
+            // Dashboard: navigera + alltid öppna (stäng aldrig)
+            if (item.key === 'dashboard' && item.children?.[0]?.href) {
+              router.push(item.children[0].href)
+              setOpenGroups(new Set([item.key]))
+            } else {
+              toggleGroup(item.key)
+            }
+          }}
           className={`w-full ${navClass(groupActive)}`}
         >
           <div className="flex items-center gap-3">
