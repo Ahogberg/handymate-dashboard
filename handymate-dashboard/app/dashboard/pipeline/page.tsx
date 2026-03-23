@@ -885,6 +885,15 @@ export default function PipelinePage() {
       return
     }
 
+    // Optimistisk uppdatering — flytta kortet direkt i UI
+    const previousStageId = deals.find(d => d.id === dealId)?.stage_id
+    if (targetStage) {
+      setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: targetStage.id, updated_at: new Date().toISOString() } : d))
+      if (selectedDeal?.id === dealId) {
+        setSelectedDeal(prev => prev ? { ...prev, stage_id: targetStage.id, updated_at: new Date().toISOString() } : prev)
+      }
+    }
+
     try {
       const res = await fetch(`/api/pipeline/deals/${dealId}/move`, {
         method: 'POST',
@@ -897,15 +906,15 @@ export default function PipelinePage() {
       })
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
+        // Revert optimistisk uppdatering vid fel
+        if (previousStageId) {
+          setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: previousStageId } : d))
+          if (selectedDeal?.id === dealId) {
+            setSelectedDeal(prev => prev ? { ...prev, stage_id: previousStageId } : prev)
+          }
+        }
         if (errData.error) alert(errData.error)
         return
-      }
-
-      if (targetStage) {
-        setDeals(prev => prev.map(d => d.id === dealId ? { ...d, stage_id: targetStage.id, updated_at: new Date().toISOString() } : d))
-        if (selectedDeal?.id === dealId) {
-          setSelectedDeal(prev => prev ? { ...prev, stage_id: targetStage.id, updated_at: new Date().toISOString() } : prev)
-        }
       }
 
       // Save extra data (loss_reason, won_value)

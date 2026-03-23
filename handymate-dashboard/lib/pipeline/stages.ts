@@ -53,17 +53,19 @@ export type PipelineStageId = typeof PIPELINE_STAGES[number]['id']
 export const ACTIVE_STAGES = PIPELINE_STAGES.filter(s => !s.isTerminal)
 export const TERMINAL_STAGES = PIPELINE_STAGES.filter(s => s.isTerminal)
 
-/** Valid forward transitions — deal can only move to next stage or to 'lost' */
+/** Valid transitions — any active stage can move to any other stage (including backward).
+ *  Terminal stages (won/lost) can be reopened back to any active stage. */
 export const VALID_TRANSITIONS: Record<PipelineStageId, PipelineStageId[]> = {
-  new_inquiry: ['contacted', 'lost'],
-  contacted: ['quote_sent', 'lost'],
-  quote_sent: ['quote_accepted', 'lost'],
-  quote_accepted: ['won', 'lost'],
-  won: [],   // terminal
-  lost: [],  // terminal
+  new_inquiry: ['contacted', 'quote_sent', 'quote_accepted', 'won', 'lost'],
+  contacted: ['new_inquiry', 'quote_sent', 'quote_accepted', 'won', 'lost'],
+  quote_sent: ['new_inquiry', 'contacted', 'quote_accepted', 'won', 'lost'],
+  quote_accepted: ['new_inquiry', 'contacted', 'quote_sent', 'won', 'lost'],
+  won: ['new_inquiry', 'contacted', 'quote_sent', 'quote_accepted', 'lost'],
+  lost: ['new_inquiry', 'contacted', 'quote_sent', 'quote_accepted', 'won'],
 }
 
 export function isValidTransition(from: PipelineStageId, to: PipelineStageId): boolean {
+  if (from === to) return false
   return VALID_TRANSITIONS[from]?.includes(to) ?? false
 }
 
