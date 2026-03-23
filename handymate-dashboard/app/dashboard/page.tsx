@@ -103,6 +103,10 @@ export default function DashboardPage() {
     revenue: number; costs: number; margin_amount: number; margin_percent: number
     hours_worked: number; budget_hours: number
   }[]>([])
+  const [economics, setEconomics] = useState<{
+    invoiced: number; unpaidCount: number; unpaidAmount: number
+    estimatedMargin: number | null; overheadSet: boolean
+  } | null>(null)
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
   const [projectsAtRisk, setProjectsAtRisk] = useState<{ project_id: string; name: string; ai_health_score: number | null; ai_health_summary: string | null; status: string }[]>([])
@@ -369,6 +373,23 @@ export default function DashboardPage() {
         setProfitLoaded(true)
       })
       .catch(() => setProfitLoaded(true))
+
+    // Ekonomisammanfattning
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+    Promise.all([
+      supabase.from('invoices').select('total_amount').eq('business_id', business.business_id).neq('status', 'draft').gte('created_at', startOfMonth),
+      supabase.from('invoices').select('id, total_amount').eq('business_id', business.business_id).eq('status', 'sent'),
+      supabase.from('business_preferences').select('value').eq('business_id', business.business_id).eq('key', 'overhead_monthly_sek').single(),
+      supabase.from('business_preferences').select('value').eq('business_id', business.business_id).eq('key', 'margin_target_percent').single(),
+    ]).then(([invRes, unpaidRes, overheadRes, marginRes]) => {
+      const invoiced = (invRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
+      const unpaidCount = unpaidRes.data?.length || 0
+      const unpaidAmount = (unpaidRes.data || []).reduce((s, i) => s + (Number(i.total_amount) || 0), 0)
+      const overhead = Number(overheadRes.data?.value) || 0
+      const target = Number(marginRes.data?.value) || 50
+      const estimatedMargin = invoiced > 0 ? Math.round(((invoiced - overhead) / invoiced) * 100) : null
+      setEconomics({ invoiced, unpaidCount, unpaidAmount, estimatedMargin, overheadSet: overhead > 0 })
+    }).catch(() => {})
 
     const activityPromise = supabase
       .from('customer_activity')
@@ -1189,72 +1210,50 @@ export default function DashboardPage() {
           </div>
           )}
 
-          {/* Projektlönsamhet */}
-          {!profitLoaded ? (
-            <SkeletonCard>
-              <SkeletonPulse className="h-4 w-32 mb-4" />
-              <div className="space-y-3">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex items-center justify-between p-2">
-                    <div className="space-y-1.5 flex-1">
-                      <SkeletonPulse className="h-3.5 w-32" />
-                      <SkeletonPulse className="h-3 w-20" />
-                    </div>
-                    <SkeletonPulse className="h-5 w-10" />
-                  </div>
-                ))}
-              </div>
-            </SkeletonCard>
-          ) : (
+          {/* Ekonomi */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-sky-700" />
-                Projektlönsamhet
+                Ekonomi
               </h2>
-              {profitProjects.length > 0 && (
-                <Link href="/dashboard/projects" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
-                  Alla projekt <ArrowRight className="w-3 h-3" />
-                </Link>
-              )}
+              <Link href="/dashboard/analytics" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
+                Visa analys <ArrowRight className="w-3 h-3" />
+              </Link>
             </div>
-            {profitProjects.length === 0 ? (
-              <p className="text-sm text-gray-400 py-2">Inga aktiva projekt</p>
-            ) : (
-              <div className="space-y-2">
-                {profitProjects.slice(0, 5).map((p) => {
-                  const color = p.margin_percent >= 20 ? 'emerald' : p.margin_percent >= 5 ? 'amber' : 'red'
-                  return (
-                    <Link
-                      key={p.project_id}
-                      href={`/dashboard/projects/${p.project_id}`}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-gray-900 truncate">{p.name}</p>
-                        <p className="text-xs text-gray-400">
-                          {formatCurrency(p.revenue)} kr inkl. moms
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-2 shrink-0">
-                        <p className={`text-sm font-bold ${
-                          color === 'emerald' ? 'text-emerald-600' :
-                          color === 'amber' ? 'text-amber-600' : 'text-red-600'
-                        }`}>
-                          {p.margin_percent}%
-                        </p>
-                        <div className={`w-2 h-2 rounded-full ${
-                          color === 'emerald' ? 'bg-emerald-500' :
-                          color === 'amber' ? 'bg-amber-500' : 'bg-red-500'
-                        }`} />
-                      </div>
-                    </Link>
-                  )
-                })}
+            {economics ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-500">Fakturerat denna månad</span>
+                  <span className="text-sm font-semibold text-gray-900">
+                    {economics.invoiced > 0 ? `~${economics.invoiced.toLocaleString('sv-SE')} kr` : '—'}
+                  </span>
+                </div>
+                {economics.estimatedMargin !== null && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-500">Uppskattad marginal</span>
+                    <span className={`text-sm font-bold ${economics.estimatedMargin >= 50 ? 'text-emerald-600' : economics.estimatedMargin >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
+                      ~{economics.estimatedMargin}%
+                    </span>
+                  </div>
+                )}
+                {economics.unpaidCount > 0 && (
+                  <Link href="/dashboard/invoices?status=sent" className="flex items-center justify-between p-2 -mx-2 rounded-lg hover:bg-amber-50 transition-colors">
+                    <span className="text-sm text-amber-700">Obetalda fakturor</span>
+                    <span className="text-sm font-medium text-amber-700">{economics.unpaidCount} st · {economics.unpaidAmount.toLocaleString('sv-SE')} kr</span>
+                  </Link>
+                )}
+                {!economics.overheadSet && (
+                  <Link href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-teal-600 transition-colors mt-1">
+                    Sätt overhead i inställningar för bättre estimat →
+                  </Link>
+                )}
+                <p className="text-[10px] text-gray-300 mt-1">Estimat baserat på dina kostnadsinställningar</p>
               </div>
+            ) : (
+              <p className="text-sm text-gray-400 py-2">Laddar ekonomidata...</p>
             )}
           </div>
-          )}
 
           {/* Projekthälsa - Kräver uppmärksamhet */}
           {projectsAtRisk.length > 0 && (
