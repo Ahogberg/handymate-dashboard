@@ -188,6 +188,16 @@ export async function POST(request: NextRequest) {
           entryId: data.time_entry_id,
         })
       } catch { /* non-blocking */ }
+
+      // Realtids-lönsamhetslarm — Karin kollar om projektet spårar ur
+      try {
+        const { calculateProfitability } = await import('@/lib/profitability')
+        const prof = await calculateProfitability(data.project_id, business.business_id)
+        if (prof && prof.status !== 'on_track') {
+          const { checkProfitabilityWarnings } = await import('@/lib/profitability')
+          await checkProfitabilityWarnings(business.business_id)
+        }
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({ entry: data })

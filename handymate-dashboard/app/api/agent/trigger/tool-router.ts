@@ -91,6 +91,15 @@ export async function executeTool(
         return await createApprovalRequest(supabase, businessId, input)
       case 'check_pending_approvals':
         return await checkPendingApprovals(supabase, businessId)
+      case 'get_project_profitability': {
+        try {
+          const { calculateProfitability } = await import('@/lib/profitability')
+          const prof = await calculateProfitability(String(input.project_id), businessId)
+          return { success: true, data: prof }
+        } catch (err: any) {
+          return { success: false, error: err.message }
+        }
+      }
       case 'update_business_preference':
         return await updateBusinessPreference(supabase, businessId, input)
       case 'get_automation_settings':

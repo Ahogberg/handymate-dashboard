@@ -319,6 +319,21 @@ export const toolDefinitions = [
       required: [],
     },
   },
+  // Profitability
+  {
+    name: "get_project_profitability",
+    description: "Hämta lönsamhetsanalys för ett specifikt projekt. Returnerar budget, faktisk kostnad, marginal, prognos och status (on_track/at_risk/over_budget).",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        project_id: {
+          type: "string",
+          description: "Projekt-ID att analysera",
+        },
+      },
+      required: ["project_id"],
+    },
+  },
   // Business preferences
   {
     name: "update_business_preference",

@@ -98,6 +98,17 @@ export async function POST(request: NextRequest) {
       results.push({ item_id, success: true, new_stock: newStock })
     }
 
+    // Realtids-lönsamhetslarm efter materialuttag
+    if (project_id) {
+      try {
+        const { calculateProfitability, checkProfitabilityWarnings } = await import('@/lib/profitability')
+        const prof = await calculateProfitability(project_id, business.business_id)
+        if (prof && prof.status !== 'on_track') {
+          await checkProfitabilityWarnings(business.business_id)
+        }
+      } catch { /* non-blocking */ }
+    }
+
     return NextResponse.json({ results })
   } catch (error: any) {
     console.error('Inventory withdraw error:', error)

@@ -215,6 +215,19 @@ export async function checkProfitabilityWarnings(businessId: string): Promise<nu
       },
     })
 
+    // Push-notis till hantverkaren — realtidslarm
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    fetch(`${APP_URL}/api/push/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        business_id: businessId,
+        title: isOverBudget ? '🔴 Budget överskriden' : '⚠️ Lönsamhetslarm',
+        body: `${prof.project_name}: ${prof.cost_percent}% av budget använt${isOverBudget ? ' — skapa ÄTA?' : ''}`,
+        url: `/dashboard/projects/${prof.project_id}`,
+      }),
+    }).catch(() => {})
+
     warningsCreated++
   }
 
