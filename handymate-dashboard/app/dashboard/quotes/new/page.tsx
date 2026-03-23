@@ -239,10 +239,14 @@ export default function NewQuotePage() {
   const [aiGenerated, setAiGenerated] = useState(false)
   const [aiTextInput, setAiTextInput] = useState('')
   const [aiConfidence, setAiConfidence] = useState<number | null>(null)
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [photoDescription, setPhotoDescription] = useState('')
   const [showAiHelper, setShowAiHelper] = useState(false)
+  const [aiPriceWarning, setAiPriceWarning] = useState<{ message: string; link: string } | null>(null)
+  const [aiPhotoCount, setAiPhotoCount] = useState(0)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const MAX_PHOTOS = 5
 
   // ─── Form state ────────────────────────────────────────────────────────────
   const [selectedCustomer, setSelectedCustomer] = useState<string>('')
@@ -688,29 +692,44 @@ export default function NewQuotePage() {
 
   function handlePhotoFile(file: File) {
     if (!file.type.startsWith('image/')) return
+    if (photos.length >= MAX_PHOTOS) {
+      toast.error(`Max ${MAX_PHOTOS} foton`)
+      return
+    }
     const reader = new FileReader()
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string
-      setPhotoPreview(dataUrl)
+      setPhotos(prev => [...prev, dataUrl])
     }
     reader.readAsDataURL(file)
   }
 
+  function removePhoto(index: number) {
+    setPhotos(prev => prev.filter((_, i) => i !== index))
+  }
+
   async function analyzePhoto() {
-    if (!photoPreview) return
-    const base64 = photoPreview.split(',')[1]
-    setSourceImageBase64(base64)
+    if (photos.length === 0) return
+    const images = photos.map(p => p.split(',')[1])
+    setSourceImageBase64(images[0])
     setGenerating(true)
     try {
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({
+          images,
+          textDescription: photoDescription || undefined,
+          customerId: selectedCustomer || undefined,
+        }),
       })
       const data = await response.json()
       if (data.success) {
         applyAiResult(data.quote)
-        setPhotoPreview(null)
+        setAiPriceWarning(data.priceWarning || null)
+        setAiPhotoCount(data.photoCount || photos.length)
+        setPhotos([])
+        setPhotoDescription('')
       } else {
         toast.error(data.error || 'AI-generering misslyckades')
       }
@@ -1207,7 +1226,17 @@ export default function NewQuotePage() {
             <span className="text-[18px] font-medium text-[#1E293B] ml-3">Ny offert</span>
             {aiGenerated && (
               <span className="ml-2.5 text-[11px] bg-[#CCFBF1] text-[#0F766E] px-2.5 py-0.5 rounded-full">
-                AI-genererad
+                AI-genererad{aiConfidence ? ` · ${aiConfidence}% säkerhet` : ''}
+              </span>
+            )}
+            {aiPriceWarning && (
+              <a href={aiPriceWarning.link} className="ml-2 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full hover:bg-amber-100 transition-colors">
+                {aiPriceWarning.message.length > 40 ? 'Priser saknas — uppdatera prislista →' : aiPriceWarning.message}
+              </a>
+            )}
+            {aiPhotoCount > 1 && (
+              <span className="ml-2 text-[11px] text-gray-400">
+                Baserad på {aiPhotoCount} foton
               </span>
             )}
           </div>
@@ -1280,19 +1309,36 @@ export default function NewQuotePage() {
                       </button>
                     </div>
 
-                    {/* Photo preview */}
-                    {photoPreview && (
-                      <div className="mt-3 flex items-start gap-3">
-                        <div className="relative w-24 h-24 rounded-lg overflow-hidden border-thin border-[#E2E8F0] flex-shrink-0">
-                          <img src={photoPreview} alt="Förhandsvisning" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => setPhotoPreview(null)}
-                            className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center"
-                          >
-                            <X className="w-3 h-3 text-white" />
-                          </button>
+                    {/* Photo grid */}
+                    {photos.length > 0 && (
+                      <div className="mt-3 space-y-3">
+                        <div className="grid grid-cols-5 gap-2">
+                          {photos.map((photo, i) => (
+                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden border-thin border-[#E2E8F0]">
+                              <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(i)}
+                                className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70"
+                              >
+                                <X className="w-3 h-3 text-white" />
+                              </button>
+                            </div>
+                          ))}
+                          {photos.length < MAX_PHOTOS && (
+                            <label className="aspect-square border-thin border-dashed border-[#CBD5E1] rounded-lg flex items-center justify-center cursor-pointer hover:border-[#0F766E] transition-colors text-[#CBD5E1] hover:text-[#0F766E] text-xl">
+                              +
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }} />
+                            </label>
+                          )}
                         </div>
+                        <textarea
+                          value={photoDescription}
+                          onChange={e => setPhotoDescription(e.target.value)}
+                          placeholder="Beskriv jobbet (valfritt) — t.ex. mått, materialönskemål, speciella förutsättningar"
+                          rows={2}
+                          className="w-full px-3 py-2 text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-y"
+                        />
                         <button
                           type="button"
                           onClick={analyzePhoto}
@@ -1300,7 +1346,7 @@ export default function NewQuotePage() {
                           className="flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
                         >
                           {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                          {generating ? 'Analyserar...' : 'Analysera bild'}
+                          {generating ? 'Analyserar...' : `Analysera ${photos.length} foto${photos.length > 1 ? 'n' : ''}`}
                         </button>
                       </div>
                     )}
