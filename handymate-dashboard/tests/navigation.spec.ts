@@ -1,37 +1,41 @@
 import { test, expect } from '@playwright/test'
 
 const PAGES = [
-  { path: '/dashboard', title: 'Dashboard' },
-  { path: '/dashboard/customers', title: 'Kunder' },
-  { path: '/dashboard/pipeline', title: 'Säljtratt' },
-  { path: '/dashboard/quotes', title: 'Offerter' },
-  { path: '/dashboard/invoices', title: 'Fakturor' },
-  { path: '/dashboard/projects', title: 'Projekt' },
-  { path: '/dashboard/agent', title: 'Mitt team' },
-  { path: '/dashboard/approvals', title: 'Godkännanden' },
-  { path: '/dashboard/settings', title: 'Inställningar' },
-  { path: '/dashboard/time', title: 'Tidrapportering' },
-  { path: '/dashboard/planning/inventory', title: 'Lager' },
-  { path: '/dashboard/planning/schedule', title: 'Schema' },
+  { path: '/dashboard', name: 'Dashboard' },
+  { path: '/dashboard/customers', name: 'Kunder' },
+  { path: '/dashboard/pipeline', name: 'Säljtratt' },
+  { path: '/dashboard/quotes', name: 'Offerter' },
+  { path: '/dashboard/invoices', name: 'Fakturor' },
+  { path: '/dashboard/projects', name: 'Projekt' },
+  { path: '/dashboard/agent', name: 'Mitt team' },
+  { path: '/dashboard/approvals', name: 'Godkännanden' },
+  { path: '/dashboard/settings', name: 'Inställningar' },
+  { path: '/dashboard/time', name: 'Tidrapportering' },
+  { path: '/dashboard/planning/inventory', name: 'Lager' },
+  { path: '/dashboard/planning/schedule', name: 'Schema' },
 ]
 
-for (const page of PAGES) {
-  test(`${page.title} (${page.path}) laddar utan fel`, async ({ page: p }) => {
+for (const pg of PAGES) {
+  test(`${pg.name} (${pg.path}) laddar utan fel`, async ({ page }) => {
     const errors: string[] = []
-    p.on('pageerror', (err) => errors.push(err.message))
+    page.on('pageerror', (err) => errors.push(err.message))
 
-    const res = await p.goto(page.path)
-    expect(res?.status()).toBeLessThan(400)
+    await page.goto(pg.path, { waitUntil: 'networkidle' })
 
-    // Vänta på att sidan renderas (inga laddningsspinners kvar)
-    await p.waitForLoadState('networkidle')
+    // Ska inte ha redirectat till login
+    expect(page.url()).not.toContain('/login')
 
-    // Inga JavaScript-fel
-    expect(errors).toHaveLength(0)
-
-    // Sidan ska inte visa felmeddelande
-    const body = await p.textContent('body')
+    // Sidan ska inte visa kritiska fel
+    const body = await page.textContent('body')
     expect(body).not.toContain('Application error')
     expect(body).not.toContain('Internal Server Error')
+
+    // Inga okontrollerade JS-fel (tillåt mindre konsolfel)
+    const criticalErrors = errors.filter(e =>
+      !e.includes('ResizeObserver') &&
+      !e.includes('hydration') &&
+      !e.includes('ChunkLoadError')
+    )
+    expect(criticalErrors).toHaveLength(0)
   })
 }

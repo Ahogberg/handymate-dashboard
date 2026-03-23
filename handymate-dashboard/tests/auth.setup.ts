@@ -3,9 +3,11 @@ import { createClient } from '@supabase/supabase-js'
 import * as fs from 'fs'
 import * as path from 'path'
 
+const AUTH_FILE = path.join('playwright', '.auth', 'user.json')
+
 setup('authenticate', async ({ page }) => {
   // Skapa auth-katalog om den saknas
-  const authDir = path.join(process.cwd(), 'playwright', '.auth')
+  const authDir = path.dirname(AUTH_FILE)
   if (!fs.existsSync(authDir)) fs.mkdirSync(authDir, { recursive: true })
 
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -34,12 +36,20 @@ setup('authenticate', async ({ page }) => {
     throw new Error(`Kunde inte skapa magic link: ${error?.message || 'Ingen länk genererad'}`)
   }
 
+  console.log('Auth setup — Magic link genererad, navigerar...')
+
   // Navigera till magic link — loggar in automatiskt
   await page.goto(data.properties.action_link)
 
-  // Vänta på redirect till dashboard
-  await page.waitForURL('**/dashboard**', { timeout: 15_000 })
+  // Vänta på redirect — kan vara /dashboard eller /onboarding
+  await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 15_000 })
 
-  // Spara session state
-  await page.context().storageState({ path: 'playwright/.auth/user.json' })
+  // Vänta extra så att Supabase-cookies sätts korrekt
+  await page.waitForTimeout(2000)
+
+  console.log('Auth setup — Inloggad, URL:', page.url())
+
+  // Spara session state (cookies + localStorage)
+  await page.context().storageState({ path: AUTH_FILE })
+  console.log('Auth setup — Session sparad till', AUTH_FILE)
 })
