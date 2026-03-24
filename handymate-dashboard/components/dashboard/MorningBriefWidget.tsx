@@ -70,8 +70,8 @@ export default function MorningBriefWidget() {
         </span>
       </div>
 
-      {/* Agent pills — avatar + namn, kompakt */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+      {/* Agent pills — avatar + namn + citat, flex-1 jämnt fördelat */}
+      <div className="flex gap-1.5">
         {brief.agents.map(agent => {
           const conf = AGENTS[agent.agentId] || AGENTS.matte
           const isActive = selected === agent.agentId
@@ -81,7 +81,7 @@ export default function MorningBriefWidget() {
             <button
               key={agent.agentId}
               onClick={() => setSelected(agent.agentId)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-full shrink-0 transition-all ${
+              className={`flex items-center gap-2 px-2.5 py-2 rounded-full min-w-0 flex-1 transition-all ${
                 isActive
                   ? 'bg-white border border-gray-300 shadow-sm'
                   : 'bg-gray-50 border border-transparent hover:bg-gray-100'
@@ -90,7 +90,7 @@ export default function MorningBriefWidget() {
               {/* Avatar med profilbild + status-prick */}
               <div className="relative shrink-0">
                 <img
-                  src={`${SUPABASE_URL}/storage/v1/object/public/team-avatars/${agent.agentId}.png`}
+                  src={`${SUPABASE_URL}/storage/v1/object/public/team-avatars/${agent.agentId.charAt(0).toUpperCase() + agent.agentId.slice(1)}.png`}
                   alt={conf.name}
                   onError={(e) => {
                     const el = e.currentTarget
@@ -117,8 +117,13 @@ export default function MorningBriefWidget() {
                 />
               </div>
 
-              {/* Namn */}
-              <span className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</span>
+              {/* Namn + citat */}
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</p>
+                <p className="text-[11px] text-gray-400 italic whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: 85 }}>
+                  {agent.quote}
+                </p>
+              </div>
             </button>
           )
         })}
