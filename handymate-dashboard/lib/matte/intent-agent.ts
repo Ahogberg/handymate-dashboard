@@ -24,6 +24,7 @@ export interface MatteAction {
 export interface MatteDecision {
   intent: string
   confidence: number
+  suggestedAgent: 'matte' | 'karin' | 'daniel' | 'lars' | 'hanna' | 'lisa'
   projectId?: string
   dealId?: string
   invoiceId?: string
@@ -68,6 +69,15 @@ FÖR BOKNINGS- OCH OMBOKNINGSFÖRFRÅGNINGAR:
 - Formulera customer_reply med de tre tiderna: "Hej [namn]! Vi kan komma [tid1], [tid2] eller [tid3]. Vilket passar bäst? // [företag]"
 - Om inga tider finns → skapa approval utan specifika tider, be hantverkaren kontrollera kalender
 
+AGENT-DELEGERING:
+Returnera alltid suggestedAgent baserat på intent:
+- new_contact, general_question, unclear, complaint → "lisa"
+- quote_request, quote_addition, cancellation → "daniel"
+- reschedule_request, new_booking_request, material_change → "lars"
+- invoice_question, payment_confirmation → "karin"
+- confirmation, new_contact (enkel) → "lisa"
+- Allt oklart eller komplext → "matte"
+
 BEGRÄNSNINGAR:
 - Lova ALDRIG specifika datum/tider som inte kommer från TILLGÄNGLIGA TIDER
 - Ge ALDRIG prisuppgifter utan prislista
@@ -101,6 +111,7 @@ Analysera meddelandet och returnera ENDAST JSON (ingen markdown):
 {
   "intent": "...",
   "confidence": 85,
+  "suggestedAgent": "lisa",
   "projectId": null,
   "dealId": null,
   "invoiceId": null,
@@ -127,6 +138,7 @@ Analysera meddelandet och returnera ENDAST JSON (ingen markdown):
     return {
       intent: 'unclear',
       confidence: 0,
+      suggestedAgent: 'matte',
       actions: [],
       reasoning: 'Kunde inte tolka intent-agentens svar',
     }

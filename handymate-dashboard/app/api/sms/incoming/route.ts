@@ -157,6 +157,12 @@ export async function POST(request: NextRequest) {
 
         const decision = await runIntentAgent(signal, entity, businessConf, availableSlots)
         await executeMatteActions(decision, entity, signal, businessId, supabase, availableSlots)
+
+        // V34: Delegera till specialist-agent om Matte rekommenderar det
+        if (decision.suggestedAgent && decision.suggestedAgent !== 'matte') {
+          const { routeToAgentWithContext } = await import('@/lib/matte/agent-router')
+          await routeToAgentWithContext(decision.suggestedAgent, signal, entity, decision, businessId, supabase)
+        }
       } catch (err) {
         console.error('[Matte SMS Intelligence] Error:', err)
       }

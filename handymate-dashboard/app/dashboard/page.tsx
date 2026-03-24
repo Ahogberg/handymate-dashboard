@@ -35,6 +35,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
+import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
 
 interface Booking {
   booking_id: string
@@ -862,6 +863,9 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        {/* ═══ Morning Brief ═══ */}
+        <MorningBriefWidget />
 
         {/* ═══ Att göra idag (alltid synlig) ═══ */}
         <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
