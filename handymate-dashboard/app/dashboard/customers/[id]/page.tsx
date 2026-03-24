@@ -121,6 +121,46 @@ interface Task {
   created_at: string
 }
 
+interface Project {
+  id: string
+  name: string
+  status: string
+  created_at: string
+  completed_at?: string
+  budget?: number
+}
+
+interface Quote {
+  id: string
+  title: string
+  status: string
+  total_amount: number
+  created_at: string
+  sent_at?: string
+  signed_at?: string
+  quote_number?: string
+}
+
+interface Invoice {
+  id: string
+  invoice_number: string
+  status: string
+  total_amount: number
+  due_date?: string
+  paid_at?: string
+  created_at: string
+}
+
+interface Deal {
+  id: string
+  title: string
+  stage_id: string
+  value: number | null
+  created_at: string
+  deal_number?: number
+  stage?: { label: string; slug: string } | null
+}
+
 export default function CustomerDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -130,14 +170,18 @@ export default function CustomerDetailPage() {
   const customerId = (params as any)?.id as string
 
   const tabParam = searchParams?.get('tab')
-  const initialTab = tabParam === 'documents' ? 'documents' : tabParam === 'bookings' ? 'bookings' : tabParam === 'tasks' ? 'tasks' : 'timeline'
+  const initialTab = tabParam === 'documents' ? 'documents' : tabParam === 'bookings' ? 'bookings' : tabParam === 'tasks' ? 'tasks' : tabParam === 'projects' ? 'projects' : 'timeline'
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [bookings, setBookings] = useState<Booking[]>([])
   const [documents, setDocuments] = useState<CustomerDocument[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents' | 'tasks'>(initialTab)
+  const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents' | 'tasks' | 'projects'>(initialTab)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [quotes, setQuotes] = useState<Quote[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [deals, setDeals] = useState<Deal[]>([])
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -195,9 +239,41 @@ export default function CustomerDetailPage() {
       .eq('customer_id', customerId)
       .order('scheduled_start', { ascending: false })
 
+    // Hämta projekt
+    const { data: projectData } = await supabase
+      .from('projects')
+      .select('id, name, status, created_at, completed_at, budget')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+
+    // Hämta offerter
+    const { data: quoteData } = await supabase
+      .from('quotes')
+      .select('id, title, status, total_amount, created_at, sent_at, signed_at, quote_number')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+
+    // Hämta fakturor
+    const { data: invoiceData } = await supabase
+      .from('invoices')
+      .select('id, invoice_number, status, total_amount, due_date, paid_at, created_at')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+
+    // Hämta deals
+    const { data: dealData } = await supabase
+      .from('deal')
+      .select('id, title, stage_id, value, created_at, deal_number, stage:pipeline_stage(label, slug)')
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+
     setCustomer(customerData)
     setActivities(activityData || [])
     setBookings(bookingData || [])
+    setProjects(projectData || [])
+    setQuotes(quoteData || [])
+    setInvoices(invoiceData || [])
+    setDeals((dealData || []) as Deal[])
 
     // Load portal fields
     if (customerData) {
@@ -736,20 +812,30 @@ export default function CustomerDetailPage() {
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-xl font-bold text-gray-900">{projects.length}</p>
+                  <p className="text-xs text-gray-400">Projekt</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-xl font-bold text-gray-900">{quotes.length}</p>
+                  <p className="text-xs text-gray-400">Offerter</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-xl font-bold text-gray-900">{invoices.length}</p>
+                  <p className="text-xs text-gray-400">Fakturor</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
+                  <p className="text-xl font-bold text-teal-600">
+                    {invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_amount || 0), 0).toLocaleString('sv-SE')} kr
+                  </p>
+                  <p className="text-xs text-gray-400">Totalt betalt</p>
+                </div>
+                <div className="p-3 bg-gray-50 rounded-xl text-center">
                   <p className="text-xl font-bold text-gray-900">{bookings.length}</p>
                   <p className="text-xs text-gray-400">Bokningar</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{bookings.filter(b => b.job_status === 'completed').length}</p>
-                  <p className="text-xs text-gray-400">Slutförda jobb</p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{activities.filter(a => a.activity_type.includes('call')).length}</p>
-                  <p className="text-xs text-gray-400">Samtal</p>
-                </div>
-                <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{activities.filter(a => a.activity_type.includes('sms')).length}</p>
-                  <p className="text-xs text-gray-400">SMS</p>
+                  <p className="text-xl font-bold text-gray-900">{activities.filter(a => a.activity_type.includes('call') || a.activity_type.includes('sms')).length}</p>
+                  <p className="text-xs text-gray-400">Kontakter</p>
                 </div>
               </div>
             </div>
@@ -788,6 +874,16 @@ export default function CustomerDetailPage() {
                 }`}
               >
                 Dokument ({documents.length})
+              </button>
+              <button
+                onClick={() => setActiveTab('projects')}
+                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
+                  activeTab === 'projects'
+                    ? 'bg-teal-600 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                Projekt & Affärer ({projects.length + quotes.length + invoices.length})
               </button>
               <button
                 onClick={() => setActiveTab('tasks')}
@@ -956,6 +1052,160 @@ export default function CustomerDetailPage() {
                             </button>
                           </div>
                         </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Projekt & Affärer */}
+            {activeTab === 'projects' && (
+              <div className="space-y-6">
+                {/* Deals / Pipeline */}
+                {deals.length > 0 && (
+                  <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                    <div className="p-4 border-b border-gray-100">
+                      <h3 className="text-sm font-semibold text-gray-900">Ärenden i säljtratten</h3>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {deals.map(deal => (
+                        <Link key={deal.id} href={`/dashboard/pipeline?deal=${deal.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{deal.title}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              Ärende #{deal.deal_number || deal.id.slice(0, 6)} · {new Date(deal.created_at).toLocaleDateString('sv-SE')}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {deal.value != null && deal.value > 0 && (
+                              <span className="text-sm font-medium text-gray-700">{deal.value.toLocaleString('sv-SE')} kr</span>
+                            )}
+                            <span className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-full">
+                              {(deal.stage as any)?.label || 'Okänt steg'}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Projekt */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  <div className="p-4 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">Projekt ({projects.length})</h3>
+                  </div>
+                  {projects.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-400 text-sm">Inga projekt</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {projects.map(project => (
+                        <Link key={project.id} href={`/dashboard/projects/${project.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{project.name}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(project.created_at).toLocaleDateString('sv-SE')}
+                              {project.completed_at && ` — Klart ${new Date(project.completed_at).toLocaleDateString('sv-SE')}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {project.budget != null && project.budget > 0 && (
+                              <span className="text-sm text-gray-500">{project.budget.toLocaleString('sv-SE')} kr</span>
+                            )}
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              project.status === 'completed' ? 'bg-green-50 text-green-700' :
+                              project.status === 'active' ? 'bg-teal-50 text-teal-700' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {project.status === 'completed' ? 'Klart' : project.status === 'active' ? 'Pågår' : project.status || 'Utkast'}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Offerter */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  <div className="p-4 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">Offerter ({quotes.length})</h3>
+                  </div>
+                  {quotes.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-400 text-sm">Inga offerter</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {quotes.map(quote => (
+                        <Link key={quote.id} href={`/dashboard/quotes/${quote.id}/edit`} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{quote.title || quote.quote_number || 'Offert'}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {quote.quote_number && `${quote.quote_number} · `}
+                              {new Date(quote.created_at).toLocaleDateString('sv-SE')}
+                              {quote.signed_at && ` · Signerad ${new Date(quote.signed_at).toLocaleDateString('sv-SE')}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700">{(quote.total_amount || 0).toLocaleString('sv-SE')} kr</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              quote.status === 'signed' || quote.status === 'accepted' ? 'bg-green-50 text-green-700' :
+                              quote.status === 'sent' ? 'bg-teal-50 text-teal-700' :
+                              quote.status === 'draft' ? 'bg-gray-100 text-gray-500' :
+                              'bg-red-50 text-red-600'
+                            }`}>
+                              {quote.status === 'signed' || quote.status === 'accepted' ? 'Signerad' :
+                               quote.status === 'sent' ? 'Skickad' :
+                               quote.status === 'draft' ? 'Utkast' :
+                               quote.status === 'expired' ? 'Utgången' : quote.status || 'Utkast'}
+                            </span>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fakturor */}
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  <div className="p-4 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">Fakturor ({invoices.length})</h3>
+                  </div>
+                  {invoices.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <p className="text-gray-400 text-sm">Inga fakturor</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {invoices.map(invoice => (
+                        <Link key={invoice.id} href={`/dashboard/invoices/${invoice.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{invoice.invoice_number || 'Faktura'}</p>
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {new Date(invoice.created_at).toLocaleDateString('sv-SE')}
+                              {invoice.due_date && ` · Förfaller ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}`}
+                              {invoice.paid_at && ` · Betald ${new Date(invoice.paid_at).toLocaleDateString('sv-SE')}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700">{(invoice.total_amount || 0).toLocaleString('sv-SE')} kr</span>
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              invoice.status === 'paid' ? 'bg-green-50 text-green-700' :
+                              invoice.status === 'sent' ? 'bg-teal-50 text-teal-700' :
+                              invoice.status === 'overdue' ? 'bg-red-50 text-red-600' :
+                              'bg-gray-100 text-gray-500'
+                            }`}>
+                              {invoice.status === 'paid' ? 'Betald' :
+                               invoice.status === 'sent' ? 'Skickad' :
+                               invoice.status === 'overdue' ? 'Förfallen' :
+                               invoice.status === 'draft' ? 'Utkast' : invoice.status || 'Utkast'}
+                            </span>
+                          </div>
+                        </Link>
                       ))}
                     </div>
                   )}
