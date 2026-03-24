@@ -326,7 +326,7 @@ export default function OnboardingPage() {
           <div className="space-y-6">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Välj din plan</h1>
-              <p className="text-gray-500">Alla planer inkluderar AI-telefonassistent och 14 dagars gratis provperiod</p>
+              <p className="text-gray-500">Alla planer inkluderar AI-telefonassistent och 30 dagars pengarna-tillbaka-garanti</p>
             </div>
 
             <div className="grid gap-4">
@@ -381,10 +381,10 @@ export default function OnboardingPage() {
               }}
               className="w-full py-4 bg-teal-600 text-white text-lg font-semibold rounded-xl hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
             >
-              Starta provperiod <ChevronRight className="w-5 h-5" />
+              Kom igång <ChevronRight className="w-5 h-5" />
             </button>
             <p className="text-center text-xs text-gray-400">
-              14 dagar gratis — avbryt när som helst
+              30 dagars pengarna-tillbaka-garanti — inga frågor
             </p>
           </div>
         )}

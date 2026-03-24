@@ -110,57 +110,57 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-white">Skapa ditt konto</h1>
-        <p className="text-zinc-400 mt-2">Steg 1 av 7 — Företagsinformation & konto</p>
+        <h1 className="text-2xl font-bold text-gray-900">Skapa ditt konto</h1>
+        <p className="text-gray-500 mt-2">Steg 1 av 7 — Företagsinformation & konto</p>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-red-400 text-sm">
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
           {error}
         </div>
       )}
 
       {/* Business Info */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-teal-400" />
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <Building2 className="w-5 h-5 text-teal-600" />
           Företagsinformation
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Företagsnamn *</label>
+            <label className="block text-sm text-gray-500 mb-1">Företagsnamn *</label>
             <input
               type="text"
               value={form.business_name}
               onChange={(e) => setForm({ ...form, business_name: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="T.ex. Anderssons El AB"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Visningsnamn</label>
+            <label className="block text-sm text-gray-500 mb-1">Visningsnamn</label>
             <input
               type="text"
               value={form.display_name}
               onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="Kort namn för SMS & samtal"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm text-zinc-400 mb-2">Bransch *</label>
+          <label className="block text-sm text-gray-500 mb-2">Bransch *</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {BRANCHES.map((b) => (
               <button
                 key={b.value}
                 onClick={() => setForm({ ...form, branch: b.value })}
-                className={`px-3 py-2.5 rounded-lg border text-sm transition-all ${
+                className={`px-3 py-2.5 rounded-xl border text-sm transition-all ${
                   form.branch === b.value
-                    ? 'bg-teal-500/20 border-teal-500 text-white'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                    ? 'bg-teal-50 border-teal-500 text-teal-700 font-medium'
+                    : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
                 <span className="mr-1.5">{b.icon}</span>
@@ -171,106 +171,106 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
         </div>
 
         <div>
-          <label className="block text-sm text-zinc-400 mb-1 flex items-center gap-1">
+          <label className="block text-sm text-gray-500 mb-1 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5" /> Serviceområde
           </label>
           <input
             type="text"
             value={form.service_area}
             onChange={(e) => setForm({ ...form, service_area: e.target.value })}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
             placeholder="T.ex. Stockholm, Södertälje, Nynäshamn"
           />
         </div>
       </div>
 
       {/* Account Info */}
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-          <User className="w-5 h-5 text-teal-400" />
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <User className="w-5 h-5 text-teal-600" />
           Kontouppgifter
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Kontaktperson *</label>
+            <label className="block text-sm text-gray-500 mb-1">Kontaktperson *</label>
             <input
               type="text"
               value={form.contact_name}
               onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="Ditt namn"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1 flex items-center gap-1">
+            <label className="block text-sm text-gray-500 mb-1 flex items-center gap-1">
               <Phone className="w-3.5 h-3.5" /> Telefon *
             </label>
             <input
               type="tel"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="+46 70 123 45 67"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm text-zinc-400 mb-1 flex items-center gap-1">
+          <label className="block text-sm text-gray-500 mb-1 flex items-center gap-1">
             <Mail className="w-3.5 h-3.5" /> E-post *
           </label>
           <input
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
             placeholder="din@email.se"
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1 flex items-center gap-1">
+            <label className="block text-sm text-gray-500 mb-1 flex items-center gap-1">
               <Lock className="w-3.5 h-3.5" /> Lösenord *
             </label>
             <input
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="Minst 6 tecken"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Bekräfta lösenord *</label>
+            <label className="block text-sm text-gray-500 mb-1">Bekräfta lösenord *</label>
             <input
               type="password"
               value={form.password_confirm}
               onChange={(e) => setForm({ ...form, password_confirm: e.target.value })}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2.5 text-white placeholder-zinc-500 focus:outline-none focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
               placeholder="Skriv lösenordet igen"
             />
           </div>
         </div>
       </div>
 
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
-        <p className="text-zinc-400 text-sm text-center">
-          14 dagars gratis provperiod. Inget betalkort behövs.
+      <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-4">
+        <p className="text-gray-400 text-sm text-center">
+          30 dagars pengarna-tillbaka-garanti. Inga frågor.
         </p>
       </div>
 
       <button
         onClick={handleSubmit}
         disabled={loading}
-        className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-xl font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-gray-900 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Skapa konto <ArrowRight className="w-5 h-5" /></>}
       </button>
 
-      <p className="text-center text-sm text-zinc-500">
-        Har du redan ett konto? <a href="/login" className="text-teal-400 hover:underline">Logga in</a>
+      <p className="text-center text-sm text-gray-400">
+        Har du redan ett konto? <a href="/login" className="text-teal-600 hover:underline">Logga in</a>
       </p>
     </div>
   )
