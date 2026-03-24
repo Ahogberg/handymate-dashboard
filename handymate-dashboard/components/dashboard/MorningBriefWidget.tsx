@@ -6,19 +6,21 @@ interface BriefDetail { text: string; urgency: 'low' | 'medium' | 'high' }
 interface AgentBrief { agentId: string; quote: string; badge?: string; badgeType: string; details: BriefDetail[] }
 interface MorningBrief { date: string; greeting: string; agents: AgentBrief[]; generatedAt: string }
 
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+
 const AGENTS: Record<string, { name: string; initials: string; bg: string; text: string }> = {
-  matte:  { name: 'Matte', initials: 'M', bg: 'bg-teal-100', text: 'text-teal-700' },
-  karin:  { name: 'Karin', initials: 'K', bg: 'bg-blue-100', text: 'text-blue-700' },
-  daniel: { name: 'Daniel', initials: 'D', bg: 'bg-amber-100', text: 'text-amber-700' },
-  lars:   { name: 'Lars', initials: 'L', bg: 'bg-green-100', text: 'text-green-700' },
-  hanna:  { name: 'Hanna', initials: 'H', bg: 'bg-pink-100', text: 'text-pink-700' },
+  matte:  { name: 'Matte', initials: 'M', bg: '#E1F5EE', text: '#0F6E56' },
+  karin:  { name: 'Karin', initials: 'K', bg: '#E6F1FB', text: '#185FA5' },
+  daniel: { name: 'Daniel', initials: 'D', bg: '#FAEEDA', text: '#854F0B' },
+  lars:   { name: 'Lars', initials: 'L', bg: '#EAF3DE', text: '#3B6D11' },
+  hanna:  { name: 'Hanna', initials: 'H', bg: '#FBEAF0', text: '#993556' },
 }
 
 const STATUS_DOT: Record<string, string> = {
-  danger: 'bg-red-500',
-  warning: 'bg-amber-400',
-  success: 'bg-emerald-500',
-  neutral: 'bg-emerald-500',
+  danger: '#EF4444',
+  warning: '#F59E0B',
+  success: '#22C55E',
+  neutral: '#22C55E',
 }
 
 const URGENCY_DOT: Record<string, string> = {
@@ -49,7 +51,7 @@ export default function MorningBriefWidget() {
   if (loading) return (
     <div className="bg-white border border-gray-200 rounded-2xl p-4 animate-pulse">
       <div className="flex gap-2">
-        {[...Array(5)].map((_, i) => <div key={i} className="h-10 w-32 bg-gray-100 rounded-full" />)}
+        {[...Array(5)].map((_, i) => <div key={i} className="h-10 w-20 bg-gray-100 rounded-full" />)}
       </div>
     </div>
   )
@@ -68,7 +70,7 @@ export default function MorningBriefWidget() {
         </span>
       </div>
 
-      {/* Agent pills */}
+      {/* Agent pills — avatar + namn, kompakt */}
       <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {brief.agents.map(agent => {
           const conf = AGENTS[agent.agentId] || AGENTS.matte
@@ -85,35 +87,60 @@ export default function MorningBriefWidget() {
                   : 'bg-gray-50 border border-transparent hover:bg-gray-100'
               }`}
             >
-              {/* Avatar med status-prick */}
+              {/* Avatar med profilbild + status-prick */}
               <div className="relative shrink-0">
-                <div className={`w-7 h-7 rounded-full ${conf.bg} ${conf.text} flex items-center justify-center text-[11px] font-semibold`}>
+                <img
+                  src={`${SUPABASE_URL}/storage/v1/object/public/team-avatars/${agent.agentId}.png`}
+                  alt={conf.name}
+                  onError={(e) => {
+                    const el = e.currentTarget
+                    el.style.display = 'none'
+                    const fallback = el.nextElementSibling as HTMLElement
+                    if (fallback) fallback.style.display = 'flex'
+                  }}
+                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                />
+                <div
+                  style={{
+                    display: 'none',
+                    width: 28, height: 28, borderRadius: '50%',
+                    background: conf.bg, color: conf.text,
+                    alignItems: 'center', justifyContent: 'center',
+                    fontSize: 11, fontWeight: 500,
+                  }}
+                >
                   {conf.initials}
                 </div>
-                <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-white ${dotColor}`} />
+                <div
+                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-white"
+                  style={{ background: dotColor }}
+                />
               </div>
 
-              {/* Namn + citat */}
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</p>
-                <p className="text-[10px] text-gray-400 italic whitespace-nowrap overflow-hidden text-ellipsis max-w-[100px]">
-                  {agent.quote}
-                </p>
-              </div>
+              {/* Namn */}
+              <span className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</span>
             </button>
           )
         })}
       </div>
 
       {/* Detail panel */}
-      {selectedBrief && selectedBrief.details.length > 0 && (
+      {selectedBrief && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          {selectedBrief.details.slice(0, 3).map((detail, i) => (
-            <div key={i} className="flex items-start gap-2 py-1">
-              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
-              <span className="text-xs text-gray-600 leading-relaxed">{detail.text}</span>
-            </div>
-          ))}
+          {/* Agentens quote */}
+          <p className="text-xs italic text-gray-500 mb-2">"{selectedBrief.quote}"</p>
+
+          {/* Detaljer */}
+          {selectedBrief.details.length > 0 ? (
+            selectedBrief.details.slice(0, 3).map((detail, i) => (
+              <div key={i} className="flex items-start gap-2 py-1">
+                <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
+                <span className="text-xs text-gray-600 leading-relaxed">{detail.text}</span>
+              </div>
+            ))
+          ) : (
+            <p className="text-xs text-gray-400">Inget att rapportera.</p>
+          )}
         </div>
       )}
     </div>
