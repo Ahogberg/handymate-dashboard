@@ -244,6 +244,44 @@ export async function processInboundEmail(
     console.error('[gmail-processor] fireEvent error:', err)
   }
 
+  // ── Matte Gmail Intelligence (fire-and-forget) ──
+  ;(async () => {
+    try {
+      const { resolveEntity } = await import('@/lib/matte/resolver')
+      const { runIntentAgent } = await import('@/lib/matte/intent-agent')
+      const { executeMatteActions } = await import('@/lib/matte/action-executor')
+
+      const { data: config } = await supabase
+        .from('business_config')
+        .select('display_name, business_name, default_hourly_rate, pricing_settings, rot_enabled')
+        .eq('business_id', businessId)
+        .single()
+
+      const entity = await resolveEntity(message.from, businessId)
+
+      const signal = {
+        channel: 'email' as const,
+        from: fromEmail,
+        body: bodyPreview,
+        subject: message.subject,
+        receivedAt: message.date ? new Date(message.date).toISOString() : new Date().toISOString(),
+      }
+
+      const businessConf = {
+        businessName: config?.display_name || config?.business_name || 'Handymate',
+        hourlyRate: (config?.pricing_settings as any)?.hourly_rate || config?.default_hourly_rate || 650,
+        rotEnabled: config?.rot_enabled || false,
+        workStart: '07:00',
+        workEnd: '17:00',
+      }
+
+      const decision = await runIntentAgent(signal, entity, businessConf)
+      await executeMatteActions(decision, entity, signal, businessId, supabase)
+    } catch (err) {
+      console.error('[Matte Gmail Intelligence] Error:', err)
+    }
+  })()
+
   return { stored: true }
 }
 
