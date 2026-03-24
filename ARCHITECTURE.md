@@ -53,6 +53,11 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 | V21 | Agent-team | 5 specialiserade agenter, persistent memory, inter-agent kommunikation | ✅ Klar |
 | V23 | Automationer | Automationsbibliotek, bekräftelsemail, jobbrapport, garantiuppföljning | ✅ Klar |
 | V24 | Dokument & Debug | ensureBucket(), debug-endpoints, E2E-test, Gmail OAuth-fix | ✅ Klar |
+| V25 | Lönsamhetsanalys | DB-triggers på time_entry/material, projectkolumner, Karin-varningar | ✅ Klar |
+| V26 | Offert-intelligens | Daniel analyserar historik före skickning, prisvarning | ✅ Klar |
+| V27–V28 | Pipeline V2 | 6 låsta steg, deal_automation_tasks, tidslinje, flex-kolumner | ✅ Klar |
+| V29 | Ekonomi | Dashboard-widget, Analys & Ekonomi-sida, kostnadsinställningar | ✅ Klar |
+| V30 | Multi-foto offert + Realtidslarm | Upp till 5 foton + fritext i AI-offert, realtids-lönsamhetslarm med push | ✅ Klar |
 
 ---
 
@@ -530,7 +535,7 @@ Anropas i alla upload-routes innan `supabase.storage.upload()`.
 
 ---
 
-## 16. Nya SQL-migrationer (V14–V24)
+## 16. Nya SQL-migrationer (V14–V30)
 
 | Fil | Innehåll |
 |-----|----------|
@@ -553,6 +558,12 @@ Anropas i alla upload-routes innan `supabase.storage.upload()`.
 | `v23_job_report.sql` | Jobbrapport-automation toggle |
 | `v23_review_requests.sql` | Komplettera review_request |
 | `v24_documents_fix.sql` | customer_document + project_document fix |
+| `v25_profitability.sql` | Triggers på time_entry/material, lönsamhetskolumner på project |
+| `v26_quote_intelligence.sql` | Index för offert-matchning (accepted quotes) |
+| `v27_pipeline_hantverkare.sql` | 10 hantverkar-steg (ersatt av V28) |
+| `v28_pipeline_locked.sql` | 6 låsta pipeline-steg, deal_automation_tasks, won/lost_at |
+| `v29_economics_settings.sql` | Ekonomi-nycklar i business_preferences |
+| `v29b_economics_fix.sql` | overhead_monthly_sek + margin_target_percent på business_config |
 
 ---
 
