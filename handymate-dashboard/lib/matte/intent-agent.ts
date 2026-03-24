@@ -4,6 +4,7 @@
 
 import Anthropic from '@anthropic-ai/sdk'
 import type { ResolvedEntity } from './resolver'
+import type { TimeSlot } from './calendar-slots'
 
 export interface IncomingSignal {
   channel: 'sms' | 'email'
@@ -62,8 +63,13 @@ TONLÄGE MOT KUND:
 - Underteckna med hantverkarens företagsnamn
 - Avslöja ALDRIG att du är AI
 
+FÖR BOKNINGS- OCH OMBOKNINGSFÖRFRÅGNINGAR:
+- Om TILLGÄNGLIGA TIDER finns i kontexten → inkludera dem i approval-beskrivningen
+- Formulera customer_reply med de tre tiderna: "Hej [namn]! Vi kan komma [tid1], [tid2] eller [tid3]. Vilket passar bäst? // [företag]"
+- Om inga tider finns → skapa approval utan specifika tider, be hantverkaren kontrollera kalender
+
 BEGRÄNSNINGAR:
-- Lova ALDRIG specifika datum/tider
+- Lova ALDRIG specifika datum/tider som inte kommer från TILLGÄNGLIGA TIDER
 - Ge ALDRIG prisuppgifter utan prislista
 - Om meddelandet är otydligt — be om förtydligande, skapa inga actions`
 
@@ -76,11 +82,12 @@ export async function runIntentAgent(
     rotEnabled: boolean
     workStart: string
     workEnd: string
-  }
+  },
+  availableSlots?: TimeSlot[]
 ): Promise<MatteDecision> {
   const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })
 
-  const context = buildContext(signal, entity, businessConfig)
+  const context = buildContext(signal, entity, businessConfig, availableSlots)
 
   const response = await anthropic.messages.create({
     model: 'claude-sonnet-4-20250514',
@@ -131,8 +138,13 @@ Analysera meddelandet och returnera ENDAST JSON (ingen markdown):
 function buildContext(
   signal: IncomingSignal,
   entity: ResolvedEntity,
-  config: { businessName: string; hourlyRate: number; rotEnabled: boolean; workStart: string; workEnd: string }
+  config: { businessName: string; hourlyRate: number; rotEnabled: boolean; workStart: string; workEnd: string },
+  availableSlots?: TimeSlot[]
 ): string {
+  const slotsSection = availableSlots && availableSlots.length > 0
+    ? `\nTILLGÄNGLIGA TIDER (verifierade mot kalender):\n${availableSlots.map((s, i) => `  ${i + 1}. ${s.label}`).join('\n')}\nOBS: Föreslå KUN dessa tider om kunden frågar om bokning/ombokning.`
+    : '\nKALENDER: Inga lediga tider pre-hämtade — skapa approval utan specifika tider.'
+
   return `INKOMMANDE ${signal.channel.toUpperCase()} FRÅN: ${entity.customerName ?? 'Okänd avsändare'}
 Telefon/mail: ${signal.from}
 ${signal.subject ? `Ämne: ${signal.subject}\n` : ''}Meddelande: "${signal.body}"
@@ -163,6 +175,7 @@ KONVERSATIONSHISTORIK (senaste ${entity.conversationHistory.length}):
 ${entity.conversationHistory.map(m =>
     `  ${m.direction === 'in' ? '←' : '→'} [${m.timestamp.split('T')[0]}]: "${m.body.slice(0, 80)}${m.body.length > 80 ? '...' : ''}"`
   ).join('\n') || '  Ingen historik'}
+${slotsSection}
 
 FÖRETAG: ${config.businessName}
 Timpris: ${config.hourlyRate} kr/h | ROT: ${config.rotEnabled ? 'Ja' : 'Nej'} | Arbetstid: ${config.workStart}–${config.workEnd}`

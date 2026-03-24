@@ -127,6 +127,7 @@ export async function POST(request: NextRequest) {
         const { resolveEntity } = await import('@/lib/matte/resolver')
         const { runIntentAgent } = await import('@/lib/matte/intent-agent')
         const { executeMatteActions } = await import('@/lib/matte/action-executor')
+        const { getAvailableSlots } = await import('@/lib/matte/calendar-slots')
 
         const { data: config } = await supabase
           .from('business_config')
@@ -134,7 +135,10 @@ export async function POST(request: NextRequest) {
           .eq('business_id', businessId)
           .single()
 
-        const entity = await resolveEntity(from, businessId)
+        const [entity, availableSlots] = await Promise.all([
+          resolveEntity(from, businessId),
+          getAvailableSlots(businessId, 2).catch(() => [] as import('@/lib/matte/calendar-slots').TimeSlot[]),
+        ])
 
         const signal = {
           channel: 'sms' as const,
@@ -151,8 +155,8 @@ export async function POST(request: NextRequest) {
           workEnd: '17:00',
         }
 
-        const decision = await runIntentAgent(signal, entity, businessConf)
-        await executeMatteActions(decision, entity, signal, businessId, supabase)
+        const decision = await runIntentAgent(signal, entity, businessConf, availableSlots)
+        await executeMatteActions(decision, entity, signal, businessId, supabase, availableSlots)
       } catch (err) {
         console.error('[Matte SMS Intelligence] Error:', err)
       }

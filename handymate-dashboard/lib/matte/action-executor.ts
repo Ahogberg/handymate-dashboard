@@ -5,20 +5,22 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import type { MatteDecision, MatteAction, IncomingSignal } from './intent-agent'
 import type { ResolvedEntity } from './resolver'
+import type { TimeSlot } from './calendar-slots'
 
 export async function executeMatteActions(
   decision: MatteDecision,
   entity: ResolvedEntity,
   signal: IncomingSignal,
   businessId: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  availableSlots?: TimeSlot[]
 ): Promise<void> {
   for (const action of decision.actions) {
     try {
       if (action.autonomous) {
         await executeDirectAction(action, entity, signal, businessId, supabase)
       } else {
-        await createApproval(action, decision, entity, businessId, supabase)
+        await createApproval(action, decision, entity, businessId, supabase, availableSlots)
       }
     } catch (err) {
       console.error(`[Matte] Action ${action.type} failed:`, err)
@@ -120,7 +122,8 @@ async function createApproval(
   decision: MatteDecision,
   entity: ResolvedEntity,
   businessId: string,
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  availableSlots?: TimeSlot[]
 ): Promise<void> {
   const id = `appr_matte_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
 
@@ -133,6 +136,7 @@ async function createApproval(
     payload: {
       ...action.params,
       customer_reply_pending: decision.customerReply?.message,
+      available_slots: availableSlots || [],
       entity: {
         customerId: entity.customerId,
         leadId: entity.leadId,

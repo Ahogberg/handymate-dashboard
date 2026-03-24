@@ -250,6 +250,7 @@ export async function processInboundEmail(
       const { resolveEntity } = await import('@/lib/matte/resolver')
       const { runIntentAgent } = await import('@/lib/matte/intent-agent')
       const { executeMatteActions } = await import('@/lib/matte/action-executor')
+      const { getAvailableSlots } = await import('@/lib/matte/calendar-slots')
 
       const { data: config } = await supabase
         .from('business_config')
@@ -257,7 +258,10 @@ export async function processInboundEmail(
         .eq('business_id', businessId)
         .single()
 
-      const entity = await resolveEntity(message.from, businessId)
+      const [entity, availableSlots] = await Promise.all([
+        resolveEntity(fromEmail, businessId),
+        getAvailableSlots(businessId, 2).catch(() => [] as import('@/lib/matte/calendar-slots').TimeSlot[]),
+      ])
 
       const signal = {
         channel: 'email' as const,
@@ -275,8 +279,8 @@ export async function processInboundEmail(
         workEnd: '17:00',
       }
 
-      const decision = await runIntentAgent(signal, entity, businessConf)
-      await executeMatteActions(decision, entity, signal, businessId, supabase)
+      const decision = await runIntentAgent(signal, entity, businessConf, availableSlots)
+      await executeMatteActions(decision, entity, signal, businessId, supabase, availableSlots)
     } catch (err) {
       console.error('[Matte Gmail Intelligence] Error:', err)
     }

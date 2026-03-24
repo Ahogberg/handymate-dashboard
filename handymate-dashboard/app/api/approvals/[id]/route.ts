@@ -433,6 +433,77 @@ async function executeApprovalPayload(
         return { action: 'job_report', ...result }
       }
 
+      // ── V33 Matte approval types ──────────────────────────
+
+      case 'propose_booking_times':
+      case 'reschedule_request':
+      case 'new_booking_request': {
+        const pl = payload as any
+        const message = pl.customer_reply_pending
+          || (pl.available_slots?.length
+            ? `Hej! Vi kan komma:\n${(pl.available_slots as any[]).map((s: any, i: number) => `${i + 1}. ${s.label}`).join('\n')}\nVilket passar bäst?`
+            : null)
+
+        if (!message || !pl.entity?.phone) {
+          return { action: 'propose_booking_times', skipped: 'no message or phone' }
+        }
+
+        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            to: pl.entity.phone,
+            message,
+          }),
+        })
+        return { action: 'propose_booking_times', sms_sent: smsRes.ok, slots_count: pl.available_slots?.length || 0 }
+      }
+
+      case 'create_quote_draft':
+      case 'quote_request':
+      case 'quote_addition': {
+        const pl = payload as any
+        const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            textDescription: pl.description || pl.job_description || pl.customer_reply_pending,
+            customerId: pl.entity?.customerId,
+            businessId,
+          }),
+        })
+        return { action: 'create_quote_draft', ok: res.ok }
+      }
+
+      case 'create_ata_draft': {
+        const pl = payload as any
+        const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            textDescription: `ÄTA-tillägg: ${pl.description || ''}`,
+            customerId: pl.entity?.customerId,
+            businessId,
+          }),
+        })
+        return { action: 'create_ata_draft', ok: res.ok }
+      }
+
+      case 'send_matte_customer_reply': {
+        const pl = payload as any
+        const msg = pl.customer_reply_pending || pl.message
+        if (!msg || !pl.entity?.phone) {
+          return { action: 'send_matte_customer_reply', skipped: 'no message or phone' }
+        }
+        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: businessId, to: pl.entity.phone, message: msg }),
+        })
+        return { action: 'send_matte_customer_reply', sms_sent: smsRes.ok }
+      }
+
       default:
         return { action: approval_type, skipped: 'no handler for this type', payload }
     }
