@@ -16,7 +16,6 @@ import {
   XCircle,
   BarChart3,
   Receipt,
-  UserPlus,
   Activity,
   Phone,
   Zap,
@@ -797,8 +796,13 @@ export default function DashboardPage() {
           })()
         )}
 
-        {/* KPI cards — 2 per row on mobile, 5 on desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+        {/* ═══ Morning Brief ═══ */}
+        <div className="max-w-3xl mx-auto mb-8">
+          <MorningBriefWidget />
+        </div>
+
+        {/* KPI cards — 2 per row on mobile, 4 on desktop */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {!statsLoaded ? (
             <>
               {[...Array(5)].map((_, i) => (
@@ -831,17 +835,6 @@ export default function DashboardPage() {
 
               <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
                 <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-emerald-50">
-                    <Mic className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <TrendIndicator value={stats?.calls?.trend || 0} />
-                </div>
-                <p className="text-2xl font-bold text-gray-900">{stats?.calls?.week || 0}</p>
-                <p className="text-xs text-gray-400">Samtal denna vecka</p>
-              </div>
-
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
                   <div className="p-2 rounded-lg bg-amber-50">
                     <Clock className="w-4 h-4 text-amber-600" />
                   </div>
@@ -864,11 +857,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* ═══ Morning Brief ═══ */}
-        <MorningBriefWidget />
-
-        {/* ═══ Att göra idag (alltid synlig) ═══ */}
-        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+        {/* ═══ Att göra idag ═══ */}
+        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 mb-8">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-teal-600" />
@@ -932,8 +922,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Main 2-column grid (50/50) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-6">
+        {/* Main 2-column grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
           {/* ═══ Säljtratt ═══ */}
           {!pipelineLoaded ? (
@@ -1119,39 +1109,38 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* ═══ Snabbåtgärder ═══ */}
+          {/* ═══ Senaste aktivitet ═══ */}
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">Snabbåtgärder</h2>
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                href="/dashboard/quotes/new"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
-              >
-                <FileText className="w-6 h-6 text-sky-700 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Ny offert</span>
-              </Link>
-              <Link
-                href="/dashboard/invoices"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
-              >
-                <Receipt className="w-6 h-6 text-teal-600 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Ny faktura</span>
-              </Link>
-              <Link
-                href="/dashboard/bookings"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
-              >
-                <Calendar className="w-6 h-6 text-emerald-600 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Ny bokning</span>
-              </Link>
-              <Link
-                href="/dashboard/customers"
-                className="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-teal-50 hover:border-teal-200 border border-gray-200 rounded-xl transition-all group min-h-[80px]"
-              >
-                <UserPlus className="w-6 h-6 text-amber-600 mb-2 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Ny kund</span>
-              </Link>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+                <Activity className="w-4 h-4 text-teal-600" />
+                Senaste aktivitet
+              </h2>
             </div>
+            {activityLoaded && recentActivity.length > 0 ? (
+              <div className="space-y-1">
+                {recentActivity.slice(0, 5).map(activity => (
+                  <div key={activity.activity_id} className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0">
+                    <div className="mt-0.5 shrink-0">{getActivityIcon(activity.activity_type)}</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 truncate">{activity.title}</p>
+                      {activity.customer && (
+                        <p className="text-xs text-gray-400 truncate">{(activity.customer as any).name}</p>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-300 shrink-0">
+                      {new Date(activity.created_at).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : activityLoaded ? (
+              <p className="text-sm text-gray-400 py-4 text-center">Ingen aktivitet ännu</p>
+            ) : (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
+              </div>
+            )}
           </div>
         </div>
 
