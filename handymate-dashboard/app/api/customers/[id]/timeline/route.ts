@@ -398,6 +398,106 @@ export async function GET(
     }
   }
 
+  // ── 11. projects — Projekt-händelser ──────────────────────────
+  if (filter === 'all' || filter === 'projects') {
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('id, name, status, created_at, completed_at, budget')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    for (const p of projects || []) {
+      events.push({
+        id: `proj_created_${p.id}`,
+        type: 'project_created',
+        title: `Projekt skapat: ${p.name}`,
+        description: p.budget ? `Budget: ${formatSEK(p.budget)}` : null,
+        timestamp: p.created_at,
+        metadata: { project_id: p.id, status: p.status, budget: p.budget },
+      })
+
+      if (p.status === 'completed' && p.completed_at) {
+        events.push({
+          id: `proj_done_${p.id}`,
+          type: 'project_completed',
+          title: `Projekt avslutat: ${p.name}`,
+          description: null,
+          timestamp: p.completed_at,
+          metadata: { project_id: p.id },
+        })
+      }
+    }
+
+    // Project log entries (byggdagbok)
+    const projectIds = (projects || []).map((p: any) => p.id)
+    if (projectIds.length > 0) {
+      const { data: logEntries } = await supabase
+        .from('project_log')
+        .select('id, entry, project_id, logged_at')
+        .in('project_id', projectIds)
+        .order('logged_at', { ascending: false })
+        .limit(20)
+
+      for (const le of logEntries || []) {
+        const proj = (projects || []).find((p: any) => p.id === le.project_id)
+        events.push({
+          id: `plog_${le.id}`,
+          type: 'project_log',
+          title: `Byggdagbok: ${proj?.name || 'Projekt'}`,
+          description: le.entry ? le.entry.substring(0, 150) : null,
+          timestamp: le.logged_at,
+          metadata: { project_id: le.project_id },
+        })
+      }
+    }
+  }
+
+  // ── 12. deals — Pipeline-händelser ──────────────────────────
+  if (filter === 'all' || filter === 'leads') {
+    const { data: dealRows } = await supabase
+      .from('deal')
+      .select('id, title, deal_number, stage_id, value, created_at, stage:pipeline_stage(label)')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    for (const d of dealRows || []) {
+      events.push({
+        id: `deal_${d.id}`,
+        type: 'deal_created',
+        title: `Ärende #${d.deal_number || d.id.slice(0, 6)} skapat`,
+        description: `${d.title}${d.value ? ` — ${formatSEK(d.value)}` : ''}`,
+        timestamp: d.created_at,
+        metadata: { deal_id: d.id, deal_number: d.deal_number, stage: (d.stage as any)?.label, value: d.value },
+      })
+    }
+
+    // Pipeline activity log
+    const dealIds = (dealRows || []).map((d: any) => d.id)
+    if (dealIds.length > 0) {
+      const { data: pipelineActs } = await supabase
+        .from('pipeline_activity')
+        .select('id, deal_id, from_stage, to_stage, note, created_at')
+        .in('deal_id', dealIds)
+        .order('created_at', { ascending: false })
+        .limit(30)
+
+      for (const pa of pipelineActs || []) {
+        events.push({
+          id: `pa_${pa.id}`,
+          type: 'pipeline_stage_changed',
+          title: `Ärende flyttat: ${pa.from_stage || '?'} → ${pa.to_stage || '?'}`,
+          description: pa.note || null,
+          timestamp: pa.created_at,
+          metadata: { deal_id: pa.deal_id, from_stage: pa.from_stage, to_stage: pa.to_stage },
+        })
+      }
+    }
+  }
+
   // ── Deduplicate, sort, paginate ───────────────────────────────
   // Deduplicate by id
   const seen = new Set<string>()

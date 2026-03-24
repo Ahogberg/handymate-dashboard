@@ -232,12 +232,32 @@ export default function CustomerDetailPage() {
       .order('created_at', { ascending: false })
       .limit(50)
 
-    // Hämta bokningar
+    // Hämta bokningar (direkt via kund + via kundens projekt)
     const { data: bookingData } = await supabase
       .from('booking')
       .select('*')
       .eq('customer_id', customerId)
       .order('scheduled_start', { ascending: false })
+
+    // Hämta projektbokningar som inte redan finns via customer_id
+    const projectIds = (await supabase
+      .from('projects')
+      .select('id')
+      .eq('customer_id', customerId)
+    ).data?.map((p: any) => p.id) || []
+
+    let projectBookings: any[] = []
+    if (projectIds.length > 0) {
+      const { data: pb } = await supabase
+        .from('booking')
+        .select('*')
+        .in('project_id', projectIds)
+        .order('scheduled_start', { ascending: false })
+      const existingIds = new Set((bookingData || []).map((b: any) => b.booking_id))
+      projectBookings = (pb || []).filter((b: any) => !existingIds.has(b.booking_id))
+    }
+    const allBookings = [...(bookingData || []), ...projectBookings]
+      .sort((a: any, b: any) => new Date(b.scheduled_start).getTime() - new Date(a.scheduled_start).getTime())
 
     // Hämta projekt
     const { data: projectData } = await supabase
@@ -269,7 +289,7 @@ export default function CustomerDetailPage() {
 
     setCustomer(customerData)
     setActivities(activityData || [])
-    setBookings(bookingData || [])
+    setBookings(allBookings)
     setProjects(projectData || [])
     setQuotes(quoteData || [])
     setInvoices(invoiceData || [])
@@ -282,18 +302,44 @@ export default function CustomerDetailPage() {
       setPortalLastVisited(customerData.portal_last_visited_at || null)
     }
 
-    // Fetch documents
+    // Fetch documents (kund + projekt)
+    let allDocs: CustomerDocument[] = []
     try {
       const docRes = await fetch(`/api/customers/${customerId}/documents`, {
         headers: { 'Content-Type': 'application/json' }
       })
       if (docRes.ok) {
         const docData = await docRes.json()
-        setDocuments(docData.documents || [])
+        allDocs = docData.documents || []
       }
-    } catch {
-      // Documents table may not exist yet
+    } catch { /* Documents table may not exist yet */ }
+
+    // Hämta projektdokument
+    if (projectIds.length > 0) {
+      try {
+        const { data: projDocs } = await supabase
+          .from('project_document')
+          .select('id, file_name, file_url, file_type, file_size, category, uploaded_at')
+          .in('project_id', projectIds)
+          .order('uploaded_at', { ascending: false })
+
+        const existingUrls = new Set(allDocs.map(d => d.file_url))
+        for (const pd of projDocs || []) {
+          if (!existingUrls.has(pd.file_url)) {
+            allDocs.push({
+              id: pd.id,
+              file_name: pd.file_name,
+              file_url: pd.file_url,
+              file_type: pd.file_type,
+              file_size: pd.file_size,
+              category: pd.category || 'project',
+              uploaded_at: pd.uploaded_at,
+            })
+          }
+        }
+      } catch { /* project_document table may not exist */ }
     }
+    setDocuments(allDocs)
 
     // Fetch tasks
     try {
