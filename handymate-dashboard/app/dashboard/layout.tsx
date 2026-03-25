@@ -30,11 +30,22 @@ export default function DashboardLayout({
   // Redirect to onboarding if not completed
   // step >= 7 also counts as done (old 6-step flow finalized at step 7)
   const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 7))
+
+  // Subscription access check — pilot-konton, aktiva och trials har åtkomst
+  const hasAccess = !!(
+    (business as any)?.is_pilot ||
+    (business as any)?.subscription_status === 'active' ||
+    (business as any)?.subscription_status === 'trial' ||
+    ((business as any)?.subscription_status === 'trialing' &&
+      (business as any)?.trial_ends_at &&
+      new Date((business as any).trial_ends_at) > new Date())
+  )
+
   useEffect(() => {
-    if (!loading && business && !onboardingDone) {
+    if (!loading && business && (!onboardingDone || !hasAccess)) {
       router.push('/onboarding')
     }
-  }, [loading, business, onboardingDone, router])
+  }, [loading, business, onboardingDone, hasAccess, router])
 
   if (loading) {
     return (
@@ -49,7 +60,7 @@ export default function DashboardLayout({
   }
 
   // Don't render dashboard while redirecting to onboarding
-  if (!onboardingDone) {
+  if (!onboardingDone || !hasAccess) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
