@@ -64,7 +64,12 @@ export default function MorningBriefWidget() {
     <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-gray-900">{brief.greeting}</span>
+        <span className="text-sm font-semibold text-gray-900">{(() => {
+          const hour = new Date().getHours()
+          const g = hour < 10 ? 'God morgon' : hour < 18 ? 'Hej' : 'God kväll'
+          const name = brief.greeting.replace(/^[^,]*,?\s*/, '').replace(/!$/, '')
+          return name ? `${g}, ${name}!` : `${g}!`
+        })()}</span>
         <span className="text-xs text-gray-400">
           {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
         </span>
@@ -120,7 +125,7 @@ export default function MorningBriefWidget() {
               {/* Namn + citat */}
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</p>
-                <p className="text-[11px] text-gray-400 italic whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: 85 }}>
+                <p className="text-[11px] text-gray-400 italic whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: 120 }}>
                   {agent.quote}
                 </p>
               </div>
