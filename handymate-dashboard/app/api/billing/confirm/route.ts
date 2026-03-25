@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
     await supabase
       .from('business_config')
       .update({
-        billing_plan: planId,
-        billing_status: 'trialing',
+        subscription_plan: planId,
+        subscription_status: 'trialing',
         trial_ends_at: trialEnd,
       })
       .eq('business_id', business.business_id)
