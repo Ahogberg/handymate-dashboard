@@ -33,12 +33,12 @@ export default function DashboardLayout({
 
   // Subscription access check — pilot-konton, aktiva och trials har åtkomst
   const hasAccess = !!(
-    (business as any)?.is_pilot ||
-    (business as any)?.subscription_status === 'active' ||
-    (business as any)?.subscription_status === 'trial' ||
-    ((business as any)?.subscription_status === 'trialing' &&
-      (business as any)?.trial_ends_at &&
-      new Date((business as any).trial_ends_at) > new Date())
+    business?.is_pilot ||
+    business?.subscription_status === 'active' ||
+    business?.subscription_status === 'trial' ||
+    (business?.subscription_status === 'trialing' &&
+      business?.trial_ends_at &&
+      new Date(business.trial_ends_at) > new Date())
   )
 
   useEffect(() => {

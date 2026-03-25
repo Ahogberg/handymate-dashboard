@@ -207,7 +207,7 @@ if (action === 'login') {
 
   const { data: directBusiness } = await getServerSupabase()
     .from('business_config')
-    .select('business_id, business_name, contact_name')
+    .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at')
     .eq('user_id', authData.user.id)
     .single()
 
@@ -225,7 +225,7 @@ if (action === 'login') {
     if (bu) {
       const { data: bc } = await getServerSupabase()
         .from('business_config')
-        .select('business_id, business_name, contact_name')
+        .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at')
         .eq('business_id', bu.business_id)
         .single()
       if (bc) business = bc

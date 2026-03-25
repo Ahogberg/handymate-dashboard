@@ -9,6 +9,9 @@ interface Business {
   contact_name: string
   contact_email: string
   subscription_plan: 'starter' | 'professional' | 'business'
+  subscription_status: string | null
+  is_pilot: boolean | null
+  trial_ends_at: string | null
   onboarding_step: number
   onboarding_completed_at: string | null
 }

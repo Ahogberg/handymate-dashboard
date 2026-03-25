@@ -174,7 +174,7 @@ async function scrapeGooglePlaces(): Promise<RawBusiness[]> {
         params: {
           query,
           key: GOOGLE_KEY!,
-          language: 'sv',
+          language: 'sv' as any,
           region: 'se',
         },
       })
@@ -192,7 +192,7 @@ async function scrapeGooglePlaces(): Promise<RawBusiness[]> {
               place_id: place.place_id!,
               key: GOOGLE_KEY!,
               fields: ['formatted_phone_number', 'international_phone_number', 'website', 'name', 'vicinity', 'user_ratings_total', 'types'],
-              language: 'sv',
+              language: 'sv' as any,
             },
           })
 
