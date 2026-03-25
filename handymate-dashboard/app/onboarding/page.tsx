@@ -26,7 +26,7 @@ const STEPS = [
 const PLANS = [
   { id: 'starter', name: 'Bas', price: '2 495', monthly: 2495, features: ['AI-telefonassistent', 'Offerter & Fakturor', 'Kundhantering', 'Pipeline', '1 användare'] },
   { id: 'professional', name: 'Pro', price: '5 995', monthly: 5995, popular: true, features: ['Allt i Bas +', 'Automationer & Nurture', 'Lead-generering', 'Offertmallar (obegränsat)', '5 användare', 'Fortnox-integration'] },
-  { id: 'enterprise', name: 'Enterprise', price: '11 995', monthly: 11995, features: ['Allt i Pro +', 'Obegränsade användare', 'Egen AI-röst', 'Dedikerad support', 'Egen domän'] },
+  { id: 'business', name: 'Business', price: '11 995', monthly: 11995, features: ['Allt i Pro +', 'Obegränsade användare', 'Egen AI-röst', 'Dedikerad support', 'Egen domän'] },
 ]
 
 // ── Branch SMS templates ──────────────────────────────────────────────
