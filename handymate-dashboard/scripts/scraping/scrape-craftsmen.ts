@@ -1,19 +1,22 @@
 /**
- * Handymate Outreach Scraper
+ * Handymate Outreach Scraper — Google Places API + Firecrawl
  *
- * Scrapar hantverkare från Google Maps + Easoft-kunder via Firecrawl.
+ * Scrapar hantverkare via Google Places Text Search.
+ * Easoft-kunder via Firecrawl (hitta.se/foretagsfakta.se).
  * Exporterar till CSV, valfritt importerar till Supabase.
  *
- * Kör:  npx ts-node scripts/scraping/scrape-craftsmen.ts
- * Med:  npx ts-node scripts/scraping/scrape-craftsmen.ts --import
+ * Kör:  npx tsx scripts/scraping/scrape-craftsmen.ts
+ * Med:  npx tsx scripts/scraping/scrape-craftsmen.ts --import
  */
 
+import { Client, PlaceInputType } from '@googlemaps/google-maps-services-js'
 import FirecrawlApp from '@mendable/firecrawl-js'
 import * as fs from 'fs'
 import * as path from 'path'
-import { ScrapedLead, RawBusiness, SEARCH_QUERIES, EASOFT_QUERIES } from './types'
+import { ScrapedLead, RawBusiness, SEARCH_QUERIES } from './types.js'
 
-// Ladda .env.local
+// ── Env ────────────────────────────────────────────────
+
 try {
   const envPath = path.resolve(__dirname, '../../.env.local')
   const envContent = fs.readFileSync(envPath, 'utf-8')
@@ -23,254 +26,267 @@ try {
   }
 } catch { /* .env.local kanske inte finns */ }
 
-const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY
-if (!FIRECRAWL_KEY) {
-  console.error('FIRECRAWL_API_KEY saknas i .env.local')
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_API_KEY
+if (!GOOGLE_KEY) {
+  console.error('GOOGLE_MAPS_API_KEY saknas i .env.local eller miljövariabler')
   process.exit(1)
 }
 
-const firecrawl = new FirecrawlApp({ apiKey: FIRECRAWL_KEY })
+const FIRECRAWL_KEY = process.env.FIRECRAWL_API_KEY
+const google = new Client({})
+const firecrawlApp = FIRECRAWL_KEY ? new FirecrawlApp({ apiKey: FIRECRAWL_KEY }) : null
+// SDK v1 uses .v1.scrapeUrl()
+const firecrawl = firecrawlApp?.v1 ?? firecrawlApp
 
-async function scrapeUrl(url: string, opts: any): Promise<any> {
-  // Handle different SDK versions
-  if (typeof (firecrawl as any).scrapeUrl === 'function') return (firecrawl as any).scrapeUrl(url, opts)
-  if (typeof (firecrawl as any).scrape === 'function') return (firecrawl as any).scrape(url, opts)
-  throw new Error('Firecrawl SDK: varken scrapeUrl eller scrape hittades')
-}
-const MAX_LEADS = 50
-const DELAY_MS = 2000
+const MAX_LEADS = 100
+const DELAY_MS = 500
 
 function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
-// ── Svenska mobilnummer-validering ─────────────────────
+// ── Telefonnummer ──────────────────────────────────────
 
 function normalizePhone(phone: string): string | null {
   if (!phone) return null
   const cleaned = phone.replace(/[\s\-\(\)]/g, '')
-
-  // +467X... format
   if (/^\+467\d{8}$/.test(cleaned)) return cleaned
-  // 07X... format → +46
   if (/^07\d{8}$/.test(cleaned)) return '+46' + cleaned.slice(1)
-  // 467X... utan +
   if (/^467\d{8}$/.test(cleaned)) return '+' + cleaned
+  // Acceptera även fasta nummer som leads (08-xxx etc)
+  if (/^\+46[1-9]\d{7,9}$/.test(cleaned)) return cleaned
+  if (/^0[1-9]\d{7,9}$/.test(cleaned)) return '+46' + cleaned.slice(1)
+  return null
+}
 
-  return null // Inte ett mobilnummer
+function isMobileNumber(phone: string): boolean {
+  return /^\+467/.test(phone)
 }
 
 function extractPhones(text: string): string[] {
-  const patterns = [
-    /(?:\+46|0)[\s\-]?7\d[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}/g,
-    /(?:\+46|0)7\d{8}/g,
-  ]
-  const found: string[] = []
-  for (const p of patterns) {
-    const matches = text.match(p)
-    if (matches) found.push(...matches)
+  const matches = text.match(/(?:\+46|0)[\s\-]?[1-9]\d[\s\-]?\d{2,3}[\s\-]?\d{2}[\s\-]?\d{2}/g) || []
+  return matches
+}
+
+function getFirstName(name: string): string {
+  const parts = name.split(/[\s&,]/).filter(Boolean)
+  const skip = ['AB', 'HB', 'KB', 'Bygg', 'El', 'VVS', 'Rör', 'Service', 'Företag', 'i', 'och', '&']
+  const found = parts.find(p => p.length > 2 && !skip.includes(p) && /^[A-ZÅÄÖ]/.test(p))
+  return found || 'du'
+}
+
+// ── System-detektion ───────────────────────────────────
+
+const SYSTEM_SIGNATURES: Array<{ pattern: RegExp; system: string; label: string }> = [
+  { pattern: /easoft\.se|powered by easoft|easoft/i, system: 'easoft', label: 'Easoft' },
+  { pattern: /bokadirekt\.se|bokadirekt/i, system: 'bokadirekt', label: 'Bokadirekt' },
+  { pattern: /bygglet\.se|bygglet/i, system: 'bygglet', label: 'Bygglet' },
+  { pattern: /servicefinder\.se|servicefinder/i, system: 'servicefinder', label: 'ServiceFinder' },
+  { pattern: /offerta\.se|offerta/i, system: 'offerta', label: 'Offerta' },
+  { pattern: /fortnox\.se|fortnox/i, system: 'fortnox', label: 'Fortnox' },
+  { pattern: /visma\.net|visma/i, system: 'visma', label: 'Visma' },
+  { pattern: /wint\.se|wint/i, system: 'wint', label: 'Wint' },
+  { pattern: /planacy|planacy\.com/i, system: 'planacy', label: 'Planacy' },
+  { pattern: /housecall|housecallpro/i, system: 'housecallpro', label: 'Housecall Pro' },
+]
+
+function detectSystem(html: string): string | null {
+  for (const sig of SYSTEM_SIGNATURES) {
+    if (sig.pattern.test(html)) return sig.system
   }
-  return found
+  return null
 }
 
-function getFirstName(companyName: string): string {
-  // Försök extrahera förnamn från företagsnamn
-  const parts = companyName.split(/[\s&,]/).filter(Boolean)
-  const common = ['AB', 'HB', 'KB', 'Bygg', 'El', 'VVS', 'Rör', 'Service', 'Företag', 'Hantverkare']
-  const name = parts.find(p => p.length > 2 && !common.includes(p) && /^[A-ZÅÄÖ]/.test(p))
-  return name || 'du'
+function getSystemLabel(system: string | null): string {
+  if (!system) return 'Okänt'
+  return SYSTEM_SIGNATURES.find(s => s.system === system)?.label || system
 }
 
-// ── SMS-textgenerering ─────────────────────────────────
+async function enrichWithSystemDetection(leads: ScrapedLead[]): Promise<void> {
+  if (!firecrawl) {
+    console.log('   Firecrawl ej konfigurerat — hoppar system-detektion')
+    return
+  }
 
-function generateSmsText(lead: { name: string; industry: string; source: string }): string {
+  const withWebsite = leads.filter(l => l.website)
+  console.log(`\n── System-detektion (${withWebsite.length} hemsidor) ──`)
+
+  let detected = 0
+  for (const lead of withWebsite) {
+    try {
+      const res = await (firecrawl as any).scrapeUrl(lead.website, {
+        formats: ['markdown', 'html'],
+        timeout: 10000,
+      })
+
+      if (res?.success) {
+        // Sök i både HTML och markdown — signaturer gömmer sig ofta i HTML
+        const searchText = (res.html || '') + '\n' + (res.markdown || '')
+        const system = detectSystem(searchText)
+        if (system) {
+          lead.current_system = system
+          lead.source = system === 'easoft' ? 'easoft' : lead.source
+          lead.sms_text = generateSmsText(lead)
+          detected++
+          console.log(`   ✅ ${lead.name} → ${getSystemLabel(system)}`)
+        }
+      }
+    } catch {
+      // Timeout eller blockerad — fortsätt
+    }
+    await sleep(1500)
+  }
+
+  console.log(`   Detekterade system: ${detected}/${withWebsite.length}`)
+}
+
+// ── SMS-text ───────────────────────────────────────────
+
+function generateSmsText(lead: { name: string; industry: string; source: string; current_system?: string | null }): string {
   const firstName = getFirstName(lead.name)
 
-  if (lead.source === 'easoft') {
+  if (lead.current_system === 'easoft') {
     return `Hej ${firstName}! Trött på Easoft? Handymate är ett modernare alternativ med AI som sköter hela back office automatiskt — offerter, fakturor, kundkontakt. Prova: handymate.se`
   }
+  if (lead.current_system === 'bokadirekt') {
+    return `Hej ${firstName}! Betalar du för Bokadirekt? Handymate har inbyggd bokning + AI som sköter offerter, fakturor och kundkontakt. Allt i ett. Prova: handymate.se`
+  }
+  if (lead.current_system === 'bygglet') {
+    return `Hej ${firstName}! Använder du Bygglet? Handymate gör allt Bygglet gör + AI-telefonist som svarar kunder dygnet runt. Prova: handymate.se`
+  }
+  if (lead.current_system && lead.current_system !== 'fortnox') {
+    return `Hej ${firstName}! Vi märkte att ni använder ${getSystemLabel(lead.current_system)}. Handymate ersätter det med AI som sköter allt automatiskt. Prova: handymate.se`
+  }
 
-  const branchLower = lead.industry.toLowerCase()
-  return `Hej ${firstName}! Handymate hjälper ${branchLower} i Stockholm att slippa administrationen. Matte — vår AI — sköter offerter, fakturor och kundkontakt automatiskt. Prova: handymate.se`
+  const branch = lead.industry.toLowerCase()
+  return `Hej ${firstName}! Handymate hjälper ${branch} i Stockholm att slippa administrationen. Matte — vår AI — sköter offerter, fakturor och kundkontakt automatiskt. Prova: handymate.se`
 }
 
-// ── Google Maps scraping ───────────────────────────────
+// ── Google Places Text Search ──────────────────────────
 
-async function scrapeGoogleMaps(): Promise<RawBusiness[]> {
+async function scrapeGooglePlaces(): Promise<RawBusiness[]> {
   const results: RawBusiness[] = []
 
   for (const { query, industry } of SEARCH_QUERIES) {
     if (results.length >= MAX_LEADS) break
+    console.log(`🔍 Google Places: "${query}"...`)
 
-    console.log(`🔍 Söker: "${query}"...`)
     try {
-      const url = `https://www.google.com/maps/search/${encodeURIComponent(query)}`
-      const response = await scrapeUrl(url, { formats: ['markdown'] })
+      const searchRes = await google.textSearch({
+        params: {
+          query,
+          key: GOOGLE_KEY!,
+          language: 'sv',
+          region: 'se',
+        },
+      })
 
-      if (response.success && response.markdown) {
-        const businesses = parseGoogleMapsMarkdown(response.markdown, industry)
-        console.log(`   Hittade ${businesses.length} företag`)
-        results.push(...businesses)
-      } else {
-        console.log(`   Inga resultat`)
-      }
-    } catch (err: any) {
-      console.error(`   Fel: ${err.message}`)
-    }
+      const places = searchRes.data.results || []
+      console.log(`   ${places.length} resultat`)
 
-    await sleep(DELAY_MS)
-  }
+      // Hämta detaljer för varje plats (telefon + hemsida)
+      for (const place of places.slice(0, 20)) {
+        if (results.length >= MAX_LEADS) break
 
-  return results
-}
+        try {
+          const detailRes = await google.placeDetails({
+            params: {
+              place_id: place.place_id!,
+              key: GOOGLE_KEY!,
+              fields: ['formatted_phone_number', 'international_phone_number', 'website', 'name', 'vicinity', 'user_ratings_total', 'types'],
+              language: 'sv',
+            },
+          })
 
-function parseGoogleMapsMarkdown(markdown: string, industry: string): RawBusiness[] {
-  const businesses: RawBusiness[] = []
-  const lines = markdown.split('\n')
+          const d = detailRes.data.result
+          if (!d) continue
 
-  let current: Partial<RawBusiness> = {}
-  for (const line of lines) {
-    // Företagsnamn (vanligtvis bold eller header)
-    const nameMatch = line.match(/^#{1,3}\s+(.+)/) || line.match(/\*\*(.+?)\*\*/)
-    if (nameMatch && nameMatch[1].length > 3 && nameMatch[1].length < 80) {
-      if (current.name && current.phone) {
-        businesses.push({ ...current, industry } as RawBusiness)
-      }
-      current = { name: nameMatch[1].trim(), industry }
-    }
-
-    // Telefonnummer
-    const phones = extractPhones(line)
-    if (phones.length > 0 && !current.phone) {
-      current.phone = phones[0]
-    }
-
-    // Adress (innehåller Stockholm, gata, väg etc.)
-    if (/Stockholm|gatan|vägen|väg\s\d/i.test(line) && !current.address) {
-      current.address = line.trim().replace(/[*#]/g, '').trim().slice(0, 100)
-    }
-
-    // Recensioner
-    const reviewMatch = line.match(/(\d+)\s*(?:recension|review|omdöme)/i)
-    if (reviewMatch) {
-      current.reviews = parseInt(reviewMatch[1])
-    }
-
-    // Hemsida
-    const urlMatch = line.match(/https?:\/\/(?:www\.)?([a-z0-9\-]+\.[a-z]{2,})/i)
-    if (urlMatch && !current.website && !urlMatch[0].includes('google')) {
-      current.website = urlMatch[0]
-    }
-  }
-
-  // Sista företaget
-  if (current.name) {
-    businesses.push({ ...current, industry } as RawBusiness)
-  }
-
-  return businesses
-}
-
-// ── Easoft-kunder scraping ─────────────────────────────
-
-async function scrapeEasoftCustomers(): Promise<RawBusiness[]> {
-  const results: RawBusiness[] = []
-
-  for (const query of EASOFT_QUERIES) {
-    console.log(`🔍 Söker Easoft: "${query}"...`)
-    try {
-      const url = `https://www.google.com/search?q=${encodeURIComponent(query)}`
-      const response = await scrapeUrl(url, { formats: ['markdown'] })
-
-      if (response.success && response.markdown) {
-        // Extrahera företagsnamn och hemsidor från sökresultat
-        const urlMatches = response.markdown.match(/https?:\/\/(?:www\.)?([a-z0-9\-]+\.[a-z]{2,})/gi) || []
-        const uniqueUrls = Array.from(new Set(urlMatches) as Set<string>)
-          .filter(u => !u.includes('google') && !u.includes('easoft') && !u.includes('facebook'))
-          .slice(0, 10)
-
-        for (const siteUrl of uniqueUrls) {
-          if (results.length >= 15) break // Max 15 Easoft-leads
-
-          console.log(`   Scrapar hemsida: ${siteUrl}`)
-          try {
-            const siteRes = await scrapeUrl(siteUrl, { formats: ['markdown'] })
-
-            if (siteRes.success && siteRes.markdown) {
-              const phones = extractPhones(siteRes.markdown)
-              const mobilePhone = phones.find(p => normalizePhone(p))
-              // Extrahera företagsnamn från title eller H1
-              const titleMatch = siteRes.markdown.match(/^#\s+(.+)/m)
-              const name = titleMatch?.[1]?.trim() || new URL(siteUrl).hostname.replace('www.', '')
-
-              if (name) {
-                results.push({
-                  name,
-                  phone: mobilePhone,
-                  website: siteUrl,
-                  industry: 'Hantverkare',
-                })
-              }
-            }
-          } catch { /* Fortsätt med nästa */ }
-
-          await sleep(DELAY_MS)
+          const phone = (d as any).international_phone_number || (d as any).formatted_phone_number
+          results.push({
+            name: d.name || place.name || 'Okänt',
+            phone: phone || undefined,
+            address: d.vicinity || place.formatted_address || undefined,
+            website: d.website || undefined,
+            reviews: d.user_ratings_total || place.user_ratings_total || undefined,
+            industry,
+          })
+        } catch (err: any) {
+          // Enstaka plats-fel — fortsätt
+          if (err.response?.status === 429) {
+            console.log('   Rate limit — väntar 5s...')
+            await sleep(5000)
+          }
         }
+
+        await sleep(DELAY_MS)
       }
     } catch (err: any) {
       console.error(`   Fel: ${err.message}`)
     }
 
-    await sleep(DELAY_MS)
+    await sleep(1000) // Mellan sökningar
   }
 
   return results
 }
 
-// ── Deduplicering + filtrering ─────────────────────────
+// ── Easoft-scraping borttagen ────────────────────────
+// TODO: Lägg till Allabolag-berikning som steg 2 för att filtrera
+// på faktiska anställda och identifiera vilka system företagen använder.
+// Allabolag.se har företagsstorlek, omsättning och ibland systeminfo.
+
+const MIN_REVIEWS = 10 // Minimum Google-recensioner (proxy för volym)
+
+// ── Filter + dedup ─────────────────────────────────────
 
 function deduplicateAndFilter(
-  mapsLeads: RawBusiness[],
-  easoftLeads: RawBusiness[]
+  placesLeads: RawBusiness[]
 ): ScrapedLead[] {
   const seen = new Set<string>()
   const results: ScrapedLead[] = []
 
-  function processLead(raw: RawBusiness, source: 'google_maps' | 'easoft') {
+  function process(raw: RawBusiness) {
     const phone = normalizePhone(raw.phone || '')
-    if (!phone) return // Bara mobilnummer
-    if (seen.has(phone)) return // Dublett
+    if (!phone) return
+    if (seen.has(phone)) return
+    // Filter: minimum recensioner
+    if ((raw.reviews || 0) < MIN_REVIEWS) return
     seen.add(phone)
 
     const lead: ScrapedLead = {
       name: raw.name,
       phone,
-      city: raw.address?.match(/Stockholm|Solna|Sundbyberg|Nacka|Huddinge|Södertälje/i)?.[0] || 'Stockholm',
+      city: raw.address?.match(/Stockholm|Solna|Sundbyberg|Nacka|Huddinge|Södertälje|Bromma|Täby|Danderyd|Lidingö/i)?.[0] || 'Stockholm',
       industry: raw.industry || 'Hantverkare',
-      source,
+      source: 'google_maps',
+      current_system: null,
+      company_size: null, // TODO: berika via Allabolag
       sms_text: '',
       website: raw.website || null,
       reviews_count: raw.reviews || null,
     }
-
     lead.sms_text = generateSmsText(lead)
     results.push(lead)
   }
 
-  // Easoft-kunder först (högre prioritet)
-  for (const lead of easoftLeads) processLead(lead, 'easoft')
-  // Sen Google Maps
-  for (const lead of mapsLeads) processLead(lead, 'google_maps')
+  for (const l of placesLeads) process(l)
+
+  // Sortera: mobilnummer först, sen efter recensioner
+  results.sort((a, b) => {
+    const aMobile = isMobileNumber(a.phone) ? 0 : 1
+    const bMobile = isMobileNumber(b.phone) ? 0 : 1
+    if (aMobile !== bMobile) return aMobile - bMobile
+    return (b.reviews_count || 0) - (a.reviews_count || 0)
+  })
 
   return results.slice(0, MAX_LEADS)
 }
 
-// ── CSV-export ─────────────────────────────────────────
+// ── CSV ────────────────────────────────────────────────
 
 function exportToCsv(leads: ScrapedLead[]): string {
   const date = new Date().toISOString().split('T')[0]
-  const filename = `leads-${date}.csv`
-  const filepath = path.resolve(__dirname, 'output', filename)
+  const filepath = path.resolve(__dirname, 'output', `leads-${date}.csv`)
 
-  const header = 'name,phone,city,industry,source,sms_text,website,reviews_count'
+  const header = 'name,phone,city,industry,source,current_system,sms_text,website,reviews_count'
   const rows = leads.map(l =>
     [
       `"${l.name.replace(/"/g, '""')}"`,
@@ -278,6 +294,7 @@ function exportToCsv(leads: ScrapedLead[]): string {
       l.city,
       l.industry,
       l.source,
+      l.current_system || '',
       `"${l.sms_text.replace(/"/g, '""')}"`,
       l.website || '',
       l.reviews_count ?? '',
@@ -293,59 +310,41 @@ function exportToCsv(leads: ScrapedLead[]): string {
 async function importToSupabase(leads: ScrapedLead[]) {
   const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('Supabase-credentials saknas i .env.local')
+    console.error('Supabase-credentials saknas')
     return
   }
 
   console.log(`\n📤 Importerar ${leads.length} leads till Supabase...`)
-
-  let imported = 0
-  let skipped = 0
+  let imported = 0, skipped = 0
 
   for (const lead of leads) {
-    // Kolla om telefonnumret redan finns
     const checkRes = await fetch(`${SUPABASE_URL}/rest/v1/leads?phone=eq.${encodeURIComponent(lead.phone)}&select=lead_id`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-      },
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` },
     })
     const existing = await checkRes.json()
-    if (existing.length > 0) {
-      skipped++
-      continue
-    }
+    if (existing.length > 0) { skipped++; continue }
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/leads`, {
       method: 'POST',
       headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal',
+        'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json', 'Prefer': 'return=minimal',
       },
       body: JSON.stringify({
-        lead_id: `lead_outreach_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        lead_id: `lead_out_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
         business_id: process.env.HANDYMATE_BUSINESS_ID || 'biz_al7pjuu5smi',
-        name: lead.name,
-        phone: lead.phone,
-        source: 'outreach_scrape',
-        status: 'new',
-        pipeline_stage: 'new_inquiry',
-        job_type: lead.industry,
-        notes: `Source: ${lead.source}${lead.website ? ` | Web: ${lead.website}` : ''}${lead.reviews_count ? ` | ${lead.reviews_count} recensioner` : ''}`,
+        name: lead.name, phone: lead.phone, source: 'outreach_scrape',
+        status: 'new', pipeline_stage: 'new_inquiry', job_type: lead.industry,
+        notes: `Source: ${lead.source}${lead.website ? ` | ${lead.website}` : ''}${lead.reviews_count ? ` | ${lead.reviews_count} recensioner` : ''}`,
       }),
     })
-
     if (res.ok) imported++
-    else console.error(`   Fel vid import av ${lead.name}: ${res.statusText}`)
-
-    await sleep(200) // Rate limit
+    else console.error(`   Fel: ${lead.name} — ${res.statusText}`)
+    await sleep(200)
   }
 
-  console.log(`✅ Importerat: ${imported}, Hoppade över (dubbletter): ${skipped}`)
+  console.log(`✅ Importerat: ${imported}, Hoppade över: ${skipped}`)
 }
 
 // ── Main ───────────────────────────────────────────────
@@ -353,46 +352,67 @@ async function importToSupabase(leads: ScrapedLead[]) {
 async function main() {
   const shouldImport = process.argv.includes('--import')
 
-  console.log('🚀 Handymate Outreach Scraper')
-  console.log(`   Max leads: ${MAX_LEADS}`)
+  console.log('🚀 Handymate Outreach Scraper (Google Places)')
+  console.log(`   Max leads: ${MAX_LEADS} | Min recensioner: ${MIN_REVIEWS}`)
   console.log(`   Import: ${shouldImport ? 'JA' : 'NEJ'}`)
+  console.log(`   Google API: ${GOOGLE_KEY ? '✅' : '❌'}`)
+  console.log(`   Firecrawl: ${FIRECRAWL_KEY ? '✅ (system-detektion)' : '⏭ (hoppar system-detektion)'}`)
   console.log('')
 
-  // Steg 1: Scrapa Google Maps
-  console.log('── Google Maps ──────────────────')
-  const mapsLeads = await scrapeGoogleMaps()
-  console.log(`\nTotalt från Maps: ${mapsLeads.length} råleads`)
+  // Google Places
+  console.log('── Google Places ────────────────')
+  const placesLeads = await scrapeGooglePlaces()
+  console.log(`\nTotalt från Places: ${placesLeads.length} råleads`)
+  console.log(`  Med telefon: ${placesLeads.filter(l => l.phone).length}`)
+  console.log(`  Med ≥${MIN_REVIEWS} recensioner: ${placesLeads.filter(l => (l.reviews || 0) >= MIN_REVIEWS).length}`)
 
-  // Steg 2: Scrapa Easoft-kunder
-  console.log('\n── Easoft-kunder ────────────────')
-  const easoftLeads = await scrapeEasoftCustomers()
-  console.log(`\nTotalt från Easoft: ${easoftLeads.length} råleads`)
-
-  // Steg 3: Filtrera och dedupplicera
+  // Filter
   console.log('\n── Filtrering ──────────────────')
-  const leads = deduplicateAndFilter(mapsLeads, easoftLeads)
+  const leads = deduplicateAndFilter(placesLeads)
+  const mobileCount = leads.filter(l => isMobileNumber(l.phone)).length
   console.log(`Filtrerade leads: ${leads.length}`)
-  console.log(`  - Google Maps: ${leads.filter(l => l.source === 'google_maps').length}`)
-  console.log(`  - Easoft: ${leads.filter(l => l.source === 'easoft').length}`)
+  console.log(`  Mobilnummer: ${mobileCount}`)
+  console.log(`  Fasta nummer: ${leads.length - mobileCount}`)
 
-  // Steg 4: Exportera CSV
+  // System-detektion via hemsida-scraping
+  await enrichWithSystemDetection(leads)
+
+  const systemCounts: Record<string, number> = {}
+  for (const l of leads) {
+    const sys = l.current_system || 'okänt'
+    systemCounts[sys] = (systemCounts[sys] || 0) + 1
+  }
+
+  console.log('\n── System-fördelning ────────────')
+  for (const [sys, count] of Object.entries(systemCounts).sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${getSystemLabel(sys)}: ${count}`)
+  }
+
+  // CSV
   const csvPath = exportToCsv(leads)
-  console.log(`\n📁 CSV exporterad: ${csvPath}`)
+  console.log(`\n📁 CSV: ${csvPath}`)
 
-  // Steg 5: Importera till Supabase
-  if (shouldImport) {
-    await importToSupabase(leads)
+  // Import
+  if (shouldImport) await importToSupabase(leads)
+
+  // Preview
+  const knownSystemLeads = leads.filter(l => l.current_system && l.current_system !== 'fortnox')
+  if (knownSystemLeads.length > 0) {
+    console.log(`\n── 🎯 Identifierade system (${knownSystemLeads.length}) ──`)
+    for (const lead of knownSystemLeads) {
+      const mobile = isMobileNumber(lead.phone) ? '📱' : '☎️'
+      console.log(`  ${mobile} ${lead.name} [${getSystemLabel(lead.current_system)}] | ${lead.phone}`)
+    }
   }
 
-  // Visa preview
-  console.log('\n── Preview (första 3) ──────────')
-  for (const lead of leads.slice(0, 3)) {
-    console.log(`  ${lead.name} | ${lead.phone} | ${lead.industry} | ${lead.source}`)
-    console.log(`  SMS: "${lead.sms_text.slice(0, 80)}..."`)
-    console.log('')
+  console.log('\n── Topp 10 leads ───────────────')
+  for (const lead of leads.slice(0, 10)) {
+    const mobile = isMobileNumber(lead.phone) ? '📱' : '☎️'
+    const sys = lead.current_system ? ` [${getSystemLabel(lead.current_system)}]` : ''
+    console.log(`  ${mobile} ${lead.name}${sys} | ${lead.phone} | ${lead.industry} | ⭐${lead.reviews_count ?? '—'}`)
   }
 
-  console.log(`\n✅ Klart! ${leads.length} leads redo.`)
+  console.log(`\n✅ Klart! ${leads.length} leads (${mobileCount} mobil).`)
 }
 
 main().catch(err => {

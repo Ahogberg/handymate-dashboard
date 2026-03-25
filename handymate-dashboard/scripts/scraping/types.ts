@@ -4,6 +4,8 @@ export interface ScrapedLead {
   city: string
   industry: string
   source: 'google_maps' | 'easoft' | 'manual'
+  current_system: string | null  // easoft, bokadirekt, bygglet, servicefinder, offerta, okänt
+  company_size: string | null    // TODO: berika via Allabolag.se
   sms_text: string
   website: string | null
   reviews_count: number | null
