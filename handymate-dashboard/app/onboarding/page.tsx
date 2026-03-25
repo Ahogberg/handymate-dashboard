@@ -10,14 +10,15 @@ import { supabase } from '@/lib/supabase'
 import { BRANCH_HOURLY_RATE, ROT_BRANCHES, RUT_BRANCHES } from './constants'
 import Step1BusinessAccount from './components/Step1BusinessAccount'
 import Step3Phone from './components/Step3Phone'
+import StepPayment from './components/StepPayment'
 import type { OnboardingData } from './types'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 // ── Steps ─────────────────────────────────────────────────────────────
 const STEPS = [
-  { label: 'Betalning', icon: Shield },
   { label: 'Företag', icon: Building2 },
   { label: 'Telefon', icon: Phone },
+  { label: 'Betalning', icon: Shield },
   { label: 'Kunder', icon: Users },
   { label: 'Aktivera', icon: Sparkles },
 ]
@@ -88,10 +89,13 @@ export default function OnboardingPage() {
           router.push('/dashboard')
           return
         }
-        // Resume: map old steps
+        // Resume: map DB step to UI step
+        // DB: 0=start, 1=telefon done, 2=betalning done, 3=kunder done, 4+=SMS
         if (d.onboarding_step >= 4) setStep(4)
-        else if (d.onboarding_step >= 1) setStep(Math.min(d.onboarding_step, 4))
-        else setStep(1)
+        else if (d.onboarding_step >= 3) setStep(3)
+        else if (d.onboarding_step >= 2) setStep(2)
+        else if (d.onboarding_step >= 1) setStep(1)
+        else setStep(0)
       } catch {
         setIsNewUser(true)
         setStep(0)
@@ -185,8 +189,8 @@ export default function OnboardingPage() {
 
     // Generate SMS template
     setSmsText(getSmsTemplate(formData.branch, formData.business_name))
-    setStep(2)
-    saveProgress(2).catch(() => {})
+    setStep(1) // → Telefon
+    saveProgress(1).catch(() => {})
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [logoUrl, orgNumber, fSkatt, serviceArea, saveProgress])
 
@@ -322,79 +326,12 @@ export default function OnboardingPage() {
       <div className="max-w-2xl mx-auto px-4 py-8">
 
         {/* ── STEP 0: Payment ─────────────────────────────────── */}
+        {/* ── STEP 0: Företag ─────────────────────────────── */}
         {step === 0 && (
-          <div className="space-y-6">
-            <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Välj din plan</h1>
-              <p className="text-gray-500">Alla planer inkluderar AI-telefonassistent och 30 dagars pengarna-tillbaka-garanti</p>
-            </div>
-
-            <div className="grid gap-4">
-              {PLANS.map(plan => (
-                <button
-                  key={plan.id}
-                  onClick={() => setSelectedPlan(plan.id)}
-                  className={`relative text-left p-5 rounded-2xl border-2 transition-all ${
-                    selectedPlan === plan.id
-                      ? 'border-teal-600 bg-teal-50/50 shadow-sm'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
-                  }`}
-                >
-                  {plan.popular && (
-                    <span className="absolute -top-2.5 right-4 bg-teal-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                      Populärast
-                    </span>
-                  )}
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-gray-900">{plan.price}</span>
-                      <span className="text-sm text-gray-400"> kr/mån</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap gap-x-4 gap-y-1">
-                    {plan.features.map(f => (
-                      <span key={f} className="text-xs text-gray-500 flex items-center gap-1">
-                        <Check className="w-3 h-3 text-teal-600" />{f}
-                      </span>
-                    ))}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {/* Guarantee */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
-              <p className="text-sm font-semibold text-emerald-700">
-                💚 30 dagars pengarna-tillbaka-garanti
-              </p>
-              <p className="text-xs text-emerald-600 mt-1">
-                Sparar du inte tid inom 30 dagar — få pengarna tillbaka, inga frågor
-              </p>
-            </div>
-
-            <button
-              onClick={() => {
-                // In production: redirect to Stripe checkout
-                // For now: proceed to step 1
-                setStep(1)
-              }}
-              className="w-full py-4 bg-teal-600 text-white text-lg font-semibold rounded-xl hover:bg-teal-700 transition-colors flex items-center justify-center gap-2"
-            >
-              Kom igång <ChevronRight className="w-5 h-5" />
-            </button>
-            <p className="text-center text-xs text-gray-400">
-              30 dagars pengarna-tillbaka-garanti — inga frågor
-            </p>
-          </div>
-        )}
-
-        {/* ── STEP 1: Company Info ────────────────────────────── */}
-        {step === 1 && (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Företagsinfo</h1>
-              <p className="text-gray-500 text-sm">Steg 1 av 4 — tar ca 2 minuter</p>
+              <p className="text-gray-500 text-sm">Steg 1 av 5 — tar ca 2 minuter</p>
             </div>
 
             {/* Logo upload */}
@@ -453,14 +390,29 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* ── STEP 2: Phone ───────────────────────────────────── */}
-        {step === 2 && stepProps && (
+        {/* ── STEP 1: Phone ───────────────────────────────────── */}
+        {step === 1 && stepProps && (
           <div className="space-y-6">
             <div className="text-center mb-6">
               <h1 className="text-2xl font-bold text-gray-900 mb-1">Ditt företagsnummer</h1>
-              <p className="text-gray-500 text-sm">Steg 2 av 4</p>
+              <p className="text-gray-500 text-sm">Steg 2 av 5</p>
             </div>
             <Step3Phone {...stepProps} />
+          </div>
+        )}
+
+        {/* ── STEP 2: Betalning (Stripe Elements) ─────────────── */}
+        {step === 2 && (
+          <div className="space-y-6">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Aktivera ditt konto</h1>
+              <p className="text-gray-500 text-sm">Steg 3 av 5</p>
+            </div>
+            <StepPayment
+              selectedPlan={selectedPlan}
+              onComplete={async () => { await saveProgress(3); setStep(3) }}
+              onBack={() => setStep(1)}
+            />
           </div>
         )}
 
