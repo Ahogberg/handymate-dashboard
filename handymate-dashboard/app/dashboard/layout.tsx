@@ -53,14 +53,8 @@ export default function DashboardLayout({
     return null
   }
 
-  // Don't render dashboard while redirecting to onboarding
-  if (!onboardingDone || !hasAccess) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="text-gray-500">Laddar...</div>
-      </div>
-    )
-  }
+  // Don't render while redirecting — useEffect hanterar redirect
+  // Visa inte onboarding-flash medan data laddas
 
   return (
     <BusinessContext.Provider value={business}>
