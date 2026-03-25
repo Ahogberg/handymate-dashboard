@@ -31,21 +31,15 @@ export default function DashboardLayout({
   // step >= 7 also counts as done (old 6-step flow finalized at step 7)
   const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 7))
 
-  // Subscription access check — pilot-konton, aktiva och trials har åtkomst
-  const hasAccess = !!(
-    business?.is_pilot ||
-    business?.subscription_status === 'active' ||
-    business?.subscription_status === 'trial' ||
-    (business?.subscription_status === 'trialing' &&
-      business?.trial_ends_at &&
-      new Date(business.trial_ends_at) > new Date())
-  )
+  // Subscription access check — tillfälligt avaktiverad, aktiveras efter verifiering
+  // TODO: Återaktivera när auth-queryn verifierats i produktion
+  const hasAccess = true
 
   useEffect(() => {
-    if (!loading && business && (!onboardingDone || !hasAccess)) {
+    if (!loading && business && !onboardingDone) {
       router.push('/onboarding')
     }
-  }, [loading, business, onboardingDone, hasAccess, router])
+  }, [loading, business, onboardingDone, router])
 
   if (loading) {
     return (
