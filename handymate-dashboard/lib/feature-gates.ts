@@ -113,25 +113,25 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     key: 'quote_templates',
     name: 'Offertmallar',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 10, business: null },
+    limit: { starter: 5, professional: null, business: null },
   },
   ai_photo_quote: {
     key: 'ai_photo_quote',
     name: 'AI prisberäkning foto/ritning',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 3, professional: 30, business: null },
+    limit: { starter: 10, professional: 50, business: null },
   },
   team_members: {
     key: 'team_members',
     name: 'Teammedlemmar',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 1, professional: 10, business: null },
+    limit: { starter: 3, professional: 25, business: null },
   },
   users: {
     key: 'users',
     name: 'Användare',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 1, professional: 10, business: null },
+    limit: { starter: 3, professional: 25, business: null },
   },
   call_volume: {
     key: 'call_volume',
@@ -240,7 +240,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   storefront_contact_form: {
     key: 'storefront_contact_form',
     name: 'Kontaktformulär till pipeline',
-    plans: ['professional', 'business'],
+    plans: ['starter', 'professional', 'business'],
   },
   storefront_reviews: {
     key: 'storefront_reviews',
@@ -255,7 +255,7 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   gmail_integration: {
     key: 'gmail_integration',
     name: 'Gmail-integration',
-    plans: ['professional', 'business'],
+    plans: ['starter', 'professional', 'business'],
   },
   ai_project_manager: {
     key: 'ai_project_manager',
@@ -265,7 +265,8 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
   ai_quote_generator: {
     key: 'ai_quote_generator',
     name: 'AI-offertgenerering',
-    plans: ['professional', 'business'],
+    plans: ['starter', 'professional', 'business'],
+    limit: { starter: 10, professional: 50, business: null },
   },
   deal_autopilot: {
     key: 'deal_autopilot',
@@ -347,7 +348,7 @@ export function getPlanLabel(plan: PlanType): string {
   const labels: Record<PlanType, string> = {
     starter: 'Starter',
     professional: 'Professional',
-    business: 'Enterprise',
+    business: 'Business',
   }
   return labels[plan]
 }
