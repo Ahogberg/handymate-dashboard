@@ -56,8 +56,15 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 | V25 | Partnerportal | Webhook, API-nyckel, provision, tidslinje per hänvisning | ✅ Klar |
 | V26 | Komplett offertflöde | Skicka-modal, Gmail API, sign_token, kundvy, progress-indikator | ✅ Klar |
 | V27 | Säsongsint. + Dispatch | Branschanpassade kampanjer (8 branscher), smart dispatch med skills-matchning | ✅ Klar |
-| V28 | Pipeline v2 + Admin | Låsta pipeline-steg, superadmin-panel, impersonering, tidslinje-vy | ✅ Klar |
-| V29 | Full Autonomi | Auto-approval learning, E2E deal flow, proaktiv kundvård per jobbtyp | ✅ Klar |
+| V28 | Pipeline-refaktor | 6 låsta steg, DealTimeline, automations-handlers, quote_accepted-bug fixad | ✅ Klar |
+| V29 | Analys & Ekonomi | P&L-widget, Analys-sida, kostnadsinställningar i business_config | ✅ Klar |
+| V30 | Multi-foto offert | Flera foton per offert, fritext-komplement, confidence-badges | ✅ Klar |
+| V31 | Lönsamhetslarm | Realtidsvarningar vid 70%/100% budget, Karin-tool, push-notiser | ✅ Klar |
+| V32 | Guldmotorn Sprint 1 | Matte resolver + intent-agent + action-executor, SMS + Gmail hooks | ✅ Klar |
+| V33 | Guldmotorn Sprint 2 | Kalender-slots, Gmail-bilagor → photo-to-quote, approval-execution | ✅ Klar |
+| V34 | Agent-arkitektur | Intelligent routing, morning brief API, MorningBriefWidget | ✅ Klar |
+| V35 | Dashboard UI | Pill-brief med foton, 4 KPI-kort, ny widget-hierarki | ✅ Klar |
+| V36 | Stripe Elements | Inbyggt betalformulär, billing_plan-tabell, telefon-reservering, dashboard-skydd | ✅ Klar |
 
 ---
 
@@ -515,3 +522,193 @@ npx next build                            # Ren build
 
 *Handymate är inte en app. Det är en anställd.*
 **Hantverkaren sköter hantverket. Handymate sköter resten.**
+
+---
+
+## Ekonomiinställningar (V29)
+
+### Ekonomi-kolumner i business_config
+
+| Fält | Typ | Beskrivning |
+|------|-----|-------------|
+| `pricing_settings->>'hourly_rate'` | JSONB | Timkostnad kr/h (default 650) |
+| `overhead_monthly_sek` | numeric | Månatlig overhead kr |
+| `margin_target_percent` | numeric | Marginalmål % (default 50) |
+
+Dessa används av `/api/analytics/economics` och `MorningBriefWidget`.
+
+### Analys & Ekonomi-sidan
+
+URL: `/dashboard/analytics`
+Två sektioner: Ekonomiöversikt (överst) + Försäljningsinsikter (nedanför)
+Morning brief-widget visar komprimerad ekonomisammanfattning på dashboarden.
+
+---
+
+## Guldmotorn — Mattes konversationsintelligens (V32–V33)
+
+### Arkitektur
+
+```
+Signal (SMS/Gmail)
+      ↓
+lib/matte/resolver.ts        — Identifiera kund/lead, hämta projekt/deals/fakturor/historik
+      ↓
+lib/matte/intent-agent.ts    — Claude Sonnet analyserar intent + beslutar actions + suggestedAgent
+      ↓
+lib/matte/action-executor.ts — Autonoma actions direkt, komplexa → pending_approvals
+      ↓
+lib/matte/calendar-slots.ts  — Lediga tider från Google Calendar (14 dagar, 3 slots)
+```
+
+### Signal-kanaler
+
+| Kanal | Hook | Status |
+|-------|------|--------|
+| SMS | `app/api/sms/incoming/route.ts` | ✅ Live |
+| Gmail | `lib/gmail/processor.ts` → `processInboundEmail()` | ✅ Live |
+| Samtal | Sprint 3 — väntar på röstbeslut | ⏳ Pausad |
+
+### Intent-typer
+
+`material_change`, `reschedule_request`, `new_booking_request`, `quote_request`,
+`quote_addition`, `invoice_question`, `payment_confirmation`, `general_question`,
+`complaint`, `confirmation`, `cancellation`, `new_contact`, `call_followup`, `unclear`
+
+### Autonomiregler
+
+Direkt (autonomous: true): svara på frågor, uppdatera projektanteckningar,
+materialändringar, tacka för betalning, skapa lead från okänd kontakt.
+
+Approval (autonomous: false): boka/omboka tider, skicka offert/prisuppgift,
+ÄTA-tillägg, flytta deal-stage, allt med pengar.
+
+### Approval-typer (Matte-specifika)
+
+`propose_booking_times`, `create_quote_draft`, `create_ata_draft`,
+`send_matte_customer_reply` — hanteras i `app/api/approvals/[id]/route.ts`
+
+### Databas
+
+`project_events` — tidslinje-events per projekt (material_change, note, etc.)
+Index: `idx_leads_phone_business`, `idx_leads_email_business`, `idx_customer_phone_business`
+
+---
+
+## Agent-arkitektur (V34)
+
+### Routing
+
+Matte är orkestratorn. `incoming_sms` går inte längre direkt till Lisa —
+Matte resolver + intent-agent bestämmer vem som äger ärendet.
+
+```typescript
+// lib/matte/agent-router.ts
+routeToAgentWithContext(decision.suggestedAgent, signal, entity, decision, businessId, supabase)
+```
+
+| Intent | Agent |
+|--------|-------|
+| new_contact, general_question, unclear, complaint | Lisa |
+| quote_request, quote_addition, cancellation | Daniel |
+| reschedule_request, new_booking_request, material_change | Lars |
+| invoice_question, payment_confirmation | Karin |
+| Hantverkaren direkt (manual) | Matte |
+
+### Morning Brief
+
+Genereras kl 06:00 UTC via cron (`app/api/cron/morning-brief`).
+Cachas i `business_preferences.morning_brief_latest`.
+Hämtas via `GET /api/morning-brief`.
+
+Varje `AgentBrief`: `{ agentId, quote, badge, badgeType, details[] }`
+
+### MorningBriefWidget
+
+`components/dashboard/MorningBriefWidget.tsx`
+Pill-rad med agent-foton från Supabase Storage bucket `team-avatars`.
+Filnamn: `Matte.png`, `Karin.png`, `Daniel.png`, `Lars.png`, `Hanna.png`
+Klick på agent → expanderar detaljpanel med agentens brief.
+
+---
+
+## Stripe & Billing (V36)
+
+### Tabeller
+
+`billing_plan` — plan-definitioner med Stripe Price IDs:
+
+| Kolumn | Typ | Beskrivning |
+|--------|-----|-------------|
+| `plan_id` | TEXT PK | 'starter', 'professional', 'business' |
+| `name` | TEXT | Visningsnamn |
+| `price_sek` | INTEGER | Månadspris |
+| `stripe_price_id` | TEXT | Stripe Price ID |
+
+### Betalningsflöde (Stripe Elements)
+
+```
+Onboarding steg 2 (Betalning)
+  → POST /api/billing/setup-intent
+  → Stripe Elements CardElement
+  → stripe.confirmCardSetup()
+  → POST /api/billing/confirm → subscription_status + telefon-provisionering
+```
+
+### Kolumner i business_config (betalning)
+
+| Kolumn | Typ | Beskrivning |
+|--------|-----|-------------|
+| `subscription_status` | TEXT | `inactive`, `trial`, `trialing`, `active` |
+| `subscription_plan` | TEXT | `starter`, `professional`, `business` |
+| `trial_ends_at` | TIMESTAMPTZ | +30 dagar från betalning |
+| `stripe_customer_id` | TEXT | Stripe customer ID |
+| `is_pilot` | BOOLEAN | Grandfatherade konton — aldrig låsas ute |
+
+### Dashboard-skydd
+
+```typescript
+const hasAccess = config?.is_pilot ||
+  config?.subscription_status === 'active' ||
+  config?.subscription_status === 'trial' ||
+  (config?.subscription_status === 'trialing' &&
+   config?.trial_ends_at && new Date(config.trial_ends_at) > new Date())
+```
+
+### Onboarding-flöde (V36)
+
+```
+0: Företag    — namn, bransch, logga, org-nr
+1: Telefon    — reserverat nummer, sparar personal_phone + call_mode
+2: Betalning  — planväljare + Stripe Elements, provisionerar telefon
+3: Kunder     — CSV-import eller manuellt
+4: SMS        — reaktiveringskampanj
+```
+
+### Billing-endpoints
+
+```
+app/api/billing/
+├── checkout/       — Stripe Checkout Session (redirect)
+├── setup-intent/   — SetupIntent för Elements
+├── confirm/        — Bekräftar kort + provisionerar telefon
+├── portal/         — Stripe Customer Portal
+├── webhook/        — Stripe webhooks
+├── leads-addon/    — Leads add-on upgrade
+├── route.ts        — Billing overview
+└── usage/          — SMS/samtal-förbrukning
+```
+
+---
+
+## SQL-migrationer V28–V36
+
+| Fil | Innehåll |
+|-----|----------|
+| `sql/v28_pipeline_locked.sql` | 6 låsta pipeline-steg, deal_automation_tasks, won_at/lost_at |
+| `sql/v29_economics_settings.sql` | overhead_monthly_sek, margin_target_percent |
+| `sql/v29b_economics_fix.sql` | Fix: läs från business_config istf business_preferences |
+| `sql/v32_matte_intelligence.sql` | project_events-tabell, resolver-index |
+| `sql/v33_sprint2.sql` | attachment_count på email_conversations, booking-index |
+| `sql/v34_agent_architecture.sql` | routed_agent på pending_approvals, invoice/quotes/leads-index |
+| `sql/v36_stripe_elements.sql` | is_pilot-kolumn, subscription_status default, pilot-konton |
