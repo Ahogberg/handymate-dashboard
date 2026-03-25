@@ -64,19 +64,14 @@ export default function MorningBriefWidget() {
     <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-semibold text-gray-900">{(() => {
-          const hour = new Date().getHours()
-          const g = hour < 10 ? 'God morgon' : hour < 18 ? 'Hej' : 'God kväll'
-          const name = brief.greeting.replace(/^[^,]*,?\s*/, '').replace(/!$/, '')
-          return name ? `${g}, ${name}!` : `${g}!`
-        })()}</span>
+        <span className="text-sm font-semibold text-gray-900">Lägesrapport</span>
         <span className="text-xs text-gray-400">
           {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
         </span>
       </div>
 
-      {/* Agent pills — avatar + namn + citat, flex-1 jämnt fördelat */}
-      <div className="flex gap-1.5">
+      {/* Agent-kort — grid för att ge varje agent mer plats */}
+      <div className="grid grid-cols-5 gap-2">
         {brief.agents.map(agent => {
           const conf = AGENTS[agent.agentId] || AGENTS.matte
           const isActive = selected === agent.agentId
@@ -86,14 +81,14 @@ export default function MorningBriefWidget() {
             <button
               key={agent.agentId}
               onClick={() => setSelected(agent.agentId)}
-              className={`flex items-center gap-2 px-2.5 py-2 rounded-full min-w-0 flex-1 transition-all ${
+              className={`flex flex-col items-center text-center p-2.5 rounded-xl min-w-0 transition-all ${
                 isActive
                   ? 'bg-white border border-gray-300 shadow-sm'
                   : 'bg-gray-50 border border-transparent hover:bg-gray-100'
               }`}
             >
               {/* Avatar med profilbild + status-prick */}
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 mb-1.5">
                 <img
                   src={`${SUPABASE_URL}/storage/v1/object/public/team-avatars/${agent.agentId.charAt(0).toUpperCase() + agent.agentId.slice(1)}.png`}
                   alt={conf.name}
@@ -103,32 +98,30 @@ export default function MorningBriefWidget() {
                     const fallback = el.nextElementSibling as HTMLElement
                     if (fallback) fallback.style.display = 'flex'
                   }}
-                  style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
                 />
                 <div
                   style={{
                     display: 'none',
-                    width: 28, height: 28, borderRadius: '50%',
+                    width: 36, height: 36, borderRadius: '50%',
                     background: conf.bg, color: conf.text,
                     alignItems: 'center', justifyContent: 'center',
-                    fontSize: 11, fontWeight: 500,
+                    fontSize: 13, fontWeight: 500,
                   }}
                 >
                   {conf.initials}
                 </div>
                 <div
-                  className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-white"
+                  className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white"
                   style={{ background: dotColor }}
                 />
               </div>
 
               {/* Namn + citat */}
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-900 whitespace-nowrap">{conf.name}</p>
-                <p className="text-[11px] text-gray-400 italic whitespace-nowrap overflow-hidden text-ellipsis" style={{ maxWidth: 120 }}>
-                  {agent.quote}
-                </p>
-              </div>
+              <p className="text-xs font-medium text-gray-900">{conf.name}</p>
+              <p className="text-[11px] text-gray-400 italic leading-tight line-clamp-2 w-full">
+                {agent.quote}
+              </p>
             </button>
           )
         })}
