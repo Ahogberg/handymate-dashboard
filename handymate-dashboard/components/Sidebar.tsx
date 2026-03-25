@@ -73,18 +73,11 @@ const NAV: NavItem[] = [
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
     ],
   },
-  { type: 'link', key: 'calls', label: 'Samtal', icon: Phone, href: '/dashboard/calls', paths: ['/dashboard/calls', '/dashboard/inbox', '/dashboard/assistant', '/dashboard/recordings'], hasBadge: true },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
-  {
-    type: 'group', key: 'marketing', label: 'Marknadsföring', icon: Megaphone,
-    children: [
-      { label: 'SMS-kampanjer', href: '/dashboard/campaigns' },
-      { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
-    ],
-  },
-  { type: 'link', key: 'agent', label: 'Mitt team', icon: Users, href: '/dashboard/agent' },
+  { type: 'link', key: 'calendar', label: 'Kalender', icon: Calendar, href: '/dashboard/calendar' },
+  { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
@@ -98,13 +91,16 @@ const NAV: NavItem[] = [
     type: 'group', key: 'planning', label: 'Planering', icon: Calendar,
     children: [
       { label: 'Schema', href: '/dashboard/schedule' },
-      { label: 'Kalender', href: '/dashboard/calendar' },
       { label: 'Tidrapportering', href: '/dashboard/time' },
-      { label: 'Attestering', href: '/dashboard/time/attestation' },
-      { label: 'Ersättningar', href: '/dashboard/time/allowances' },
       { label: 'Fordon', href: '/dashboard/vehicles' },
       { label: 'Lager', href: '/dashboard/planning/inventory' },
-      { label: 'Skissblock', href: '/dashboard/planning/canvas' },
+    ],
+  },
+  {
+    type: 'group', key: 'marketing', label: 'Kampanjer', icon: Megaphone,
+    children: [
+      { label: 'SMS-kampanjer', href: '/dashboard/campaigns' },
+      { label: 'Utskick (Leads)', href: '/dashboard/marketing/leads', featureGate: 'leads_outbound' },
     ],
   },
 ]
