@@ -7,3 +7,6 @@ playwright-report/
 playwright/.auth/
 test-results/
 .env.test
+
+# Scraping output
+scripts/scraping/output/*.csv
