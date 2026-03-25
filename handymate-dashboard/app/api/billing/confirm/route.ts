@@ -39,7 +39,36 @@ export async function POST(request: NextRequest) {
       })
       .eq('business_id', business.business_id)
 
-    return NextResponse.json({ success: true, trial_ends_at: trialEnd })
+    // Provisionera telefonnummer nu när betalning är bekräftad
+    let assignedPhone: string | null = null
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+      const phoneRes = await fetch(`${appUrl}/api/onboarding/phone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessId: business.business_id,
+          phone_setup_type: 'handymate_number',
+        }),
+      })
+      const phoneData = await phoneRes.json()
+      assignedPhone = phoneData.number || phoneData.assigned_phone_number || null
+      if (assignedPhone) {
+        await supabase
+          .from('business_config')
+          .update({ assigned_phone_number: assignedPhone })
+          .eq('business_id', business.business_id)
+      }
+    } catch (err) {
+      console.error('[billing/confirm] Phone provisioning error:', err)
+      // Non-blocking — betalningen är redan bekräftad
+    }
+
+    return NextResponse.json({
+      success: true,
+      trial_ends_at: trialEnd,
+      assigned_phone_number: assignedPhone,
+    })
   } catch (error: any) {
     console.error('[billing/confirm] Error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
