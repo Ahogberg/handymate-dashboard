@@ -7,6 +7,7 @@ import { analyzePriceAdjustments } from '@/lib/agent/price-analysis'
 import { calculateCustomerLTV } from '@/lib/customer-ltv'
 import { checkWarrantyFollowups } from '@/lib/warranty-followup'
 import { checkProactiveCare } from '@/lib/proactive-care'
+import { sendBookingReminders } from '@/lib/booking-reminders'
 
 export const maxDuration = 60
 
@@ -114,6 +115,14 @@ async function runAgentContext() {
     } catch (err: any) {
       proactiveCareResult = { success: false, error: err.message }
     }
+
+    // Bokningspåminnelser (SMS 24h före)
+    try {
+      const reminderResult = await sendBookingReminders(biz.business_id)
+      if (reminderResult.sent > 0) {
+        console.log(`[AgentContext Cron] ${biz.business_id}: ${reminderResult.sent} bokningspåminnelser skickade`)
+      }
+    } catch { /* non-blocking */ }
 
     results.push({
       business_id: biz.business_id,

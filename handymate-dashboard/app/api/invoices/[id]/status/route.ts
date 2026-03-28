@@ -114,6 +114,32 @@ export async function PATCH(
           invoiceId,
         })
       } catch { /* non-blocking */ }
+
+      // Golden Path: tack-SMS till kund efter betalning
+      try {
+        const customerPhone = (invoice as any)?.customer?.phone_number
+        const customerName = (invoice as any)?.customer?.name?.split(' ')[0] || ''
+        if (customerPhone) {
+          const { data: config } = await supabase
+            .from('business_config')
+            .select('business_name')
+            .eq('business_id', business.business_id)
+            .single()
+
+          const bizName = config?.business_name || 'Vi'
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+          await fetch(`${appUrl}/api/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              business_id: business.business_id,
+              to: customerPhone,
+              message: `Tack ${customerName}! Vi har mottagit din betalning. Det var ett nöje att hjälpa dig — hör av dig om du behöver mer hjälp! // ${bizName}`,
+            }),
+          })
+        }
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({
