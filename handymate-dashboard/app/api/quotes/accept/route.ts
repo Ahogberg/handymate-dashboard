@@ -125,6 +125,55 @@ export async function POST(request: NextRequest) {
       })
     } catch { /* non-blocking */ }
 
+    // Golden Path: flytta deal till "Offert accepterad" → "Vunnen"
+    try {
+      const { data: linkedDeal } = await supabase
+        .from('deal')
+        .select('id')
+        .eq('business_id', business.business_id)
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+      if (linkedDeal) {
+        const { moveDeal } = await import('@/lib/pipeline')
+        await moveDeal({
+          dealId: linkedDeal.id,
+          businessId: business.business_id,
+          toStageSlug: 'won',
+          triggeredBy: 'system',
+          aiReason: 'Offert signerad av kund — deal vunnen',
+        })
+      }
+    } catch { /* non-blocking */ }
+
+    // Golden Path: bekräftelse-SMS till kund
+    try {
+      const customerPhone = quote.customer?.phone_number
+      const customerName = quote.customer?.name?.split(' ')[0] || ''
+      if (customerPhone) {
+        const { data: config } = await supabase
+          .from('business_config')
+          .select('business_name, contact_name')
+          .eq('business_id', business.business_id)
+          .single()
+
+        const bizName = config?.business_name || 'Vi'
+        const contactName = config?.contact_name || ''
+        const smsText = `Tack ${customerName}! Vi har mottagit din signatur på offerten. Vi återkommer inom kort med en tid för att påbörja arbetet. // ${contactName}, ${bizName}`
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+        await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: business.business_id,
+            to: customerPhone,
+            message: smsText,
+          }),
+        })
+      }
+    } catch { /* non-blocking */ }
+
     // Auto-create project: from lead if available, otherwise from quote
     try {
       if (quote.lead_id) {

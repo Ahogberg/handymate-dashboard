@@ -511,6 +511,27 @@ Frågor? Ring ${business.phone_number}`
       console.error('fireEvent quote_sent error (non-blocking):', eventErr)
     }
 
+    // Golden Path: flytta deal till "Offert skickad" automatiskt
+    try {
+      const { data: linkedDeal } = await supabase
+        .from('deal')
+        .select('id')
+        .eq('business_id', business.business_id)
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+      if (linkedDeal) {
+        const { moveDeal } = await import('@/lib/pipeline')
+        await moveDeal({
+          dealId: linkedDeal.id,
+          businessId: business.business_id,
+          toStageSlug: 'quote_sent',
+          triggeredBy: 'system',
+          aiReason: 'Offert skickad till kund',
+        })
+      }
+    } catch { /* non-blocking */ }
+
     // Bygg svar
     const sentMethods = []
     if (smsSent) sentMethods.push('SMS')

@@ -88,7 +88,21 @@ export async function POST(
 
     // Build reminder message
     const ocrNumber = invoice.ocr_number || generateOCR(invoice.invoice_number || '')
-    const defaultTemplate = `Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till ${bankgiro ? `bankgiro ${bankgiro}` : ''}${bankgiro && swishNumber ? ' eller ' : ''}${swishNumber ? `Swish ${swishNumber}` : ''}. OCR: {ocr}. Frågor? Ring ${businessConfig?.phone_number || ''}. //${businessName}`
+    // Hämta kundportal-länk om den finns
+    let portalLink = ''
+    if (invoice.customer_id) {
+      const { data: cust } = await supabase
+        .from('customer')
+        .select('portal_token')
+        .eq('customer_id', invoice.customer_id)
+        .single()
+      if (cust?.portal_token) {
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+        portalLink = ` Se och betala: ${appUrl}/portal/${cust.portal_token}?tab=invoices`
+      }
+    }
+
+    const defaultTemplate = `Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till ${bankgiro ? `bankgiro ${bankgiro}` : ''}${bankgiro && swishNumber ? ' eller ' : ''}${swishNumber ? `Swish ${swishNumber}` : ''}.${portalLink} OCR: {ocr}. //${businessName}`
 
     const template = businessConfig?.reminder_sms_template || defaultTemplate
 

@@ -100,6 +100,46 @@ export async function POST(request: NextRequest) {
       console.error('fireEvent contacted error (non-blocking):', eventErr)
     }
 
+    // Golden Path: flytta deal till "Kontaktad" om den står i "Ny förfrågan"
+    try {
+      const { data: customer } = await supabase
+        .from('customer')
+        .select('customer_id')
+        .eq('business_id', business.business_id)
+        .eq('phone_number', to)
+        .maybeSingle()
+
+      if (customer) {
+        const { data: deal } = await supabase
+          .from('deal')
+          .select('id, stage_id')
+          .eq('business_id', business.business_id)
+          .eq('customer_id', customer.customer_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (deal) {
+          const { data: stage } = await supabase
+            .from('pipeline_stage')
+            .select('slug')
+            .eq('id', deal.stage_id)
+            .single()
+
+          if (stage?.slug === 'new_inquiry' || stage?.slug === 'ny_forfragen') {
+            const { moveDeal } = await import('@/lib/pipeline')
+            await moveDeal({
+              dealId: deal.id,
+              businessId: business.business_id,
+              toStageSlug: 'contacted',
+              triggeredBy: 'system',
+              aiReason: 'SMS skickat till kund',
+            })
+          }
+        }
+      }
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({
       success: true,
       id: result.id,
