@@ -303,6 +303,18 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
+    // Fire job_completed event → triggar review request + nurture
+    if (body.status === 'completed' && project) {
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'job_completed', business.business_id, {
+          project_id: project.project_id,
+          customer_id: project.customer_id,
+          project_name: project.name,
+        })
+      } catch { /* non-blocking */ }
+    }
+
     return NextResponse.json({ project })
 
   } catch (error: any) {

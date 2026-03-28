@@ -373,6 +373,7 @@ export async function POST(request: NextRequest) {
 
     if (body.personnummer) insertData.personnummer = body.personnummer
     if (body.fastighetsbeteckning) insertData.fastighetsbeteckning = body.fastighetsbeteckning
+    if (body.lead_id) insertData.lead_id = body.lead_id
 
     const { data: quote, error: insertError } = await supabase
       .from('quotes')
@@ -414,6 +415,21 @@ export async function POST(request: NextRequest) {
     // Sync deal value + quote_id if deal_id provided
     if (body.deal_id && quote.quote_id) {
       try {
+        // Hämta deal för att kopiera lead_id till offerten
+        const { data: dealData } = await supabase
+          .from('deal')
+          .select('lead_id')
+          .eq('id', body.deal_id)
+          .eq('business_id', business.business_id)
+          .single()
+
+        if (dealData?.lead_id && !quote.lead_id) {
+          await supabase
+            .from('quotes')
+            .update({ lead_id: dealData.lead_id })
+            .eq('quote_id', quote.quote_id)
+        }
+
         const dealUpdate: Record<string, unknown> = { quote_id: quote.quote_id }
         if (quote.total) dealUpdate.value = quote.total
         await supabase

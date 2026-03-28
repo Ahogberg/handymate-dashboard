@@ -173,6 +173,44 @@ export async function POST(request: NextRequest) {
       ...(source_ref ? { source_ref } : {}),
     })
 
+    // Auto-skapa deal i pipeline (Golden Path)
+    try {
+      const { data: firstPipelineStage } = await supabase
+        .from('pipeline_stages')
+        .select('id')
+        .eq('business_id', business.business_id)
+        .order('sort_order', { ascending: true })
+        .limit(1)
+        .single()
+
+      if (firstPipelineStage) {
+        const { data: maxDeal } = await supabase
+          .from('deal')
+          .select('deal_number')
+          .eq('business_id', business.business_id)
+          .not('deal_number', 'is', null)
+          .order('deal_number', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        const nextNumber = (maxDeal?.deal_number || 1000) + 1
+
+        await supabase.from('deal').insert({
+          business_id: business.business_id,
+          title: message ? message.slice(0, 80) : `Förfrågan från ${name}`,
+          customer_id: customerId,
+          lead_id: leadId,
+          stage_id: firstPipelineStage.id,
+          source: sourceName ? sourceName.toLowerCase() : 'website_form',
+          deal_number: nextNumber,
+          priority: 'medium',
+        })
+      }
+    } catch (err) {
+      console.error('[leads/intake] Auto-deal creation failed:', err)
+      // Non-blocking — lead skapas ändå
+    }
+
     // SMS till hantverkaren (non-blocking)
     if (business.phone_number) {
       const sourceLabel = sourceName || 'hemsidan'
