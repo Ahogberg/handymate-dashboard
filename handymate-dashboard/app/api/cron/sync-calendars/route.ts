@@ -5,6 +5,7 @@ import {
   getCalendarEvents,
   createGoogleEvent,
 } from '@/lib/google-calendar'
+import { renewExpiringWatches, ensureAllWatches } from '@/lib/google-calendar-watch'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -209,7 +210,24 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ synced, failed, skipped })
+    // Förnya watch channels som snart förfaller + registrera saknade
+    let watchResult = { renewed: 0, failed: 0, registered: 0 }
+    try {
+      const renewResult = await renewExpiringWatches()
+      const ensureResult = await ensureAllWatches()
+      watchResult = {
+        renewed: renewResult.renewed,
+        failed: renewResult.failed,
+        registered: ensureResult.registered,
+      }
+      if (watchResult.renewed > 0 || watchResult.registered > 0) {
+        console.log(`[sync-calendars] Watches: ${watchResult.renewed} renewed, ${watchResult.registered} new, ${watchResult.failed} failed`)
+      }
+    } catch (watchErr) {
+      console.error('[sync-calendars] Watch renewal error (non-blocking):', watchErr)
+    }
+
+    return NextResponse.json({ synced, failed, skipped, watches: watchResult })
   } catch (error: unknown) {
     console.error('Cron sync-calendars error:', error)
     const errorMessage = error instanceof Error ? error.message : 'Cron job failed'
