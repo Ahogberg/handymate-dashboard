@@ -498,8 +498,8 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       <div className="p-4 sm:p-6 border-b border-white/10">
         <div className="flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-700 rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/25">
-              <Zap className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Handymate" className="w-8 h-8 object-contain" />
             </div>
             <span className="text-xl font-bold text-white">Handymate</span>
           </Link>

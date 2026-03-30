@@ -303,8 +303,8 @@ export default function OnboardingPage() {
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="w-8 h-8 bg-teal-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">H</span>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="Handymate" className="w-7 h-7 object-contain" />
             </div>
             <span className="text-gray-900 font-semibold text-lg">Handymate</span>
           </div>

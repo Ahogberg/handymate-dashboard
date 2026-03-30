@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   description: 'AI-powered back office for craftspeople',
   manifest: '/manifest.json',
   themeColor: '#0F766E',
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
