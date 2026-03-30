@@ -377,7 +377,6 @@ export default function Jobbkompisen() {
         {([
           { id: 'chat' as Tab, icon: MessageSquare, label: 'Chat' },
           { id: 'voice' as Tab, icon: Mic, label: 'Röst' },
-          { id: 'photo' as Tab, icon: Camera, label: 'Foto' },
         ]).map(tab => (
           <button
             key={tab.id}
@@ -400,7 +399,7 @@ export default function Jobbkompisen() {
           <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span className="text-xs text-emerald-700">
             Jobbar hos <strong>{activeTimer.customer?.name || 'kund'}</strong>
-            {activeTimer.work_category && ` \u00B7 ${activeTimer.work_category}`}
+            {activeTimer.work_category && ` \· ${activeTimer.work_category}`}
           </span>
         </div>
       )}
@@ -494,7 +493,7 @@ function ChatTab({
         {/* Smart suggestions */}
         {suggestions.length > 0 && (
           <div className="space-y-2 mb-3">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Smarta f\u00F6rslag</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Smarta f\örslag</p>
             {suggestions.map(s => (
               <div key={s.id} className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
                 <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -566,7 +565,7 @@ function ChatTab({
           <div className="flex justify-start">
             <div className="bg-gray-100 text-gray-500 px-3.5 py-2.5 rounded-2xl text-sm border border-gray-200">
               <Loader2 className="w-4 h-4 animate-spin inline mr-1.5" />
-              T\u00E4nker...
+              T\änker...
             </div>
           </div>
         )}
@@ -581,7 +580,7 @@ function ChatTab({
             value={input}
             onChange={(e) => onInputChange(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && onSend()}
-            placeholder="Fr\u00E5ga din jobbkompis..."
+            placeholder="Fr\åga din jobbkompis..."
             className="flex-1 px-3.5 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
           />
           <button
@@ -639,14 +638,14 @@ function VoiceTab({
       <div className="flex-1 overflow-y-auto p-4">
         {/* What AI understood */}
         <div className="mb-4 p-3 bg-teal-50 border border-teal-200 rounded-xl">
-          <p className="text-xs font-medium text-sky-700 mb-1">F\u00F6rstod:</p>
+          <p className="text-xs font-medium text-sky-700 mb-1">F\örstod:</p>
           <p className="text-sm text-gray-900">{result.understood}</p>
         </div>
 
         {/* Actions */}
         {result.actions.length > 0 && (
           <div className="space-y-2 mb-4">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Åtg\u00E4rder</p>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Åtg\ärder</p>
             {result.actions.map(action => (
               <button
                 key={action.id}
@@ -686,7 +685,7 @@ function VoiceTab({
             onClick={() => onExecuteAll(result.actions)}
             className="w-full py-3 bg-teal-600 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity mb-3"
           >
-            Utf\u00F6r alla ({pendingActions.length} \u00E5tg\u00E4rder)
+            Utf\ör alla ({pendingActions.length} \åtg\ärder)
           </button>
         )}
 
@@ -714,7 +713,7 @@ function VoiceTab({
       <div className="flex-1 flex flex-col items-center justify-center p-6">
         <Loader2 className="w-10 h-10 text-teal-600 animate-spin mb-3" />
         <p className="text-gray-900 font-medium">Analyserar...</p>
-        <p className="text-xs text-gray-400 mt-1">Transkriberar och f\u00F6rst\u00E5r dina instruktioner</p>
+        <p className="text-xs text-gray-400 mt-1">Transkriberar och f\örst\år dina instruktioner</p>
       </div>
     )
   }
@@ -753,8 +752,8 @@ function VoiceTab({
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-6">
       <p className="text-sm text-gray-500 mb-6 text-center max-w-[260px]">
-        Ber\u00E4tta vad du gjort, vad som beh\u00F6vs eller s\u00E4g ett kommando.
-        AI:n f\u00F6rst\u00E5r och utf\u00F6r.
+        Ber\ätta vad du gjort, vad som beh\övs eller s\äg ett kommando.
+        AI:n f\örst\år och utf\ör.
       </p>
 
       <button
@@ -778,7 +777,7 @@ function VoiceTab({
       {isRecording ? (
         <p className="mt-4 text-lg font-mono text-gray-900 tabular-nums">{formatTime(duration)}</p>
       ) : (
-        <p className="mt-4 text-xs text-gray-400">Tryck f\u00F6r att b\u00F6rja</p>
+        <p className="mt-4 text-xs text-gray-400">Tryck f\ör att b\örja</p>
       )}
 
       {/* Quick examples */}
@@ -786,9 +785,9 @@ function VoiceTab({
         <div className="mt-6 space-y-1.5 w-full px-2">
           <p className="text-xs text-gray-400 text-center mb-2">Exempel:</p>
           {[
-            'Jag \u00E4r klar hos kunden, bytte tv\u00E5 uttag',
-            'Skapa offert f\u00F6r badrumsrenovering',
-            'Skicka p\u00E5minnelse till senaste kunden',
+            'Jag \är klar hos kunden, bytte tv\å uttag',
+            'Skapa offert f\ör badrumsrenovering',
+            'Skicka p\åminnelse till senaste kunden',
           ].map((example, i) => (
             <p key={i} className="text-xs text-gray-400 text-center italic">
               "{example}"
@@ -835,7 +834,7 @@ function PhotoTab({
         <p className="text-gray-900 font-medium">Analyserar bild...</p>
         <div className="mt-2 space-y-1 text-xs text-gray-400 text-center">
           <p>Identifierar arbete och material...</p>
-          <p>Ber\u00E4knar ungef\u00E4rlig omfattning...</p>
+          <p>Ber\äknar ungef\ärlig omfattning...</p>
         </div>
       </div>
     )
@@ -904,7 +903,7 @@ function PhotoTab({
     <div className="flex-1 flex flex-col items-center justify-center p-6">
       <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center w-full mb-4">
         <Camera className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-        <p className="text-sm text-gray-500 mb-4">Fota jobbet f\u00F6r analys</p>
+        <p className="text-sm text-gray-500 mb-4">Fota jobbet f\ör analys</p>
         <div className="flex flex-col gap-2">
           <button
             onClick={() => cameraInputRef.current?.click()}
@@ -918,12 +917,12 @@ function PhotoTab({
             className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-700 text-sm hover:bg-gray-200"
           >
             <Upload className="w-4 h-4" />
-            V\u00E4lj bild
+            V\älj bild
           </button>
         </div>
       </div>
       <p className="text-xs text-gray-400 text-center">
-        AI:n identifierar material, arbete och ger offertf\u00F6rslag.
+        AI:n identifierar material, arbete och ger offertf\örslag.
       </p>
 
       {/* Hidden file inputs */}
