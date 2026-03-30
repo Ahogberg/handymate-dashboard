@@ -1109,11 +1109,17 @@ export default function CustomerDetailPage() {
             {activeTab === 'projects' && (
               <div className="space-y-6">
                 {/* Deals / Pipeline */}
-                {deals.length > 0 && (
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200">
-                    <div className="p-4 border-b border-gray-100">
-                      <h3 className="text-sm font-semibold text-gray-900">Ärenden i säljtratten</h3>
-                    </div>
+                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                  <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-gray-900">Ärenden i säljtratten</h3>
+                    <a
+                      href={`/dashboard/pipeline?newDeal=true&customer_id=${customer.customer_id}&customer_name=${encodeURIComponent(customer.name)}`}
+                      className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    >
+                      + Ny deal
+                    </a>
+                  </div>
+                  {deals.length > 0 ? (
                     <div className="divide-y divide-gray-100">
                       {deals.map(deal => (
                         <Link key={deal.id} href={`/dashboard/pipeline?deal=${deal.id}`} className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
@@ -1134,8 +1140,12 @@ export default function CustomerDetailPage() {
                         </Link>
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="p-6 text-center text-sm text-gray-400">
+                      Inga ärenden än
+                    </div>
+                  )}
+                </div>
 
                 {/* Projekt */}
                 <div className="bg-white shadow-sm rounded-xl border border-gray-200">
