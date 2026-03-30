@@ -1121,7 +1121,7 @@ export default function NewQuotePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customer_id: selectedCustomer || null,
-          status: send ? 'sent' : 'draft',
+          status: 'draft',
           title,
           description,
           quote_items: finalItems,
@@ -1154,8 +1154,11 @@ export default function NewQuotePage() {
       if (!res.ok) {
         toast.error(data.error || 'Kunde inte spara offerten')
       } else {
-        toast.success(send ? 'Offert skickad!' : 'Offert sparad som utkast')
-        router.push(`/dashboard/quotes/${data.quote.quote_id}`)
+        toast.success(send ? 'Offert sparad — öppnar skicka-vy' : 'Offert sparad som utkast')
+        router.push(send
+          ? `/dashboard/quotes/${data.quote.quote_id}?send=true`
+          : `/dashboard/quotes/${data.quote.quote_id}`
+        )
       }
     } catch (err) {
       console.error('Save failed:', err)
