@@ -67,11 +67,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Title is required' }, { status: 400 })
     }
 
-    // Default stage to 'lead' if not provided
-    const slug = stageSlug || 'lead'
-    const stage = await getStageBySlug(business.business_id, slug)
+    // Default stage to first pipeline stage
+    const slug = stageSlug || 'new_inquiry'
+    let stage = await getStageBySlug(business.business_id, slug)
+    // Fallback: hämta första steget om slug inte matchar
     if (!stage) {
-      return NextResponse.json({ error: `Stage '${slug}' not found` }, { status: 404 })
+      const supabaseStage = getServerSupabase()
+      const { data: firstStage } = await supabaseStage
+        .from('pipeline_stage')
+        .select('*')
+        .eq('business_id', business.business_id)
+        .order('sort_order', { ascending: true })
+        .limit(1)
+        .single()
+      stage = firstStage
+    }
+    if (!stage) {
+      return NextResponse.json({ error: 'Inga pipeline-steg hittades' }, { status: 404 })
     }
 
     // Get next deal number for this business
