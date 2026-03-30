@@ -504,8 +504,72 @@ async function executeApprovalPayload(
         return { action: 'send_matte_customer_reply', sms_sent: smsRes.ok }
       }
 
-      default:
-        return { action: approval_type, skipped: 'no handler for this type', payload }
+      case 'low_stock_alert': {
+        // Godkänn = bekräfta att hantverkaren sett varningen
+        return { action: 'low_stock_alert', acknowledged: true }
+      }
+
+      case 'price_adjustment': {
+        // Uppdatera pris i prislista
+        const pl = payload as any
+        if (pl.item_id && pl.suggested_price) {
+          const supabasePa = (await import('@/lib/supabase')).getServerSupabase()
+          await supabasePa.from('price_list').update({
+            unit_price: pl.suggested_price,
+          }).eq('id', pl.item_id).eq('business_id', businessId)
+        }
+        return { action: 'price_adjustment', ok: true }
+      }
+
+      case 'profitability_warning': {
+        // Godkänn = bekräfta att hantverkaren är medveten
+        return { action: 'profitability_warning', acknowledged: true }
+      }
+
+      case 'customer_reactivation': {
+        const pl = payload as any
+        if (pl.customer_phone && pl.suggested_sms) {
+          const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              business_id: businessId,
+              to: pl.customer_phone,
+              message: pl.suggested_sms,
+            }),
+          })
+          return { action: 'customer_reactivation', sms_sent: smsRes.ok }
+        }
+        return { action: 'customer_reactivation', skipped: 'no phone or message' }
+      }
+
+      case 'create_invoice_from_report': {
+        // Navigerar — returnerar bara bekräftelse
+        return { action: 'create_invoice_from_report', acknowledged: true, navigate_to: `/dashboard/invoices` }
+      }
+
+      default: {
+        // Smart fallback: om payload har SMS-data → skicka SMS
+        const pl = payload as any
+        const smsMessage = pl.message || pl.suggested_sms || pl.sms_text
+        const smsTo = pl.to || pl.customer_phone || pl.entity?.phone
+
+        if (smsMessage && smsTo) {
+          const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              business_id: businessId,
+              to: smsTo,
+              message: smsMessage,
+            }),
+          })
+          return { action: approval_type, sms_sent: smsRes.ok, fallback: true }
+        }
+
+        // Om inget SMS-data → bara bekräfta (acknowledgement)
+        return { action: approval_type, acknowledged: true, note: 'Godkänt utan specifik åtgärd' }
+      }
     }
   } catch (err: any) {
     return { action: approval_type, error: err.message }

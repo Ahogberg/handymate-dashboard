@@ -139,6 +139,7 @@ export default function ApprovalsPage() {
   const [expandedPackage, setExpandedPackage] = useState<string | null>(null)
   const [rejectedActions, setRejectedActions] = useState<Record<string, Set<string>>>({})
   const [confirmModal, setConfirmModal] = useState<{ approval: Approval; editedPayload?: Record<string, unknown> } | null>(null)
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null)
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -218,8 +219,24 @@ export default function ApprovalsPage() {
         body: JSON.stringify(body),
       })
       if (res.ok) {
+        const result = await res.json().catch(() => null)
         setApprovals(prev => prev.filter(a => a.id !== id))
         setEditingId(null)
+
+        // Visa feedback baserat på vad som hände
+        if (action === 'approve') {
+          const exec = result?.execution
+          if (exec?.sms_sent) {
+            setFeedbackMsg('SMS skickat!')
+          } else if (exec?.acknowledged) {
+            setFeedbackMsg('Godkänt')
+          } else if (exec?.ok) {
+            setFeedbackMsg('Utfört!')
+          } else {
+            setFeedbackMsg(action === 'approve' ? 'Godkänt' : 'Avvisat')
+          }
+          setTimeout(() => setFeedbackMsg(null), 3000)
+        }
       }
     } finally {
       setActionLoading(null)
@@ -303,6 +320,11 @@ export default function ApprovalsPage() {
               <p className="text-sm text-gray-500">AI-agentens förslag som kräver din bekräftelse</p>
             </div>
           </div>
+          {feedbackMsg && (
+            <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-700 font-medium">
+              ✓ {feedbackMsg}
+            </div>
+          )}
           <button
             onClick={fetchApprovals}
             className="p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
