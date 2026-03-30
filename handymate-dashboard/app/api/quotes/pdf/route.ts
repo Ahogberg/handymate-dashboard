@@ -111,7 +111,7 @@ export async function GET(request: NextRequest) {
     const { data: quoteItems } = await supabase
       .from('quote_items')
       .select('*')
-      .eq('quote_id', quoteId)
+      .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
     quote.quote_items = quoteItems || []
 
@@ -124,13 +124,14 @@ export async function GET(request: NextRequest) {
       quote.customer = customer
     }
 
-    const { data: config } = await supabase
+    // Hämta business-config (används som business-objekt i PDF-generatorn)
+    const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website')
+      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered')
       .eq('business_id', quote.business_id)
       .single()
 
-    const html = generateQuoteHTML(quote, config, config)
+    const html = generateQuoteHTML(quote, bizConfig, bizConfig)
 
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
@@ -214,7 +215,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       <div class="label">Offertdatum</div>
       <div class="value">${formatDateLong(quote.created_at)}</div>
       <div class="label" style="margin-top:12px">Giltig till</div>
-      <div class="value highlight">${formatDateLong(quote.valid_until)}</div>
+      <div class="value highlight">${quote.valid_until ? formatDateLong(quote.valid_until) : (quote.created_at ? formatDateLong(new Date(new Date(quote.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()) : '30 dagar från offertdatum')}</div>
     </div>
     <div class="meta-block">
       <div class="label">Avser</div>
