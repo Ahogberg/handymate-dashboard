@@ -144,12 +144,14 @@ export default function ItemRow({
         {isEditable && (
           <div className="flex items-center gap-1.5">
             <input type="number" value={item.quantity} onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
               className="w-14 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
             <select value={item.unit} onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
               className="w-16 px-1 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500">
               {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </select>
             <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+              onFocus={(e) => e.target.select()}
               className="w-20 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
             <span className="flex-1 text-right text-xs font-medium text-gray-900 whitespace-nowrap">{formatCurrency(displayTotal)}</span>
           </div>
@@ -190,6 +192,7 @@ export default function ItemRow({
         {/* Quantity */}
         {isEditable ? (
           <input type="number" value={item.quantity} onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
             className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
         ) : <span />}
 
@@ -204,6 +207,7 @@ export default function ItemRow({
         {/* Unit price */}
         {isEditable ? (
           <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
+            onFocus={(e) => e.target.select()}
             className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
         ) : <span />}
 
