@@ -56,7 +56,7 @@ type Filter = 'all' | 'active' | 'invited' | 'inactive'
 interface InviteForm {
   email: string
   name: string
-  role: 'admin' | 'project_manager' | 'employee'
+  role: 'admin' | 'project_manager' | 'kalkylator' | 'employee'
   title: string
   phone: string
   hourly_rate: string
@@ -129,6 +129,7 @@ function getRoleBadge(role: string): { label: string; className: string } {
   if (role === 'owner') return { label: 'Ägare', className: 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-teal-600 border-teal-300' }
   if (role === 'admin') return { label: 'Admin', className: 'bg-teal-100 text-teal-500 border-teal-500/30' }
   if (role === 'project_manager') return { label: 'Projektledare', className: 'bg-blue-100 text-blue-600 border-blue-300' }
+  if (role === 'kalkylator') return { label: 'Kalkylator', className: 'bg-amber-100 text-amber-600 border-amber-300' }
   return { label: 'Anställd', className: 'bg-gray-100 text-gray-500 border-gray-300' }
 }
 
@@ -552,6 +553,7 @@ export default function TeamPage() {
                 >
                   <option value="admin">Admin</option>
                   <option value="project_manager">Projektledare</option>
+                  <option value="kalkylator">Kalkylator</option>
                   <option value="employee">Anställd</option>
                 </select>
                 <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[inviteForm.role]}</p>
@@ -708,6 +710,7 @@ export default function TeamPage() {
                   {editingMember.role === 'owner' && <option value="owner">Ägare</option>}
                   <option value="admin">Admin</option>
                   <option value="project_manager">Projektledare</option>
+                  <option value="kalkylator">Kalkylator</option>
                   <option value="employee">Anställd</option>
                 </select>
                 {editingMember.role !== 'owner' && (
