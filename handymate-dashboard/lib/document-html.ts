@@ -72,6 +72,7 @@ export function getDocumentCSS(): string {
   /* Header */
   .doc-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 44px; }
   .company-name { font-size: 18px; font-weight: 500; color: ${TEXT_PRIMARY}; }
+  .company-org { font-size: 11px; color: ${TEXT_SECONDARY}; margin-top: 2px; }
   .company-sub { font-size: 12px; color: ${TEXT_SECONDARY}; margin-top: 4px; line-height: 1.7; }
   .doc-type { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: ${ACCENT}; font-weight: 500; text-align: right; }
   .doc-number { font-size: 22px; font-weight: 500; color: ${TEXT_PRIMARY}; text-align: right; margin-top: 3px; }
@@ -206,11 +207,23 @@ export function renderDocumentHeader(
   contactInfo: string,
   docType: string,
   docNumber: string,
+  options?: { logoUrl?: string; orgNumber?: string; fSkatt?: boolean }
 ): string {
+  const logoHtml = options?.logoUrl
+    ? `<img src="${escapeHtml(options.logoUrl)}" alt="${escapeHtml(companyName)}" style="max-width:120px;max-height:60px;object-fit:contain;margin-bottom:8px;" onerror="this.style.display='none'" />`
+    : ''
+
+  const orgLine = [
+    options?.orgNumber ? `Org.nr: ${escapeHtml(options.orgNumber)}` : '',
+    options?.fSkatt ? 'Godkänd för F-skatt' : '',
+  ].filter(Boolean).join(' · ')
+
   return `
   <div class="doc-header">
     <div>
+      ${logoHtml}
       <div class="company-name">${escapeHtml(companyName)}</div>
+      ${orgLine ? `<div class="company-org">${orgLine}</div>` : ''}
       <div class="company-sub">${contactInfo}</div>
     </div>
     <div>

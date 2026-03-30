@@ -192,6 +192,11 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
     contactLine,
     'Offert',
     quoteNumber,
+    {
+      logoUrl: config?.logo_url || undefined,
+      orgNumber: config?.org_number || undefined,
+      fSkatt: config?.f_skatt_registered || false,
+    }
   )
 
   // ── Meta row ──
