@@ -196,6 +196,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       logoUrl: config?.logo_url || undefined,
       orgNumber: config?.org_number || undefined,
       fSkatt: config?.f_skatt_registered || false,
+      title: quote.title || undefined,
     }
   )
 

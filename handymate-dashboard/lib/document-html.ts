@@ -76,6 +76,8 @@ export function getDocumentCSS(): string {
   .company-sub { font-size: 12px; color: ${TEXT_SECONDARY}; margin-top: 4px; line-height: 1.7; }
   .doc-type { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: ${ACCENT}; font-weight: 500; text-align: right; }
   .doc-number { font-size: 22px; font-weight: 500; color: ${TEXT_PRIMARY}; text-align: right; margin-top: 3px; }
+  .doc-title { font-size: 16px; font-weight: 600; color: ${TEXT_PRIMARY}; }
+  .doc-ref { font-size: 11px; color: ${TEXT_SECONDARY}; margin-top: 4px; }
 
   /* Teal line */
   .teal-line { height: 1px; background: ${ACCENT}; opacity: 0.25; margin-bottom: 36px; }
@@ -207,16 +209,21 @@ export function renderDocumentHeader(
   contactInfo: string,
   docType: string,
   docNumber: string,
-  options?: { logoUrl?: string; orgNumber?: string; fSkatt?: boolean }
+  options?: { logoUrl?: string; orgNumber?: string; fSkatt?: boolean; title?: string }
 ): string {
   const logoHtml = options?.logoUrl
-    ? `<img src="${escapeHtml(options.logoUrl)}" alt="${escapeHtml(companyName)}" style="max-width:120px;max-height:60px;object-fit:contain;margin-bottom:8px;" onerror="this.style.display='none'" />`
+    ? `<img src="${escapeHtml(options.logoUrl)}" alt="${escapeHtml(companyName)}" style="max-width:140px;max-height:56px;object-fit:contain;margin-bottom:6px;" onerror="this.style.display='none'" />`
     : ''
 
   const orgLine = [
     options?.orgNumber ? `Org.nr: ${escapeHtml(options.orgNumber)}` : '',
     options?.fSkatt ? 'Godkänd för F-skatt' : '',
   ].filter(Boolean).join(' · ')
+
+  // Titel-baserad header: "Offert — Badrumsrenovering" med nummer som referens
+  const titleText = options?.title
+    ? `${escapeHtml(docType)} — ${escapeHtml(options.title)}`
+    : escapeHtml(docType)
 
   return `
   <div class="doc-header">
@@ -226,9 +233,9 @@ export function renderDocumentHeader(
       ${orgLine ? `<div class="company-org">${orgLine}</div>` : ''}
       <div class="company-sub">${contactInfo}</div>
     </div>
-    <div>
-      <div class="doc-type">${escapeHtml(docType)}</div>
-      <div class="doc-number">${escapeHtml(docNumber)}</div>
+    <div style="text-align:right">
+      <div class="doc-title">${titleText}</div>
+      <div class="doc-ref">Ref: ${escapeHtml(docNumber)}</div>
     </div>
   </div>`
 }

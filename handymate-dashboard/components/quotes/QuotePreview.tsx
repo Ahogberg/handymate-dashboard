@@ -127,8 +127,10 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
             <div style={{ fontSize: '6.5px', color: SECONDARY, marginTop: 2 }}>{contactName}</div>
           </div>
           <div className="text-right">
-            <div style={{ fontSize: '5.5px', letterSpacing: '0.12em', textTransform: 'uppercase', color: ACCENT, fontWeight: 500 }}>Offert</div>
-            <div style={{ fontSize: '12px', fontWeight: 500, marginTop: 1 }}>OFF-XXXX</div>
+            <div style={{ fontSize: '9px', fontWeight: 600 }}>
+              {data.title ? `Offert — ${data.title}` : 'Offert'}
+            </div>
+            <div style={{ fontSize: '6px', color: SECONDARY, marginTop: 2 }}>Ref: #XXXX</div>
           </div>
         </div>
 
