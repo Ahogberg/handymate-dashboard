@@ -186,14 +186,14 @@ export default function ApprovalsPage() {
     }
   }
 
-  // Typer som kräver bekräftelse-modal innan godkännande
-  const CONFIRM_TYPES = ['seasonal_campaign', 'send_sms', 'quote_nudge', 'proactive_care', 'send_matte_customer_reply', 'warranty_followup']
+  // Typer som INTE behöver bekräftelse (rena acknowledgements)
+  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion']
 
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
-    if (CONFIRM_TYPES.includes(approval.approval_type) || approval.approval_type.includes('campaign') || approval.approval_type.includes('sms')) {
-      setConfirmModal({ approval, editedPayload })
-    } else {
+    if (SKIP_CONFIRM.includes(approval.approval_type)) {
       handleAction(approval.id, 'approve', editedPayload)
+    } else {
+      setConfirmModal({ approval, editedPayload })
     }
   }
 
@@ -763,10 +763,28 @@ export default function ApprovalsPage() {
       {confirmModal && (() => {
         const a = confirmModal.approval
         const payload = confirmModal.editedPayload || a.payload
-        const msg = (payload.message || payload.sms_text || payload.body || payload.suggested_sms || '') as string
+        const msg = (payload.message || payload.sms_text || payload.body || payload.suggested_sms || payload.customer_reply_pending || '') as string
         const recipient = getRecipient(payload)
         const recipientCount = (payload.customers as any[])?.length || (recipient ? 1 : 0)
         const isCampaign = a.approval_type.includes('campaign') || recipientCount > 1
+        const type = a.approval_type
+
+        // Dynamisk rubrik och knapptext per typ
+        const getModalInfo = () => {
+          if (isCampaign) return { title: `Skicka kampanj till ${recipientCount} mottagare?`, btn: `Skicka till ${recipientCount} mottagare`, icon: '📢' }
+          if (type === 'job_report') return { title: 'Skicka jobbrapport till kund?', btn: 'Skicka rapport', icon: '📋' }
+          if (type === 'price_adjustment') return { title: 'Ändra pris i prislistan?', btn: 'Ändra pris', icon: '💰' }
+          if (type === 'create_invoice_from_report') return { title: 'Skapa faktura?', btn: 'Skapa faktura', icon: '🧾' }
+          if (type === 'autopilot_package') {
+            const actionCount = (payload.actions as any[])?.length || 0
+            return { title: `Utför ${actionCount} automatiska åtgärder?`, btn: `Utför ${actionCount} åtgärder`, icon: '🤖' }
+          }
+          if (msg && recipient) return { title: `Skicka SMS till ${recipient}?`, btn: 'Skicka SMS', icon: '💬' }
+          if (type.includes('quote')) return { title: 'Utför offertåtgärd?', btn: 'Utför', icon: '📄' }
+          return { title: 'Bekräfta åtgärd', btn: 'Bekräfta', icon: '✓' }
+        }
+
+        const info = getModalInfo()
 
         return (
           <>
@@ -774,16 +792,21 @@ export default function ApprovalsPage() {
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    {isCampaign ? `Skicka kampanj till ${recipientCount} mottagare?` : 'Bekräfta utskick'}
+                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <span>{info.icon}</span> {info.title}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">{a.title}</p>
+                  {a.description && <p className="text-xs text-gray-400 mt-1">{a.description}</p>}
                 </div>
 
                 <div className="p-6 space-y-4">
                   {msg && (
                     <div>
-                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Meddelande som skickas</label>
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">
+                        {type.includes('sms') || type.includes('nudge') || type.includes('care') || type.includes('reactivation') || type.includes('followup')
+                          ? 'SMS som skickas'
+                          : 'Innehåll'}
+                      </label>
                       <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
                         {msg}
                       </div>
@@ -794,6 +817,12 @@ export default function ApprovalsPage() {
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <MessageSquare className="w-4 h-4 text-teal-600" />
                       <span>Till: <strong>{recipient}</strong></span>
+                    </div>
+                  )}
+
+                  {type === 'price_adjustment' && (payload as any).suggested_price && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
+                      Nytt pris: <strong>{(payload as any).suggested_price} kr</strong>
                     </div>
                   )}
 
@@ -817,7 +846,7 @@ export default function ApprovalsPage() {
                     disabled={actionLoading !== null}
                     className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 disabled:opacity-50"
                   >
-                    {actionLoading ? 'Skickar...' : isCampaign ? `Skicka till ${recipientCount} mottagare` : 'Skicka SMS'}
+                    {actionLoading ? 'Utför...' : info.btn}
                   </button>
                 </div>
               </div>
