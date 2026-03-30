@@ -182,13 +182,40 @@ export async function POST(request: NextRequest) {
 
       case 'delete_customer': {
         const { customerId } = data
-        
+
+        // Kontrollera om kunden har kopplad data
+        const [dealsCheck, quotesCheck, invoicesCheck] = await Promise.all([
+          supabase.from('deal').select('id', { count: 'exact', head: true }).eq('customer_id', customerId),
+          supabase.from('quotes').select('quote_id', { count: 'exact', head: true }).eq('customer_id', customerId),
+          supabase.from('invoice').select('invoice_id', { count: 'exact', head: true }).eq('customer_id', customerId),
+        ])
+
+        const linkedItems = []
+        if ((dealsCheck.count || 0) > 0) linkedItems.push(`${dealsCheck.count} ärende(n)`)
+        if ((quotesCheck.count || 0) > 0) linkedItems.push(`${quotesCheck.count} offert(er)`)
+        if ((invoicesCheck.count || 0) > 0) linkedItems.push(`${invoicesCheck.count} faktura/or`)
+
+        if (linkedItems.length > 0) {
+          return NextResponse.json({
+            error: `Kunden har ${linkedItems.join(', ')} kopplat. Ta bort dem först eller arkivera kunden istället.`,
+          }, { status: 400 })
+        }
+
+        // Rensa relaterad data utan FK-constraint
+        await supabase.from('customer_document').delete().eq('customer_id', customerId)
+        await supabase.from('customer_activity').delete().eq('customer_id', customerId)
+        await supabase.from('leads').update({ customer_id: null }).eq('customer_id', customerId)
+
         const { error } = await supabase
           .from('customer')
           .delete()
           .eq('customer_id', customerId)
+          .eq('business_id', authBusiness.business_id)
 
-        if (error) throw error
+        if (error) {
+          console.error('[delete_customer] Error:', error)
+          return NextResponse.json({ error: 'Kunde inte ta bort kunden: ' + error.message }, { status: 500 })
+        }
         return NextResponse.json({ success: true })
       }
 

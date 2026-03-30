@@ -138,6 +138,7 @@ export default function ApprovalsPage() {
   const [editText, setEditText] = useState('')
   const [expandedPackage, setExpandedPackage] = useState<string | null>(null)
   const [rejectedActions, setRejectedActions] = useState<Record<string, Set<string>>>({})
+  const [confirmModal, setConfirmModal] = useState<{ approval: Approval; editedPayload?: Record<string, unknown> } | null>(null)
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -184,6 +185,23 @@ export default function ApprovalsPage() {
     }
   }
 
+  // Typer som kräver bekräftelse-modal innan godkännande
+  const CONFIRM_TYPES = ['seasonal_campaign', 'send_sms', 'quote_nudge', 'proactive_care', 'send_matte_customer_reply', 'warranty_followup']
+
+  function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
+    if (CONFIRM_TYPES.includes(approval.approval_type) || approval.approval_type.includes('campaign') || approval.approval_type.includes('sms')) {
+      setConfirmModal({ approval, editedPayload })
+    } else {
+      handleAction(approval.id, 'approve', editedPayload)
+    }
+  }
+
+  function confirmAndExecute() {
+    if (!confirmModal) return
+    handleAction(confirmModal.approval.id, 'approve', confirmModal.editedPayload)
+    setConfirmModal(null)
+  }
+
   async function handleAction(id: string, action: 'approve' | 'reject', editedPayload?: Record<string, unknown>) {
     setActionLoading(id + action)
     try {
@@ -219,7 +237,7 @@ export default function ApprovalsPage() {
     if (editedPayload.message !== undefined) editedPayload.message = editText
     else if (editedPayload.sms_text !== undefined) editedPayload.sms_text = editText
     else if (editedPayload.body !== undefined) editedPayload.body = editText
-    handleAction(approval.id, 'approve', editedPayload)
+    requestApprove(approval, editedPayload)
   }
 
   async function handleAutopilotApprove(approval: Approval, rejectIds?: string[]) {
@@ -680,7 +698,7 @@ export default function ApprovalsPage() {
                       ) : (
                         <>
                           <button
-                            onClick={() => handleAction(approval.id, 'approve')}
+                            onClick={() => requestApprove(approval)}
                             disabled={actionLoading !== null}
                             className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
@@ -718,6 +736,73 @@ export default function ApprovalsPage() {
           </div>
         )}
       </div>
+
+      {/* Bekräftelse-modal för SMS/kampanjer */}
+      {confirmModal && (() => {
+        const a = confirmModal.approval
+        const payload = confirmModal.editedPayload || a.payload
+        const msg = (payload.message || payload.sms_text || payload.body || payload.suggested_sms || '') as string
+        const recipient = getRecipient(payload)
+        const recipientCount = (payload.customers as any[])?.length || (recipient ? 1 : 0)
+        const isCampaign = a.approval_type.includes('campaign') || recipientCount > 1
+
+        return (
+          <>
+            <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={() => setConfirmModal(null)} />
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+                <div className="p-6 border-b border-gray-100">
+                  <h3 className="text-lg font-bold text-gray-900">
+                    {isCampaign ? `Skicka kampanj till ${recipientCount} mottagare?` : 'Bekräfta utskick'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">{a.title}</p>
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {msg && (
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase tracking-wider mb-2 block">Meddelande som skickas</label>
+                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                        {msg}
+                      </div>
+                    </div>
+                  )}
+
+                  {recipient && !isCampaign && (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      <MessageSquare className="w-4 h-4 text-teal-600" />
+                      <span>Till: <strong>{recipient}</strong></span>
+                    </div>
+                  )}
+
+                  {isCampaign && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700 flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Detta skickar SMS till <strong>{recipientCount} mottagare</strong>. Kontrollera meddelandet ovan innan du fortsätter.</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-6 border-t border-gray-100 flex gap-3">
+                  <button
+                    onClick={() => setConfirmModal(null)}
+                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    Avbryt
+                  </button>
+                  <button
+                    onClick={confirmAndExecute}
+                    disabled={actionLoading !== null}
+                    className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Skickar...' : isCampaign ? `Skicka till ${recipientCount} mottagare` : 'Skicka SMS'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 }
