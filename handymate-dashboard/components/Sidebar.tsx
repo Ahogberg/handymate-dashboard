@@ -501,7 +501,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden">
               <img src="/logo.png" alt="Handymate" className="w-8 h-8 object-contain" />
             </div>
-            <span className="text-xl font-bold text-white">Handymate</span>
+            <span className="text-lg font-bold text-white truncate max-w-[120px]">{businessName || 'Handymate'}</span>
           </Link>
           <div className="relative" ref={notifRef}>
             <button
