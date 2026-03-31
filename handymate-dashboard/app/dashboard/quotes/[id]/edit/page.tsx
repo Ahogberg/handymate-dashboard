@@ -1339,7 +1339,7 @@ export default function EditQuotePage() {
               )}
 
               {/* Quick add from price list */}
-              {priceList.length > 0 && (
+              {priceList.length > 0 ? (
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <p className="text-sm text-gray-400 mb-2">Snabbval från prislista:</p>
                   <div className="flex flex-wrap gap-2">
@@ -1353,6 +1353,15 @@ export default function EditQuotePage() {
                       </button>
                     ))}
                   </div>
+                </div>
+              ) : (
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
+                  <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
+                    className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                    + Bygg din prislista →
+                  </a>
+                  <p className="text-xs text-gray-300 mt-0.5">Öppnas i ny flik</p>
                 </div>
               )}
             </div>
