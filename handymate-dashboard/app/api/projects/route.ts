@@ -278,8 +278,50 @@ export async function PUT(request: NextRequest) {
     if (body.description !== undefined) updates.description = body.description
     if (body.project_type !== undefined) updates.project_type = body.project_type
     if (body.status !== undefined) {
-      updates.status = body.status
+      // 4-eyes check för projektstängning
       if (body.status === 'completed') {
+        const { data: fourEyesConfig } = await supabase
+          .from('business_config')
+          .select('four_eyes_enabled, four_eyes_threshold_sek')
+          .eq('business_id', business.business_id)
+          .single()
+
+        const projectValue = body.budget_amount || 0
+        // Hämta befintligt projektvärde om inte i body
+        if (!projectValue) {
+          const { data: existingProject } = await supabase
+            .from('project')
+            .select('budget_amount')
+            .eq('project_id', project_id)
+            .single()
+          if (existingProject) {
+            const pVal = existingProject.budget_amount || 0
+            if (
+              fourEyesConfig?.four_eyes_enabled &&
+              pVal >= (fourEyesConfig.four_eyes_threshold_sek || 50000)
+            ) {
+              const approvalId = `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+              await supabase.from('pending_approvals').insert({
+                id: approvalId,
+                business_id: business.business_id,
+                approval_type: 'four_eyes_project_close',
+                title: `Projektstängning kräver godkännande — ${pVal.toLocaleString('sv-SE')} kr`,
+                description: `Projektets värde överstiger gränsen på ${(fourEyesConfig.four_eyes_threshold_sek || 50000).toLocaleString('sv-SE')} kr.`,
+                payload: { project_id, budget_amount: pVal, threshold: fourEyesConfig.four_eyes_threshold_sek },
+                status: 'pending',
+                risk_level: 'high',
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              })
+
+              return NextResponse.json({
+                requires_approval: true,
+                approval_id: approvalId,
+                message: `Projektstängning kräver admin-godkännande (${pVal.toLocaleString('sv-SE')} kr)`,
+              })
+            }
+          }
+        }
+
         updates.completed_at = new Date().toISOString()
       }
       if (body.status === 'active' || body.status === 'planning') {

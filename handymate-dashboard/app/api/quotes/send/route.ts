@@ -267,6 +267,55 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // 4-eyes check: kräv admin-godkännande för stora offerter
+    const { data: fourEyesConfig } = await supabase
+      .from('business_config')
+      .select('four_eyes_enabled, four_eyes_threshold_sek')
+      .eq('business_id', quote.business_id)
+      .single()
+
+    const quoteTotal = quote.total || quote.subtotal || 0
+    if (
+      fourEyesConfig?.four_eyes_enabled &&
+      quoteTotal >= (fourEyesConfig.four_eyes_threshold_sek || 50000) &&
+      currentUser?.role !== 'owner' && currentUser?.role !== 'admin'
+    ) {
+      // Skapa approval istf att skicka direkt
+      const approvalId = `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
+      await supabase.from('pending_approvals').insert({
+        id: approvalId,
+        business_id: quote.business_id,
+        approval_type: 'four_eyes_quote',
+        title: `Offert kräver godkännande — ${(quoteTotal).toLocaleString('sv-SE')} kr`,
+        description: `${quote.title || 'Offert'} till ${quote.customer?.name || 'kund'}. Beloppet överstiger gränsen på ${(fourEyesConfig.four_eyes_threshold_sek || 50000).toLocaleString('sv-SE')} kr.`,
+        payload: {
+          quote_id: quoteId,
+          quote_title: quote.title,
+          quote_total: quoteTotal,
+          threshold: fourEyesConfig.four_eyes_threshold_sek,
+          requested_by: currentUser?.name || 'Användare',
+          send_method: method,
+          extra_emails: extraEmails,
+          bcc_emails: bccEmails,
+        },
+        status: 'pending',
+        risk_level: 'high',
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      })
+
+      // Uppdatera status till pending_approval
+      await supabase
+        .from('quotes')
+        .update({ status: 'pending_approval' })
+        .eq('quote_id', quoteId)
+
+      return NextResponse.json({
+        requires_approval: true,
+        approval_id: approvalId,
+        message: `Offerten kräver godkännande av admin innan den skickas (belopp: ${quoteTotal.toLocaleString('sv-SE')} kr)`,
+      })
+    }
+
     // Hämta kund separat (FK-relation osäker)
     let customer: any = null
     if (quote.customer_id) {

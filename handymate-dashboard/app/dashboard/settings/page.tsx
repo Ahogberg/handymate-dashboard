@@ -125,6 +125,8 @@ interface BusinessConfig {
   autopilot_auto_materials: boolean
   autopilot_booking_buffer_days: number
   autopilot_default_duration_hours: number
+  four_eyes_enabled: boolean
+  four_eyes_threshold_sek: number
 }
 
 interface FortnoxStatus {
@@ -3978,6 +3980,56 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+
+            {/* 4-eyes / Dubbelt godkännande */}
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    🔒 Dubbelt godkännande
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Offerter och projektstängningar över en viss summa kräver admin-godkännande
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    const newVal = !config.four_eyes_enabled
+                    setConfig({ ...config, four_eyes_enabled: newVal })
+                    await supabase.from('business_config').update({ four_eyes_enabled: newVal }).eq('business_id', business.business_id)
+                  }}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${config.four_eyes_enabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.four_eyes_enabled ? 'translate-x-4' : ''}`} />
+                </button>
+              </div>
+
+              {config.four_eyes_enabled && (
+                <div className="pt-4 border-t border-gray-100 space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 block mb-1">Beloppsträskel</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-500">Kräv godkännande för belopp över</span>
+                      <input
+                        type="number"
+                        value={config.four_eyes_threshold_sek || 50000}
+                        onChange={async (e) => {
+                          const val = parseInt(e.target.value) || 50000
+                          setConfig({ ...config, four_eyes_threshold_sek: val })
+                          await supabase.from('business_config').update({ four_eyes_threshold_sek: val }).eq('business_id', business.business_id)
+                        }}
+                        onFocus={(e) => e.target.select()}
+                        className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:border-teal-500"
+                      />
+                      <span className="text-sm text-gray-500">kr</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Gäller offertskickning och projektstängning. Admin och ägare kan alltid godkänna direkt.
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

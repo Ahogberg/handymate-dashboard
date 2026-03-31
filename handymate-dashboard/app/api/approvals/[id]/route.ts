@@ -505,8 +505,66 @@ async function executeApprovalPayload(
       }
 
       case 'low_stock_alert': {
-        // Godkänn = bekräfta att hantverkaren sett varningen
         return { action: 'low_stock_alert', acknowledged: true }
+      }
+
+      case 'four_eyes_quote': {
+        const pl = payload as any
+        if (!pl.quote_id) return { action: 'four_eyes_quote', skipped: 'no quote_id' }
+
+        const supabase4e = (await import('@/lib/supabase')).getServerSupabase()
+
+        // Återställ till draft — skaparen kan nu skicka
+        await supabase4e
+          .from('quotes')
+          .update({ status: 'draft' })
+          .eq('quote_id', pl.quote_id)
+
+        // Push-notis till skaparen
+        fetch(`${appUrl}/api/push/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            business_id: businessId,
+            title: 'Offert godkänd',
+            body: `Din offert på ${(pl.quote_total || 0).toLocaleString('sv-SE')} kr har godkänts — du kan nu skicka den`,
+            url: `/dashboard/quotes/${pl.quote_id}`,
+          }),
+        }).catch(() => {})
+
+        return { action: 'four_eyes_quote', ok: true, quote_id: pl.quote_id }
+      }
+
+      case 'four_eyes_project_close': {
+        const pl = payload as any
+        if (!pl.project_id) return { action: 'four_eyes_project_close', skipped: 'no project_id' }
+
+        const supabase4p = (await import('@/lib/supabase')).getServerSupabase()
+
+        await supabase4p
+          .from('project')
+          .update({ status: 'completed', completed_at: new Date().toISOString() })
+          .eq('project_id', pl.project_id)
+
+        // Fire job_completed
+        try {
+          const { fireEvent } = await import('@/lib/automation-engine')
+          const { data: proj } = await supabase4p
+            .from('project')
+            .select('customer_id, name')
+            .eq('project_id', pl.project_id)
+            .single()
+
+          if (proj) {
+            await fireEvent(supabase4p, 'job_completed', businessId, {
+              project_id: pl.project_id,
+              customer_id: proj.customer_id,
+              project_name: proj.name,
+            })
+          }
+        } catch { /* non-blocking */ }
+
+        return { action: 'four_eyes_project_close', ok: true, project_id: pl.project_id }
       }
 
       case 'price_adjustment': {
