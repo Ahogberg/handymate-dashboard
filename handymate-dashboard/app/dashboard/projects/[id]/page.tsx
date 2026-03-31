@@ -341,6 +341,7 @@ export default function ProjectDetailPage() {
   const [showProductSearch, setShowProductSearch] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<string | null>(null)
   const [editValues, setEditValues] = useState<{ quantity: number; markup_percent: number }>({ quantity: 1, markup_percent: 20 })
+  const [projectPriceList, setProjectPriceList] = useState<Array<{ id: string; name: string; unit: string; unit_price: number; default_quantity: number; category: string }>>([])
 
   // Team state
   const [projectTeam, setProjectTeam] = useState<ProjectAssignment[]>([])
@@ -591,6 +592,14 @@ export default function ProjectDetailPage() {
     if (activeTab === 'economy') {
       fetchProfitability()
       fetchSupplierInvoices()
+    }
+    if (activeTab === 'material' && projectPriceList.length === 0) {
+      supabase
+        .from('price_list')
+        .select('id, name, unit, unit_price, default_quantity, category')
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .then(({ data }: { data: any }) => { if (data) setProjectPriceList(data) })
     }
   }, [activeTab, fetchProfitability])
 
@@ -2270,6 +2279,51 @@ export default function ProjectDetailPage() {
                 )}
               </div>
             </div>
+
+            {/* Snabbval från prislista */}
+            {projectPriceList.length > 0 ? (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                <p className="text-sm text-gray-400 mb-2">Snabbval från prislista:</p>
+                <div className="flex flex-wrap gap-2">
+                  {projectPriceList.slice(0, 10).map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={async () => {
+                        try {
+                          await fetch(`/api/projects/${project?.project_id}/materials`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              name: item.name,
+                              unit: item.unit,
+                              purchase_price: item.unit_price,
+                              sell_price: item.unit_price,
+                              markup_percent: 0,
+                              quantity: item.default_quantity || 1,
+                            }),
+                          })
+                          fetchProjectData()
+                          setToast({ show: true, message: `${item.name} tillagt`, type: 'success' })
+                        } catch {
+                          setToast({ show: true, message: 'Kunde inte lägga till', type: 'error' })
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm hover:border-teal-400 hover:text-teal-700 transition-colors"
+                    >
+                      {item.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
+                <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
+                  className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                  + Bygg din prislista →
+                </a>
+              </div>
+            )}
 
             {/* Material list */}
             {materials.length === 0 ? (
