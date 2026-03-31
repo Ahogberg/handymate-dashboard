@@ -1,24 +1,24 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowRight, ArrowLeft, Phone, Lock, MessageSquare, PhoneCall } from 'lucide-react'
+import { ArrowRight, ArrowLeft, Phone, Lock, Check, X } from 'lucide-react'
 import type { StepProps } from '../types'
 
 const CALL_HANDLING_MODES = [
   {
-    value: 'agent_always',
-    label: 'Agenten svarar alltid',
-    description: 'Agenten hanterar alla samtal, du behöver aldrig svara telefon',
+    value: 'agent_fallback',
+    label: 'Agenten svarar om jag inte hinner',
+    description: 'Din telefon ringer först — om du inte svarar tar agenten vid.',
   },
   {
     value: 'agent_with_transfer',
-    label: 'Agenten filtrerar, du tar vid vid behov',
-    description: 'Agenten svarar, men kan koppla till dig om kunden vill prata direkt',
+    label: 'Agenten filtrerar — jag tar vid vid behov',
+    description: 'Agenten svarar alltid och kopplar till dig om kunden vill prata direkt.',
   },
   {
     value: 'human_work_hours',
-    label: 'Du svarar under arbetstid, agenten tar kvällar och helger',
-    description: 'Under 07-17 mån-fre ringer din telefon direkt — agenten täcker resten',
+    label: 'Jag svarar under arbetstid',
+    description: '07-17 mån-fre ringer din telefon direkt — agenten täcker kvällar och helger.',
   },
 ]
 
@@ -27,8 +27,9 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
     (data as any).personal_phone || data.forward_phone_number || data.phone_number || ''
   )
   const [callHandlingMode, setCallHandlingMode] = useState(
-    (data as any).call_handling_mode || 'agent_with_transfer'
+    (data as any).call_handling_mode || 'agent_fallback'
   )
+  const [numberChoice, setNumberChoice] = useState<'new' | 'keep'>('new')
   const [phoneSaving, setPhoneSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,7 +38,6 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
     setError('')
 
     try {
-      // Spara bara personal_phone och call_handling_mode — numret provisioneras efter betalning
       const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
       const supabase = createClientComponentClient()
       const { data: { session } } = await supabase.auth.getSession()
@@ -49,7 +49,10 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
       await fetch('/api/settings', {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ personal_phone: cleanPhone }),
+        body: JSON.stringify({
+          personal_phone: cleanPhone,
+          number_strategy: numberChoice,
+        }),
       })
 
       await fetch('/api/automation/settings', {
@@ -66,13 +69,24 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
     setPhoneSaving(false)
   }
 
+  const Feature = ({ ok, text }: { ok: boolean; text: string }) => (
+    <div className="flex items-center gap-2 text-sm">
+      {ok ? (
+        <Check className="w-4 h-4 text-teal-600 shrink-0" />
+      ) : (
+        <X className="w-4 h-4 text-gray-300 shrink-0" />
+      )}
+      <span className={ok ? 'text-gray-700' : 'text-gray-400'}>{text}</span>
+    </div>
+  )
+
   return (
     <div className="space-y-6">
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error}</div>
       )}
 
-      {/* Reserverat nummer */}
+      {/* Sektion 1 — Reserverat nummer */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center shadow-sm">
         <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-3">
           <Phone className="w-6 h-6 text-teal-600" />
@@ -82,60 +96,69 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
           <Lock className="w-3 h-3 text-teal-600" />
           <span className="text-xs font-medium text-teal-700">Reserverat åt dig</span>
         </div>
-        <p className="text-xs text-gray-400 mt-2">Aktiveras automatiskt när du slutför betalningen i nästa steg</p>
+        <p className="text-xs text-gray-400 mt-2">Aktiveras automatiskt när du slutför betalningen</p>
       </div>
 
-      {/* Beskrivning */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-        <p className="text-sm text-gray-700 leading-relaxed">
-          Det här numret är din direktlinje till Matte — din AI-assistent som aldrig sover.
-        </p>
+      {/* Sektion 2 — Vilket nummer ser kunder? */}
+      <div className="space-y-3">
+        <div>
+          <h3 className="text-gray-900 font-semibold">Vilket nummer ser dina kunder?</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Det här valet avgör hur mycket av Handymates värde du kan utnyttja.</p>
+        </div>
 
-        <div className="space-y-2.5">
-          <div className="flex items-start gap-2.5">
-            <MessageSquare className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">SMS-automatisering (alltid aktiv)</p>
-              <ul className="text-xs text-gray-500 mt-1 space-y-0.5">
-                <li>Nya leads svaras inom sekunder och kvalificeras automatiskt</li>
-                <li>Offerter följs upp med påminnelser tills kunden svarar</li>
-                <li>Bokningsbekräftelser och påminnelser skickas automatiskt</li>
-                <li>Betalningspåminnelser vid förfallna fakturor</li>
-              </ul>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Kort 1 — Byt till Handymate */}
+          <button
+            onClick={() => setNumberChoice('new')}
+            className={`relative text-left p-4 rounded-xl border-2 transition-all ${
+              numberChoice === 'new'
+                ? 'border-teal-600 bg-teal-50/50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            <span className="absolute -top-2.5 right-3 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              ⭐ Rekommenderat
+            </span>
+            <div className="text-xl mb-2">🆕</div>
+            <p className="text-sm font-semibold text-gray-900 mb-1">Byt till Handymate-numret</p>
+            <p className="text-xs text-gray-500 mb-3">Sätt det här numret på hemsida, visitkort och offerter.</p>
+            <div className="space-y-1.5">
+              <Feature ok={true} text="Matte svarar på inkommande SMS" />
+              <Feature ok={true} text="Utgående SMS-automation" />
+              <Feature ok={true} text="Samtalsagent (kommer snart)" />
             </div>
-          </div>
+          </button>
 
-          <div className="flex items-start gap-2.5">
-            <PhoneCall className="w-4 h-4 text-teal-600 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-gray-900">Samtal (valfritt)</p>
-              <p className="text-xs text-gray-500 mt-0.5">Välj hur inkommande samtal ska hanteras nedan</p>
+          {/* Kort 2 — Behåll befintligt */}
+          <button
+            onClick={() => setNumberChoice('keep')}
+            className={`relative text-left p-4 rounded-xl border-2 transition-all ${
+              numberChoice === 'keep'
+                ? 'border-teal-600 bg-teal-50/50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
+            }`}
+          >
+            <div className="text-xl mb-2">📱</div>
+            <p className="text-sm font-semibold text-gray-900 mb-1">Behåll ditt befintliga nummer</p>
+            <p className="text-xs text-gray-500 mb-3">Ditt gamla nummer behålls utåt mot kunder.</p>
+            <div className="space-y-1.5">
+              <Feature ok={false} text="Matte kan ej svara inkommande SMS" />
+              <Feature ok={true} text="Utgående SMS-automation aktiv" />
+              <Feature ok={false} text="Samtalsagent ej tillgänglig" />
             </div>
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Privat mobilnummer */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
-        <h3 className="text-gray-900 font-medium flex items-center gap-2">
-          <Phone className="w-4 h-4 text-teal-600" />
-          Ditt privata mobilnummer
-        </h3>
-        <p className="text-xs text-gray-500">
-          Hit kopplar agenten vidare om kunden behöver prata med dig direkt.
+      {/* Sektion 3 — Samtalshantering */}
+      <div className={`space-y-3 transition-all ${numberChoice !== 'new' ? 'opacity-40 pointer-events-none' : ''}`}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-gray-900 font-medium">Hur hanteras inkommande samtal?</h3>
+          <span className="text-[10px] font-medium bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Kommer snart</span>
+        </div>
+        <p className="text-xs text-gray-500 -mt-1">
+          Samtalsagenten aktiveras automatiskt när den är redo. SMS-funktionen fungerar fullt ut redan nu.
         </p>
-        <input
-          type="tel"
-          value={personalPhone}
-          onChange={(e) => setPersonalPhone(e.target.value)}
-          className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
-          placeholder="+46708379552"
-        />
-      </div>
-
-      {/* Samtalshantering */}
-      <div className="space-y-3">
-        <h3 className="text-gray-900 font-medium">Hur ska vi hantera inkommande samtal?</h3>
         {CALL_HANDLING_MODES.map((mode) => (
           <button
             key={mode.value}
@@ -159,6 +182,24 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
             <p className="text-xs text-gray-500 mt-1 ml-6">{mode.description}</p>
           </button>
         ))}
+      </div>
+
+      {/* Sektion 4 — Privat mobilnummer */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
+        <h3 className="text-gray-900 font-medium flex items-center gap-2">
+          <Phone className="w-4 h-4 text-teal-600" />
+          Ditt privata mobilnummer
+        </h3>
+        <p className="text-xs text-gray-500">
+          Hit kopplar agenten vidare om kunden behöver prata med dig direkt.
+        </p>
+        <input
+          type="tel"
+          value={personalPhone}
+          onChange={(e) => setPersonalPhone(e.target.value)}
+          className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+          placeholder="+46708379552"
+        />
       </div>
 
       {/* Knappar */}
