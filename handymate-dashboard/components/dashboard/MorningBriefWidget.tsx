@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
-interface BriefDetail { text: string; urgency: 'low' | 'medium' | 'high' }
+interface BriefDetail { text: string; urgency: 'low' | 'medium' | 'high'; link?: string }
 interface AgentBrief { agentId: string; quote: string; badge?: string; badgeType: string; details: BriefDetail[] }
 interface MorningBrief { date: string; greeting: string; agents: AgentBrief[]; generatedAt: string }
 
@@ -30,6 +31,7 @@ const URGENCY_DOT: Record<string, string> = {
 }
 
 export default function MorningBriefWidget() {
+  const router = useRouter()
   const [brief, setBrief] = useState<MorningBrief | null>(null)
   const [selected, setSelected] = useState('matte')
   const [loading, setLoading] = useState(true)
@@ -136,9 +138,18 @@ export default function MorningBriefWidget() {
           {/* Detaljer */}
           {selectedBrief.details.length > 0 ? (
             selectedBrief.details.slice(0, 3).map((detail, i) => (
-              <div key={i} className="flex items-start gap-2 py-1">
+              <div
+                key={i}
+                className={`flex items-start gap-2 py-1.5 rounded-lg px-1 -mx-1 ${
+                  detail.link ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''
+                }`}
+                onClick={() => detail.link && router.push(detail.link)}
+              >
                 <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
-                <span className="text-xs text-gray-600 leading-relaxed">{detail.text}</span>
+                <span className={`text-xs leading-relaxed ${detail.link ? 'text-gray-700 hover:text-teal-700' : 'text-gray-600'}`}>
+                  {detail.text}
+                </span>
+                {detail.link && <span className="text-gray-300 text-xs ml-auto shrink-0">→</span>}
               </div>
             ))
           ) : (

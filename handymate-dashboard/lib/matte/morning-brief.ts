@@ -7,6 +7,7 @@ import { getServerSupabase } from '@/lib/supabase'
 export interface BriefDetail {
   text: string
   urgency: 'low' | 'medium' | 'high'
+  link?: string
 }
 
 export interface AgentBrief {
@@ -121,15 +122,15 @@ function buildKarinBrief(overdue: any[], upcoming: any[]): AgentBrief {
     quote: `${overdue.length} faktura${overdue.length > 1 ? 'r' : ''} förfallen — ${fmt(total)} kr`,
     badge: `${overdue.length} förfallen`, badgeType: 'danger',
     details: [
-      ...overdue.map((i: any) => ({ text: `${i.invoice_number || '—'}: ${fmt(i.total || 0)} kr, förföll ${i.due_date}`, urgency: 'high' as const })),
-      ...upcoming.map((i: any) => ({ text: `${fmt(i.total || 0)} kr förfaller ${i.due_date}`, urgency: 'medium' as const })),
+      ...overdue.map((i: any) => ({ text: `${i.invoice_number || '—'}: ${fmt(i.total || 0)} kr, förföll ${i.due_date}`, urgency: 'high' as const, link: `/dashboard/invoices/${i.invoice_id}` })),
+      ...upcoming.map((i: any) => ({ text: `${fmt(i.total || 0)} kr förfaller ${i.due_date}`, urgency: 'medium' as const, link: `/dashboard/invoices/${i.invoice_id}` })),
     ],
   }
   if (upcoming.length > 0) return {
     agentId: 'karin',
     quote: `${fmt(upcoming.reduce((s: number, i: any) => s + (i.total || 0), 0))} kr förfaller inom 3 dagar`,
     badge: `${upcoming.length} snart`, badgeType: 'warning',
-    details: upcoming.map((i: any) => ({ text: `${fmt(i.total || 0)} kr förfaller ${i.due_date}`, urgency: 'medium' as const })),
+    details: upcoming.map((i: any) => ({ text: `${fmt(i.total || 0)} kr förfaller ${i.due_date}`, urgency: 'medium' as const, link: `/dashboard/invoices/${i.invoice_id}` })),
   }
   return { agentId: 'karin', quote: 'Ekonomin ser bra ut idag.', badge: 'OK', badgeType: 'success', details: [] }
 }
@@ -143,19 +144,19 @@ function buildDanielBrief(leads: any[], staleQuotes: any[]): AgentBrief {
     details: [
       ...staleQuotes.map((q: any) => {
         const days = Math.floor((Date.now() - new Date(q.created_at).getTime()) / 86400000)
-        return { text: `${q.title}: ${fmt(q.total || 0)} kr, ${days} dagar sedan`, urgency: 'medium' as const }
+        return { text: `${q.title}: ${fmt(q.total || 0)} kr, ${days} dagar sedan`, urgency: 'medium' as const, link: `/dashboard/quotes/${q.quote_id}/edit` }
       }),
-      ...hot.map((l: any) => ({ text: `Hett lead: ${l.name || l.job_type} — score ${l.score}`, urgency: 'high' as const })),
+      ...hot.map((l: any) => ({ text: `Hett lead: ${l.name || l.job_type} — score ${l.score}`, urgency: 'high' as const, link: `/dashboard/pipeline?lead=${l.lead_id}` })),
     ],
   }
   if (hot.length > 0) return {
     agentId: 'daniel', quote: `${hot.length} hett${hot.length > 1 ? 'a' : ''} lead${hot.length > 1 ? 's' : ''}`,
     badge: `${hot.length} heta`, badgeType: 'success',
-    details: hot.map((l: any) => ({ text: `${l.name || 'Lead'}: ${l.job_type || '—'} — score ${l.score}`, urgency: 'high' as const })),
+    details: hot.map((l: any) => ({ text: `${l.name || 'Lead'}: ${l.job_type || '—'} — score ${l.score}`, urgency: 'high' as const, link: `/dashboard/pipeline?lead=${l.lead_id}` })),
   }
   if (leads.length > 0) return {
     agentId: 'daniel', quote: `${leads.length} aktiva leads`, badge: `${leads.length}`, badgeType: 'neutral',
-    details: leads.slice(0, 3).map((l: any) => ({ text: `${l.name || 'Lead'} — ${l.pipeline_stage || '—'}`, urgency: 'low' as const })),
+    details: leads.slice(0, 3).map((l: any) => ({ text: `${l.name || 'Lead'} — ${l.pipeline_stage || '—'}`, urgency: 'low' as const, link: `/dashboard/pipeline?lead=${l.lead_id}` })),
   }
   return { agentId: 'daniel', quote: 'Inga leads just nu.', badge: 'Tomt', badgeType: 'neutral', details: [] }
 }
@@ -165,10 +166,11 @@ function buildLarsBrief(bookings: any[], warnings: any[]): AgentBrief {
     agentId: 'lars', quote: `${warnings.length} projekt med lönsamhetsrisk`,
     badge: 'Risk', badgeType: 'danger',
     details: [
-      ...warnings.map((w: any) => ({ text: w.description, urgency: 'high' as const })),
+      ...warnings.map((w: any) => ({ text: w.description, urgency: 'high' as const, link: `/dashboard/projects/${w.project_id}` })),
       ...bookings.map((b: any) => ({
         text: `Kl ${new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}: ${b.notes || 'Bokning'}`,
         urgency: 'low' as const,
+        link: `/dashboard/schedule`,
       })),
     ],
   }
@@ -178,6 +180,7 @@ function buildLarsBrief(bookings: any[], warnings: any[]): AgentBrief {
     details: bookings.map((b: any) => ({
       text: `Kl ${new Date(b.scheduled_start).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}: ${b.notes || 'Bokning'}`,
       urgency: 'low' as const,
+      link: `/dashboard/schedule`,
     })),
   }
   return { agentId: 'lars', quote: 'Inga bokningar idag.', badge: 'Ledig', badgeType: 'neutral', details: [] }
@@ -187,7 +190,7 @@ function buildHannaBrief(inactive: any[]): AgentBrief {
   if (inactive.length > 0) return {
     agentId: 'hanna', quote: `${inactive.length} kunder redo för reaktivering`,
     badge: 'Möjlighet', badgeType: 'success',
-    details: inactive.slice(0, 3).map((c: any) => ({ text: `${c.name} — inaktiv 6+ månader`, urgency: 'low' as const })),
+    details: inactive.slice(0, 3).map((c: any) => ({ text: `${c.name} — inaktiv 6+ månader`, urgency: 'low' as const, link: `/dashboard/customers/${c.customer_id}` })),
   }
   return { agentId: 'hanna', quote: 'Inga reaktiveringsmöjligheter just nu.', badge: 'OK', badgeType: 'neutral', details: [] }
 }
@@ -195,7 +198,7 @@ function buildHannaBrief(inactive: any[]): AgentBrief {
 function buildMatteBrief(approvals: any[], agentBriefs: AgentBrief[]): AgentBrief {
   const urgentCount = agentBriefs.reduce((sum, b) => sum + b.details.filter(d => d.urgency === 'high').length, 0) + approvals.length
   const details: BriefDetail[] = [
-    ...approvals.slice(0, 3).map((a: any) => ({ text: a.title, urgency: 'high' as const })),
+    ...approvals.slice(0, 3).map((a: any) => ({ text: a.title, urgency: 'high' as const, link: `/dashboard/approvals` })),
     ...agentBriefs.filter(b => b.badgeType === 'danger' || b.badgeType === 'warning')
       .map(b => ({ text: b.quote, urgency: b.badgeType === 'danger' ? 'high' as const : 'medium' as const })),
   ].slice(0, 5)
