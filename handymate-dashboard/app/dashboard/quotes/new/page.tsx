@@ -618,6 +618,8 @@ export default function NewQuotePage() {
     }
     const customer = customers.find((c) => c.customer_id === selectedCustomer)
     if (!customer) return
+
+    // Sync kör — auto-fill fält direkt
     if (customer.personal_number && !personnummer) setPersonnummer(customer.personal_number)
     if (customer.property_designation && !fastighetsbeteckning)
       setFastighetsbeteckning(customer.property_designation)
@@ -626,10 +628,41 @@ export default function NewQuotePage() {
     // Pre-fill customer reference from customer name
     if (customer.name && !customerReference) setCustomerReference(customer.name)
 
-    // Fetch customer's price list if assigned — auto-apply rates
+    // Fetch customer's price list — direkt koppling ELLER via kundsegment
+    ;(async () => {
     const cust = customer as any
-    if (cust.price_list_id) {
-      fetch(`/api/pricing/price-lists/${cust.price_list_id}`)
+    let priceListId = cust.price_list_id
+
+    // Om ingen direkt prislista → sök via kundsegment
+    if (!priceListId && cust.segment_id) {
+      try {
+        const segRes = await supabase
+          .from('price_lists_v2')
+          .select('id')
+          .eq('business_id', business.business_id)
+          .eq('segment_id', cust.segment_id)
+          .limit(1)
+          .maybeSingle()
+        if (segRes.data?.id) priceListId = segRes.data.id
+      } catch { /* non-blocking */ }
+    }
+
+    // Om fortfarande ingen → sök default-prislista
+    if (!priceListId) {
+      try {
+        const defRes = await supabase
+          .from('price_lists_v2')
+          .select('id')
+          .eq('business_id', business.business_id)
+          .eq('is_default', true)
+          .limit(1)
+          .maybeSingle()
+        if (defRes.data?.id) priceListId = defRes.data.id
+      } catch { /* non-blocking */ }
+    }
+
+    if (priceListId) {
+      fetch(`/api/pricing/price-lists/${priceListId}`)
         .then(r => r.json())
         .then(data => {
           if (data.priceList) {
@@ -665,6 +698,7 @@ export default function NewQuotePage() {
     } else {
       setCustomerPriceListInfo(null)
     }
+    })()
   }, [selectedCustomer])
 
   // ═══════════════════════════════════════════════════════════════════════════
