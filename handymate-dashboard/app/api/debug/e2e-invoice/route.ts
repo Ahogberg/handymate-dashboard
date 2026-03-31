@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     // ── STEG 4: Generera PDF ──
     try {
-      const pdfRes = await fetch(`${APP_URL}/api/invoices/pdf?id=${invoiceId}`, {
+      const pdfRes = await fetch(`${APP_URL}/api/invoices/pdf?invoiceId=${invoiceId}`, {
         headers: { 'Cookie': request.headers.get('cookie') || '' },
       })
       if (pdfRes.ok) {
@@ -196,7 +196,6 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           status: 'paid',
           payment_method: 'swish',
-          paid_amount: total,
         }),
       })
 

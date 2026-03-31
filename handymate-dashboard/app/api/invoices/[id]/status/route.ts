@@ -4,7 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 
 /**
  * PATCH - Update invoice status with payment details
- * Body: { status: 'paid' | 'cancelled', paid_at?: string, payment_method?: string, paid_amount?: number }
+ * Body: { status: 'paid' | 'cancelled', paid_at?: string, payment_method?: string }
  */
 export async function PATCH(
   request: NextRequest,
@@ -21,7 +21,7 @@ export async function PATCH(
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { status, paid_at, payment_method, paid_amount } = body
+    const { status, paid_at, payment_method } = body
 
     if (!status) {
       return NextResponse.json({ error: 'Missing status' }, { status: 400 })
@@ -45,7 +45,7 @@ export async function PATCH(
     if (status === 'paid') {
       updates.paid_at = paid_at || new Date().toISOString()
       updates.payment_method = payment_method || null
-      updates.paid_amount = paid_amount || existing.total
+      // paid_amount kolumn finns ej i schemat — skippa
     }
 
     if (status === 'cancelled') {
