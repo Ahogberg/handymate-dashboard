@@ -21,6 +21,7 @@ interface PriceItem {
   name: string
   unit: string
   unit_price: number
+  default_quantity: number
   is_active: boolean
   _isNew?: boolean
   _dirty?: boolean
@@ -73,6 +74,7 @@ export default function MyPricesPage() {
       name: '',
       unit: category === 'labor' ? 'timme' : 'st',
       unit_price: 0,
+      default_quantity: 1,
       is_active: true,
       _isNew: true,
       _dirty: true,
@@ -115,6 +117,7 @@ export default function MyPricesPage() {
             name: i.name,
             unit: i.unit,
             unit_price: i.unit_price,
+            default_quantity: i.default_quantity || 1,
             is_active: i.is_active,
           }))
         )
@@ -128,6 +131,7 @@ export default function MyPricesPage() {
             name: item.name,
             unit: item.unit,
             unit_price: item.unit_price,
+            default_quantity: item.default_quantity || 1,
             is_active: item.is_active,
           })
           .eq('id', item.id)
@@ -204,6 +208,16 @@ export default function MyPricesPage() {
                   placeholder="0"
                   className="w-24 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-teal-500"
                 />
+                <input
+                  type="number"
+                  value={item.default_quantity || 1}
+                  onChange={e => updateItem(item.id, 'default_quantity', Number(e.target.value) || 1)}
+                  onFocus={e => e.target.select()}
+                  title="Standardantal"
+                  min={0.1}
+                  step="any"
+                  className="w-16 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-teal-500"
+                />
                 <select
                   value={item.unit}
                   onChange={e => updateItem(item.id, 'unit', e.target.value)}
@@ -262,6 +276,16 @@ export default function MyPricesPage() {
                   onChange={e => updateItem(item.id, 'unit_price', Number(e.target.value))}
                   placeholder="0"
                   className="w-24 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-teal-500"
+                />
+                <input
+                  type="number"
+                  value={item.default_quantity || 1}
+                  onChange={e => updateItem(item.id, 'default_quantity', Number(e.target.value) || 1)}
+                  onFocus={e => e.target.select()}
+                  title="Standardantal"
+                  min={0.1}
+                  step="any"
+                  className="w-16 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-teal-500"
                 />
                 <select
                   value={item.unit}

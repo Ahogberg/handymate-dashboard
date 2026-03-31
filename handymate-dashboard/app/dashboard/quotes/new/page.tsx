@@ -1006,14 +1006,15 @@ export default function NewQuotePage() {
   }, [])
 
   const addFromPriceList = useCallback((priceItem: PriceItem) => {
+    const qty = (priceItem as any).default_quantity || 1
     const newItem: QuoteItem = {
       id: generateItemId(),
       item_type: 'item',
       description: priceItem.name,
-      quantity: 1,
+      quantity: qty,
       unit: normalizeUnit(priceItem.unit),
       unit_price: priceItem.unit_price,
-      total: priceItem.unit_price,
+      total: priceItem.unit_price * qty,
       is_rot_eligible: priceItem.category === 'labor',
       is_rut_eligible: false,
       sort_order: 0,
