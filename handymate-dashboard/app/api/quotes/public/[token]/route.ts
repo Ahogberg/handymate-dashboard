@@ -17,37 +17,10 @@ export async function GET(
       return NextResponse.json({ error: 'Token saknas' }, { status: 400 })
     }
 
-    // Fetch quote by sign_token (utan FK-join som kan misslyckas)
+    // Fetch quote by sign_token
     const { data: quote, error } = await supabase
       .from('quotes')
-      .select(`
-        quote_id,
-        title,
-        description,
-        items,
-        labor_total,
-        material_total,
-        subtotal,
-        discount_percent,
-        discount_amount,
-        vat_rate,
-        vat_amount,
-        total,
-        rot_rut_type,
-        rot_rut_eligible,
-        rot_rut_deduction,
-        customer_pays,
-        personnummer,
-        fastighetsbeteckning,
-        valid_until,
-        status,
-        signed_at,
-        signed_by_name,
-        attachments,
-        created_at,
-        business_id,
-        customer_id
-      `)
+      .select('*')
       .eq('sign_token', token)
       .single()
 
@@ -118,7 +91,7 @@ export async function POST(
     // Fetch quote by sign_token
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('quote_id, business_id, customer_id, status, signed_at, total, customer:customer_id(name)')
+      .select('*')
       .eq('sign_token', token)
       .single()
 

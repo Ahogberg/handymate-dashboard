@@ -243,7 +243,7 @@ export async function POST(request: NextRequest) {
       const acceptRes = await fetch(`${APP_URL}/api/quotes/public/${signToken}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sign', signed_by_name: 'E2E Test' }),
+        body: JSON.stringify({ action: 'sign', name: 'E2E Test', signature_data: 'data:image/png;base64,e2etest' }),
       })
 
       if (acceptRes.ok) {
