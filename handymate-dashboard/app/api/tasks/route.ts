@@ -77,6 +77,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ task: { ...task, assigned_user: assignedUser }, activities: activities || [] })
   }
 
+  const myOnly = searchParams.get('my') === 'true'
+  const userId = auth.user_id
+
   let query = supabase
     .from('task')
     .select('*')
@@ -88,13 +91,26 @@ export async function GET(request: NextRequest) {
   if (dealId) query = query.eq('deal_id', dealId)
   if (projectId) query = query.eq('project_id', projectId)
 
+  // "Mina uppgifter" — bara tilldelade till mig eller skapade av mig
+  if (myOnly && userId) {
+    query = query.or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
+  }
+
   const { data, error } = await query
+
+  // Filtrera privata uppgifter — visa bara om jag är skapare eller tilldelad
+  const filtered = (data || []).filter((t: any) => {
+    if (t.visibility === 'private') {
+      return t.created_by === userId || t.assigned_to === userId
+    }
+    return true // team + project synliga för alla
+  })
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   // Resolve assigned user names for all tasks
-  const tasks: any[] = data || []
+  const tasks: any[] = filtered
   const assignedIds = Array.from(new Set(tasks.filter((t: any) => t.assigned_to).map((t: any) => t.assigned_to as string)))
   let userMap: Record<string, { id: string; name: string; color: string }> = {}
   if (assignedIds.length > 0) {
@@ -142,6 +158,7 @@ export async function POST(request: NextRequest) {
       deal_id: body.deal_id || null,
       project_id: body.project_id || null,
       created_by: auth.user_id,
+      visibility: body.visibility || (body.project_id ? 'project' : 'private'),
     })
     .select()
     .single()
@@ -204,6 +221,7 @@ export async function PUT(request: NextRequest) {
   if (body.due_date !== undefined) updates.due_date = body.due_date
   if (body.due_time !== undefined) updates.due_time = body.due_time
   if (body.assigned_to !== undefined) updates.assigned_to = body.assigned_to
+  if (body.visibility !== undefined) updates.visibility = body.visibility
 
   const { data, error } = await supabase
     .from('task')
