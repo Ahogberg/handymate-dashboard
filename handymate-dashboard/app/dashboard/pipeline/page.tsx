@@ -437,7 +437,9 @@ export default function PipelinePage() {
 
   // Site visit booking
   const [showSiteVisit, setShowSiteVisit] = useState(false)
-  const [siteVisitForm, setSiteVisitForm] = useState({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true })
+  const [siteVisitForm, setSiteVisitForm] = useState({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [] as string[], externalUe: '' })
+  const [siteVisitTeam, setSiteVisitTeam] = useState<Array<{ id: string; name: string; phone: string | null }>>([])
+  const [siteVisitTeamLoaded, setSiteVisitTeamLoaded] = useState(false)
   const [siteVisitSaving, setSiteVisitSaving] = useState(false)
 
   // Stage management
@@ -1079,6 +1081,21 @@ export default function PipelinePage() {
   // Site visit booking
   // ------------------------------------------
 
+  // Load team for site visit invite
+  useEffect(() => {
+    if (showSiteVisit && !siteVisitTeamLoaded) {
+      supabase
+        .from('business_users')
+        .select('id, name, phone')
+        .eq('business_id', business.business_id)
+        .eq('is_active', true)
+        .then(({ data }: { data: any }) => {
+          setSiteVisitTeam(data || [])
+          setSiteVisitTeamLoaded(true)
+        })
+    }
+  }, [showSiteVisit])
+
   async function bookSiteVisit() {
     if (!selectedDeal || !siteVisitForm.date) return
     setSiteVisitSaving(true)
@@ -1115,9 +1132,42 @@ export default function PipelinePage() {
         }).catch(() => {})
       }
 
+      // Send SMS to invited team members
+      const dateStr = start.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
+      const timeStr2 = start.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+      for (const memberId of siteVisitForm.invitedTeam) {
+        const member = siteVisitTeam.find(m => m.id === memberId)
+        if (member?.phone) {
+          fetch('/api/sms/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: member.phone,
+              message: `Platsbesök: ${selectedDeal.title} hos ${selectedDeal.customer?.name || 'kund'}, ${dateStr} kl ${timeStr2}. ${siteVisitForm.notes || ''} //${business.business_name}`,
+            }),
+          }).catch(() => {})
+        }
+      }
+
+      // SMS to external UE
+      if (siteVisitForm.externalUe) {
+        const phonePart = siteVisitForm.externalUe.match(/\+?\d[\d\s-]{7,}/)
+        if (phonePart) {
+          const uePhone = '+' + phonePart[0].replace(/\D/g, '')
+          fetch('/api/sms/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: uePhone,
+              message: `Inbjudan till platsbesök: ${selectedDeal.title}, ${dateStr} kl ${timeStr2}. ${siteVisitForm.notes || ''} //${business.business_name}`,
+            }),
+          }).catch(() => {})
+        }
+      }
+
       showToast('Platsbesök bokat!', 'success')
       setShowSiteVisit(false)
-      setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true })
+      setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' })
     } catch {
       showToast('Kunde inte boka platsbesök', 'error')
     }
@@ -2015,7 +2065,7 @@ export default function PipelinePage() {
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
-                        <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true }) }}
+                        <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' }) }}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
@@ -2874,6 +2924,40 @@ export default function PipelinePage() {
                   <span className="text-sm text-gray-600">Skicka SMS till kund</span>
                 </label>
               )}
+
+              {/* Team invite */}
+              {siteVisitTeam.length > 0 && (
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Bjud in deltagare (valfritt)</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {siteVisitTeam.map(m => (
+                      <button key={m.id} type="button"
+                        onClick={() => setSiteVisitForm(p => ({
+                          ...p,
+                          invitedTeam: p.invitedTeam.includes(m.id)
+                            ? p.invitedTeam.filter(id => id !== m.id)
+                            : [...p.invitedTeam, m.id]
+                        }))}
+                        className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                          siteVisitForm.invitedTeam.includes(m.id)
+                            ? 'bg-teal-50 border-teal-400 text-teal-700'
+                            : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                        }`}>
+                        {m.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* External UE */}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Extern underentreprenör (valfritt)</label>
+                <input type="text" value={siteVisitForm.externalUe}
+                  onChange={e => setSiteVisitForm(p => ({ ...p, externalUe: e.target.value }))}
+                  placeholder="Namn + telefon, t.ex. Erik +46701234567"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={bookSiteVisit} disabled={siteVisitSaving || !siteVisitForm.date}

@@ -535,6 +535,32 @@ async function executeApprovalPayload(
         return { action: 'four_eyes_quote', ok: true, quote_id: pl.quote_id }
       }
 
+      case 'propose_site_visit': {
+        const pl = payload as any
+        if (!pl.entity?.phone) return { action: 'propose_site_visit', skipped: 'no phone' }
+
+        // Hämta lediga tider
+        let slotsText = ''
+        try {
+          const { getAvailableSlots } = await import('@/lib/matte/calendar-slots')
+          const slots = await getAvailableSlots(businessId, 1)
+          if (slots.length > 0) {
+            slotsText = slots.map((s: any, i: number) => `${i + 1}) ${s.label}`).join('\n')
+          }
+        } catch { /* no calendar */ }
+
+        const message = slotsText
+          ? `Hej ${pl.entity?.customerName || ''}! Vi skulle gärna komma och titta på jobbet. Passar någon av dessa tider?\n${slotsText}\nSvara med 1, 2 eller 3. //${pl.businessName || ''}`
+          : pl.customer_reply_pending || `Hej! Vi vill gärna boka in ett platsbesök. Vilken tid passar dig? //${pl.businessName || ''}`
+
+        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ business_id: businessId, to: pl.entity.phone, message }),
+        })
+        return { action: 'propose_site_visit', sms_sent: smsRes.ok }
+      }
+
       case 'four_eyes_project_close': {
         const pl = payload as any
         if (!pl.project_id) return { action: 'four_eyes_project_close', skipped: 'no project_id' }
