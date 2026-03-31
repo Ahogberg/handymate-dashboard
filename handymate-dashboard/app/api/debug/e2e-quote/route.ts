@@ -238,6 +238,113 @@ export async function POST(request: NextRequest) {
       steps.push({ step: '7. PDF-generering', status: 'fail', detail: pdfErr.message })
     }
 
+    // ── STEG 8: Simulera signering ──
+    try {
+      const acceptRes = await fetch(`${APP_URL}/api/quotes/public/${signToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sign', signed_by_name: 'E2E Test' }),
+      })
+
+      if (acceptRes.ok) {
+        const acceptData = await acceptRes.json().catch(() => null)
+        steps.push({
+          step: '8. Signering',
+          status: 'ok',
+          detail: 'Offert signerad digitalt',
+          data: acceptData,
+        })
+      } else {
+        const errText = await acceptRes.text().catch(() => '')
+        steps.push({
+          step: '8. Signering',
+          status: 'fail',
+          detail: `HTTP ${acceptRes.status}: ${errText.substring(0, 200)}`,
+        })
+      }
+    } catch (signErr: any) {
+      steps.push({ step: '8. Signering', status: 'fail', detail: signErr.message })
+    }
+
+    // ── STEG 9: Verifiera att offert → accepted + projekt skapas ──
+    try {
+      // Kort paus för att låta automationer köra
+      await new Promise(resolve => setTimeout(resolve, 2000))
+
+      const { data: signedQuote } = await supabase
+        .from('quotes')
+        .select('status, signed_at')
+        .eq('quote_id', quoteId)
+        .single()
+
+      if (signedQuote?.status === 'accepted' || signedQuote?.signed_at) {
+        steps.push({
+          step: '9. Status → accepted',
+          status: 'ok',
+          detail: `Status: ${signedQuote.status}, signerad: ${signedQuote.signed_at}`,
+        })
+      } else {
+        steps.push({
+          step: '9. Status → accepted',
+          status: 'fail',
+          detail: `Status: ${signedQuote?.status || 'okänd'} (förväntade 'accepted')`,
+        })
+      }
+
+      // Kolla om projekt skapades
+      const { data: project } = await supabase
+        .from('project')
+        .select('project_id, name, status')
+        .eq('business_id', business.business_id)
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+      if (project) {
+        steps.push({
+          step: '10. Projekt skapat',
+          status: 'ok',
+          detail: `Projekt: ${project.name} (${project.status})`,
+          data: { project_id: project.project_id },
+        })
+      } else {
+        steps.push({
+          step: '10. Projekt skapat',
+          status: 'fail',
+          detail: 'Inget projekt hittades kopplat till offerten',
+        })
+      }
+
+      // Kolla om deal flyttades till won
+      const { data: deal } = await supabase
+        .from('deal')
+        .select('id, stage_id')
+        .eq('business_id', business.business_id)
+        .eq('quote_id', quoteId)
+        .maybeSingle()
+
+      if (deal) {
+        const { data: stage } = await supabase
+          .from('pipeline_stage')
+          .select('slug, name')
+          .eq('id', deal.stage_id)
+          .single()
+
+        steps.push({
+          step: '11. Deal → Vunnen',
+          status: stage?.slug === 'won' ? 'ok' : 'fail',
+          detail: `Deal stage: ${stage?.name || stage?.slug || 'okänd'}`,
+        })
+      } else {
+        steps.push({
+          step: '11. Deal → Vunnen',
+          status: 'skip',
+          detail: 'Ingen deal kopplad till offerten',
+        })
+      }
+    } catch (postSignErr: any) {
+      steps.push({ step: '9-11. Post-signering', status: 'fail', detail: postSignErr.message })
+    }
+
     // ── SAMMANFATTNING ──
     const failCount = steps.filter(s => s.status === 'fail').length
     const allOk = failCount === 0
