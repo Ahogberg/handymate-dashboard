@@ -21,9 +21,25 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     if (!customer) return NextResponse.json({ error: 'Kund ej hittad' }, { status: 404 })
 
-    // Generate new token
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+    // Återanvänd befintlig token om den finns
+    if (customer.portal_token) {
+      // Säkerställ att portalen är aktiverad
+      await supabase
+        .from('customer')
+        .update({ portal_enabled: true })
+        .eq('customer_id', customerId)
+
+      return NextResponse.json({
+        success: true,
+        token: customer.portal_token,
+        url: `${appUrl}/portal/${customer.portal_token}`
+      })
+    }
+
+    // Skapa ny token bara om ingen finns
     const token = randomUUID()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://handymate.se'
 
     await supabase
       .from('customer')

@@ -165,6 +165,41 @@ export async function createProjectFromLead(
       // SMS failure should not block
     }
 
+    // 9. Notifiera kund med portallänk
+    try {
+      if (lead.customer_id) {
+        const { data: cust } = await supabase
+          .from('customer')
+          .select('phone_number, name, portal_token, portal_enabled')
+          .eq('customer_id', lead.customer_id)
+          .single()
+
+        if (cust?.phone_number && cust?.portal_token && cust?.portal_enabled) {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+          const portalUrl = `${appUrl}/portal/${cust.portal_token}?tab=projects`
+          const firstName = cust.name?.split(' ')[0] || ''
+
+          const { data: biz } = await supabase
+            .from('business_config')
+            .select('business_name')
+            .eq('business_id', businessId)
+            .single()
+
+          await fetch(`${appUrl}/api/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to: cust.phone_number,
+              message: `Hej ${firstName}! Ditt projekt "${projectName}" har startats. Följ projektets gång här: ${portalUrl} // ${biz?.business_name || ''}`,
+              business_id: businessId,
+            }),
+          })
+        }
+      }
+    } catch {
+      // Non-blocking
+    }
+
     return { success: true, project_id: project.project_id }
   } catch (err: any) {
     console.error('[createProjectFromLead] Error:', err)

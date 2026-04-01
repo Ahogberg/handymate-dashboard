@@ -39,7 +39,7 @@ export async function sendQuoteSignedConfirmation(
   // Fetch customer
   const { data: customer } = await supabase
     .from('customer')
-    .select('name, email, address_line, phone_number, personal_number, property_designation')
+    .select('name, email, address_line, phone_number, personal_number, property_designation, portal_token, portal_enabled')
     .eq('customer_id', quote.customer_id)
     .single()
 
@@ -67,6 +67,11 @@ export async function sendQuoteSignedConfirmation(
     ? `Tack för att du godkände offerten — vänligen granska dina uppgifter`
     : `Tack för att du godkände offerten`
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+  const portalUrl = customer.portal_token && customer.portal_enabled
+    ? `${appUrl}/portal/${customer.portal_token}`
+    : ''
+
   const html = buildConfirmationHtml({
     firstName,
     customerName,
@@ -77,6 +82,7 @@ export async function sendQuoteSignedConfirmation(
     hasRot,
     personnummer,
     fastighet,
+    portalUrl,
   })
 
   const result = await sendEmail({
@@ -113,6 +119,7 @@ function buildConfirmationHtml(opts: {
   hasRot: boolean
   personnummer: string
   fastighet: string
+  portalUrl: string
 }): string {
   const rotSection = opts.hasRot ? `
     <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 16px; margin: 16px 0;">
@@ -156,6 +163,17 @@ function buildConfirmationHtml(opts: {
     <p style="color: #374151; line-height: 1.6;">
       Vi hör av oss inom kort för att boka in arbetets start.
     </p>
+
+    ${opts.portalUrl ? `
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${opts.portalUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
+        Gå till din kundportal
+      </a>
+      <p style="color: #6B7280; font-size: 13px; margin: 8px 0 0;">
+        Här kan du följa ditt projekt, se fakturor och skicka meddelanden.
+      </p>
+    </div>
+    ` : ''}
 
     <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
 
