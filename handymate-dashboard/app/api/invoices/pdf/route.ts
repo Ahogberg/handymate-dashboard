@@ -22,11 +22,6 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request: NextRequest) {
   try {
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const supabase = getServerSupabase()
     const invoiceId = request.nextUrl.searchParams.get('invoiceId')
 
@@ -34,7 +29,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoiceId' }, { status: 400 })
     }
 
-    const { data: invoice, error: invoiceError } = await supabase
+    // Försök autentiserad åtkomst först (dashboard-vy)
+    const business = await getAuthenticatedBusiness(request)
+
+    let query = supabase
       .from('invoice')
       .select(`
         *,
@@ -49,8 +47,16 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('invoice_id', invoiceId)
-      .eq('business_id', business.business_id)
-      .single()
+
+    if (business) {
+      // Autentiserad: visa bara egna fakturor
+      query = query.eq('business_id', business.business_id)
+    } else {
+      // Publik åtkomst: bara skickade/betalda fakturor (inte drafts)
+      query = query.in('status', ['sent', 'paid', 'overdue', 'reminded'])
+    }
+
+    const { data: invoice, error: invoiceError } = await query.single()
 
     if (invoiceError || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
     const { data: businessConfig } = await supabase
       .from('business_config')
       .select('*')
-      .eq('business_id', business.business_id)
+      .eq('business_id', invoice.business_id)
       .single()
 
     const format = request.nextUrl.searchParams.get('format') || 'html'
