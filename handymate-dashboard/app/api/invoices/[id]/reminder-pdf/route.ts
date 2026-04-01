@@ -59,7 +59,7 @@ export async function GET(
     const businessName = config?.display_name || config?.business_name || 'Företag'
     const penaltyInterest = config?.penalty_interest || config?.late_fee_percent || 8
     const reminderFee = config?.reminder_fee || 60
-    const accentColor = config?.accent_color || '#7c3aed'
+    const accentColor = config?.accent_color || '#0F766E'
     const currentCount = invoice.reminder_count || 0
 
     // Calculate
