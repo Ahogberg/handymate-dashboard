@@ -5,6 +5,7 @@ import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
+import { randomUUID } from 'crypto'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -78,10 +79,37 @@ export async function POST(request: NextRequest) {
 
     const results: { sms?: boolean; email?: boolean; errors: string[] } = { errors: [] }
 
+    // Säkerställ kundportal aktiverad
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+    let portalUrl = ''
+    if (invoice.customer_id) {
+      const { data: cust } = await supabase
+        .from('customer')
+        .select('portal_token, portal_enabled')
+        .eq('customer_id', invoice.customer_id)
+        .single()
+
+      if (cust?.portal_token && cust?.portal_enabled) {
+        portalUrl = `${APP_URL}/portal/${cust.portal_token}?tab=invoices`
+      } else {
+        // Auto-skapa kundportal
+        const newToken = randomUUID()
+        await supabase
+          .from('customer')
+          .update({
+            portal_token: newToken,
+            portal_token_created_at: new Date().toISOString(),
+            portal_enabled: true,
+          })
+          .eq('customer_id', invoice.customer_id)
+        portalUrl = `${APP_URL}/portal/${newToken}?tab=invoices`
+      }
+    }
+
     // Skicka email
     if (send_email && invoice.customer?.email) {
       try {
-        const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate.se'}/api/invoices/pdf?invoiceId=${invoice_id}`
+        const pdfUrl = `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
         const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
 
         // Generera PDF-bilaga
@@ -135,6 +163,7 @@ export async function POST(request: NextRequest) {
             orgNumber: business?.org_number,
             contactEmail: business?.contact_email,
             contactPhone: business?.contact_phone,
+            portalUrl: portalUrl || pdfUrl,
             pdfUrl,
           }),
           attachments: [
@@ -156,7 +185,7 @@ export async function POST(request: NextRequest) {
     if (send_sms && invoice.customer?.phone_number) {
       try {
         const amountToPay = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
-        const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://handymate.se'}/api/invoices/pdf?invoiceId=${invoice_id}`
+        const smsLink = portalUrl || `${APP_URL}/api/invoices/pdf?invoiceId=${invoice_id}`
 
         const smsResponse = await fetch('https://api.46elks.com/a1/sms', {
           method: 'POST',
@@ -167,7 +196,7 @@ export async function POST(request: NextRequest) {
           body: new URLSearchParams({
             from: business?.business_name?.substring(0, 11) || 'Handymate',
             to: invoice.customer.phone_number,
-            message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${pdfUrl}`
+            message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${smsLink}`
           }).toString()
         })
 
@@ -264,6 +293,7 @@ function buildInvoiceEmailHtml(opts: {
   orgNumber?: string | null
   contactEmail?: string | null
   contactPhone?: string | null
+  portalUrl: string
   pdfUrl: string
 }): string {
   const firstName = opts.customerName.split(' ')[0] || 'Kund'
@@ -326,7 +356,7 @@ function buildInvoiceEmailHtml(opts: {
 
       <h2 style="color: #111827; font-size: 18px; margin: 0 0 8px;">Hej ${firstName}!</h2>
       <p style="color: #374151; line-height: 1.6; margin: 0 0 20px;">
-        Här kommer din faktura. Nedan hittar du en sammanfattning — fullständig faktura finns bifogad som PDF.
+        Här kommer din faktura. Nedan hittar du en sammanfattning — du kan se alla detaljer i din kundportal eller i bifogad PDF.
       </p>
 
       ${rotSection}
@@ -360,9 +390,12 @@ function buildInvoiceEmailHtml(opts: {
       ${swishSection}
 
       <div style="text-align: center; margin: 24px 0 8px;">
-        <a href="${opts.pdfUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
-          Visa faktura som PDF
+        <a href="${opts.portalUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
+          Visa i kundportalen
         </a>
+        <p style="margin: 12px 0 0; font-size: 13px;">
+          <a href="${opts.pdfUrl}" style="color: #0F766E; text-decoration: underline;">Ladda ner som PDF</a>
+        </p>
       </div>
 
       <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
