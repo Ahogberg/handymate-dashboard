@@ -109,6 +109,7 @@ interface BusinessConfig {
   auto_invoice_enabled: boolean
   auto_invoice_send: boolean
   auto_invoice_max_amount: number
+  auto_invoice_on_complete: boolean
   // Google Reviews
   google_review_url: string | null
   review_request_enabled: boolean
@@ -630,6 +631,7 @@ export default function SettingsPage() {
           auto_invoice_enabled: config.auto_invoice_enabled || false,
           auto_invoice_send: config.auto_invoice_send || false,
           auto_invoice_max_amount: config.auto_invoice_max_amount || 50000,
+          auto_invoice_on_complete: config.auto_invoice_on_complete || false,
           updated_at: new Date().toISOString(),
         })
         .eq('business_id', business.business_id)
@@ -2726,6 +2728,29 @@ export default function SettingsPage() {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">Auto-faktura vid projektavslut</h3>
+                  <p className="text-sm text-gray-400 mt-1">
+                    {config.auto_invoice_on_complete
+                      ? 'Fakturan skapas och skickas direkt till kund vid projektavslut'
+                      : 'Fakturan skapas som utkast vid projektavslut'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setConfig({ ...config, auto_invoice_on_complete: !config.auto_invoice_on_complete })}
+                  className={`w-12 h-6 rounded-full transition-all flex-shrink-0 ${config.auto_invoice_on_complete ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gray-200'}`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.auto_invoice_on_complete ? 'translate-x-6' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-gray-500 bg-gray-50 rounded-xl p-3">
+                {config.auto_invoice_on_complete
+                  ? 'Fakturan baseras på offertens rader och godkända ÄTA och skickas automatiskt.'
+                  : 'Fakturan skapas automatiskt men du granskar innan den skickas. Se under Godkännanden.'}
+              </p>
             </div>
           </div>
         )}

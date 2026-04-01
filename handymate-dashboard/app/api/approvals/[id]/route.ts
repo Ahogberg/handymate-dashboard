@@ -632,6 +632,31 @@ async function executeApprovalPayload(
         return { action: 'create_invoice_from_report', acknowledged: true, navigate_to: `/dashboard/invoices` }
       }
 
+      case 'review_auto_invoice': {
+        // Godkänn = skicka faktura till kund
+        const invoiceId = (payload as any)?.invoice_id
+        if (!invoiceId) return { action: 'review_auto_invoice', error: 'invoice_id saknas' }
+
+        const sendRes = await fetch(`${appUrl}/api/invoices/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invoice_id: invoiceId,
+            send_email: true,
+            send_sms: true,
+            _internal_business_id: businessId,
+          }),
+        })
+        const sendData = await sendRes.json().catch(() => null)
+        return {
+          action: 'review_auto_invoice',
+          invoice_sent: sendRes.ok,
+          invoice_id: invoiceId,
+          navigate_to: `/dashboard/invoices/${invoiceId}`,
+          detail: sendData?.error || 'Faktura skickad till kund',
+        }
+      }
+
       default: {
         // Smart fallback: om payload har SMS-data → skicka SMS
         const pl = payload as any

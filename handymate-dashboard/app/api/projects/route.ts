@@ -355,6 +355,14 @@ export async function PUT(request: NextRequest) {
           project_name: project.name,
         })
       } catch { /* non-blocking */ }
+
+      // Auto-faktura vid projektavslut
+      try {
+        const { autoInvoiceOnComplete } = await import('@/lib/projects/auto-invoice-on-complete')
+        await autoInvoiceOnComplete(business.business_id, project.project_id)
+      } catch (invoiceErr) {
+        console.error('Auto-invoice on complete error (non-blocking):', invoiceErr)
+      }
     }
 
     return NextResponse.json({ project })
