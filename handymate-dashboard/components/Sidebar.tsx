@@ -673,7 +673,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-[#1a3a4a] border-r border-white/10 flex-col">
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-[#1a3a4a] border-r border-white/10 flex-col z-50">
         {sidebarContent}
       </div>
     </>
