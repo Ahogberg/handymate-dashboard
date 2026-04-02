@@ -170,8 +170,8 @@ export function getDocumentCSS(): string {
   .footer-bar .fb-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 5px; }
   .footer-bar .fb-val { font-size: 12px; color: rgba(255,255,255,0.92); line-height: 1.7; }
 
-  /* Large document title (like Desorbera) */
-  .doc-title-large { font-size: 20px; font-weight: 600; color: ${ACCENT}; margin-bottom: 20px; line-height: 1.3; }
+  /* Large document title */
+  .doc-title-large { font-size: 20px; font-weight: 600; color: ${TEXT_PRIMARY}; margin-bottom: 20px; line-height: 1.3; }
 
   /* Author / reviewer block */
   .author-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 28px; padding-top: 20px; border-top: 0.5px solid ${BORDER}; }
