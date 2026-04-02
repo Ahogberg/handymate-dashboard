@@ -18,6 +18,8 @@ import {
   ChevronUp,
   FolderOpen,
   Package,
+  Phone,
+  ExternalLink,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -83,7 +85,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   send_invoice: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
-  quote_nudge: { label: 'Nudge', icon: MessageSquare, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
+  quote_nudge: { label: 'Manuell åtgärd', icon: Phone, bgColor: 'bg-sky-50', textColor: 'text-sky-700' },
   low_stock_alert: { label: 'Lager', icon: Package, bgColor: 'bg-red-50', textColor: 'text-red-600' },
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
   time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
@@ -126,6 +128,16 @@ function getMessagePreview(payload: Record<string, unknown>): string {
   if (payload.sms_text) return payload.sms_text as string
   if (payload.body) return payload.body as string
   return ''
+}
+
+const QUOTE_RELATED_TYPES = ['quote_nudge', 'send_quote', 'quote_followup', 'quote_reminder']
+
+function getQuoteId(approval: Approval): string | null {
+  const p = approval.payload
+  if (p?.quote_id) return p.quote_id as string
+  if ((p?.context as any)?.quote_id) return (p.context as any).quote_id as string
+  if (approval.package_data?.quote_id) return approval.package_data.quote_id
+  return null
 }
 
 export default function ApprovalsPage() {
@@ -187,7 +199,7 @@ export default function ApprovalsPage() {
   }
 
   // Typer som INTE behöver bekräftelse (rena acknowledgements)
-  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion']
+  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge']
 
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
     if (SKIP_CONFIRM.includes(approval.approval_type)) {
@@ -220,22 +232,28 @@ export default function ApprovalsPage() {
       })
       if (res.ok) {
         const result = await res.json().catch(() => null)
+        // Hämta approval-typen innan vi filtrerar bort den
+        const approvedItem = approvals.find(a => a.id === id)
         setApprovals(prev => prev.filter(a => a.id !== id))
         setEditingId(null)
 
         // Visa feedback baserat på vad som hände
         if (action === 'approve') {
-          const exec = result?.execution
-          if (exec?.sms_sent) {
-            setFeedbackMsg('SMS skickat!')
-          } else if (exec?.acknowledged) {
-            setFeedbackMsg('Godkänt')
-          } else if (exec?.ok) {
-            setFeedbackMsg('Utfört!')
+          if (approvedItem?.approval_type === 'quote_nudge') {
+            setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
           } else {
-            setFeedbackMsg(action === 'approve' ? 'Godkänt' : 'Avvisat')
+            const exec = result?.execution
+            if (exec?.sms_sent) {
+              setFeedbackMsg('SMS skickat!')
+            } else if (exec?.acknowledged) {
+              setFeedbackMsg('Godkänt')
+            } else if (exec?.ok) {
+              setFeedbackMsg('Utfört!')
+            } else {
+              setFeedbackMsg('Godkänt')
+            }
           }
-          setTimeout(() => setFeedbackMsg(null), 3000)
+          setTimeout(() => setFeedbackMsg(null), 4000)
         }
       }
     } finally {
@@ -600,6 +618,21 @@ export default function ApprovalsPage() {
                         {approval.description && (
                           <p className="text-sm text-gray-500 mt-1">{approval.description}</p>
                         )}
+                        {/* Visa offert-länk för quote-relaterade approvals */}
+                        {QUOTE_RELATED_TYPES.includes(approval.approval_type) && (() => {
+                          const quoteId = getQuoteId(approval)
+                          if (!quoteId) return null
+                          return (
+                            <a
+                              href={`/dashboard/quotes/${quoteId}`}
+                              className="inline-flex items-center gap-1 text-sm text-primary-700 hover:text-primary-800 hover:underline mt-1.5"
+                            >
+                              <FileText className="w-3.5 h-3.5" />
+                              Visa offert
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )
+                        })()}
                         {/* Seasonal campaign details */}
                         {approval.approval_type === 'seasonal_campaign' && approval.payload && (
                           <div className="mt-2 space-y-2">
@@ -724,8 +757,17 @@ export default function ApprovalsPage() {
                             disabled={actionLoading !== null}
                             className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
-                            <CheckCircle className="w-4 h-4" />
-                            {actionLoading === approval.id + 'approve' ? 'Godkänner...' : 'Godkänn'}
+                            {approval.approval_type === 'quote_nudge' ? (
+                              <>
+                                <Phone className="w-4 h-4" />
+                                {actionLoading === approval.id + 'approve' ? 'Noterar...' : 'Noterat, jag ringer'}
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4" />
+                                {actionLoading === approval.id + 'approve' ? 'Godkänner...' : 'Godkänn'}
+                              </>
+                            )}
                           </button>
                           {messagePreview && (
                             <button
