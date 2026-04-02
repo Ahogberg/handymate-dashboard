@@ -78,6 +78,7 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'calendar', label: 'Kalender', icon: Calendar, href: '/dashboard/calendar' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
+  { type: 'link', key: 'sms_inbox', label: 'SMS', icon: MessageSquare, href: '/dashboard/sms-inbox' },
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
