@@ -10,11 +10,18 @@ import {
   Star,
   Copy,
   Trash2,
-  Edit,
+  Pencil,
   FileText,
   Loader2,
   Sparkles,
   ArrowLeft,
+  Layers,
+  Hammer,
+  Zap,
+  Wrench,
+  LayoutTemplate,
+  CreditCard,
+  CheckCircle2,
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -25,11 +32,104 @@ interface QuoteTemplate {
   branch?: string
   category?: string
   default_items: any[]
+  default_payment_plan?: any[]
   is_favorite: boolean
   usage_count: number
   rot_enabled: boolean
   rut_enabled: boolean
   created_at: string
+  introduction_text?: string
+  conclusion_text?: string
+}
+
+// Branch icons and colors
+const BRANCH_CONFIG: Record<string, { icon: any; color: string; bg: string }> = {
+  'Bygg': { icon: Hammer, color: 'text-amber-600', bg: 'bg-amber-50' },
+  'El': { icon: Zap, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+  'VVS': { icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50' },
+  'Reparation': { icon: Wrench, color: 'text-orange-600', bg: 'bg-orange-50' },
+  'Allround': { icon: Layers, color: 'text-teal-600', bg: 'bg-teal-50' },
+}
+
+function getBranchConfig(branch?: string, category?: string) {
+  const key = category || branch || 'Allround'
+  return BRANCH_CONFIG[key] || BRANCH_CONFIG['Allround']
+}
+
+/** Mini-preview of template structure */
+function TemplatePreview({ items, rotEnabled }: { items: any[]; rotEnabled: boolean }) {
+  const headings = items.filter((i: any) => i.item_type === 'heading')
+  const lineItems = items.filter((i: any) => i.item_type === 'item')
+  const total = lineItems.reduce((sum: number, i: any) => sum + (i.total || 0), 0)
+
+  return (
+    <div className="mt-3 bg-slate-50 rounded-lg p-3 border border-slate-100">
+      {/* Mini header bar */}
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="w-5 h-5 rounded bg-[#0F766E]/10 flex items-center justify-center">
+          <FileText className="w-3 h-3 text-[#0F766E]" />
+        </div>
+        <div className="h-2 w-20 bg-slate-200 rounded-full" />
+        <div className="ml-auto h-2 w-12 bg-slate-200 rounded-full" />
+      </div>
+
+      {/* Structure lines */}
+      <div className="space-y-1">
+        {headings.length > 0 ? (
+          headings.slice(0, 3).map((h: any, i: number) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-[#0F766E]" />
+              <span className="text-[10px] text-slate-500 truncate">{h.description}</span>
+            </div>
+          ))
+        ) : (
+          lineItems.slice(0, 3).map((item: any, i: number) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="w-1 h-1 rounded-full bg-slate-300" />
+              <span className="text-[10px] text-slate-400 truncate flex-1">{item.description}</span>
+              <span className="text-[10px] text-slate-400">{(item.total || 0).toLocaleString('sv-SE')} kr</span>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Footer total */}
+      <div className="mt-2.5 pt-2 border-t border-slate-200 flex items-center justify-between">
+        <div className="flex gap-1">
+          {rotEnabled && (
+            <span className="text-[9px] font-medium px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded">ROT</span>
+          )}
+          <span className="text-[9px] text-slate-400">{lineItems.length} rader</span>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-700">
+          {total > 0 ? `${total.toLocaleString('sv-SE')} kr` : '—'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/** Illustrated empty state template card (non-interactive) */
+function EmptyTemplateCard({ name, category, lines, color }: {
+  name: string; category: string; lines: string[]; color: string
+}) {
+  return (
+    <div className="bg-white border border-dashed border-slate-200 rounded-xl p-5 opacity-60">
+      <div className="flex items-center gap-2 mb-1">
+        <div className={`w-2 h-2 rounded-full ${color}`} />
+        <span className="text-[10px] tracking-wide uppercase text-slate-400">{category}</span>
+      </div>
+      <h4 className="text-sm font-semibold text-slate-600 mb-3">{name}</h4>
+      <div className="space-y-1.5">
+        {lines.map((line, i) => (
+          <div key={i} className="flex items-center gap-1.5">
+            <div className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+            <div className="h-1.5 rounded-full bg-slate-100" style={{ width: `${60 + Math.random() * 30}%` }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function QuoteTemplatesPage() {
@@ -154,209 +254,285 @@ export default function QuoteTemplatesPage() {
 
   if (!hasAccess) {
     return (
-      <div className="p-6 max-w-4xl mx-auto">
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
-          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Offertmallar</h2>
-          <p className="text-gray-500 mb-4">
-            Uppgradera till Professional eller Business för att använda offertmallar.
+      <div className="p-4 sm:p-6 max-w-5xl mx-auto">
+        <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-10 text-center">
+          <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+            <LayoutTemplate className="w-6 h-6 text-slate-400" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-2">Offertmallar</h2>
+          <p className="text-sm text-slate-500 mb-4 max-w-md mx-auto">
+            Uppgradera till Professional eller Business för att använda offertmallar och snabba upp ditt offertarbete.
           </p>
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="px-4 py-2 bg-[#0F766E] text-white text-sm font-medium rounded-lg hover:bg-[#0D6B63] transition-colors"
+          >
+            Uppgradera plan
+          </button>
         </div>
+        {showUpgrade && (
+          <UpgradeModal feature="Obegränsade offertmallar" onClose={() => setShowUpgrade(false)} />
+        )}
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/settings" className="text-gray-400 hover:text-gray-900 transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+          <Link
+            href="/dashboard/settings"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Offertmallar</h1>
-            <p className="text-gray-500 text-sm">Skapa och hantera mallar för snabbare offerter</p>
+            <h1 className="text-xl font-bold text-slate-900">Offertmallar</h1>
+            <p className="text-sm text-slate-500">Återanvänd strukturer för snabbare offerter</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Limit counter */}
+
+        <div className="flex items-center gap-2">
           {templateLimit !== null && (
-            <div className="text-sm text-gray-500">
-              {templates.length} / {templateLimit} mallar
-              {atLimit && (
-                <button
-                  onClick={() => setShowUpgrade(true)}
-                  className="text-primary-700 font-medium ml-2 hover:underline"
-                >
-                  Uppgradera →
-                </button>
-              )}
-            </div>
+            <span className="text-xs text-slate-400 mr-1">
+              {templates.length}/{templateLimit}
+            </span>
           )}
-          <div className="flex gap-2">
-            {templates.length === 0 && (
-              <button
-                onClick={seedTemplates}
-                disabled={seeding}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-900 rounded-lg transition-colors"
-              >
-                {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Skapa exempelmallar
-              </button>
-            )}
+          {templates.length === 0 && (
             <button
-              onClick={createNew}
-              disabled={atLimit}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                atLimit
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-primary-700 text-white hover:bg-primary-800'
-              }`}
+              onClick={seedTemplates}
+              disabled={seeding}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
             >
-              <Plus className="w-4 h-4" />
-              Ny mall
+              {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+              Skapa exempelmallar
             </button>
-          </div>
+          )}
+          <button
+            onClick={createNew}
+            disabled={atLimit}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+              atLimit
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                : 'bg-[#0F766E] text-white hover:bg-[#0D6B63]'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            Ny mall
+          </button>
         </div>
       </div>
 
-      {/* Branch filter tabs */}
+      {/* Branch filter pills */}
       {branches.length > 1 && (
-        <div className="flex gap-2 mb-6 overflow-x-auto">
+        <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1">
           <button
             onClick={() => setBranchFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
               branchFilter === 'all'
-                ? 'bg-primary-600/20 text-primary-300 border border-primary-600/30'
-                : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700 hover:text-white'
+                ? 'bg-[#0F766E] text-white'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
             }`}
           >
             Alla
           </button>
-          {branches.map(b => (
-            <button
-              key={b}
-              onClick={() => setBranchFilter(b!)}
-              className={`px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors ${
-                branchFilter === b
-                  ? 'bg-primary-600/20 text-primary-300 border border-primary-600/30'
-                  : 'bg-zinc-800/50 text-zinc-400 border border-zinc-700 hover:text-white'
-              }`}
-            >
-              {b}
-            </button>
-          ))}
+          {branches.map(b => {
+            const config = getBranchConfig(b!, b!)
+            const Icon = config.icon
+            return (
+              <button
+                key={b}
+                onClick={() => setBranchFilter(b!)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  branchFilter === b
+                    ? 'bg-[#0F766E] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                {b}
+              </button>
+            )
+          })}
         </div>
       )}
 
       {/* Loading */}
       {loading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-5 h-5 animate-spin text-[#0F766E]" />
         </div>
       )}
 
       {/* Empty state */}
       {!loading && templates.length === 0 && (
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-12 text-center">
-          <FileText className="w-12 h-12 text-zinc-600 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-2">Inga mallar ännu</h3>
-          <p className="text-zinc-400 mb-6">
-            Skapa din första mall eller generera exempelmallar anpassade för din bransch.
-          </p>
-          <button
-            onClick={seedTemplates}
-            disabled={seeding}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-600 text-white rounded-lg hover:opacity-90"
-          >
-            {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            Generera exempelmallar
-          </button>
+        <div className="mt-2">
+          {/* Hero empty state */}
+          <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-10 text-center mb-6">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 flex items-center justify-center mx-auto mb-5">
+              <LayoutTemplate className="w-7 h-7 text-[#0F766E]" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900 mb-2">Kom igång med offertmallar</h2>
+            <p className="text-sm text-slate-500 max-w-lg mx-auto mb-6">
+              Spara tid genom att skapa mallar med färdiga rader, texter och betalningsplaner.
+              Välj en mall nästa gång du skapar en offert så är grunden redan lagd.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                onClick={seedTemplates}
+                disabled={seeding}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[#0F766E] text-white text-sm font-medium rounded-lg hover:bg-[#0D6B63] transition-colors"
+              >
+                {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Generera mallar för min bransch
+              </button>
+              <button
+                onClick={createNew}
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Skapa från grunden
+              </button>
+            </div>
+
+            {/* What you get */}
+            <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-lg mx-auto text-left">
+              {[
+                { icon: FileText, text: 'Färdiga offertrader med grupper och delsummor' },
+                { icon: CreditCard, text: 'Betalningsplan med delbetalningar inlagda' },
+                { icon: CheckCircle2, text: 'ROT-avdrag och standardtexter förifyllda' },
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <item.icon className="w-4 h-4 text-[#0F766E] mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-slate-500">{item.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Ghost template previews */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <EmptyTemplateCard
+              name="Standard byggoffert"
+              category="Bygg"
+              color="bg-amber-400"
+              lines={['Rivning & demontering', 'Material', 'Arbete', 'Slutbesiktning']}
+            />
+            <EmptyTemplateCard
+              name="Elinstallation"
+              category="El"
+              color="bg-yellow-400"
+              lines={['Elmaterial', 'Installation', 'Besiktning']}
+            />
+            <EmptyTemplateCard
+              name="VVS-jobb"
+              category="VVS"
+              color="bg-blue-400"
+              lines={['Material', 'Arbete', 'Provtryckning']}
+            />
+          </div>
         </div>
       )}
 
       {/* Template grid */}
       {!loading && filteredTemplates.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredTemplates.map(template => (
-            <div
-              key={template.id}
-              className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 hover:border-zinc-700 transition-colors group"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-white font-medium truncate">{template.name}</h3>
-                  {template.description && (
-                    <p className="text-zinc-500 text-sm mt-1 line-clamp-2">{template.description}</p>
-                  )}
-                </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredTemplates.map(template => {
+            const config = getBranchConfig(template.branch, template.category)
+            const BranchIcon = config.icon
+            const lineItems = (template.default_items || []).filter((i: any) => i.item_type === 'item')
+            const hasPaymentPlan = (template.default_payment_plan || []).length > 0
+
+            return (
+              <div
+                key={template.id}
+                onClick={() => router.push(`/dashboard/settings/quote-templates/${template.id}`)}
+                className="bg-white border-thin border-[#E2E8F0] rounded-xl p-5 hover:shadow-md hover:border-slate-300 transition-all cursor-pointer group relative"
+              >
+                {/* Favorite star */}
                 <button
-                  onClick={() => toggleFavorite(template.id)}
-                  className="ml-2 flex-shrink-0"
+                  onClick={(e) => { e.stopPropagation(); toggleFavorite(template.id) }}
+                  className="absolute top-4 right-4"
                 >
                   <Star
-                    className={`w-5 h-5 ${
+                    className={`w-4 h-4 transition-colors ${
                       template.is_favorite
-                        ? 'text-yellow-400 fill-yellow-400'
-                        : 'text-zinc-600 hover:text-yellow-400'
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-200 hover:text-amber-300 group-hover:text-slate-300'
                     }`}
                   />
                 </button>
-              </div>
 
-              {/* Badges */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {template.branch && (
-                  <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
-                    {template.branch}
+                {/* Category badge */}
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-6 h-6 rounded-lg ${config.bg} flex items-center justify-center`}>
+                    <BranchIcon className={`w-3.5 h-3.5 ${config.color}`} />
+                  </div>
+                  <span className="text-[10px] tracking-wide uppercase text-slate-400 font-medium">
+                    {template.category || template.branch || 'Mall'}
                   </span>
-                )}
-                {template.category && template.category !== template.branch && (
-                  <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
-                    {template.category}
-                  </span>
-                )}
-                <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded">
-                  {(template.default_items || []).filter((i: any) => i.item_type === 'item').length} rader
-                </span>
-                {template.rot_enabled && (
-                  <span className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 text-xs rounded">ROT</span>
-                )}
-                {template.rut_enabled && (
-                  <span className="px-2 py-0.5 bg-primary-700/10 text-primary-600 text-xs rounded">RUT</span>
-                )}
-              </div>
+                </div>
 
-              {/* Usage count */}
-              <div className="text-zinc-500 text-xs mb-3">
-                Använd {template.usage_count} gånger
-              </div>
+                {/* Name & description */}
+                <h3 className="text-sm font-semibold text-slate-900 mb-0.5 pr-6">{template.name}</h3>
+                {template.description && (
+                  <p className="text-xs text-slate-400 line-clamp-1 mb-0">{template.description}</p>
+                )}
 
-              {/* Actions */}
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => router.push(`/dashboard/settings/quote-templates/${template.id}`)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-colors"
-                >
-                  <Edit className="w-3.5 h-3.5" />
-                  Redigera
-                </button>
-                <button
-                  onClick={() => duplicateTemplate(template)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-colors"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => deleteTemplate(template.id)}
-                  className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-red-900/50 text-zinc-300 hover:text-red-300 text-sm rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {/* Mini preview */}
+                <TemplatePreview
+                  items={template.default_items || []}
+                  rotEnabled={template.rot_enabled}
+                />
+
+                {/* Footer meta */}
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {hasPaymentPlan && (
+                      <span className="text-[9px] font-medium px-1.5 py-0.5 bg-blue-50 text-blue-500 rounded">
+                        Betalningsplan
+                      </span>
+                    )}
+                    <span className="text-[10px] text-slate-400">
+                      Använd {template.usage_count}×
+                    </span>
+                  </div>
+
+                  {/* Quick actions */}
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); duplicateTemplate(template) }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                      title="Duplicera"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteTemplate(template.id) }}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                      title="Ta bort"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
+
+          {/* Add new card */}
+          {!atLimit && (
+            <button
+              onClick={createNew}
+              className="border-2 border-dashed border-slate-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 text-slate-400 hover:text-[#0F766E] hover:border-[#0F766E]/30 hover:bg-teal-50/30 transition-all min-h-[200px]"
+            >
+              <Plus className="w-6 h-6" />
+              <span className="text-sm font-medium">Ny mall</span>
+            </button>
+          )}
         </div>
       )}
 

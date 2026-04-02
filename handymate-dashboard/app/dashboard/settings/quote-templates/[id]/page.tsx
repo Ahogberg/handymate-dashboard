@@ -9,9 +9,11 @@ import {
   Loader2,
   Plus,
   Trash2,
-  GripVertical,
   ChevronDown,
   ChevronRight,
+  Check,
+  MoveUp,
+  MoveDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import { QuoteItem, PaymentPlanEntry } from '@/lib/types/quote'
@@ -56,6 +58,7 @@ export default function QuoteTemplateEditorPage() {
   const [template, setTemplate] = useState<TemplateData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     basic: true,
     texts: true,
@@ -114,6 +117,8 @@ export default function QuoteTemplateEditorPage() {
         body: JSON.stringify(template),
       })
       dirtyRef.current = false
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
     } catch (err) {
       console.error('Failed to save template:', err)
     } finally {
@@ -124,6 +129,7 @@ export default function QuoteTemplateEditorPage() {
   const updateField = (field: string, value: any) => {
     setTemplate(prev => prev ? { ...prev, [field]: value } : null)
     dirtyRef.current = true
+    setSaved(false)
     // Auto-save debounce
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
     saveTimeoutRef.current = setTimeout(() => saveTemplate(), 3000)
@@ -191,7 +197,7 @@ export default function QuoteTemplateEditorPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-[#0F766E]" />
       </div>
     )
   }
@@ -199,8 +205,8 @@ export default function QuoteTemplateEditorPage() {
   if (!template) {
     return (
       <div className="p-6 text-center">
-        <p className="text-zinc-400">Mall hittades inte.</p>
-        <Link href="/dashboard/settings/quote-templates" className="text-primary-500 hover:underline mt-2 inline-block">
+        <p className="text-slate-500">Mall hittades inte.</p>
+        <Link href="/dashboard/settings/quote-templates" className="text-[#0F766E] hover:underline mt-2 inline-block text-sm">
           Tillbaka till mallar
         </Link>
       </div>
@@ -211,25 +217,34 @@ export default function QuoteTemplateEditorPage() {
   const paymentValid = template.default_payment_plan.length === 0 || Math.abs(paymentSum - 100) < 0.01
 
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-24">
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto pb-24">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/settings/quote-templates" className="text-zinc-400 hover:text-white transition-colors">
-            <ArrowLeft className="w-5 h-5" />
+          <Link
+            href="/dashboard/settings/quote-templates"
+            className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:border-slate-300 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-white">Redigera mall</h1>
-            <p className="text-zinc-500 text-sm">{template.name}</p>
+            <h1 className="text-xl font-bold text-slate-900">Redigera mall</h1>
+            <p className="text-sm text-slate-500">{template.name}</p>
           </div>
         </div>
         <button
           onClick={saveTemplate}
           disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-600 text-white rounded-lg hover:opacity-90 transition-opacity"
+          className="flex items-center gap-2 px-4 py-2 bg-[#0F766E] text-white text-sm font-medium rounded-lg hover:bg-[#0D6B63] transition-colors"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Spara
+          {saving ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : saved ? (
+            <Check className="w-4 h-4" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          {saved ? 'Sparad' : 'Spara'}
         </button>
       </div>
 
@@ -237,41 +252,41 @@ export default function QuoteTemplateEditorPage() {
       <Section title="Namn & Kategori" sectionKey="basic" expanded={expandedSections.basic} onToggle={toggleSection}>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Mallnamn</label>
+            <label className="block text-[12px] text-[#64748B] mb-1">Mallnamn</label>
             <input
               type="text"
               value={template.name}
               onChange={e => updateField('name', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-600"
+              className="w-full border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#0F766E] transition-colors"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Bransch</label>
+            <label className="block text-[12px] text-[#64748B] mb-1">Bransch</label>
             <input
               type="text"
               value={template.branch}
               onChange={e => updateField('branch', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-600"
+              className="w-full border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#0F766E] transition-colors"
               placeholder="t.ex. bygg, el, vvs"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Kategori</label>
+            <label className="block text-[12px] text-[#64748B] mb-1">Kategori</label>
             <input
               type="text"
               value={template.category}
               onChange={e => updateField('category', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-600"
+              className="w-full border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#0F766E] transition-colors"
               placeholder="t.ex. Badrum, Kök"
             />
           </div>
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Beskrivning</label>
+            <label className="block text-[12px] text-[#64748B] mb-1">Beskrivning</label>
             <input
               type="text"
               value={template.description}
               onChange={e => updateField('description', e.target.value)}
-              className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-600"
+              className="w-full border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-[#0F766E] transition-colors"
               placeholder="Kort beskrivning av mallen"
             />
           </div>
@@ -291,25 +306,40 @@ export default function QuoteTemplateEditorPage() {
 
       {/* Section: Items */}
       <Section title="Specifikationsrader" sectionKey="items" expanded={expandedSections.items} onToggle={toggleSection}>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {template.default_items.map((item, index) => (
             <div
               key={item.id || index}
-              className={`flex items-center gap-2 p-2 rounded-lg border ${
+              className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors ${
                 item.item_type === 'heading'
-                  ? 'bg-zinc-800/30 border-zinc-700'
+                  ? 'bg-slate-50 border-slate-200'
                   : item.item_type === 'subtotal'
-                  ? 'bg-zinc-800/50 border-zinc-600'
-                  : 'bg-zinc-900/30 border-zinc-800'
+                  ? 'bg-teal-50/30 border-teal-100'
+                  : 'bg-white border-[#E2E8F0]'
               }`}
             >
               <div className="flex flex-col gap-0.5">
-                <button onClick={() => moveItem(index, index - 1)} className="text-zinc-600 hover:text-zinc-300 text-xs">&uarr;</button>
-                <GripVertical className="w-4 h-4 text-zinc-600" />
-                <button onClick={() => moveItem(index, index + 1)} className="text-zinc-600 hover:text-zinc-300 text-xs">&darr;</button>
+                <button
+                  onClick={() => moveItem(index, index - 1)}
+                  disabled={index === 0}
+                  className="text-slate-300 hover:text-slate-600 disabled:opacity-30 transition-colors"
+                >
+                  <MoveUp className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => moveItem(index, index + 1)}
+                  disabled={index === template.default_items.length - 1}
+                  className="text-slate-300 hover:text-slate-600 disabled:opacity-30 transition-colors"
+                >
+                  <MoveDown className="w-3 h-3" />
+                </button>
               </div>
 
-              <span className="text-xs text-zinc-500 w-16 flex-shrink-0">
+              <span className={`text-[10px] uppercase tracking-wide w-14 flex-shrink-0 ${
+                item.item_type === 'heading' ? 'text-slate-500 font-medium' :
+                item.item_type === 'subtotal' ? 'text-teal-600 font-medium' :
+                'text-slate-400'
+              }`}>
                 {item.item_type === 'heading' ? 'Rubrik' :
                  item.item_type === 'text' ? 'Text' :
                  item.item_type === 'subtotal' ? 'Delsum.' :
@@ -320,10 +350,10 @@ export default function QuoteTemplateEditorPage() {
                 type="text"
                 value={item.description}
                 onChange={e => updateItem(index, 'description', e.target.value)}
-                className={`flex-1 bg-transparent border-b border-zinc-700 px-1 py-0.5 text-sm focus:outline-none focus:border-primary-600 ${
-                  item.item_type === 'heading' ? 'font-bold text-white' :
-                  item.item_type === 'text' ? 'italic text-zinc-400' :
-                  'text-zinc-200'
+                className={`flex-1 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] px-1 py-0.5 text-sm transition-colors focus:outline-none ${
+                  item.item_type === 'heading' ? 'font-semibold text-slate-900' :
+                  item.item_type === 'text' ? 'italic text-slate-500' :
+                  'text-slate-700'
                 }`}
                 placeholder="Beskrivning"
               />
@@ -334,13 +364,13 @@ export default function QuoteTemplateEditorPage() {
                     type="number"
                     value={item.quantity || ''}
                     onChange={e => updateItem(index, 'quantity', parseFloat(e.target.value) || 0)}
-                    className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-primary-600"
+                    className="w-14 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] text-right text-sm text-slate-700 px-1 py-0.5 focus:outline-none transition-colors"
                     placeholder="Antal"
                   />
                   <select
                     value={item.unit}
                     onChange={e => updateItem(index, 'unit', e.target.value)}
-                    className="w-16 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 px-1 py-0.5"
+                    className="w-16 border-thin border-[#E2E8F0] bg-white rounded text-xs text-slate-600 px-1 py-1 focus:outline-none focus:border-[#0F766E]"
                   >
                     {UNIT_OPTIONS.map(u => (
                       <option key={u.value} value={u.value}>{u.label}</option>
@@ -350,28 +380,28 @@ export default function QuoteTemplateEditorPage() {
                     type="number"
                     value={item.unit_price || ''}
                     onChange={e => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)}
-                    className="w-20 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-primary-600"
+                    className="w-20 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] text-right text-sm text-slate-700 px-1 py-0.5 focus:outline-none transition-colors"
                     placeholder="À-pris"
                   />
-                  <span className="w-20 text-right text-sm text-zinc-400">
+                  <span className="w-20 text-right text-sm text-slate-500 tabular-nums">
                     {((item.quantity || 0) * (item.unit_price || 0)).toLocaleString('sv-SE')} kr
                   </span>
                 </>
               )}
 
               {item.item_type === 'subtotal' && (
-                <span className="text-sm font-medium text-zinc-300 ml-auto">
+                <span className="text-sm font-semibold text-[#0F766E] ml-auto tabular-nums">
                   {(item.total || 0).toLocaleString('sv-SE')} kr
                 </span>
               )}
 
               {item.item_type === 'item' && (
-                <label className="flex items-center gap-1 text-xs text-zinc-500 ml-1">
+                <label className="flex items-center gap-1 text-[10px] text-slate-400 ml-1 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={item.is_rot_eligible}
                     onChange={e => updateItem(index, 'is_rot_eligible', e.target.checked)}
-                    className="rounded border-zinc-600 bg-zinc-800 text-primary-600 focus:ring-primary-600"
+                    className="rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E] w-3.5 h-3.5"
                   />
                   ROT
                 </label>
@@ -379,65 +409,78 @@ export default function QuoteTemplateEditorPage() {
 
               <button
                 onClick={() => removeItem(index)}
-                className="text-zinc-600 hover:text-red-400 transition-colors"
+                className="text-slate-300 hover:text-red-500 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          <button onClick={() => addItem('item')} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg"><Plus className="w-3.5 h-3.5" /> Post</button>
-          <button onClick={() => addItem('heading')} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg"><Plus className="w-3.5 h-3.5" /> Rubrik</button>
-          <button onClick={() => addItem('text')} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg"><Plus className="w-3.5 h-3.5" /> Fritext</button>
-          <button onClick={() => addItem('subtotal')} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg"><Plus className="w-3.5 h-3.5" /> Delsumma</button>
-          <button onClick={() => addItem('discount')} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg"><Plus className="w-3.5 h-3.5" /> Rabatt</button>
+        <div className="flex flex-wrap gap-1.5 mt-3">
+          {[
+            { type: 'item' as const, label: 'Post' },
+            { type: 'heading' as const, label: 'Rubrik' },
+            { type: 'text' as const, label: 'Fritext' },
+            { type: 'subtotal' as const, label: 'Delsumma' },
+            { type: 'discount' as const, label: 'Rabatt' },
+          ].map(btn => (
+            <button
+              key={btn.type}
+              onClick={() => addItem(btn.type)}
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 text-xs font-medium rounded-lg transition-colors"
+            >
+              <Plus className="w-3 h-3" /> {btn.label}
+            </button>
+          ))}
         </div>
       </Section>
 
       {/* Section: Payment Plan */}
       <Section title="Betalningsplan" sectionKey="payment" expanded={expandedSections.payment} onToggle={toggleSection}>
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {template.default_payment_plan.map((entry, index) => (
-            <div key={index} className="flex items-center gap-2 p-2 bg-zinc-900/30 border border-zinc-800 rounded-lg">
+            <div key={index} className="flex items-center gap-2 p-2.5 bg-white border border-[#E2E8F0] rounded-lg">
               <input
                 type="text"
                 value={entry.label}
                 onChange={e => updatePaymentEntry(index, 'label', e.target.value)}
-                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-primary-600"
+                className="flex-1 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] text-sm text-slate-700 px-1 py-0.5 focus:outline-none transition-colors"
                 placeholder="Benämning"
               />
               <input
                 type="number"
                 value={entry.percent || ''}
                 onChange={e => updatePaymentEntry(index, 'percent', parseFloat(e.target.value) || 0)}
-                className="w-16 bg-transparent border-b border-zinc-700 text-right text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-primary-600"
+                className="w-14 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] text-right text-sm text-slate-700 px-1 py-0.5 focus:outline-none transition-colors"
                 placeholder="%"
               />
-              <span className="text-sm text-zinc-500">%</span>
+              <span className="text-xs text-slate-400">%</span>
               <input
                 type="text"
                 value={entry.due_description}
                 onChange={e => updatePaymentEntry(index, 'due_description', e.target.value)}
-                className="flex-1 bg-transparent border-b border-zinc-700 text-sm text-zinc-200 px-1 py-0.5 focus:outline-none focus:border-primary-600"
+                className="flex-1 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-[#0F766E] text-sm text-slate-700 px-1 py-0.5 focus:outline-none transition-colors"
                 placeholder="Förfaller"
               />
-              <button onClick={() => removePaymentEntry(index)} className="text-zinc-600 hover:text-red-400">
-                <Trash2 className="w-4 h-4" />
+              <button onClick={() => removePaymentEntry(index)} className="text-slate-300 hover:text-red-500 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
         </div>
 
         {!paymentValid && template.default_payment_plan.length > 0 && (
-          <div className="mt-2 p-2 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300 text-sm">
-            Procentsatserna summerar till {paymentSum}% – de måste bli exakt 100%.
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            Procentsatserna summerar till {paymentSum}% — de måste bli exakt 100%.
           </div>
         )}
 
-        <button onClick={addPaymentEntry} className="flex items-center gap-1 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg mt-3">
-          <Plus className="w-3.5 h-3.5" /> Lägg till delfaktura
+        <button
+          onClick={addPaymentEntry}
+          className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-lg mt-3 transition-colors"
+        >
+          <Plus className="w-3 h-3" /> Lägg till delfaktura
         </button>
       </Section>
 
@@ -445,51 +488,51 @@ export default function QuoteTemplateEditorPage() {
       <Section title="Visningsinställningar" sectionKey="display" expanded={expandedSections.display} onToggle={toggleSection}>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-zinc-400 mb-1">Detaljnivå</label>
+            <label className="block text-[12px] text-[#64748B] mb-1">Detaljnivå</label>
             <select
               value={template.detail_level}
               onChange={e => updateField('detail_level', e.target.value)}
-              className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-600"
+              className="border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-[#0F766E] transition-colors"
             >
               <option value="detailed">Detaljerad (alla rader)</option>
               <option value="subtotals_only">Enbart delsummor</option>
               <option value="total_only">Enbart totalsumma</option>
             </select>
           </div>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input
               type="checkbox"
               checked={template.show_unit_prices}
               onChange={e => updateField('show_unit_prices', e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-primary-600 focus:ring-primary-600"
+              className="rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
             />
             Visa à-priser
           </label>
-          <label className="flex items-center gap-2 text-sm text-zinc-300">
+          <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input
               type="checkbox"
               checked={template.show_quantities}
               onChange={e => updateField('show_quantities', e.target.checked)}
-              className="rounded border-zinc-600 bg-zinc-800 text-primary-600 focus:ring-primary-600"
+              className="rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
             />
             Visa antal
           </label>
           <div className="flex gap-4">
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={template.rot_enabled}
                 onChange={e => updateField('rot_enabled', e.target.checked)}
-                className="rounded border-zinc-600 bg-zinc-800 text-primary-600 focus:ring-primary-600"
+                className="rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
               />
               ROT-avdrag
             </label>
-            <label className="flex items-center gap-2 text-sm text-zinc-300">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={template.rut_enabled}
                 onChange={e => updateField('rut_enabled', e.target.checked)}
-                className="rounded border-zinc-600 bg-zinc-800 text-primary-600 focus:ring-primary-600"
+                className="rounded border-slate-300 text-[#0F766E] focus:ring-[#0F766E]"
               />
               RUT-avdrag
             </label>
@@ -498,14 +541,14 @@ export default function QuoteTemplateEditorPage() {
       </Section>
 
       {/* Sticky bottom bar (mobile) */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-zinc-900/95 backdrop-blur border-t border-zinc-800 md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 backdrop-blur border-t border-slate-200 md:hidden z-50">
         <button
           onClick={saveTemplate}
           disabled={saving}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-primary-600 to-primary-600 text-white rounded-lg font-medium"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0F766E] text-white rounded-lg font-medium hover:bg-[#0D6B63] transition-colors"
         >
-          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-          Spara mall
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          {saved ? 'Sparad' : 'Spara mall'}
         </button>
       </div>
     </div>
@@ -523,15 +566,15 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl mb-4 overflow-hidden">
+    <div className="bg-white border-thin border-[#E2E8F0] rounded-xl mb-4 overflow-hidden">
       <button
         onClick={() => onToggle(sectionKey)}
-        className="w-full flex items-center justify-between p-4 text-left hover:bg-zinc-800/30 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
       >
-        <span className="font-medium text-white">{title}</span>
-        {expanded ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
+        <span className="text-sm font-semibold text-slate-900">{title}</span>
+        {expanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
       </button>
-      {expanded && <div className="px-4 pb-4">{children}</div>}
+      {expanded && <div className="px-5 pb-5 border-t border-slate-100">{children}</div>}
     </div>
   )
 }
@@ -540,12 +583,12 @@ function Section({
 function TextArea({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-sm text-zinc-400 mb-1">{label}</label>
+      <label className="block text-[12px] text-[#64748B] mb-1">{label}</label>
       <textarea
         value={value}
         onChange={e => onChange(e.target.value)}
         rows={3}
-        className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-primary-600 resize-y"
+        className="w-full border-thin border-[#E2E8F0] bg-white rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:border-[#0F766E] resize-y transition-colors"
       />
     </div>
   )
