@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 /**
  * POST /api/ata/[id]/send — Skicka ÄTA till kund för signering
@@ -57,6 +58,15 @@ export async function POST(
     const ataLabel = `ÄTA-${ata.ata_number || '?'}`
     const projectName = project?.name || 'Projekt'
 
+    // Hämta assigned_phone_number för svarsnummer
+    const { data: bizConfig } = await supabase
+      .from('business_config')
+      .select('assigned_phone_number')
+      .eq('business_id', business.business_id)
+      .single()
+
+    const suffix = buildSmsSuffix(business.business_name || 'Handymate', bizConfig?.assigned_phone_number)
+
     // Send via SMS or email
     if (method === 'sms') {
       const phone = to || customer?.phone_number
@@ -64,7 +74,7 @@ export async function POST(
         return NextResponse.json({ error: 'Inget telefonnummer att skicka till' }, { status: 400 })
       }
 
-      const message = `Hej! Du har fått ${ataLabel} för ${projectName} att granska och signera. Klicka här: ${signUrl} / ${business.business_name || 'Handymate'}`
+      const message = `Hej! Du har fått ${ataLabel} för ${projectName} att granska och signera. Klicka här: ${signUrl}\n${suffix}`
 
       try {
         const smsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sms/send`, {

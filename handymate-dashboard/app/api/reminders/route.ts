@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -65,7 +66,8 @@ export async function POST(request: NextRequest) {
           phone_number
         ),
         business_config:business_id (
-          business_name
+          business_name,
+          assigned_phone_number
         )
       `)
       .eq('status', 'confirmed')
@@ -90,7 +92,8 @@ export async function POST(request: NextRequest) {
         minute: '2-digit' 
       })
 
-      const message = `Påminnelse: Du har en tid hos ${business.business_name} imorgon kl ${timeStr}. Välkommen! Behöver du ändra tiden? Svara på detta SMS.`
+      const suffix = buildSmsSuffix(business.business_name, (business as any).assigned_phone_number)
+      const message = `Påminnelse: Du har en tid hos ${business.business_name} imorgon kl ${timeStr}. Välkommen! Behöver du ändra tiden?\n${suffix}`
 
       const success = await sendSMS(customer.phone_number, message, business.business_name)
 

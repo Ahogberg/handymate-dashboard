@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -60,10 +61,11 @@ export async function POST(request: NextRequest) {
 
     // Build SMS text
     const firstName = customer_name?.split(' ')[0] || ''
+    const suffix = buildSmsSuffix(businessName, bizConfig?.assigned_phone_number)
     const smsText = message || (
       eta
-        ? `Hej ${firstName}! ${contactName} från ${businessName} är nu på väg till dig. Beräknad ankomsttid: ${eta}. Vid frågor, ring ${contactPhone}. Vi ses snart!`
-        : `Hej ${firstName}! ${contactName} från ${businessName} är nu på väg till dig. Vid frågor, ring ${contactPhone}. Vi ses snart!`
+        ? `Hej ${firstName}! ${contactName} från ${businessName} är nu på väg till dig. Beräknad ankomsttid: ${eta}. Vi ses snart!\n${suffix}`
+        : `Hej ${firstName}! ${contactName} från ${businessName} är nu på väg till dig. Vi ses snart!\n${suffix}`
     )
 
     // Send via 46elks

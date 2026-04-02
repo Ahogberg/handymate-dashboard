@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -88,16 +89,17 @@ export async function GET(request: NextRequest) {
         // Respektera toggle
         if (!nudgeEnabledMap.get(q.business_id)) continue
 
-        // Hämta företagsnamn
+        // Hämta företagsnamn + svarsnummer
         const { data: biz } = await supabase
           .from('business_config')
-          .select('business_name, display_name')
+          .select('business_name, display_name, assigned_phone_number')
           .eq('business_id', q.business_id)
           .single()
 
         const businessName = biz?.display_name || biz?.business_name || ''
         const amount = (q.customer_pays || q.total || 0).toLocaleString('sv-SE')
         const firstName = (customer.name || '').split(' ')[0]
+        const suffix = buildSmsSuffix(businessName, biz?.assigned_phone_number)
 
         // Skicka SMS direkt (inte via agent — detta är tidskänsligt)
         if (process.env.ELKS_API_USER) {
@@ -111,7 +113,7 @@ export async function GET(request: NextRequest) {
               body: new URLSearchParams({
                 from: businessName.substring(0, 11),
                 to: customer.phone_number,
-                message: `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare! //${businessName}`,
+                message: `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`,
               }).toString(),
             })
 

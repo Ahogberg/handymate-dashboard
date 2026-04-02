@@ -4,6 +4,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 export async function sendBookingReminders(
   businessId: string
@@ -35,11 +36,12 @@ export async function sendBookingReminders(
     // Hämta företagsnamn
     const { data: config } = await supabase
       .from('business_config')
-      .select('business_name, contact_name')
+      .select('business_name, contact_name, assigned_phone_number')
       .eq('business_id', businessId)
       .single()
 
     const bizName = config?.business_name || 'Vi'
+    const suffix = buildSmsSuffix(bizName, config?.assigned_phone_number)
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     let sent = 0
@@ -70,7 +72,7 @@ export async function sendBookingReminders(
       const customerName = customer.name?.split(' ')[0] || ''
       const jobDesc = booking.notes?.split(' — ')[0]?.slice(0, 40) || 'ditt besök'
 
-      const message = `Hej ${customerName}! Påminnelse om ${jobDesc} imorgon kl ${time}. Vi ses! // ${bizName}`
+      const message = `Hej ${customerName}! Påminnelse om ${jobDesc} imorgon kl ${time}. Vi ses!\n${suffix}`
 
       try {
         await fetch(`${appUrl}/api/sms/send`, {

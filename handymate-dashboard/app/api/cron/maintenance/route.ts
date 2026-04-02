@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -94,6 +95,19 @@ export async function GET(request: NextRequest) {
       .eq('status', 'pending')
       .lt('expires_at', new Date().toISOString())
 
+    // Pre-fetch assigned_phone_number för alla berörda företag
+    const reviewBizIds = Array.from(new Set((dueReviews || []).map((r: any) => r.business_id as string)))
+    const reviewPhoneMap = new Map<string, string | null>()
+    if (reviewBizIds.length > 0) {
+      const { data: bizPhones } = await supabase
+        .from('business_config')
+        .select('business_id, assigned_phone_number')
+        .in('business_id', reviewBizIds)
+      for (const b of bizPhones || []) {
+        reviewPhoneMap.set(b.business_id, b.assigned_phone_number)
+      }
+    }
+
     let reviewsSent = 0
     for (const review of dueReviews || []) {
       const p = review.payload as any
@@ -104,6 +118,8 @@ export async function GET(request: NextRequest) {
 
       try {
         const firstName = (p.customer_name || '').split(' ')[0]
+        const bizName = p.business_name || 'Handymate'
+        const suffix = buildSmsSuffix(bizName, reviewPhoneMap.get(review.business_id))
         const smsRes = await fetch('https://api.46elks.com/a1/sms', {
           method: 'POST',
           headers: {
@@ -111,9 +127,9 @@ export async function GET(request: NextRequest) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            from: (p.business_name || 'Handymate').substring(0, 11),
+            from: bizName.substring(0, 11),
             to: p.customer_phone,
-            message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${p.google_review_url} // ${p.business_name || ''}`,
+            message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${p.google_review_url}\n${suffix}`,
           }).toString(),
         })
 

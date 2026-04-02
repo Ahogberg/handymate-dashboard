@@ -7,6 +7,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 // ── Stegdefinitioner med risknivåer ──────────────────────
 
@@ -793,12 +794,13 @@ async function executeReviewRequest(
     // Hämta företagsinformation
     const { data: business } = await supabase
       .from('business_config')
-      .select('business_name')
+      .select('business_name, assigned_phone_number')
       .eq('business_id', businessId)
       .single()
 
     const businessName = business?.business_name || 'Handymate'
     const customerName = customer.name || 'kund'
+    const suffix = buildSmsSuffix(businessName, business?.assigned_phone_number)
 
     // Schemalägg SMS-begäran om recension (24h fördröjning via nurture)
     try {
@@ -825,7 +827,7 @@ async function executeReviewRequest(
             body: new URLSearchParams({
               from: businessName.substring(0, 11),
               to: customer.phone_number,
-              message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder. //${businessName}`,
+              message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
             }).toString(),
           })
         } catch { /* fire-and-forget */ }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -400,6 +401,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Kunden saknar telefonnummer' }, { status: 400 })
       }
 
+      const suffix = buildSmsSuffix(business.business_name, business.assigned_phone_number)
       const smsMessage = `Hej ${quote.customer.name}!
 
 Här kommer din offert från ${business.business_name}:
@@ -410,7 +412,8 @@ ${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateSt
 Öppna din kundportal:
 ${portalUrl}
 
-Frågor? Ring ${business.phone_number}`
+Frågor? Ring ${business.phone_number}
+${suffix}`
 
       smsSent = await sendSMS(quote.customer.phone_number, smsMessage, business.business_name)
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkPhoneApiRateLimit } from '@/lib/auth'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -255,7 +256,7 @@ case 'create_booking': {
 
   const { data: businessConfig } = await supabase
     .from('business_config')
-    .select('business_name')
+    .select('business_name, assigned_phone_number')
     .eq('business_id', authBusiness.business_id)
     .single()
 
@@ -272,7 +273,8 @@ case 'create_booking': {
       minute: '2-digit' 
     })
 
-    const message = `Hej${customer.name ? ' ' + customer.name.split(' ')[0] : ''}! Din tid hos ${businessConfig.business_name} är bokad: ${dateStr} kl ${timeStr}. Välkommen! Svara på detta SMS om du behöver ändra tiden.`
+    const suffix = buildSmsSuffix(businessConfig.business_name, businessConfig.assigned_phone_number)
+    const message = `Hej${customer.name ? ' ' + customer.name.split(' ')[0] : ''}! Din tid hos ${businessConfig.business_name} är bokad: ${dateStr} kl ${timeStr}. Välkommen! Behöver du ändra tiden?\n${suffix}`
 
     try {
       await fetch('https://api.46elks.com/a1/sms', {

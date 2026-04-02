@@ -1,6 +1,14 @@
 // System prompt builder for Next.js runtime
 // Mirrors supabase/functions/agent/system-prompt.ts
 
+/** +46761234567 → 076-123 45 67 */
+function formatAgentPhoneHint(phone: string): string {
+  let digits = phone.replace(/\D/g, '')
+  if (digits.startsWith('46') && digits.length > 9) digits = '0' + digits.substring(2)
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}`
+  return digits
+}
+
 interface BusinessContext {
   business_name: string
   contact_name: string
@@ -138,6 +146,7 @@ ${buildAutomationBlock(business.automationSettings)}
 - 50% av arbetskostnaden, max 75 000 kr/år
 ### SMS
 - ALDRIG mellan 21:00 och 08:00
+- Avsluta ALLTID SMS med svarsnummer och företagsnamn${business.assigned_phone_number ? `:\n  Svara: ${formatAgentPhoneHint(business.assigned_phone_number)}\n  //${business.business_name}` : `: //${business.business_name}`}
 ### Offerter
 - Giltighetstid 30 dagar
 - Separera arbete och material

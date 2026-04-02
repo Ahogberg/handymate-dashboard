@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { fireEvent } from '@/lib/automation-engine'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 /**
  * POST /api/work-orders/[id]/send — Skicka arbetsorder via SMS
@@ -81,8 +82,16 @@ export async function POST(
       lines.push(`Verktyg: ${wo.tools_needed.substring(0, 200)}`)
     }
 
+    // Hämta assigned_phone_number för svarsnummer
+    const { data: bizConfig } = await supabase
+      .from('business_config')
+      .select('assigned_phone_number')
+      .eq('business_id', business.business_id)
+      .single()
+
+    const suffix = buildSmsSuffix(business.business_name || 'Handymate', bizConfig?.assigned_phone_number)
     lines.push('')
-    lines.push(`// ${business.business_name} via Handymate`)
+    lines.push(suffix)
 
     const message = lines.join('\n')
 
