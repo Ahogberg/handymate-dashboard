@@ -15,14 +15,14 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const dealId = params.id
+  const { id: dealId } = await params
   if (!dealId) {
     return NextResponse.json({ error: 'Deal-ID krävs' }, { status: 400 })
   }
@@ -51,14 +51,14 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const dealId = params.id
+  const { id: dealId } = await params
   if (!dealId) {
     return NextResponse.json({ error: 'Deal-ID krävs' }, { status: 400 })
   }

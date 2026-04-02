@@ -10,7 +10,7 @@ import { ensureBucket } from '@/lib/storage'
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -18,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const dealId = params?.id
+    const { id: dealId } = await params
     const supabase = getServerSupabase()
     await ensureBucket(supabase, 'customer-documents', { public: true })
 
