@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const expiredCount = expiredQuotes?.length || 0
 
     // 1b. Skicka förfallo-nudge: SMS 3 dagar innan offert går ut
+    // Respekterar auto_enabled toggle — skickar INTE om företaget har stängt av auto-SMS
     let expiryNudgesSent = 0
     try {
       const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -47,9 +48,45 @@ export async function GET(request: NextRequest) {
         .in('status', ['sent', 'opened'])
         .eq('valid_until', threeDaysFromNow)  // Exakt 3 dagar kvar
 
+      // Samla unika business_ids för att kolla toggles en gång per företag
+      const nudgeBizIds = Array.from(new Set((expiringQuotes || []).map((q: any) => q.business_id as string)))
+      const nudgeEnabledMap = new Map<string, boolean>()
+
+      for (const bizId of nudgeBizIds) {
+        let enabled = true
+        // Kolla automation_settings (centraliserad toggle)
+        try {
+          const { data: autoSettings } = await supabase
+            .from('automation_settings')
+            .select('sms_auto_enabled, sms_quote_followup')
+            .eq('business_id', bizId)
+            .single()
+          if (autoSettings) {
+            enabled = autoSettings.sms_auto_enabled !== false && autoSettings.sms_quote_followup !== false
+          }
+        } catch { /* table may not exist */ }
+
+        // Fallback: kolla communication_settings
+        if (enabled) {
+          try {
+            const { data: commSettings } = await supabase
+              .from('communication_settings')
+              .select('auto_enabled')
+              .eq('business_id', bizId)
+              .single()
+            if (commSettings && commSettings.auto_enabled === false) enabled = false
+          } catch { /* non-blocking */ }
+        }
+
+        nudgeEnabledMap.set(bizId, enabled)
+      }
+
       for (const q of expiringQuotes || []) {
         const customer = q.customer as any
         if (!customer?.phone_number) continue
+
+        // Respektera toggle
+        if (!nudgeEnabledMap.get(q.business_id)) continue
 
         // Hämta företagsnamn
         const { data: biz } = await supabase
@@ -111,8 +148,10 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     // 3. Load automation settings per business (for quote_followup_days)
+    //    + kolla om V3 threshold-regler redan hanterar offertuppföljning (dedup)
     const businessIds = Array.from(new Set((sentQuotes || []).map((q: any) => q.business_id as string)))
     const settingsMap = new Map<string, number>()
+    const v3HandlesQuoteFollowup = new Set<string>()
 
     if (businessIds.length > 0) {
       const { data: settingsRows } = await supabase
@@ -123,6 +162,20 @@ export async function GET(request: NextRequest) {
       for (const s of settingsRows || []) {
         settingsMap.set(s.business_id, s.quote_followup_days || 5)
       }
+
+      // Kolla vilka företag som har aktiva V3 threshold-regler för offerter
+      // Om ja → V3 evaluate-thresholds hanterar redan uppföljning, skippa cron-sändning
+      const { data: v3QuoteRules } = await supabase
+        .from('v3_automation_rules')
+        .select('business_id')
+        .eq('trigger_type', 'threshold')
+        .eq('is_active', true)
+        .in('business_id', businessIds)
+        .contains('trigger_config', { entity: 'quote' })
+
+      for (const r of v3QuoteRules || []) {
+        v3HandlesQuoteFollowup.add(r.business_id)
+      }
     }
 
     // 4. Group candidates by business
@@ -131,6 +184,9 @@ export async function GET(request: NextRequest) {
     for (const quote of sentQuotes || []) {
       const customer = quote.customer as any
       if (!customer) continue
+
+      // Dedup: om V3 threshold-regler hanterar detta företag, skippa cron-uppföljning
+      if (v3HandlesQuoteFollowup.has(quote.business_id)) continue
 
       // Use sent_at (not created_at) for accurate timing
       const sentDate = quote.sent_at || quote.valid_until
