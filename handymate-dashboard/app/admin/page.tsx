@@ -87,15 +87,15 @@ const PLAN_LABELS: Record<string, string> = {
 }
 
 const PLAN_COLORS: Record<string, string> = {
-  starter: 'bg-teal-600',
-  professional: 'bg-teal-500',
-  business: 'bg-teal-500',
+  starter: 'bg-primary-700',
+  professional: 'bg-primary-600',
+  business: 'bg-primary-600',
 }
 
 const PLAN_BADGE_STYLES: Record<string, string> = {
-  starter: 'bg-teal-100 text-teal-700 border-teal-200',
-  professional: 'bg-teal-100 text-teal-700 border-teal-200',
-  business: 'bg-teal-100 text-teal-700 border-teal-200',
+  starter: 'bg-primary-100 text-primary-700 border-primary-200',
+  professional: 'bg-primary-100 text-primary-700 border-primary-200',
+  business: 'bg-primary-100 text-primary-700 border-primary-200',
 }
 
 function formatSEK(amount: number): string {
@@ -332,15 +332,15 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       {/* Background decorations */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-teal-600 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-primary-700 rounded-xl flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -360,7 +360,7 @@ export default function AdminDashboardPage() {
             </button>
             <a
               href="/admin/onboard"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary-700 rounded-xl hover:opacity-90 transition-opacity shadow-sm"
             >
               <UserPlus className="w-4 h-4" />
               Onboarda pilot
@@ -395,10 +395,10 @@ export default function AdminDashboardPage() {
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input type="text" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)}
-                  placeholder="Sök företag eller mail..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-teal-400" />
+                  placeholder="Sök företag eller mail..." className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-primary-500" />
               </div>
               <select value={planFilter} onChange={e => setPlanFilter(e.target.value)}
-                className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-teal-400">
+                className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-primary-500">
                 <option value="all">Alla planer</option>
                 <option value="starter">Starter</option>
                 <option value="professional">Professional</option>
@@ -432,7 +432,7 @@ export default function AdminDashboardPage() {
                             value={c.subscription_plan || 'starter'}
                             onChange={e => updateCustomerPlan(c.business_id, e.target.value)}
                             disabled={updatingPlan === c.business_id}
-                            className={`text-xs font-medium px-2 py-1 rounded-lg border bg-white cursor-pointer focus:outline-none focus:border-teal-400 ${
+                            className={`text-xs font-medium px-2 py-1 rounded-lg border bg-white cursor-pointer focus:outline-none focus:border-primary-500 ${
                               updatingPlan === c.business_id ? 'opacity-50' : ''
                             }`}
                           >
@@ -443,7 +443,7 @@ export default function AdminDashboardPage() {
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => toggleLeadsAddon(c.business_id, !!c.leads_addon)}
-                            className={`w-9 h-5 rounded-full transition-colors relative ${c.leads_addon ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                            className={`w-9 h-5 rounded-full transition-colors relative ${c.leads_addon ? 'bg-primary-600' : 'bg-gray-300'}`}>
                             <div className={`w-4 h-4 bg-white rounded-full absolute top-0.5 transition-transform ${c.leads_addon ? 'translate-x-4' : 'translate-x-0.5'}`} />
                           </button>
                         </td>
@@ -487,7 +487,7 @@ export default function AdminDashboardPage() {
               {/* Total businesses */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                     <Building2 className="w-5 h-5 text-sky-700" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Totalt</span>
@@ -511,8 +511,8 @@ export default function AdminDashboardPage() {
               {/* MRR */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 text-teal-600" />
+                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-primary-700" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">MRR</span>
                 </div>
@@ -523,8 +523,8 @@ export default function AdminDashboardPage() {
               {/* New this month */}
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <UserPlus className="w-5 h-5 text-teal-600" />
+                  <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-primary-700" />
                   </div>
                   <span className="text-xs text-gray-400 font-medium uppercase tracking-wide">Denna månad</span>
                 </div>
@@ -539,7 +539,7 @@ export default function AdminDashboardPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <FileText className="w-4 h-4 text-teal-600" />
+                  <FileText className="w-4 h-4 text-primary-700" />
                   <span className="text-xs text-gray-400 font-medium">Offerter</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.total_quotes}</p>
@@ -547,7 +547,7 @@ export default function AdminDashboardPage() {
 
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <Receipt className="w-4 h-4 text-teal-500" />
+                  <Receipt className="w-4 h-4 text-primary-600" />
                   <span className="text-xs text-gray-400 font-medium">Fakturor</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.total_invoices}</p>
@@ -563,7 +563,7 @@ export default function AdminDashboardPage() {
 
               <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="w-4 h-4 text-teal-500" />
+                  <MessageSquare className="w-4 h-4 text-primary-600" />
                   <span className="text-xs text-gray-400 font-medium">SMS (månad)</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{metrics.sms_this_month}</p>
@@ -688,10 +688,10 @@ export default function AdminDashboardPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <a
                   href="/admin/onboard"
-                  className="group flex items-center justify-between bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:border-teal-300 hover:shadow-md transition-all"
+                  className="group flex items-center justify-between bg-white rounded-2xl border border-gray-200 shadow-sm p-5 hover:border-primary-300 hover:shadow-md transition-all"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center group-hover:bg-teal-200 transition-colors">
+                    <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center group-hover:bg-primary-300 transition-colors">
                       <UserPlus className="w-5 h-5 text-sky-700" />
                     </div>
                     <div>
@@ -699,7 +699,7 @@ export default function AdminDashboardPage() {
                       <p className="text-xs text-gray-500">Skapa och hantera pilotkonton</p>
                     </div>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-teal-600 transition-colors" />
+                  <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-primary-700 transition-colors" />
                 </a>
               </div>
             </div>
@@ -714,7 +714,7 @@ export default function AdminDashboardPage() {
               {['all', 'pending_approval', 'active', 'suspended'].map(f => (
                 <button key={f} onClick={() => setPartnerFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                    partnerFilter === f ? 'bg-teal-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    partnerFilter === f ? 'bg-primary-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}>
                   {f === 'all' ? 'Alla' : PARTNER_STATUS[f]?.label || f}
                   {f === 'pending_approval' && partners.filter(p => p.status === 'pending_approval').length > 0 && (
@@ -772,7 +772,7 @@ export default function AdminDashboardPage() {
                               <div className="flex gap-1.5 justify-end">
                                 {partner.status === 'pending_approval' && (
                                   <button onClick={() => handlePartnerAction(partner.id, 'approve')}
-                                    className="px-3 py-1 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700">
+                                    className="px-3 py-1 bg-primary-700 text-white rounded-lg text-xs font-medium hover:bg-primary-800">
                                     Godkänn
                                   </button>
                                 )}
@@ -784,7 +784,7 @@ export default function AdminDashboardPage() {
                                 )}
                                 {partner.status === 'suspended' && (
                                   <button onClick={() => handlePartnerAction(partner.id, 'reactivate')}
-                                    className="px-3 py-1 bg-teal-100 text-teal-700 rounded-lg text-xs font-medium hover:bg-teal-200">
+                                    className="px-3 py-1 bg-primary-100 text-primary-700 rounded-lg text-xs font-medium hover:bg-primary-300">
                                     Återaktivera
                                   </button>
                                 )}

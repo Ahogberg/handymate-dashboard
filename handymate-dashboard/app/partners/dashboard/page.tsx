@@ -251,7 +251,7 @@ export default function PartnerDashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -263,7 +263,7 @@ export default function PartnerDashboardPage() {
   const statCards = [
     { label: 'Hänvisade företag', value: String(stats.total_referred), icon: Users, color: 'text-blue-600 bg-blue-50' },
     { label: 'Aktiva kunder', value: String(stats.active_customers), icon: TrendingUp, color: 'text-green-600 bg-green-50' },
-    { label: 'Intjänat totalt', value: formatSek(stats.total_earned_sek), icon: Banknote, color: 'text-teal-600 bg-teal-50' },
+    { label: 'Intjänat totalt', value: formatSek(stats.total_earned_sek), icon: Banknote, color: 'text-primary-700 bg-primary-50' },
     { label: 'Nästa utbetalning', value: formatSek(stats.next_payout_sek), icon: Clock, color: 'text-amber-600 bg-amber-50' },
   ]
 
@@ -273,11 +273,11 @@ export default function PartnerDashboardPage() {
       <nav className="border-b border-gray-100 bg-white sticky top-0 z-30">
         <div className="max-w-6xl mx-auto px-4 sm:px-8 py-4 flex items-center justify-between">
           <Link href="https://handymate.se/partners" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-teal-700 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-primary-800 rounded-lg flex items-center justify-center">
               <Zap className="w-4 h-4 text-white" />
             </div>
             <span className="text-lg font-bold text-gray-900">Handymate</span>
-            <span className="text-sm text-teal-700 font-medium ml-1">Partner</span>
+            <span className="text-sm text-primary-700 font-medium ml-1">Partner</span>
           </Link>
           <button
             onClick={handleLogout}
@@ -292,7 +292,7 @@ export default function PartnerDashboardPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-8 py-8 space-y-6">
         {/* ─── Header ─── */}
         <div>
-          <p className="text-sm text-teal-700 font-medium">🤝 Handymate Partner</p>
+          <p className="text-sm text-primary-700 font-medium">🤝 Handymate Partner</p>
           <h1 className="text-2xl font-bold text-gray-900 mt-1">
             Välkommen, {partner.name}!
           </h1>
@@ -325,7 +325,7 @@ export default function PartnerDashboardPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => copyToClipboard(referralUrl, setCopiedLink)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 transition-colors whitespace-nowrap"
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors whitespace-nowrap"
                 >
                   {copiedLink ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   {copiedLink ? 'Kopierad!' : 'Kopiera'}
@@ -416,7 +416,7 @@ export default function PartnerDashboardPage() {
                       <div className="text-right shrink-0">
                         {ref.status === 'active' || ref.status === 'rewarded' ? (
                           <>
-                            <p className="text-sm font-semibold text-teal-700">
+                            <p className="text-sm font-semibold text-primary-700">
                               {formatSek(ref.monthly_commission)}/mån
                             </p>
                             <p className="text-xs text-gray-500">
@@ -527,9 +527,9 @@ export default function PartnerDashboardPage() {
         </div>
 
         {/* ─── Commission info ─── */}
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
-          <h3 className="font-semibold text-teal-800 mb-2">Om provisionsutbetalning</h3>
-          <p className="text-sm text-teal-700">
+        <div className="bg-primary-50 border border-primary-200 rounded-xl p-5">
+          <h3 className="font-semibold text-primary-800 mb-2">Om provisionsutbetalning</h3>
+          <p className="text-sm text-primary-700">
             Du tjänar 20% löpande provision i 12 månader per hantverkare som registrerar sig via din länk.
             Provisionen beräknas automatiskt varje månad. Utbetalning sker månadsvis i efterskott.
           </p>
@@ -604,7 +604,7 @@ export default function PartnerDashboardPage() {
                   value={webhookUrl}
                   onChange={e => setWebhookUrl(e.target.value)}
                   placeholder="https://din-server.se/webhooks/handymate"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                 />
               </div>
 
@@ -618,7 +618,7 @@ export default function PartnerDashboardPage() {
                         type="checkbox"
                         checked={webhookEvents.includes(opt.key)}
                         onChange={() => toggleWebhookEvent(opt.key)}
-                        className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                        className="rounded border-gray-300 text-primary-700 focus:ring-primary-600"
                       />
                       <span className="text-sm text-gray-700">{opt.label}</span>
                     </label>
@@ -666,7 +666,7 @@ export default function PartnerDashboardPage() {
                 <button
                   onClick={saveWebhook}
                   disabled={webhookSaving}
-                  className="flex-1 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 transition-colors disabled:opacity-50"
+                  className="flex-1 px-4 py-2 bg-primary-800 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50"
                 >
                   {webhookSaving ? 'Sparar...' : 'Spara'}
                 </button>
@@ -696,10 +696,10 @@ function TimelineItem({ date, text, active }: { date: string; text: string; acti
   return (
     <div className="relative flex items-start gap-3">
       <div className={`absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border-2 ${
-        active ? 'bg-teal-500 border-teal-500' : 'bg-white border-gray-300'
+        active ? 'bg-primary-500 border-primary-600' : 'bg-white border-gray-300'
       }`} />
       <div className="min-w-0">
-        <p className={`text-sm ${active ? 'font-medium text-teal-700' : 'text-gray-700'}`}>{text}</p>
+        <p className={`text-sm ${active ? 'font-medium text-primary-700' : 'text-gray-700'}`}>{text}</p>
         <p className="text-xs text-gray-400">{formatDate(date)}</p>
       </div>
     </div>

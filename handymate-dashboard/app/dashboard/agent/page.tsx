@@ -193,7 +193,7 @@ const AVATAR_BASE_PUBLIC = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/
 const AVATAR_BASE = AVATAR_BASE_SIGNED
 
 const TEAM: TeamAgent[] = [
-  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-teal-600', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️', description: 'Koordinerar teamet och pratar med dig' },
+  { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-primary-700', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️', description: 'Koordinerar teamet och pratar med dig' },
   { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', avatar: `${AVATAR_BASE}/Karin.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvS2FyaW4ucG5nIiwiaWF0IjoxNzczODU1NjE4LCJleHAiOjI2Mzc4NTU2MTh9.bmvCwfi8Rry-5dGsJ1Zyyco--CYT6ZG3gXBPqHRiVdA`, greeting: 'Jag har koll på ekonomin — kollar fakturorna', description: 'Håller koll på fakturor och betalningar' },
   { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
   { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag', description: 'Följer upp offerter och leads' },
@@ -231,10 +231,10 @@ function getAgentForRun(run: { trigger_type: string; tool_calls: number; final_r
 // ── Constants ──────────────────────────────────────────────────────────
 
 const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color: string; bg: string }> = {
-  phone_call: { label: 'Telefonsamtal', icon: Phone, color: 'text-teal-400', bg: 'bg-teal-600/10 border-teal-500/20' },
-  incoming_sms: { label: 'Inkommande SMS', icon: MessageSquare, color: 'text-teal-400', bg: 'bg-teal-500/10 border-teal-500/20' },
+  phone_call: { label: 'Telefonsamtal', icon: Phone, color: 'text-primary-500', bg: 'bg-primary-700/10 border-primary-600/20' },
+  incoming_sms: { label: 'Inkommande SMS', icon: MessageSquare, color: 'text-primary-500', bg: 'bg-primary-600/10 border-primary-600/20' },
   manual: { label: 'Du frågade', icon: Settings2, color: 'text-orange-400', bg: 'bg-orange-500/10 border-orange-500/20' },
-  cron: { label: 'Automatisk kontroll', icon: Clock, color: 'text-teal-500', bg: 'bg-teal-500/10 border-teal-500/20' },
+  cron: { label: 'Automatisk kontroll', icon: Clock, color: 'text-primary-600', bg: 'bg-primary-600/10 border-primary-600/20' },
 }
 
 const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search; friendlyLabel: string }> = {
@@ -380,11 +380,11 @@ function stripMarkdown(text: string): string {
 
 const RULE_TYPE_CONFIG: Record<string, { label: string; icon: typeof FileText; color: string; bg: string }> = {
   quote_followup: { label: 'Offertuppföljning', icon: FileText, color: 'text-amber-500', bg: 'bg-amber-50 border-amber-200' },
-  booking_reminder: { label: 'Bokningspåminnelse', icon: CalendarCheck, color: 'text-sky-600', bg: 'bg-teal-50 border-teal-200' },
+  booking_reminder: { label: 'Bokningspåminnelse', icon: CalendarCheck, color: 'text-sky-600', bg: 'bg-primary-50 border-primary-200' },
   invoice_reminder: { label: 'Fakturapåminnelse', icon: FileText, color: 'text-red-500', bg: 'bg-red-50 border-red-200' },
   lead_response: { label: 'Lead-respons', icon: Phone, color: 'text-emerald-500', bg: 'bg-emerald-50 border-emerald-200' },
-  project_complete: { label: 'Projekt-avslut', icon: CheckCircle2, color: 'text-teal-500', bg: 'bg-teal-50 border-teal-200' },
-  lead_qualify: { label: 'Lead-kvalificering', icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200' },
+  project_complete: { label: 'Projekt-avslut', icon: CheckCircle2, color: 'text-primary-600', bg: 'bg-primary-50 border-primary-200' },
+  lead_qualify: { label: 'Lead-kvalificering', icon: TrendingUp, color: 'text-primary-700', bg: 'bg-primary-50 border-primary-200' },
   lead_nurture: { label: 'Lead-uppföljning', icon: MessageSquare, color: 'text-indigo-500', bg: 'bg-indigo-50 border-indigo-200' },
   lead_hot_alert: { label: 'Het lead-alert', icon: AlertTriangle, color: 'text-orange-500', bg: 'bg-orange-50 border-orange-200' },
 }
@@ -471,7 +471,7 @@ function ActivityItem({ run, isSelected, onClick }: {
     <button
       onClick={onClick}
       className={`w-full text-left px-5 py-4 border-b border-gray-100 transition-all hover:bg-gray-50 ${
-        isSelected ? 'bg-teal-50/50 border-l-[3px] border-l-teal-500' : 'border-l-[3px] border-l-transparent'
+        isSelected ? 'bg-primary-50/50 border-l-[3px] border-l-primary-600' : 'border-l-[3px] border-l-transparent'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -528,7 +528,7 @@ function ToolStep({ call, index, total, count = 1 }: {
       <div className="flex flex-col items-center w-8 flex-shrink-0">
         <div className={`w-8 h-8 rounded-lg flex items-center justify-center z-10 shadow-sm ${
           call.result.success
-            ? 'bg-teal-100 text-teal-600 shadow-teal-500/20'
+            ? 'bg-primary-100 text-primary-700 shadow-primary-600/20'
             : 'bg-red-100 text-red-500 shadow-red-500/20'
         }`}>
           {call.result.success
@@ -537,7 +537,7 @@ function ToolStep({ call, index, total, count = 1 }: {
           }
         </div>
         {index < total - 1 && (
-          <div className="w-0.5 flex-1 bg-gradient-to-b from-teal-300 to-gray-200 min-h-[16px]" />
+          <div className="w-0.5 flex-1 bg-gradient-to-b from-primary-300 to-gray-200 min-h-[16px]" />
         )}
       </div>
       {/* Content */}
@@ -608,7 +608,7 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
         </div>
 
         {/* Summary — rendered as proper markdown */}
-        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-teal-600">
+        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-700">
           {run.final_response ? (
             <ReactMarkdown>{humanizeResponse(run.final_response)}</ReactMarkdown>
           ) : (
@@ -786,7 +786,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Shield className="w-5 h-5 text-teal-500" />
+          <Shield className="w-5 h-5 text-primary-600" />
           <h3 className="text-sm font-bold text-gray-900">Agentens autonomi</h3>
         </div>
         {saving && (
@@ -820,7 +820,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
                 className="flex-shrink-0"
               >
                 {isEnabled ? (
-                  <ToggleRight className="w-8 h-8 text-teal-600" />
+                  <ToggleRight className="w-8 h-8 text-primary-700" />
                 ) : (
                   <ToggleLeft className="w-8 h-8 text-gray-300" />
                 )}
@@ -841,7 +841,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
               type="number"
               value={settings.require_approval_above}
               onChange={e => onUpdate('require_approval_above', Number(e.target.value))}
-              className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
             />
             <span className="text-sm text-gray-500">kr</span>
             <span className="text-xs text-gray-400 ml-2">
@@ -859,7 +859,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
 
 const URGENCY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   low: { label: 'Låg', color: 'text-gray-500', bg: 'bg-gray-100' },
-  medium: { label: 'Medel', color: 'text-sky-700', bg: 'bg-teal-100' },
+  medium: { label: 'Medel', color: 'text-sky-700', bg: 'bg-primary-100' },
   high: { label: 'Hög', color: 'text-orange-600', bg: 'bg-orange-100' },
   emergency: { label: 'Akut', color: 'text-red-600', bg: 'bg-red-100' },
 }
@@ -1030,7 +1030,7 @@ function LeadDetail({ lead, onClose, onStatusChange, pipelineStages }: {
                 <button
                   key={stageKey}
                   onClick={() => onStatusChange(lead.lead_id, stageKey)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-teal-600 hover:opacity-90 transition-all flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-primary-700 hover:opacity-90 transition-all flex items-center gap-1"
                   style={{ backgroundColor: stage?.color || '#0F766E' }}
                 >
                   <ArrowRight className="w-3 h-3" />
@@ -1178,14 +1178,14 @@ function PipelineTab({ businessId }: { businessId: string }) {
           label="Totala leads"
           value={stats?.total_leads || 0}
           icon={Target}
-          color="bg-teal-500"
+          color="bg-primary-600"
         />
         <StatCard
           label="Pipeline-värde"
           value={stats?.total_pipeline_value ? `${(stats.total_pipeline_value / 1000).toFixed(0)}k` : '0'}
           suffix=" kr"
           icon={DollarSign}
-          color="bg-teal-500"
+          color="bg-primary-600"
         />
         <StatCard
           label="Konvertering"
@@ -1199,7 +1199,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
           value={stats?.avg_conversion_days || 0}
           suffix=" dagar"
           icon={Clock}
-          color="bg-teal-600"
+          color="bg-primary-700"
         />
       </div>
 
@@ -1222,7 +1222,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
               onClick={() => setFilterUrgency(f.key)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 filterUrgency === f.key
-                  ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
                   : 'text-gray-500 border border-transparent hover:bg-gray-50'
               }`}
             >
@@ -1243,7 +1243,7 @@ function PipelineTab({ businessId }: { businessId: string }) {
               onClick={() => setFilterScore(f.key)}
               className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
                 filterScore === f.key
-                  ? 'bg-teal-50 text-teal-800 border border-teal-200'
+                  ? 'bg-primary-50 text-primary-800 border border-primary-200'
                   : 'text-gray-500 border border-transparent hover:bg-gray-50'
               }`}
             >
@@ -1346,7 +1346,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
               {riskLabels[rule.risk_level]}
             </span>
             {pendingCount > 0 && (
-              <span className="text-[10px] font-bold bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full">
+              <span className="text-[10px] font-bold bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full">
                 {pendingCount} väntande
               </span>
             )}
@@ -1362,7 +1362,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
                 type="number"
                 value={rule.delay_hours}
                 onChange={e => onUpdate('delay_hours', Number(e.target.value))}
-                className="w-16 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-teal-500/30"
+                className="w-16 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-600/30"
                 min={1}
               />
               <span className="text-[10px] text-gray-400">tim</span>
@@ -1374,7 +1374,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
                 type="number"
                 value={rule.max_attempts}
                 onChange={e => onUpdate('max_attempts', Number(e.target.value))}
-                className="w-12 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-teal-500/30"
+                className="w-12 px-2 py-1 rounded border border-gray-200 text-xs font-mono text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-600/30"
                 min={1}
                 max={10}
               />
@@ -1392,7 +1392,7 @@ function AutomationRuleCard({ rule, pendingCount, onToggle, onUpdate, saving }: 
           disabled={saving}
         >
           {rule.enabled ? (
-            <ToggleRight className="w-9 h-9 text-teal-600" />
+            <ToggleRight className="w-9 h-9 text-primary-700" />
           ) : (
             <ToggleLeft className="w-9 h-9 text-gray-300" />
           )}
@@ -1549,9 +1549,9 @@ function AutomationTab({ businessId }: { businessId: string }) {
     <div className="space-y-6">
       {/* Preview summary */}
       {totalPending > 0 && (
-        <div className="bg-teal-50 rounded-xl border border-teal-200 p-4 flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
-            <Timer className="w-5 h-5 text-teal-600" />
+        <div className="bg-primary-50 rounded-xl border border-primary-200 p-4 flex items-start gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary-100 flex items-center justify-center flex-shrink-0">
+            <Timer className="w-5 h-5 text-primary-700" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-900 mb-1">
@@ -1595,7 +1595,7 @@ function AutomationTab({ businessId }: { businessId: string }) {
           <button
             onClick={handleSeedRules}
             disabled={saving}
-            className="px-4 py-2 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-all shadow-sm"
+            className="px-4 py-2 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all shadow-sm"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin inline mr-1" />
@@ -1704,7 +1704,7 @@ function ManualTrigger({ businessId, onTriggered }: {
         {TEAM[0].avatar ? (
           <img src={TEAM[0].avatar} alt="Matte" className="w-7 h-7 rounded-full object-cover" />
         ) : (
-          <div className="w-7 h-7 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-xs">M</div>
+          <div className="w-7 h-7 rounded-full bg-primary-700 flex items-center justify-center text-white font-bold text-xs">M</div>
         )}
         <h3 className="text-sm font-bold text-gray-900">Prata med Matte</h3>
       </div>
@@ -1714,7 +1714,7 @@ function ManualTrigger({ businessId, onTriggered }: {
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {history.map(q => (
             <button key={q} onClick={() => { setInstruction(q); inputRef.current?.focus() }}
-              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-500 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-500 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
               <span className="truncate max-w-[180px]">{q}</span>
               <span onClick={(e) => { e.stopPropagation(); removeFromHistory(q) }}
                 className="text-gray-300 hover:text-red-400 ml-0.5">×</span>
@@ -1729,10 +1729,10 @@ function ManualTrigger({ businessId, onTriggered }: {
           onChange={e => setInstruction(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
           placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
-          className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+          className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
           disabled={loading} />
         <button onClick={handleTrigger} disabled={loading || !instruction.trim()}
-          className="px-4 py-2.5 rounded-lg bg-teal-700 text-white text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-teal-500/20">
+          className="px-4 py-2.5 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-primary-600/20">
           {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {loading ? `${elapsed}s…` : 'Kör'}
         </button>
@@ -1744,7 +1744,7 @@ function ManualTrigger({ businessId, onTriggered }: {
           <button key={btn.label} type="button"
             onClick={() => { setInstruction(btn.text); inputRef.current?.focus() }}
             disabled={loading}
-            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors disabled:opacity-50">
+            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors disabled:opacity-50">
             {btn.emoji} {btn.label}
           </button>
         ))}
@@ -1760,8 +1760,8 @@ function ManualTrigger({ businessId, onTriggered }: {
           {agentResponse.type === 'success' ? (
             <>
               <div className="flex items-start gap-2.5">
-                <div className="w-6 h-6 bg-teal-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-3.5 h-3.5 text-teal-700" />
+                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="w-3.5 h-3.5 text-primary-700" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{agentResponse.text}</div>
@@ -1926,7 +1926,7 @@ export default function AgentDashboardPage() {
     return (
       <div className="p-4 sm:p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-sm shadow-teal-500/20">
+          <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center shadow-sm shadow-primary-600/20">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -1976,7 +1976,7 @@ export default function AgentDashboardPage() {
               isDisabled
                 ? 'bg-gray-50 border-gray-100 opacity-60 cursor-default'
                 : filterType === agent.id
-                  ? 'bg-white border-teal-300 shadow-md'
+                  ? 'bg-white border-primary-300 shadow-md'
                   : filterType === 'all'
                     ? 'bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm'
                     : 'bg-gray-50 border-gray-100 opacity-50 hover:opacity-100'
@@ -2003,7 +2003,7 @@ export default function AgentDashboardPage() {
               <span className="text-[11px] text-gray-500 block">{agent.role}</span>
               {allowed && agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
               {allowed && (memoryCounts[agent.id] || 0) > 0 && (
-                <span className="text-[10px] text-teal-600 block mt-0.5">🧠 {memoryCounts[agent.id]} lärdomar</span>
+                <span className="text-[10px] text-primary-700 block mt-0.5">🧠 {memoryCounts[agent.id]} lärdomar</span>
               )}
               {isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Under utbildning</span>}
               {!allowed && !isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Pro-plan</span>}
@@ -2014,7 +2014,7 @@ export default function AgentDashboardPage() {
         <button
           onClick={() => setFilterType('all')}
           className={`flex flex-col items-center gap-1.5 px-3 py-2.5 rounded-xl border transition-all min-w-[80px] ${
-            filterType === 'all' ? 'bg-teal-50 border-teal-300' : 'bg-white border-gray-200 hover:border-gray-300'
+            filterType === 'all' ? 'bg-primary-50 border-primary-300' : 'bg-white border-gray-200 hover:border-gray-300'
           }`}
         >
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600">
@@ -2077,10 +2077,10 @@ export default function AgentDashboardPage() {
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard label="Utförda uppgifter" value={stats?.total_runs || 0} icon={Bot} color="bg-teal-600" />
-            <StatCard label="Åtgärder" value={stats?.total_tool_calls || 0} icon={Zap} color="bg-teal-500" />
+            <StatCard label="Utförda uppgifter" value={stats?.total_runs || 0} icon={Bot} color="bg-primary-700" />
+            <StatCard label="Åtgärder" value={stats?.total_tool_calls || 0} icon={Zap} color="bg-primary-600" />
             <StatCard label="Lyckade" value={successRate} suffix="%" icon={CheckCircle2} color="bg-emerald-500" />
-            <StatCard label="Snitt tid" value={formatDuration(stats?.avg_duration_ms || 0)} icon={Clock} color="bg-teal-500" />
+            <StatCard label="Snitt tid" value={formatDuration(stats?.avg_duration_ms || 0)} icon={Clock} color="bg-primary-600" />
           </div>
 
           {/* Genererat värde */}
@@ -2213,7 +2213,7 @@ export default function AgentDashboardPage() {
                 <li>✓ AI-offertgenerering</li>
               </ul>
             </div>
-            <a href="/dashboard/settings/billing" className="block w-full bg-teal-600 text-white py-3 rounded-lg font-semibold">Uppgradera nu →</a>
+            <a href="/dashboard/settings/billing" className="block w-full bg-primary-700 text-white py-3 rounded-lg font-semibold">Uppgradera nu →</a>
             <button onClick={() => setShowTeamUpgrade(false)} className="mt-3 text-sm text-gray-400">Inte nu</button>
           </div>
         </div>
@@ -2251,7 +2251,7 @@ function AutomationValueWidget() {
           <button onClick={() => setExpanded(!expanded)} className="w-full text-left">
             <p className="text-xs text-gray-400 mb-1">Senaste 7 dagarna</p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-teal-700">
+              <span className="text-3xl font-bold text-primary-700">
                 {data.total_value.toLocaleString('sv-SE')} kr
               </span>
               <span className="text-sm text-gray-500">genererat automatiskt</span>

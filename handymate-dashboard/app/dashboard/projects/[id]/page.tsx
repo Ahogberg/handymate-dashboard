@@ -52,7 +52,24 @@ import {
   Phone,
   Printer,
   MessageSquare,
+  GripVertical,
 } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -68,7 +85,7 @@ import TimeEntryModal from '@/components/time/TimeEntryModal'
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
     <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+      <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
     </div>
   ),
   ssr: false,
@@ -124,6 +141,8 @@ interface Milestone {
   sort_order: number
   status: string
   completed_at: string | null
+  actual_hours: number
+  actual_revenue: number
 }
 
 interface AtaItem {
@@ -289,7 +308,7 @@ const STATUS_MAP: Record<string, string> = {
 }
 
 const STATUS_STYLES: Record<string, string> = {
-  planning: 'bg-teal-600/20 text-teal-500 border-teal-500/30',
+  planning: 'bg-primary-700/20 text-primary-600 border-primary-600/30',
   active: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
   paused: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   completed: 'bg-gray-100 text-gray-500 border-gray-300',
@@ -318,6 +337,130 @@ function budgetBarColor(percent: number): string {
   if (percent > 100) return 'bg-red-500'
   if (percent >= 80) return 'bg-amber-500'
   return 'bg-emerald-500'
+}
+
+// --- Sortable Milestone Row ---
+
+function SortableMilestoneRow({
+  milestone: ms,
+  onCycleStatus,
+  onEdit,
+  onDelete,
+  formatDate,
+  formatHours,
+  formatCurrency,
+}: {
+  milestone: Milestone
+  onCycleStatus: (ms: Milestone) => void
+  onEdit: (ms: Milestone) => void
+  onDelete: (id: string) => void
+  formatDate: (d: string) => string
+  formatHours: (h: number) => string
+  formatCurrency: (v: number) => string
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: ms.milestone_id,
+  })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const hasTimeData = ms.actual_hours > 0 || ms.budget_hours != null
+
+  return (
+    <div ref={setNodeRef} style={style} className="p-4 hover:bg-gray-100/30 transition-all">
+      <div className="flex items-center gap-3">
+        <button
+          className="flex-shrink-0 cursor-grab active:cursor-grabbing touch-none text-gray-300 hover:text-gray-500"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+
+        <button
+          onClick={() => onCycleStatus(ms)}
+          className="flex-shrink-0"
+          title="Byt status"
+        >
+          {ms.status === 'completed' ? (
+            <CheckCircle className="w-6 h-6 text-emerald-600" />
+          ) : ms.status === 'in_progress' ? (
+            <CircleDot className="w-6 h-6 text-primary-600" />
+          ) : (
+            <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
+          )}
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className={`font-medium text-sm ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+              {ms.name}
+            </p>
+            <span className={`px-2 py-0.5 text-xs rounded-full border ${
+              ms.status === 'completed'
+                ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
+                : ms.status === 'in_progress'
+                ? 'bg-primary-700/20 text-primary-600 border-primary-600/30'
+                : 'bg-gray-100 text-gray-500 border-gray-300'
+            }`}>
+              {ms.status === 'completed' ? 'Klart' : ms.status === 'in_progress' ? 'Pågående' : 'Väntande'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-3 text-xs text-gray-400">
+            {ms.due_date && (
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {formatDate(ms.due_date)}
+              </span>
+            )}
+            {hasTimeData && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {ms.actual_hours}h{ms.budget_hours != null ? ` / ${formatHours(ms.budget_hours)}` : ''}
+              </span>
+            )}
+            {ms.budget_amount != null && (
+              <span>{formatCurrency(ms.budget_amount)}</span>
+            )}
+          </div>
+          {ms.budget_hours != null && ms.budget_hours > 0 && (
+            <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    ms.actual_hours > ms.budget_hours ? 'bg-red-500' : 'bg-primary-600'
+                  }`}
+                  style={{ width: `${Math.min((ms.actual_hours / ms.budget_hours) * 100, 100)}%` }}
+                />
+              </div>
+              <span className={`text-[10px] ${ms.actual_hours > ms.budget_hours ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                {Math.round((ms.actual_hours / ms.budget_hours) * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => onEdit(ms)}
+            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+          >
+            <Edit className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => onDelete(ms.milestone_id)}
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // --- Main Component ---
@@ -1062,6 +1205,41 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Drag-to-reorder milestones
+  const milestoneDndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  )
+
+  const handleMilestoneDragEnd = useCallback(async (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const oldIndex = milestones.findIndex(m => m.milestone_id === active.id)
+    const newIndex = milestones.findIndex(m => m.milestone_id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+
+    // Optimistic update
+    const reordered = [...milestones]
+    const [moved] = reordered.splice(oldIndex, 1)
+    reordered.splice(newIndex, 0, moved)
+    const withOrder = reordered.map((ms, i) => ({ ...ms, sort_order: i }))
+    setMilestones(withOrder)
+
+    // Persist
+    try {
+      await fetch(`/api/projects/${projectId}/milestones`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: withOrder.map(ms => ({ milestone_id: ms.milestone_id, sort_order: ms.sort_order })) })
+      })
+    } catch {
+      showToast('Kunde inte spara ordning', 'error')
+      await fetchProjectData()
+    }
+  }, [milestones, projectId, showToast, fetchProjectData])
+
   const deleteMilestone = async (milestoneId: string) => {
     if (!confirm('Vill du ta bort detta delmoment?')) return
     try {
@@ -1247,7 +1425,7 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
       </div>
     )
   }
@@ -1307,8 +1485,8 @@ export default function ProjectDetailPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -1358,7 +1536,7 @@ export default function ProjectDetailPage() {
                     key={key}
                     onClick={() => updateProjectStatus(key)}
                     className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-all ${
-                      key === project.status ? 'text-sky-700 bg-gray-50' : 'text-gray-700'
+                      key === project.status ? 'text-secondary-700 bg-gray-50' : 'text-gray-700'
                     }`}
                   >
                     {label}
@@ -1382,7 +1560,7 @@ export default function ProjectDetailPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 activeTab === tab.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'bg-gray-100 text-gray-500'
               }`}
             >
@@ -1406,7 +1584,7 @@ export default function ProjectDetailPage() {
                         onClick={() => setActiveTab(tab.key)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all ${
                           activeTab === tab.key
-                            ? 'text-teal-700 bg-teal-50 font-medium border-l-2 border-teal-600'
+                            ? 'text-primary-700 bg-primary-50 font-medium border-l-2 border-primary-700'
                             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-l-2 border-transparent'
                         }`}
                       >
@@ -1427,16 +1605,16 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {/* Snabbnavigering */}
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setActiveTab('material')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              <button onClick={() => setActiveTab('material')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 📦 Material
               </button>
-              <button onClick={() => setActiveTab('economy')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              <button onClick={() => setActiveTab('economy')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 💰 Ekonomi
               </button>
-              <button onClick={() => setActiveTab('documents')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              <button onClick={() => setActiveTab('documents')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 📄 Dokument
               </button>
-              <button onClick={() => setActiveTab('time')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-teal-50 hover:border-teal-200 hover:text-teal-700 transition-colors">
+              <button onClick={() => setActiveTab('time')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 🕐 Tidrapporter
               </button>
             </div>
@@ -1444,7 +1622,7 @@ export default function ProjectDetailPage() {
             {/* Project info card */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-sky-700" />
+                <Briefcase className="w-5 h-5 text-secondary-700" />
                 Projektinfo
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1463,7 +1641,7 @@ export default function ProjectDetailPage() {
                 <div>
                   <p className="text-sm text-gray-400">Kund</p>
                   {project.customer ? (
-                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-sky-700 hover:text-teal-600">
+                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-secondary-700 hover:text-primary-700">
                       {project.customer.name}
                     </Link>
                   ) : (
@@ -1473,7 +1651,7 @@ export default function ProjectDetailPage() {
                 {quote && (
                   <div>
                     <p className="text-sm text-gray-400">Kopplad offert</p>
-                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-sky-700 hover:text-teal-600 flex items-center gap-1">
+                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-secondary-700 hover:text-primary-700 flex items-center gap-1">
                       {quote.title || 'Offert'} <ExternalLink className="w-3.5 h-3.5" />
                     </Link>
                   </div>
@@ -1493,13 +1671,13 @@ export default function ProjectDetailPage() {
               const budgetTotal = profitability.budget.amount_with_ata
               const costTotal = profitability.costs.total
               const hoursPct = profitability.budget.hours_usage_percent
-              const barColor = costPct > 95 ? 'bg-red-500' : costPct > 75 ? 'bg-amber-500' : 'bg-teal-500'
+              const barColor = costPct > 95 ? 'bg-red-500' : costPct > 75 ? 'bg-amber-500' : 'bg-primary-600'
               const statusLabel = costPct > 95 ? '🔴 Över budget' : costPct > 75 ? '⚠️ Håll koll' : '✅ Inom budget'
               const projectedCost = hoursPct > 10 ? Math.round(costTotal / (hoursPct / 100)) : costTotal
               return (
                 <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                   <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-sky-700" />
+                    <TrendingUp className="w-5 h-5 text-secondary-700" />
                     Lönsamhet
                   </h2>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
@@ -1525,7 +1703,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-500">{costPct}% använt</span>
-                    <span className={costPct > 95 ? 'text-red-600 font-medium' : costPct > 75 ? 'text-amber-600 font-medium' : 'text-teal-600 font-medium'}>
+                    <span className={costPct > 95 ? 'text-red-600 font-medium' : costPct > 75 ? 'text-amber-600 font-medium' : 'text-primary-700 font-medium'}>
                       {statusLabel}
                     </span>
                   </div>
@@ -1542,14 +1720,14 @@ export default function ProjectDetailPage() {
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-teal-600" />
+                  <Target className="w-5 h-5 text-primary-700" />
                   Framsteg
                 </h2>
                 <span className="text-2xl font-bold text-gray-900">{project.progress_percent}%</span>
               </div>
               <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-teal-600 rounded-full transition-all duration-500"
+                  className="h-full bg-primary-700 rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(project.progress_percent, 100)}%` }}
                 />
               </div>
@@ -1602,7 +1780,7 @@ export default function ProjectDetailPage() {
             {(project.budget_hours || project.budget_amount) && summary && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-teal-400" />
+                  <BarChart3 className="w-5 h-5 text-primary-500" />
                   Budget vs Utfall
                 </h2>
                 <div className="space-y-4">
@@ -1644,12 +1822,12 @@ export default function ProjectDetailPage() {
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-sky-700" />
+                  <Users className="w-5 h-5 text-secondary-700" />
                   Personal ({projectTeam.length})
                 </h2>
                 <button
                   onClick={() => setActiveTab('team')}
-                  className="text-sm text-sky-700 hover:text-teal-600 flex items-center gap-1"
+                  className="text-sm text-secondary-700 hover:text-primary-700 flex items-center gap-1"
                 >
                   Hantera <ChevronRight className="w-4 h-4" />
                 </button>
@@ -1660,7 +1838,7 @@ export default function ProjectDetailPage() {
                   <p className="text-sm text-gray-400 mb-3">Ingen tilldelad ännu</p>
                   <button
                     onClick={() => { setActiveTab('team'); setTimeout(() => setShowAddMember(true), 100) }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-3.5 h-3.5" />
                     Tilldela personal
@@ -1692,28 +1870,28 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 onClick={() => openTimeModal()}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
               >
-                <Timer className="w-5 h-5 text-sky-700" />
+                <Timer className="w-5 h-5 text-secondary-700" />
                 <span className="text-sm text-gray-700">Lägg till tid</span>
               </button>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
               >
-                <Layers className="w-5 h-5 text-teal-400" />
+                <Layers className="w-5 h-5 text-primary-500" />
                 <span className="text-sm text-gray-700">Nytt delmoment</span>
               </button>
               <button
                 onClick={() => { setActiveTab('changes'); setChangeModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
               >
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
                 <span className="text-sm text-gray-700">Ny ATA</span>
               </button>
               <button
                 onClick={() => setActiveTab('economy')}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-teal-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
               >
                 <Receipt className="w-5 h-5 text-emerald-600" />
                 <span className="text-sm text-gray-700">Fakturera</span>
@@ -1727,12 +1905,12 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-sky-700" />
+                <Calendar className="w-5 h-5 text-secondary-700" />
                 Planerade arbetstillfällen ({projectSchedule.length})
               </h2>
               <Link
                 href={`/dashboard/schedule?project=${projectId}`}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Planera arbete
@@ -1783,7 +1961,7 @@ export default function ProjectDetailPage() {
                       <span className={`text-xs px-2 py-1 rounded-full border shrink-0 ${
                         entry.status === 'completed' ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
                           : entry.status === 'cancelled' ? 'bg-red-100 text-red-600 border-red-500/30'
-                          : 'bg-teal-600/20 text-teal-500 border-teal-500/30'
+                          : 'bg-primary-700/20 text-primary-600 border-primary-600/30'
                       }`}>
                         {entry.status === 'completed' ? 'Klart' : entry.status === 'cancelled' ? 'Avbokat' : 'Planerat'}
                       </span>
@@ -1802,7 +1980,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">Delmoment</h2>
               <button
                 onClick={() => setMilestoneModal({ open: true, editing: null })}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lagg till delmoment
@@ -1817,71 +1995,22 @@ export default function ProjectDetailPage() {
               </div>
             ) : (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
-                {milestones.map(ms => (
-                  <div key={ms.milestone_id} className="p-4 hover:bg-gray-100/30 transition-all">
-                    <div className="flex items-center gap-4">
-                      <button
-                        onClick={() => cycleMilestoneStatus(ms)}
-                        className="flex-shrink-0"
-                        title="Byt status"
-                      >
-                        {ms.status === 'completed' ? (
-                          <CheckCircle className="w-6 h-6 text-emerald-600" />
-                        ) : ms.status === 'in_progress' ? (
-                          <CircleDot className="w-6 h-6 text-teal-500" />
-                        ) : (
-                          <div className="w-6 h-6 rounded-full border-2 border-gray-300" />
-                        )}
-                      </button>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <p className={`font-medium text-sm ${ms.status === 'completed' ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
-                            {ms.name}
-                          </p>
-                          <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                            ms.status === 'completed'
-                              ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                              : ms.status === 'in_progress'
-                              ? 'bg-teal-600/20 text-teal-500 border-teal-500/30'
-                              : 'bg-gray-100 text-gray-500 border-gray-300'
-                          }`}>
-                            {ms.status === 'completed' ? 'Klart' : ms.status === 'in_progress' ? 'Pagaende' : 'Vantande'}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-                          {ms.due_date && (
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {formatDate(ms.due_date)}
-                            </span>
-                          )}
-                          {ms.budget_hours != null && (
-                            <span>{formatHours(ms.budget_hours)}</span>
-                          )}
-                          {ms.budget_amount != null && (
-                            <span>{formatCurrency(ms.budget_amount)}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => setMilestoneModal({ open: true, editing: ms })}
-                          className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteMilestone(ms.milestone_id)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                <DndContext sensors={milestoneDndSensors} collisionDetection={closestCenter} onDragEnd={handleMilestoneDragEnd}>
+                  <SortableContext items={milestones.map(m => m.milestone_id)} strategy={verticalListSortingStrategy}>
+                    {milestones.map(ms => (
+                      <SortableMilestoneRow
+                        key={ms.milestone_id}
+                        milestone={ms}
+                        onCycleStatus={cycleMilestoneStatus}
+                        onEdit={(m) => setMilestoneModal({ open: true, editing: m })}
+                        onDelete={deleteMilestone}
+                        formatDate={formatDate}
+                        formatHours={formatHours}
+                        formatCurrency={formatCurrency}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             )}
           </div>
@@ -1894,7 +2023,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">ÄTA (Ändring/Tillägg/Avgående)</h2>
               <button
                 onClick={() => setChangeModal({ open: true, editing: null })}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Ny ÄTA
@@ -1935,7 +2064,7 @@ export default function ProjectDetailPage() {
                     draft: { label: 'Utkast', bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300' },
                     pending: { label: 'Väntande', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
                     sent: { label: 'Skickad', bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
-                    signed: { label: 'Signerad', bg: 'bg-teal-50', text: 'text-teal-600', border: 'border-teal-200' },
+                    signed: { label: 'Signerad', bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
                     approved: { label: 'Godkänd', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
                     rejected: { label: 'Avslagen', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
                     declined: { label: 'Avböjd', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
@@ -2020,7 +2149,7 @@ export default function ProjectDetailPage() {
 
                           {/* Signing info */}
                           {change.signed_at && change.signed_by_name && (
-                            <div className="mt-3 flex items-center gap-2 text-xs text-teal-600">
+                            <div className="mt-3 flex items-center gap-2 text-xs text-primary-700">
                               <FileSignature className="w-3.5 h-3.5" />
                               Signerad av {change.signed_by_name} {formatDate(change.signed_at)}
                             </div>
@@ -2127,7 +2256,7 @@ export default function ProjectDetailPage() {
               <h2 className="text-lg font-semibold text-gray-900">Tidrapporter</h2>
               <button
                 onClick={() => openTimeModal()}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
               >
                 <Plus className="w-4 h-4" />
                 Lägg till tid
@@ -2156,7 +2285,7 @@ export default function ProjectDetailPage() {
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga tidrapporter annu</p>
-                <button onClick={() => openTimeModal()} className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
+                <button onClick={() => openTimeModal()} className="text-sm text-secondary-700 hover:text-primary-700 mt-2 inline-block">
                   Lägg till din första tidrapport
                 </button>
               </div>
@@ -2183,7 +2312,7 @@ export default function ProjectDetailPage() {
                           <span className="text-sm text-gray-900">{formatDate(entry.work_date)}</span>
                           <div className="flex items-center gap-2">
                             {entry.work_type?.name && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-teal-100 text-sky-700 border border-teal-300">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-primary-300">
                                 {entry.work_type.name}
                               </span>
                             )}
@@ -2212,7 +2341,7 @@ export default function ProjectDetailPage() {
                         <div className="col-span-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-teal-100 text-sky-700 border border-teal-300">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-primary-300">
                               {entry.work_type.name}
                             </span>
                           )}
@@ -2265,7 +2394,7 @@ export default function ProjectDetailPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowProductSearch(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-xl text-sm hover:opacity-90"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-xl text-sm hover:opacity-90"
                 >
                   <Plus className="w-4 h-4" /> Lägg till material
                 </button>
@@ -2308,7 +2437,7 @@ export default function ProjectDetailPage() {
                           setToast({ show: true, message: 'Kunde inte lägga till', type: 'error' })
                         }
                       }}
-                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm hover:border-teal-400 hover:text-teal-700 transition-colors"
+                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm hover:border-primary-400 hover:text-primary-700 transition-colors"
                     >
                       {item.name}
                     </button>
@@ -2319,7 +2448,7 @@ export default function ProjectDetailPage() {
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                 <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
                 <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
-                  className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                  className="text-sm text-primary-700 hover:underline mt-1 inline-block">
                   + Bygg din prislista →
                 </a>
               </div>
@@ -2412,7 +2541,7 @@ export default function ProjectDetailPage() {
                                   setEditingMaterial(mat.material_id)
                                   setEditValues({ quantity: mat.quantity, markup_percent: mat.markup_percent })
                                 }}
-                                className="p-1 text-gray-400 hover:text-sky-700"
+                                className="p-1 text-gray-400 hover:text-secondary-700"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                               </button>
@@ -2447,14 +2576,14 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-sky-700" />
+                <Users className="w-5 h-5 text-secondary-700" />
                 Tilldelade ({projectTeam.length})
               </h2>
               {can('see_all_projects') && (
                 <div className="relative">
                   <button
                     onClick={() => setShowAddMember(!showAddMember)}
-                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-4 h-4" />
                     Lagg till
@@ -2543,18 +2672,18 @@ export default function ProjectDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-medium text-gray-700">Malldokument</h3>
-                  <a href="/dashboard/documents" className="text-xs text-sky-700 hover:text-teal-600">Alla dokument &rarr;</a>
+                  <a href="/dashboard/documents" className="text-xs text-secondary-700 hover:text-primary-700">Alla dokument &rarr;</a>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {generatedDocs.map((gd: any) => (
                     <a
                       key={gd.id}
                       href="/dashboard/documents"
-                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-teal-300 transition block"
+                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-primary-300 transition block"
                     >
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 bg-teal-50 rounded-lg flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-sky-700" />
+                        <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
+                          <FileText className="w-4 h-4 text-secondary-700" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{gd.title}</p>
@@ -2563,7 +2692,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-0.5 text-xs rounded-full ${
                           gd.status === 'signed' ? 'bg-emerald-100 text-emerald-700' :
-                          gd.status === 'completed' ? 'bg-teal-100 text-teal-600' :
+                          gd.status === 'completed' ? 'bg-primary-100 text-primary-700' :
                           'bg-gray-100 text-gray-500'
                         }`}>
                           {gd.status === 'signed' ? 'Signerad' : gd.status === 'completed' ? 'Klar' : 'Utkast'}
@@ -2585,7 +2714,7 @@ export default function ProjectDetailPage() {
                     onClick={() => setDocCategory(cat)}
                     className={`px-3 py-1.5 text-xs rounded-lg border transition ${
                       docCategory === cat
-                        ? 'bg-teal-100 text-teal-600 border-teal-300'
+                        ? 'bg-primary-100 text-primary-700 border-primary-300'
                         : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -2593,7 +2722,7 @@ export default function ProjectDetailPage() {
                   </button>
                 ))}
               </div>
-              <label className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
+              <label className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium cursor-pointer hover:opacity-90">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                 Ladda upp
                 <input type="file" className="hidden" onChange={handleDocUpload} disabled={uploading} />
@@ -2608,8 +2737,8 @@ export default function ProjectDetailPage() {
                   return (
                     <div key={doc.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
                       <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-teal-500/20' : 'bg-teal-100'}`}>
-                          {isImage ? <Image className="w-5 h-5 text-teal-400" /> : <FileText className="w-5 h-5 text-sky-700" />}
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-primary-600/20' : 'bg-primary-100'}`}>
+                          {isImage ? <Image className="w-5 h-5 text-primary-500" /> : <FileText className="w-5 h-5 text-secondary-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
@@ -2621,7 +2750,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200">
                         <button
                           onClick={() => handleDocDownload(doc.id)}
-                          className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
+                          className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
                         >
                           <Download className="w-3.5 h-3.5" /> Ladda ner
                         </button>
@@ -2679,7 +2808,7 @@ export default function ProjectDetailPage() {
                 )}
                 <button
                   onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
                 >
                   <Plus className="w-4 h-4" /> Ny dagbokspost
                 </button>
@@ -2749,7 +2878,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
                         <button
                           onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                          className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
+                          className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
                         >
                           <Edit className="w-3.5 h-3.5" /> Redigera
                         </button>
@@ -2807,7 +2936,7 @@ export default function ProjectDetailPage() {
               <div className="space-y-4">
                 <button
                   onClick={() => setActiveChecklist(null)}
-                  className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600"
+                  className="flex items-center gap-1 text-sm text-secondary-700 hover:text-primary-700"
                 >
                   <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
                 </button>
@@ -2846,7 +2975,7 @@ export default function ProjectDetailPage() {
                           type="checkbox"
                           checked={item.checked || false}
                           onChange={() => handleToggleChecklistItem(activeChecklist.id, idx)}
-                          className="w-4 h-4 rounded border-gray-300 text-sky-700 bg-gray-100 focus:ring-teal-500"
+                          className="w-4 h-4 rounded border-gray-300 text-secondary-700 bg-gray-100 focus:ring-primary-600"
                         />
                         <span className={`text-sm ${item.checked ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                           {item.text}
@@ -2883,7 +3012,7 @@ export default function ProjectDetailPage() {
                   </h2>
                   <button
                     onClick={() => setShowChecklistCreate(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
                   >
                     <Plus className="w-4 h-4" /> Ny checklista
                   </button>
@@ -2895,7 +3024,7 @@ export default function ProjectDetailPage() {
                       <button
                         key={cl.id}
                         onClick={() => setActiveChecklist(cl)}
-                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 transition"
+                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-primary-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-900">{cl.name}</h3>
@@ -2962,7 +3091,7 @@ export default function ProjectDetailPage() {
                         </div>
                         <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-sky-500 rounded-full transition-all"
+                            className="h-full bg-secondary-500 rounded-full transition-all"
                             style={{ width: `${fs.progress?.percent || 0}%` }}
                           />
                         </div>
@@ -3017,7 +3146,7 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {profitLoading ? (
               <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+                <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
               </div>
             ) : profitability ? (
               <>
@@ -3101,7 +3230,7 @@ export default function ProjectDetailPage() {
                   {/* Resultat */}
                   <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-sky-700" />
+                      <TrendingUp className="w-4 h-4 text-secondary-700" />
                       <p className="text-sm font-medium text-gray-500">Resultat</p>
                     </div>
                     <p className={`text-2xl font-bold mb-1 ${profitability.margin.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -3115,7 +3244,7 @@ export default function ProjectDetailPage() {
                   {/* Fakturering */}
                   <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Receipt className="w-4 h-4 text-teal-400" />
+                      <Receipt className="w-4 h-4 text-primary-500" />
                       <p className="text-sm font-medium text-gray-500">Fakturering</p>
                     </div>
                     <div className="space-y-2">
@@ -3135,7 +3264,7 @@ export default function ProjectDetailPage() {
                 {/* Budget usage bars */}
                 <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                   <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-teal-400" />
+                    <BarChart3 className="w-5 h-5 text-primary-500" />
                     Budgetforbrukning
                   </h2>
                   <div className="space-y-4">
@@ -3181,7 +3310,7 @@ export default function ProjectDetailPage() {
                     </h2>
                     <button
                       onClick={() => setCostModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-sky-700 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
                     >
                       <Plus className="w-4 h-4" />
                       Lagg till kostnad
@@ -3255,7 +3384,7 @@ export default function ProjectDetailPage() {
                 {profitability.invoicing.uninvoiced_amount > 0 && (
                   <button
                     onClick={() => setShowInvoiceModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
                   >
                     <Receipt className="w-5 h-5" />
                     Fakturera projekt ({formatCurrency(profitability.invoicing.uninvoiced_amount)})
@@ -3278,13 +3407,13 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-teal-600" />
+                <Activity className="w-5 h-5 text-primary-700" />
                 Projektanalys
               </h2>
               <button
                 onClick={triggerHealthAnalysis}
                 disabled={analyzingHealth}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-teal-600 bg-teal-50 rounded-xl hover:bg-teal-100 transition-colors disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-700 bg-primary-50 rounded-xl hover:bg-primary-100 transition-colors disabled:opacity-50"
               >
                 {analyzingHealth ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
                 Kör analys
@@ -3326,7 +3455,7 @@ export default function ProjectDetailPage() {
               </div>
               {aiLogLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />
+                  <Loader2 className="w-5 h-5 text-primary-700 animate-spin" />
                 </div>
               ) : aiLogs.length === 0 ? (
                 <div className="text-center py-12">
@@ -3341,10 +3470,10 @@ export default function ProjectDetailPage() {
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 min-w-0">
                           <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                            log.event_type === 'daily_health_check' ? 'bg-teal-500'
+                            log.event_type === 'daily_health_check' ? 'bg-primary-600'
                               : log.event_type === 'quote_accepted' ? 'bg-emerald-400'
-                              : log.event_type === 'time_logged' ? 'bg-teal-400'
-                              : log.event_type === 'milestone_completed' ? 'bg-teal-400'
+                              : log.event_type === 'time_logged' ? 'bg-primary-400'
+                              : log.event_type === 'milestone_completed' ? 'bg-primary-400'
                               : log.event_type === 'invoice_paid' ? 'bg-amber-400'
                               : 'bg-gray-400'
                           }`} />
@@ -3375,12 +3504,12 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <ClipboardList className="w-5 h-5 text-teal-600" />
+                <ClipboardList className="w-5 h-5 text-primary-700" />
                 Arbetsorder
               </h2>
               <button
                 onClick={() => setWoModal({ open: true, editing: null })}
-                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800"
               >
                 <Plus className="w-4 h-4" />
                 Ny arbetsorder
@@ -3449,7 +3578,7 @@ export default function ProjectDetailPage() {
                 <div className="grid gap-4">
                   {woDetail.scheduled_date && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Datum & tid</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Datum & tid</p>
                       <p className="text-sm text-gray-900">
                         {new Date(woDetail.scheduled_date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
                         {woDetail.scheduled_start && ` kl ${woDetail.scheduled_start.substring(0, 5)}`}
@@ -3459,32 +3588,32 @@ export default function ProjectDetailPage() {
                   )}
                   {woDetail.address && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Adress</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Adress</p>
                       <p className="text-sm text-gray-900">{woDetail.address}</p>
                     </div>
                   )}
                   {woDetail.access_info && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Tillträde / portkod</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Tillträde / portkod</p>
                       <p className="text-sm text-gray-900">{woDetail.access_info}</p>
                     </div>
                   )}
                   {woDetail.contact_name && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Kontaktperson</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Kontaktperson</p>
                       <p className="text-sm text-gray-900">{woDetail.contact_name}{woDetail.contact_phone && ` — ${woDetail.contact_phone}`}</p>
                     </div>
                   )}
                   {woDetail.description && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Uppdragsbeskrivning</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Uppdragsbeskrivning</p>
                       <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.description}</p>
                     </div>
                   )}
                   {woDetail.materials_needed && (
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-medium text-teal-600 uppercase">Material att ta med</p>
+                        <p className="text-xs font-medium text-primary-700 uppercase">Material att ta med</p>
                         {!woDetail.materials_needed.includes('[ ]') && !woDetail.materials_needed.includes('[x]') && (
                           <button
                             onClick={async () => {
@@ -3493,7 +3622,7 @@ export default function ProjectDetailPage() {
                               await supabase.from('work_order').update({ materials_needed: asChecklist }).eq('id', woDetail.id)
                               fetchWorkOrders()
                             }}
-                            className="text-[10px] text-teal-700 hover:underline"
+                            className="text-[10px] text-primary-700 hover:underline"
                           >
                             Gör till checklista
                           </button>
@@ -3522,7 +3651,7 @@ export default function ProjectDetailPage() {
                                       fetchWorkOrders()
                                     }
                                   }}
-                                  className="w-3.5 h-3.5 rounded border-gray-300 text-teal-600 cursor-pointer"
+                                  className="w-3.5 h-3.5 rounded border-gray-300 text-primary-700 cursor-pointer"
                                 />
                               ) : (
                                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
@@ -3536,19 +3665,19 @@ export default function ProjectDetailPage() {
                   )}
                   {woDetail.tools_needed && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Verktyg att ta med</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Verktyg att ta med</p>
                       <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.tools_needed}</p>
                     </div>
                   )}
                   {woDetail.notes && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Övrigt</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Övrigt</p>
                       <p className="text-sm text-gray-900 whitespace-pre-line">{woDetail.notes}</p>
                     </div>
                   )}
                   {woDetail.assigned_to && (
                     <div>
-                      <p className="text-xs font-medium text-teal-600 uppercase mb-1">Tilldelad</p>
+                      <p className="text-xs font-medium text-primary-700 uppercase mb-1">Tilldelad</p>
                       <p className="text-sm text-gray-900">{woDetail.assigned_to}{woDetail.assigned_phone && ` — ${woDetail.assigned_phone}`}</p>
                     </div>
                   )}
@@ -3621,7 +3750,7 @@ export default function ProjectDetailPage() {
                               }
                               setWoSending(null)
                             }}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-teal-50 border border-teal-200 rounded-lg text-teal-700 hover:bg-teal-100 disabled:opacity-50"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-100 disabled:opacity-50"
                           >
                             {woSending === wo.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
                             {wo.status === 'sent' ? 'Påminn' : 'Skicka SMS'}
@@ -3641,12 +3770,12 @@ export default function ProjectDetailPage() {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-teal-600" />
+                <Receipt className="w-5 h-5 text-primary-700" />
                 Leverantörsfakturor
               </h2>
               <button
                 onClick={() => setSiModal({ open: true, editing: null })}
-                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+                className="flex items-center gap-1.5 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800"
               >
                 <Plus className="w-4 h-4" />
                 Lägg till faktura
@@ -3680,7 +3809,7 @@ export default function ProjectDetailPage() {
                   </div>
                   <div className="bg-white border border-gray-200 rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Debiterbart</p>
-                    <p className="text-lg font-bold text-teal-600">{formatCurrency(totalBillable)}</p>
+                    <p className="text-lg font-bold text-primary-700">{formatCurrency(totalBillable)}</p>
                   </div>
                   <div className="bg-white border border-gray-200 rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Ej betalt</p>
@@ -3722,7 +3851,7 @@ export default function ProjectDetailPage() {
                               <span>Förfall: {new Date(inv.due_date + 'T00:00:00').toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</span>
                             )}
                             {inv.billable_to_customer && markup > 0 && (
-                              <span className="text-teal-600">Påslag: {markup}% → {formatCurrency(customerPrice)} till kund</span>
+                              <span className="text-primary-700">Påslag: {markup}% → {formatCurrency(customerPrice)} till kund</span>
                             )}
                           </div>
                           {inv.notes && <p className="text-xs text-gray-400 mt-1 truncate">{inv.notes}</p>}
@@ -4004,7 +4133,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
     }
   }
 
-  const inputCls = 'w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50'
+  const inputCls = 'w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50'
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -4025,7 +4154,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
               <p className="text-sm text-gray-500">Välj arbetsuppgifter</p>
               <button
                 onClick={() => setShowChips(false)}
-                className="text-xs text-teal-600 hover:text-teal-700"
+                className="text-xs text-primary-700 hover:text-primary-700"
               >
                 Skriv egen istället
               </button>
@@ -4050,8 +4179,8 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
                               alreadyExists
                                 ? 'bg-gray-100 text-gray-300 cursor-not-allowed line-through'
                                 : isSelected
-                                  ? 'bg-teal-100 border border-teal-300 text-teal-700'
-                                  : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600'
+                                  ? 'bg-primary-100 border border-primary-300 text-primary-700'
+                                  : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-700'
                             }`}
                           >
                             {isSelected && <span className="mr-1">✓</span>}
@@ -4076,7 +4205,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
                 <button
                   onClick={handleBatchCreate}
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Lägg till {selectedTasks.size} st
@@ -4100,7 +4229,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
             {!editing && !showChips && (
               <button
                 onClick={() => setShowChips(true)}
-                className="text-xs text-teal-600 hover:text-teal-700 mb-3"
+                className="text-xs text-primary-700 hover:text-primary-700 mb-3"
               >
                 ← Visa förinställda uppgifter
               </button>
@@ -4173,7 +4302,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
               <button
                 onClick={handleSave}
                 disabled={saving || !name.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {editing ? 'Spara' : 'Skapa'}
@@ -4333,7 +4462,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
               rows={2}
               placeholder="Beskriv ändringar/tillägg..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
             />
           </div>
 
@@ -4348,7 +4477,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     value={item.name}
                     onChange={e => updateItemField(item.id, 'name', e.target.value)}
                     placeholder="Namn"
-                    className="flex-1 min-w-0 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="flex-1 min-w-0 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <input
                     type="number"
@@ -4357,12 +4486,12 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     placeholder="Antal"
                     min="0"
                     step="0.5"
-                    className="w-16 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-16 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <select
                     value={item.unit}
                     onChange={e => updateItemField(item.id, 'unit', e.target.value)}
-                    className="w-16 px-1 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-16 px-1 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value="st">st</option>
                     <option value="timme">tim</option>
@@ -4378,7 +4507,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     onChange={e => updateItemField(item.id, 'unit_price', Number(e.target.value) || 0)}
                     placeholder="à-pris"
                     min="0"
-                    className="w-24 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-24 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <button
                     onClick={() => removeItem(item.id)}
@@ -4391,7 +4520,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
               ))}
               <button
                 onClick={addItem}
-                className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                className="flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-700 font-medium"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Lägg till rad
@@ -4414,7 +4543,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
             <div>
@@ -4424,7 +4553,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Intern notering..."
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
           </div>
@@ -4440,7 +4569,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
           <button
             onClick={handleSave}
             disabled={saving || !description.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
@@ -4537,7 +4666,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
               onChange={e => setDescription(e.target.value)}
               placeholder="T.ex. Elektriker AB, hyra stegar..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -4549,7 +4678,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
             <div>
@@ -4558,7 +4687,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
           </div>
@@ -4574,7 +4703,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
           <button
             onClick={handleSave}
             disabled={saving || !amount}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Lagg till
@@ -4626,7 +4755,7 @@ function LogModal({ editing, onClose, onSave }: {
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -4658,7 +4787,7 @@ function LogModal({ editing, onClose, onSave }: {
                   onClick={() => setWeather(weather === w.value ? '' : w.value)}
                   className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-lg border text-sm transition-all ${
                     weather === w.value
-                      ? 'bg-teal-50 border-teal-400 text-teal-700 ring-1 ring-teal-400'
+                      ? 'bg-primary-50 border-primary-400 text-primary-700 ring-1 ring-primary-400'
                       : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
                   }`}
                 >
@@ -4741,7 +4870,7 @@ function LogModal({ editing, onClose, onSave }: {
           <button
             onClick={handleSubmit}
             disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa dagbokspost'}
@@ -4806,7 +4935,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
     }
   }, [business.business_id])
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   const handleSave = async (andSend: boolean) => {
     if (!title.trim()) return
@@ -4938,7 +5067,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
                     type="checkbox"
                     checked={item.checked}
                     onChange={() => setMaterialItems(prev => prev.map((m, i) => i === idx ? { ...m, checked: !m.checked } : m))}
-                    className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                    className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
                   />
                   <span className={`text-sm flex-1 ${item.checked ? 'line-through text-gray-400' : 'text-gray-900'}`}>{item.text}</span>
                   <button
@@ -4973,7 +5102,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
                       setNewMaterialText('')
                     }
                   }}
-                  className="p-2 text-teal-600 hover:bg-teal-50 rounded-lg transition"
+                  className="p-2 text-primary-700 hover:bg-primary-50 rounded-lg transition"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -5033,7 +5162,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
           <button
             onClick={() => handleSave(false)}
             disabled={saving || !title.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving && !sendAfterSave ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Spara utkast
@@ -5042,7 +5171,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
             <button
               onClick={() => handleSave(true)}
               disabled={saving || !title.trim()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-800 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
             >
               {saving && sendAfterSave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Spara & skicka
@@ -5080,7 +5209,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
   const markup = parseFloat(markupPercent) || 0
   const customerPrice = total + total * markup / 100
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   const handleSave = async () => {
     if (!supplierName.trim()) return
@@ -5185,7 +5314,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
               </div>
               {total > 0 && markup > 0 && (
-                <p className="text-sm text-teal-600 font-medium">
+                <p className="text-sm text-primary-700 font-medium">
                   → {customerPrice.toLocaleString('sv-SE')} kr till kund
                 </p>
               )}
@@ -5195,11 +5324,11 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
           {/* Checkboxar */}
           <div className="space-y-3">
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={billable} onChange={e => setBillable(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <input type="checkbox" checked={billable} onChange={e => setBillable(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600" />
               <span className="text-sm text-gray-700">Debiterbar till kund</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={showToCustomer} onChange={e => setShowToCustomer(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <input type="checkbox" checked={showToCustomer} onChange={e => setShowToCustomer(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600" />
               <span className="text-sm text-gray-700">Visa för kund i kundportalen</span>
             </label>
           </div>
@@ -5221,7 +5350,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving || !supplierName.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Lägg till'}
@@ -5278,7 +5407,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
                   onClick={() => { setSelectedTemplate(t); setCustomName(''); setCustomItems('') }}
                   className={`p-3 rounded-xl text-left text-sm border transition ${
                     selectedTemplate?.id === t.id
-                      ? 'bg-teal-100 border-teal-300 text-teal-600'
+                      ? 'bg-primary-100 border-primary-300 text-primary-700'
                       : 'bg-gray-100 border-gray-300 text-gray-700 hover:border-gray-300'
                   }`}
                 >
@@ -5305,7 +5434,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               value={customName}
               onChange={e => { setCustomName(e.target.value); setSelectedTemplate(null) }}
               placeholder="T.ex. Slutbesiktning badrum"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
@@ -5316,7 +5445,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               onChange={e => { setCustomItems(e.target.value); setSelectedTemplate(null) }}
               rows={5}
               placeholder={"Kontrollera tätskikt\nTesta golvvärme\nKontrollera fall mot brunn"}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
             />
           </div>
         </div>
@@ -5331,7 +5460,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
           <button
             onClick={handleCreate}
             disabled={!selectedTemplate && (!customName.trim() || !customItems.trim())}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             Skapa checklista
           </button>
@@ -5369,14 +5498,14 @@ function FormCreateModal({ templates, onClose, onCreate }: {
               onClick={() => setSelectedTemplate(t)}
               className={`w-full p-4 rounded-xl text-left border transition ${
                 selectedTemplate?.id === t.id
-                  ? 'bg-sky-50 border-sky-300 ring-1 ring-sky-300'
+                  ? 'bg-secondary-50 border-sky-300 ring-1 ring-sky-300'
                   : 'bg-gray-50 border-gray-200 hover:border-gray-300'
               }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm text-gray-900">{t.name}</span>
                 {t.is_system && (
-                  <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-600 rounded-full">System</span>
+                  <span className="px-2 py-0.5 text-xs bg-primary-100 text-primary-700 rounded-full">System</span>
                 )}
               </div>
               {t.description && (
@@ -5531,7 +5660,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
     <div className="space-y-4">
       <button
         onClick={onBack}
-        className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600"
+        className="flex items-center gap-1 text-sm text-secondary-700 hover:text-primary-700"
       >
         <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
       </button>
@@ -5559,7 +5688,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
               <span>{progressPercent}%</span>
             </div>
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-              <div className="h-full bg-sky-500 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+              <div className="h-full bg-secondary-500 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
             </div>
           </div>
         )}
@@ -5722,7 +5851,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                             const sigData = getSignatureData()
                             if (sigData) updateAnswer(field.id, 'signature_data', sigData)
                           }}
-                          className="text-xs text-sky-600 hover:text-sky-700 ml-auto"
+                          className="text-xs text-sky-600 hover:text-secondary-700 ml-auto"
                         >
                           Spara signatur
                         </button>
@@ -5809,7 +5938,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
         <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
           <button
             onClick={() => window.open(`/api/form-submissions/${submission.id}/pdf`, '_blank')}
-            className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600"
+            className="flex items-center gap-1 text-xs text-secondary-700 hover:text-primary-700"
           >
             <Printer className="w-3.5 h-3.5" /> Exportera PDF
           </button>
@@ -5897,7 +6026,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
         <h2 className="text-lg font-semibold text-gray-900">Fältrapporter</h2>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800"
         >
           + Ny fältrapport
         </button>
@@ -5930,7 +6059,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
               {r.status === 'sent' && r.signature_token && (
                 <button
                   onClick={() => navigator.clipboard.writeText(`${window.location.origin}/sign/report/${r.signature_token}`)}
-                  className="text-xs text-teal-700 hover:underline shrink-0"
+                  className="text-xs text-primary-700 hover:underline shrink-0"
                 >
                   Kopiera länk
                 </button>
@@ -5959,7 +6088,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
               </div>
             </div>
             <div className="flex gap-2 mt-5">
-              <button onClick={createReport} disabled={saving || !form.title.trim()} className="flex-1 bg-teal-700 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50">
+              <button onClick={createReport} disabled={saving || !form.title.trim()} className="flex-1 bg-primary-800 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50">
                 {saving ? 'Skapar...' : 'Skapa och skicka'}
               </button>
               <button onClick={() => setShowModal(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">Avbryt</button>

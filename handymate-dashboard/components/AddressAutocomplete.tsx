@@ -145,7 +145,7 @@ export default function AddressAutocomplete({
     }
   }
 
-  const inputCls = className || 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500'
+  const inputCls = className || 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600'
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -161,7 +161,7 @@ export default function AddressAutocomplete({
           disabled={disabled}
           className={`${inputCls} pl-9`}
         />
-        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-500 animate-spin" />}
+        {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-600 animate-spin" />}
       </div>
 
       {showDropdown && suggestions.length > 0 && (
@@ -173,10 +173,10 @@ export default function AddressAutocomplete({
               onClick={() => handleSelect(s)}
               onMouseEnter={() => setHighlightIdx(i)}
               className={`w-full text-left px-3 py-2.5 text-sm flex items-start gap-2 transition-colors ${
-                i === highlightIdx ? 'bg-teal-50 text-teal-900' : 'text-gray-700 hover:bg-gray-50'
+                i === highlightIdx ? 'bg-primary-50 text-primary-900' : 'text-gray-700 hover:bg-gray-50'
               }`}
             >
-              <MapPin className="w-4 h-4 text-teal-500 mt-0.5 shrink-0" />
+              <MapPin className="w-4 h-4 text-primary-600 mt-0.5 shrink-0" />
               <div className="min-w-0">
                 <p className="font-medium truncate">{s.street}</p>
                 <p className="text-xs text-gray-400">{s.postcode} {s.city}</p>

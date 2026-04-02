@@ -216,8 +216,8 @@ export default function NewOrderPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -242,7 +242,7 @@ export default function NewOrderPage() {
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   <option value="">Välj leverantör...</option>
                   {suppliers.map(s => (
@@ -263,7 +263,7 @@ export default function NewOrderPage() {
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                   placeholder="Adress för leverans"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
             </div>
@@ -275,7 +275,7 @@ export default function NewOrderPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ev. önskemål om leverans, brådskande etc."
                 rows={2}
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
               />
             </div>
           </div>
@@ -337,7 +337,7 @@ export default function NewOrderPage() {
                 </div>
                 <button
                   onClick={addEmptyItem}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-teal-100 border border-teal-300 rounded-xl text-sky-700 hover:bg-teal-600/30"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-primary-100 border border-primary-300 rounded-xl text-sky-700 hover:bg-primary-700/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till rad
@@ -367,7 +367,7 @@ export default function NewOrderPage() {
                         type="text"
                         value={item.name}
                         onChange={(e) => updateItem(index, 'name', e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                     <div className="w-20">
@@ -377,7 +377,7 @@ export default function NewOrderPage() {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                     <div className="w-20">
@@ -385,7 +385,7 @@ export default function NewOrderPage() {
                       <select
                         value={item.unit}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       >
                         <option value="st">st</option>
                         <option value="m">m</option>
@@ -400,7 +400,7 @@ export default function NewOrderPage() {
                         type="number"
                         value={item.unit_price}
                         onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                     <div className="w-24 text-right">
@@ -441,7 +441,7 @@ export default function NewOrderPage() {
             <button
               onClick={handleCreate}
               disabled={creating || items.length === 0}
-              className="flex items-center px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+              className="flex items-center px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               Skapa beställning

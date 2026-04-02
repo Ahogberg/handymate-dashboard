@@ -133,11 +133,11 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
 
   function getIcon(type: string) {
     if (type.startsWith('call_inbound') || type === 'call_inbound') return <PhoneIncoming className="w-4 h-4 text-emerald-600" />
-    if (type.startsWith('call_outbound') || type === 'call_outbound') return <PhoneOutgoing className="w-4 h-4 text-teal-500" />
+    if (type.startsWith('call_outbound') || type === 'call_outbound') return <PhoneOutgoing className="w-4 h-4 text-primary-600" />
     if (type === 'call_logged') return <PhoneCall className="w-4 h-4 text-sky-700" />
-    if (type === 'sms_sent') return <Send className="w-4 h-4 text-teal-600" />
-    if (type === 'sms_received') return <MessageSquare className="w-4 h-4 text-teal-400" />
-    if (type.startsWith('quote_')) return <FileText className="w-4 h-4 text-teal-500" />
+    if (type === 'sms_sent') return <Send className="w-4 h-4 text-primary-700" />
+    if (type === 'sms_received') return <MessageSquare className="w-4 h-4 text-primary-500" />
+    if (type.startsWith('quote_')) return <FileText className="w-4 h-4 text-primary-600" />
     if (type === 'invoice_created' || type === 'invoice_sent') return <Receipt className="w-4 h-4 text-amber-500" />
     if (type === 'invoice_paid') return <DollarSign className="w-4 h-4 text-emerald-600" />
     if (type === 'invoice_overdue') return <AlertCircle className="w-4 h-4 text-red-500" />
@@ -154,14 +154,14 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
 
   function getIconBg(type: string): string {
     if (type.startsWith('call_') || type === 'call_logged') return 'bg-emerald-50'
-    if (type.startsWith('sms_')) return 'bg-teal-50'
-    if (type.startsWith('quote_')) return 'bg-teal-50'
+    if (type.startsWith('sms_')) return 'bg-primary-50'
+    if (type.startsWith('quote_')) return 'bg-primary-50'
     if (type.startsWith('invoice_paid')) return 'bg-emerald-50'
     if (type.startsWith('invoice_overdue')) return 'bg-red-50'
     if (type.startsWith('invoice_')) return 'bg-amber-50'
     if (type.startsWith('booking_')) return 'bg-amber-50'
     if (type.startsWith('lead_')) return 'bg-orange-50'
-    if (type === 'agent_action') return 'bg-teal-50'
+    if (type === 'agent_action') return 'bg-primary-50'
     if (type === 'time_entry') return 'bg-indigo-50'
     return 'bg-gray-100'
   }
@@ -230,7 +230,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
             onClick={() => { setFilter(f.key); setExpandedId(null) }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
               filter === f.key
-                ? 'bg-teal-100 text-sky-700 border border-teal-200'
+                ? 'bg-primary-100 text-sky-700 border border-primary-300'
                 : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
             }`}
           >
@@ -276,7 +276,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                               {thread.messageCount > 1 && (
                                 <span className="ml-1.5 px-1.5 py-0.5 bg-gray-100 rounded text-[10px]">{thread.messageCount} meddelanden</span>
                               )}
-                              {thread.isUnread && <span className="ml-1.5 w-2 h-2 bg-teal-600 rounded-full inline-block" />}
+                              {thread.isUnread && <span className="ml-1.5 w-2 h-2 bg-primary-700 rounded-full inline-block" />}
                             </p>
                           </div>
                           <span className="text-xs text-gray-400 whitespace-nowrap">{formatTimestamp(new Date(thread.date).toISOString())}</span>
@@ -330,7 +330,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         <div className="flex items-center gap-2 min-w-0">
                           <p className="font-medium text-gray-900 text-sm truncate">{event.title}</p>
                           {link && (
-                            <Link href={link} className="text-teal-600 hover:text-sky-700 flex-shrink-0">
+                            <Link href={link} className="text-primary-700 hover:text-sky-700 flex-shrink-0">
                               <ChevronDown className="w-3.5 h-3.5 rotate-[-90deg]" />
                             </Link>
                           )}
@@ -363,7 +363,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                       {hasDetails && (
                         <button
                           onClick={() => setExpandedId(isExpanded ? null : event.id)}
-                          className="mt-1.5 text-xs text-sky-700 hover:text-teal-600 flex items-center gap-1"
+                          className="mt-1.5 text-xs text-sky-700 hover:text-primary-700 flex items-center gap-1"
                         >
                           <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                           {isExpanded ? 'Visa mindre' : 'Visa detaljer'}
@@ -387,7 +387,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                             </div>
                           ) : null}
                           {Boolean(event.metadata.recording_url) ? (
-                            <button className="flex items-center gap-1 text-xs text-sky-700 hover:text-teal-600">
+                            <button className="flex items-center gap-1 text-xs text-sky-700 hover:text-primary-700">
                               <Play className="w-3 h-3" />
                               Spela upp inspelning
                             </button>
@@ -413,7 +413,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
             <button
               onClick={() => fetchTimeline(filter, events.length)}
               disabled={loadingMore}
-              className="text-sm text-sky-700 hover:text-teal-600 disabled:opacity-50"
+              className="text-sm text-sky-700 hover:text-primary-700 disabled:opacity-50"
             >
               {loadingMore ? <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> : null}
               Visa fler ({total - events.length} kvar)

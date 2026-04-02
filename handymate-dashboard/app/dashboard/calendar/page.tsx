@@ -772,7 +772,7 @@ export default function CalendarPage() {
               <div className="flex items-center gap-2">
                 <span className={`inline-flex px-2.5 py-1 text-[11px] rounded-full font-medium ${
                   selectedEvent.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' :
-                  selectedEvent.status === 'completed' ? 'bg-teal-50 text-teal-700' :
+                  selectedEvent.status === 'completed' ? 'bg-primary-50 text-primary-700' :
                   'bg-gray-100 text-gray-600'
                 }`}>
                   {selectedEvent.status === 'confirmed' ? 'Bekräftad' :

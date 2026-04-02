@@ -106,7 +106,7 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
   if (transcribing) {
     return (
       <div className="text-center py-8">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin mx-auto mb-3" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin mx-auto mb-3" />
         <p className="text-gray-900 font-medium">Transkriberar...</p>
         <p className="text-sm text-gray-400 mt-1">Omvandlar tal till text</p>
       </div>
@@ -147,7 +147,7 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
               {!isRecording ? (
                 <button
                   onClick={startRecording}
-                  className="flex items-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                  className="flex items-center gap-2 px-6 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
                 >
                   <Mic className="w-5 h-5" />
                   Starta inspelning
@@ -185,7 +185,7 @@ export default function VoiceRecorder({ onTranscript, onBack, transcribing }: Vo
               </button>
               <button
                 onClick={submitRecording}
-                className="flex items-center gap-2 px-6 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                className="flex items-center gap-2 px-6 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
               >
                 Transkribera
               </button>

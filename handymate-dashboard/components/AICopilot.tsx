@@ -44,7 +44,7 @@ export default function AICopilot() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-teal-600 text-white rounded-2xl shadow-lg shadow-teal-500/10 flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-primary-700 text-white rounded-2xl shadow-lg shadow-primary-600/10 flex items-center justify-center hover:scale-105 transition-transform"
       >
         <Sparkles className="w-6 h-6" />
       </button>
@@ -54,7 +54,7 @@ export default function AICopilot() {
   return (
     <div className="fixed bottom-6 right-6 w-96 h-[500px] bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-gray-200">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-teal-600">
+      <div className="flex items-center justify-between px-4 py-3 bg-primary-700">
         <div className="flex items-center">
           <Sparkles className="w-5 h-5 text-gray-900 mr-2" />
           <span className="font-medium text-gray-900">AI Copilot</span>
@@ -74,7 +74,7 @@ export default function AICopilot() {
             <div
               className={`max-w-[80%] px-4 py-2 rounded-2xl ${
                 message.role === 'user'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'bg-gray-100 text-gray-800 border border-gray-300'
               }`}
             >
@@ -100,12 +100,12 @@ export default function AICopilot() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
             placeholder="Ställ en fråga..."
-            className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500"
+            className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:border-primary-600"
           />
           <button
             onClick={sendMessage}
             disabled={isLoading}
-            className="w-10 h-10 bg-teal-600 text-white rounded-xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 transition-opacity"
+            className="w-10 h-10 bg-primary-700 text-white rounded-xl flex items-center justify-center hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
             <Send className="w-4 h-4" />
           </button>

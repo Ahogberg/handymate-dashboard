@@ -521,8 +521,8 @@ export default function QuoteDetailPage() {
           switch (item.item_type) {
             case 'heading':
               return (
-                <div key={item.id} className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
-                  <p className="font-semibold text-teal-800 text-sm">{item.description}</p>
+                <div key={item.id} className="bg-primary-50 border border-primary-300 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
+                  <p className="font-semibold text-primary-800 text-sm">{item.description}</p>
                 </div>
               )
 
@@ -592,7 +592,7 @@ export default function QuoteDetailPage() {
         {/* Labor */}
         {items.filter((i: any) => i.type === 'labor').length > 0 && (
           <div className="mb-4">
-            <h3 className="text-sm font-medium text-teal-500 mb-2">Arbete</h3>
+            <h3 className="text-sm font-medium text-primary-600 mb-2">Arbete</h3>
             <div className="space-y-2">
               {items.filter((i: any) => i.type === 'labor').map((item: any, idx: number) => (
                 <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
@@ -664,8 +664,8 @@ export default function QuoteDetailPage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -701,12 +701,12 @@ export default function QuoteDetailPage() {
         {/* Version selector */}
         {versions.length > 1 && (
           <div className="flex items-center gap-3 mb-4 bg-white border border-gray-200 rounded-xl p-3">
-            <GitBranch className="w-4 h-4 text-teal-600 flex-shrink-0" />
+            <GitBranch className="w-4 h-4 text-primary-700 flex-shrink-0" />
             <span className="text-sm text-gray-500">Version:</span>
             <select
               value={quoteId}
               onChange={(e) => router.push(`/dashboard/quotes/${e.target.value}`)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-900 font-medium focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-900 font-medium focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
             >
               {versions.map((v) => (
                 <option key={v.quote_id} value={v.quote_id}>
@@ -732,7 +732,7 @@ export default function QuoteDetailPage() {
                   .then(data => setQuoteIntelligence(data))
                   .catch(() => {})
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
             >
               <Send className="w-4 h-4" />
               Skicka offert
@@ -762,7 +762,7 @@ export default function QuoteDetailPage() {
           {['sent', 'opened'].includes(quote.status) && (
             <button
               onClick={() => setShowSendModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
             >
               <RefreshCw className="w-4 h-4" />
               Skicka påminnelse
@@ -773,7 +773,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createProjectFromQuote}
                 disabled={creatingProject}
-                className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingProject ? <Loader2 className="w-4 h-4 animate-spin" /> : <FolderKanban className="w-4 h-4" />}
                 Skapa projekt
@@ -781,7 +781,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={createInvoiceFromQuote}
                 disabled={creatingInvoice}
-                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500 to-primary-600 rounded-xl text-gray-900 font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {creatingInvoice ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
                 Skapa faktura
@@ -851,7 +851,7 @@ export default function QuoteDetailPage() {
             {/* Customer */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-teal-400" />
+                <User className="w-5 h-5 text-primary-500" />
                 Kund
               </h2>
               {quote.customer ? (
@@ -886,7 +886,7 @@ export default function QuoteDetailPage() {
             {(quote.reference_person || quote.customer_reference || quote.project_address) && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-teal-500" />
+                  <ClipboardList className="w-5 h-5 text-primary-600" />
                   Referenser
                 </h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -930,7 +930,7 @@ export default function QuoteDetailPage() {
             {quote.introduction_text && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-teal-500" />
+                  <FileText className="w-5 h-5 text-primary-600" />
                   Inledning
                 </h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{quote.introduction_text}</p>
@@ -973,7 +973,7 @@ export default function QuoteDetailPage() {
             {quote.payment_plan && quote.payment_plan.length > 0 && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <CreditCard className="w-5 h-5 text-teal-500" />
+                  <CreditCard className="w-5 h-5 text-primary-600" />
                   Betalningsplan
                 </h2>
                 {quote.payment_terms_text && (
@@ -1143,13 +1143,13 @@ export default function QuoteDetailPage() {
             {quote.sign_token && ['sent', 'opened'].includes(quote.status) && (
               <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Link2 className="w-5 h-5 text-teal-600" />
+                  <Link2 className="w-5 h-5 text-primary-700" />
                   Signeringslänk
                 </h2>
                 <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
                   <span className="text-xs text-gray-500 truncate flex-1">app.handymate.se/quote/{quote.sign_token.slice(0, 8)}...</span>
                   <button onClick={() => { navigator.clipboard.writeText(`https://app.handymate.se/quote/${quote.sign_token}`); showToast('Kopierad!', 'success') }}
-                    className="flex-shrink-0 px-2.5 py-1 bg-teal-600 text-white text-xs rounded-md font-medium">Kopiera</button>
+                    className="flex-shrink-0 px-2.5 py-1 bg-primary-700 text-white text-xs rounded-md font-medium">Kopiera</button>
                 </div>
               </div>
             )}
@@ -1157,7 +1157,7 @@ export default function QuoteDetailPage() {
             {/* Progress indicator */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Clock className="w-5 h-5 text-teal-600" />
+                <Clock className="w-5 h-5 text-primary-700" />
                 Status
               </h2>
               <div className="relative space-y-0">
@@ -1172,7 +1172,7 @@ export default function QuoteDetailPage() {
                 ].map((step, i) => (
                   <div key={i} className="relative flex items-start gap-3 py-2">
                     <div className={`relative z-10 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                      step.done ? 'bg-teal-500 border-teal-500' : step.isDeadline ? 'bg-white border-gray-300' : 'bg-white border-gray-300'
+                      step.done ? 'bg-primary-600 border-primary-600' : step.isDeadline ? 'bg-white border-gray-300' : 'bg-white border-gray-300'
                     }`}>
                       {step.done && <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </div>
@@ -1208,7 +1208,7 @@ export default function QuoteDetailPage() {
           <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
-              <Mail className="w-5 h-5 text-teal-600" />
+              <Mail className="w-5 h-5 text-primary-700" />
               <h2 className="text-lg font-semibold text-gray-900">Skicka offert {quote.quote_number || ''}</h2>
               <button onClick={() => !sending && setShowSendModal(false)} className="ml-auto text-gray-400 hover:text-gray-600"><XCircle className="w-5 h-5" /></button>
             </div>
@@ -1263,7 +1263,7 @@ export default function QuoteDetailPage() {
                   {['sms', 'email', 'both'].map(m => (
                     <button key={m} onClick={() => setSendMethod(m as any)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
-                        sendMethod === m ? 'bg-teal-50 border-teal-300 text-teal-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                        sendMethod === m ? 'bg-primary-50 border-primary-300 text-primary-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
                       }`}>
                       {m === 'sms' ? 'SMS' : m === 'email' ? 'Email' : 'Båda'}
                     </button>
@@ -1296,12 +1296,12 @@ export default function QuoteDetailPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Kopia</span>
                     <input type="text" value={extraEmails} onChange={e => setExtraEmails(e.target.value)}
-                      placeholder="anna@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-teal-400 bg-gray-50" />
+                      placeholder="anna@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">BCC</span>
                     <input type="text" value={bccEmails} onChange={e => setBccEmails(e.target.value)}
-                      placeholder="chef@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-teal-400 bg-gray-50" />
+                      placeholder="chef@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
                   </div>
                 </>
               )}
@@ -1318,7 +1318,7 @@ export default function QuoteDetailPage() {
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0"></span>
                 <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                  <FileText className="w-4 h-4 text-teal-600" />
+                  <FileText className="w-4 h-4 text-primary-700" />
                   <span className="text-xs text-gray-600">Offert {quote.quote_number || ''} · {quote.total ? new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(quote.total) + ' kr' : ''}</span>
                 </div>
               </div>
@@ -1338,7 +1338,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={sendQuote}
                 disabled={sending || (sendMethod !== 'sms' && !quote.customer?.email)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-40 transition-all"
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary-700 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-40 transition-all"
               >
                 {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {sending ? 'Skickar...' : 'Skicka offert'}
@@ -1361,7 +1361,7 @@ export default function QuoteDetailPage() {
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
             <div className="flex gap-3">
@@ -1374,7 +1374,7 @@ export default function QuoteDetailPage() {
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
               </button>

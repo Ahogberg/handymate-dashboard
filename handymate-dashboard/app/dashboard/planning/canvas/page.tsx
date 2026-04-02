@@ -7,7 +7,7 @@ import { Loader2, Pencil } from 'lucide-react'
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
     <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+      <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
     </div>
   ),
   ssr: false,
@@ -19,7 +19,7 @@ export default function SkissblockPage() {
   if (!business?.business_id) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -28,7 +28,7 @@ export default function SkissblockPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-primary-700 flex items-center justify-center">
             <Pencil className="w-5 h-5 text-white" />
           </div>
           <div>

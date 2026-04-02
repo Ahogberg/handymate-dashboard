@@ -92,7 +92,7 @@ export default class ErrorBoundary extends React.Component<
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={this.handleReload}
-                className="px-6 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
+                className="px-6 py-2.5 bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-colors shadow-sm"
               >
                 Ladda om sidan
               </button>

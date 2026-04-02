@@ -172,7 +172,7 @@ export default function BookingsPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'confirmed': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
-      case 'completed': return 'bg-teal-100 text-teal-500 border-teal-500/30'
+      case 'completed': return 'bg-primary-100 text-primary-600 border-primary-600/30'
       case 'cancelled': return 'bg-red-100 text-red-600 border-red-200'
       default: return 'bg-gray-100 text-gray-500 border-gray-300'
     }
@@ -199,8 +199,8 @@ export default function BookingsPage() {
   return (
     <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -225,7 +225,7 @@ export default function BookingsPage() {
                 <select
                   value={form.customer_id}
                   onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -242,7 +242,7 @@ export default function BookingsPage() {
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -252,7 +252,7 @@ export default function BookingsPage() {
                     type="time"
                     value={form.start_time}
                     onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -261,7 +261,7 @@ export default function BookingsPage() {
                     type="time"
                     value={form.end_time}
                     onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function BookingsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value="confirmed">Bekräftad</option>
                     <option value="completed">Slutförd</option>
@@ -287,7 +287,7 @@ export default function BookingsPage() {
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   placeholder="T.ex. Elinstallation - 3 nya uttag"
                   rows={3}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
               </div>
             </div>
@@ -297,7 +297,7 @@ export default function BookingsPage() {
               <button
                 onClick={handleSubmit}
                 disabled={actionLoading || customers.length === 0}
-                className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingBooking ? 'Spara' : 'Skapa'}
@@ -320,14 +320,14 @@ export default function BookingsPage() {
                   key={f}
                   onClick={() => setFilter(f)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    filter === f ? 'bg-teal-600 text-white' : 'text-gray-500 hover:text-white'
+                    filter === f ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
                   }`}
                 >
                   {f === 'all' ? 'Alla' : f === 'today' ? 'Idag' : 'Kommande'}
                 </button>
               ))}
             </div>
-            <button onClick={openCreateModal} className="flex items-center px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90">
+            <button onClick={openCreateModal} className="flex items-center px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90">
               <Plus className="w-4 h-4 mr-2" />
               Ny bokning
             </button>
@@ -340,11 +340,11 @@ export default function BookingsPage() {
               <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-400">{filter === 'today' ? 'Inga bokningar idag' : 'Inga bokningar ännu'}</p>
               {customers.length > 0 ? (
-                <button onClick={openCreateModal} className="mt-4 text-sky-700 hover:text-teal-600">
+                <button onClick={openCreateModal} className="mt-4 text-sky-700 hover:text-primary-700">
                   Skapa din första bokning →
                 </button>
               ) : (
-                <a href="/dashboard/customers" className="mt-4 text-sky-700 hover:text-teal-600 block">
+                <a href="/dashboard/customers" className="mt-4 text-sky-700 hover:text-primary-700 block">
                   Skapa en kund först →
                 </a>
               )}
@@ -365,7 +365,7 @@ export default function BookingsPage() {
                   <tr key={booking.booking_id} className="hover:bg-gray-100/30 transition-all">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300">
+                        <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300">
                           <User className="w-5 h-5 text-sky-700" />
                         </div>
                         <div className="ml-4">

@@ -302,8 +302,8 @@ export default function RecordingsPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -319,7 +319,7 @@ export default function RecordingsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6 sm:mb-8">
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-teal-600 mr-4">
+            <div className="p-3 rounded-xl bg-primary-700 mr-4">
               <Mic className="w-6 h-6 text-gray-900" />
             </div>
             <div>
@@ -330,7 +330,7 @@ export default function RecordingsPage() {
         </div>
 
         {/* Info box */}
-        <div className="mb-6 p-4 bg-teal-50 border border-teal-300 rounded-xl">
+        <div className="mb-6 p-4 bg-primary-50 border border-primary-300 rounded-xl">
           <div className="flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-sky-700 mt-0.5" />
             <div>
@@ -376,8 +376,8 @@ export default function RecordingsPage() {
                           }}
                           className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                             playingId === recording.recording_id
-                              ? 'bg-teal-600 border-teal-300'
-                              : 'bg-gray-50 border-gray-300 hover:border-teal-300'
+                              ? 'bg-primary-700 border-primary-300'
+                              : 'bg-gray-50 border-gray-300 hover:border-primary-300'
                           }`}
                         >
                           {playingId === recording.recording_id ? (
@@ -395,12 +395,12 @@ export default function RecordingsPage() {
                             <span className={`px-2 py-0.5 text-xs rounded-full border ${
                               recording.direction === 'inbound'
                                 ? 'bg-emerald-100 text-emerald-600 border-emerald-200'
-                                : 'bg-teal-100 text-teal-500 border-teal-500/30'
+                                : 'bg-primary-100 text-primary-600 border-primary-600/30'
                             }`}>
                               {recording.direction === 'inbound' ? 'Inkommande' : 'Utgående'}
                             </span>
                             {recording.transcript && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-teal-100 text-sky-700 border border-teal-300">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-sky-700 border border-primary-300">
                                 Transkriberad
                               </span>
                             )}
@@ -447,7 +447,7 @@ export default function RecordingsPage() {
                               <button
                                 onClick={() => handleTranscribe(recording.recording_id)}
                                 disabled={transcribing === recording.recording_id}
-                                className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                                className="flex items-center gap-1 px-3 py-1.5 bg-primary-700 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                               >
                                 {transcribing === recording.recording_id ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -475,7 +475,7 @@ export default function RecordingsPage() {
                               onChange={(e) => setTranscriptDraft(e.target.value)}
                               placeholder="Skriv transkriptet här..."
                               rows={6}
-                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                             />
                             <div className="flex justify-end gap-2">
                               <button
@@ -516,7 +516,7 @@ export default function RecordingsPage() {
                             <button
                               onClick={() => handleAnalyze(recording.recording_id)}
                               disabled={analyzing === recording.recording_id}
-                              className="flex items-center gap-1 px-3 py-1.5 bg-teal-600 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+                              className="flex items-center gap-1 px-3 py-1.5 bg-primary-700 rounded-lg text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
                             >
                               {analyzing === recording.recording_id ? (
                                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -564,7 +564,7 @@ export default function RecordingsPage() {
                                     <span className={`px-2 py-0.5 text-xs rounded-full flex-shrink-0 ${
                                       suggestion.status === 'pending' ? 'bg-yellow-100 text-yellow-400' :
                                       suggestion.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
-                                      suggestion.status === 'completed' ? 'bg-teal-100 text-teal-500' :
+                                      suggestion.status === 'completed' ? 'bg-primary-100 text-primary-600' :
                                       'bg-gray-100 text-gray-500'
                                     }`}>
                                       {suggestion.status === 'pending' ? 'Väntar' :

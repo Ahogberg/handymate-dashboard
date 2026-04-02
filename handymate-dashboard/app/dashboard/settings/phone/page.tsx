@@ -332,7 +332,7 @@ export default function PhoneSettingsPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -343,7 +343,7 @@ export default function PhoneSettingsPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="p-2 bg-teal-600 rounded-xl">
+            <div className="p-2 bg-primary-700 rounded-xl">
               <Phone className="w-6 h-6 text-white" />
             </div>
             Koppla ditt telefonnummer
@@ -417,7 +417,7 @@ export default function PhoneSettingsPage() {
                   <div key={label} className="flex items-center gap-2">
                     <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                       step > i ? 'bg-emerald-500 text-white' :
-                      step === i ? 'bg-teal-600 text-white' :
+                      step === i ? 'bg-primary-700 text-white' :
                       'bg-gray-200 text-gray-500'
                     }`}>
                       {step > i ? <Check className="w-4 h-4" /> : i + 1}
@@ -437,10 +437,10 @@ export default function PhoneSettingsPage() {
                   {/* Forwarding card */}
                   <button
                     onClick={() => { setMethod('forwarding'); setStep(1) }}
-                    className="text-left p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-teal-400 hover:shadow-md transition-all group"
+                    className="text-left p-5 bg-white rounded-xl border-2 border-gray-200 hover:border-primary-500 hover:shadow-md transition-all group"
                   >
                     <div className="flex items-center gap-2 mb-3">
-                      <PhoneForwarded className="w-6 h-6 text-teal-600" />
+                      <PhoneForwarded className="w-6 h-6 text-primary-700" />
                       <h3 className="font-semibold text-gray-900">Vidarekoppling</h3>
                     </div>
                     <p className="text-xs text-sky-700 font-medium mb-3">Snabbaste – 5 minuter</p>
@@ -519,11 +519,11 @@ export default function PhoneSettingsPage() {
                 {hasNumber ? (
                   <div className="mb-6">
                     <p className="text-sm text-gray-600 mb-3">Vi har tilldelat dig numret:</p>
-                    <div className="text-2xl font-mono font-bold text-sky-700 bg-teal-50 border border-teal-200 rounded-lg px-4 py-3 inline-block">
+                    <div className="text-2xl font-mono font-bold text-sky-700 bg-primary-50 border border-primary-300 rounded-lg px-4 py-3 inline-block">
                       {formatPhone(config!.assigned_phone_number!)}
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Alla samtal till detta nummer spelas in och analyseras av vår AI.</p>
-                    <button onClick={() => setStep(2)} className="mt-4 px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium text-sm">
+                    <button onClick={() => setStep(2)} className="mt-4 px-6 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm">
                       Fortsätt
                     </button>
                   </div>
@@ -540,13 +540,13 @@ export default function PhoneSettingsPage() {
                           value={forwardNumber}
                           onChange={(e) => setForwardNumber(e.target.value)}
                           placeholder="070-123 45 67"
-                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                          className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                         />
                       </div>
                       <button
                         onClick={provisionNumber}
                         disabled={provisioning}
-                        className="px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+                        className="px-6 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
                       >
                         {provisioning && <Loader2 className="w-4 h-4 animate-spin" />}
                         Tilldela nummer
@@ -577,8 +577,8 @@ export default function PhoneSettingsPage() {
                         onClick={() => setOperator(op.id)}
                         className={`px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
                           operator === op.id
-                            ? 'bg-teal-600 text-white border-teal-500'
-                            : 'bg-white text-gray-700 border-gray-300 hover:border-teal-300'
+                            ? 'bg-primary-700 text-white border-primary-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-primary-300'
                         }`}
                       >
                         {op.name}
@@ -594,20 +594,20 @@ export default function PhoneSettingsPage() {
                   </h3>
                   <ol className="space-y-3">
                     <li className="flex items-start gap-3">
-                      <span className="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</span>
+                      <span className="w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">1</span>
                       <span className="text-sm text-gray-700">Öppna din telefons uppringare</span>
                     </li>
                     <li className="flex items-start gap-3">
-                      <span className="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</span>
+                      <span className="w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</span>
                       <div>
                         <span className="text-sm text-gray-700">Slå: </span>
-                        <code className="bg-teal-50 border border-teal-200 rounded px-2 py-0.5 text-teal-800 font-mono font-bold text-base">
+                        <code className="bg-primary-50 border border-primary-300 rounded px-2 py-0.5 text-primary-800 font-mono font-bold text-base">
                           **21*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#
                         </code>
                       </div>
                     </li>
                     <li className="flex items-start gap-3">
-                      <span className="w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">3</span>
+                      <span className="w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">3</span>
                       <span className="text-sm text-gray-700">Tryck ring <Check className="w-4 h-4 text-emerald-500 inline" /></span>
                     </li>
                     <li className="flex items-start gap-3">
@@ -625,26 +625,26 @@ export default function PhoneSettingsPage() {
 
                 {/* Alternative: only when busy/no answer */}
                 <details className="mt-5 group">
-                  <summary className="cursor-pointer text-sm font-medium text-sky-700 hover:text-teal-600 flex items-center gap-1">
+                  <summary className="cursor-pointer text-sm font-medium text-sky-700 hover:text-primary-700 flex items-center gap-1">
                     <ChevronRight className="w-4 h-4 transition-transform group-open:rotate-90" />
                     Alternativ: Bara vid upptaget eller inget svar
                   </summary>
-                  <div className="mt-3 bg-teal-50/50 rounded-lg border border-teal-100 p-4 text-sm text-gray-700">
+                  <div className="mt-3 bg-primary-50/50 rounded-lg border border-primary-100 p-4 text-sm text-gray-700">
                     <p className="mb-3">
                       Om du vill svara själv när du kan, och bara låta Handymate ta över när du inte svarar:
                     </p>
                     <div className="space-y-2 font-mono text-sm">
                       <p>
                         <strong>Vid inget svar</strong> (efter 15 sek):{' '}
-                        <code className="bg-white border rounded px-1.5 py-0.5 text-teal-800">**61*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
+                        <code className="bg-white border rounded px-1.5 py-0.5 text-primary-800">**61*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
                       </p>
                       <p>
                         <strong>Vid upptaget:</strong>{' '}
-                        <code className="bg-white border rounded px-1.5 py-0.5 text-teal-800">**67*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
+                        <code className="bg-white border rounded px-1.5 py-0.5 text-primary-800">**67*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
                       </p>
                       <p>
                         <strong>Båda:</strong>{' '}
-                        <code className="bg-white border rounded px-1.5 py-0.5 text-teal-800">**62*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
+                        <code className="bg-white border rounded px-1.5 py-0.5 text-primary-800">**62*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#</code>
                       </p>
                     </div>
                     <p className="mt-3 text-gray-500 text-xs">
@@ -655,7 +655,7 @@ export default function PhoneSettingsPage() {
 
                 <button
                   onClick={() => setStep(3)}
-                  className="mt-6 px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium text-sm"
+                  className="mt-6 px-6 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm"
                 >
                   Jag har slagit koden — verifiera
                 </button>
@@ -692,9 +692,9 @@ export default function PhoneSettingsPage() {
                     </Link>
                   </div>
                 ) : verifying ? (
-                  <div className="bg-teal-50 border border-teal-200 rounded-lg p-5 text-center">
-                    <Loader2 className="w-8 h-8 text-teal-600 animate-spin mx-auto mb-3" />
-                    <p className="text-teal-800 font-medium">Väntar på testsamtal...</p>
+                  <div className="bg-primary-50 border border-primary-300 rounded-lg p-5 text-center">
+                    <Loader2 className="w-8 h-8 text-primary-700 animate-spin mx-auto mb-3" />
+                    <p className="text-primary-800 font-medium">Väntar på testsamtal...</p>
                     <p className="text-sm text-sky-700 mt-1">
                       {verifySeconds < 120
                         ? `${Math.floor((120 - verifySeconds) / 60)}:${String((120 - verifySeconds) % 60).padStart(2, '0')} kvar`
@@ -703,7 +703,7 @@ export default function PhoneSettingsPage() {
                     </p>
                     <button
                       onClick={stopVerification}
-                      className="mt-3 text-sm text-teal-600 hover:text-teal-700 underline"
+                      className="mt-3 text-sm text-primary-700 hover:text-primary-700 underline"
                     >
                       Avbryt
                     </button>
@@ -712,7 +712,7 @@ export default function PhoneSettingsPage() {
                   <div className="text-center">
                     <button
                       onClick={startVerification}
-                      className="px-8 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium flex items-center gap-2 mx-auto"
+                      className="px-8 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium flex items-center gap-2 mx-auto"
                     >
                       <Phone className="w-5 h-5" />
                       Starta verifiering
@@ -746,7 +746,7 @@ export default function PhoneSettingsPage() {
                       <select
                         value={portOperator}
                         onChange={(e) => setPortOperator(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                       >
                         <option value="">Välj operatör...</option>
                         {OPERATORS.map(op => (
@@ -761,7 +761,7 @@ export default function PhoneSettingsPage() {
                         value={portPhone}
                         onChange={(e) => setPortPhone(e.target.value)}
                         placeholder="070-123 45 67"
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                       />
                     </div>
                     <div>
@@ -770,7 +770,7 @@ export default function PhoneSettingsPage() {
                         type="date"
                         value={portDate}
                         onChange={(e) => setPortDate(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                       />
                     </div>
                     <button
@@ -863,7 +863,7 @@ export default function PhoneSettingsPage() {
                   <label className="text-sm font-medium text-gray-700">Inspelningsmeddelande</label>
                   <button
                     onClick={() => setRecordingEnabled(!recordingEnabled)}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${recordingEnabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${recordingEnabled ? 'bg-primary-700' : 'bg-gray-300'}`}
                   >
                     <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${recordingEnabled ? 'translate-x-5' : ''}`} />
                   </button>
@@ -873,7 +873,7 @@ export default function PhoneSettingsPage() {
                     value={consentMessage}
                     onChange={(e) => setConsentMessage(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                   />
                 )}
               </div>
@@ -884,7 +884,7 @@ export default function PhoneSettingsPage() {
                   <label className="text-sm font-medium text-gray-700">SMS vid missat samtal</label>
                   <button
                     onClick={() => setMissedSmsEnabled(!missedSmsEnabled)}
-                    className={`relative w-11 h-6 rounded-full transition-colors ${missedSmsEnabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                    className={`relative w-11 h-6 rounded-full transition-colors ${missedSmsEnabled ? 'bg-primary-700' : 'bg-gray-300'}`}
                   >
                     <div className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${missedSmsEnabled ? 'translate-x-5' : ''}`} />
                   </button>
@@ -894,7 +894,7 @@ export default function PhoneSettingsPage() {
                     value={missedSmsText}
                     onChange={(e) => setMissedSmsText(e.target.value)}
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                   />
                 )}
               </div>
@@ -911,7 +911,7 @@ export default function PhoneSettingsPage() {
                   value={forwardNumber}
                   onChange={(e) => setForwardNumber(e.target.value)}
                   placeholder="070-123 45 67"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 />
               </div>
 
@@ -920,7 +920,7 @@ export default function PhoneSettingsPage() {
                 <button
                   onClick={saveSettings}
                   disabled={saving}
-                  className="px-6 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium text-sm disabled:opacity-50 flex items-center gap-2"
                 >
                   {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Spara inställningar
@@ -968,7 +968,7 @@ export default function PhoneSettingsPage() {
                     <button
                       onClick={sendTestSms}
                       disabled={sendingTest}
-                      className="px-4 py-2 border border-teal-300 text-teal-700 rounded-lg hover:bg-teal-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
+                      className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
                     >
                       {sendingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
                       Skicka test-SMS
@@ -997,7 +997,7 @@ export default function PhoneSettingsPage() {
                   setSmsLogs(data.logs || [])
                 } catch { setSmsLogs([]) }
               }}
-              className="text-sm text-teal-600 hover:text-teal-700"
+              className="text-sm text-primary-700 hover:text-primary-700"
             >
               Uppdatera
             </button>
@@ -1013,7 +1013,7 @@ export default function PhoneSettingsPage() {
                     setSmsLogs(data.logs || [])
                   } catch { setSmsLogs([]) }
                 }}
-                className="text-teal-600 hover:underline"
+                className="text-primary-700 hover:underline"
               >
                 Ladda
               </button>

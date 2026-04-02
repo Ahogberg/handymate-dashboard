@@ -381,18 +381,18 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Style helpers ──────────────────────────────────────────────────
   function navClass(active: boolean) {
-    return `flex items-center justify-between px-4 py-2.5 rounded-xl transition-all ${
+    return `flex items-center justify-between px-4 py-2.5 rounded-xl transition-all relative ${
       active
-        ? 'bg-white/10 text-white border border-white/20'
-        : 'text-teal-200/70 hover:text-white hover:bg-white/5'
+        ? 'bg-white/[0.12] text-white shadow-sm shadow-black/10'
+        : 'text-primary-200/70 hover:text-white hover:bg-white/5'
     }`
   }
 
   function subNavClass(active: boolean) {
     return `block px-4 py-2 rounded-lg text-sm transition-all ${
       active
-        ? 'text-teal-300 bg-white/10'
-        : 'text-teal-300/50 hover:text-white hover:bg-white/5'
+        ? 'text-white bg-white/[0.08] font-medium'
+        : 'text-primary-300/50 hover:text-white hover:bg-white/5'
     }`
   }
 
@@ -403,15 +403,15 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       const Icon = item.icon
       const locked = item.featureGate ? !hasFeature(plan, item.featureGate) : false
       return (
-        <Link key={item.key} href={item.href} className={`${navClass(active)} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
+        <Link key={item.key} href={item.href} className={`${navClass(active)} ${active ? 'nav-active-indicator' : ''} ${locked ? 'opacity-50' : ''}`} title={locked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
           <div className="flex items-center gap-3">
-            <Icon className={`w-5 h-5 ${active ? 'text-teal-300' : ''}`} />
+            <Icon className={`w-5 h-5 ${active ? 'text-primary-300' : ''}`} />
             <span className="text-sm">{item.label}</span>
           </div>
           {locked ? (
-            <Lock className="w-3.5 h-3.5 text-teal-300/40" />
+            <Lock className="w-3.5 h-3.5 text-primary-300/40" />
           ) : item.hasBadge && pendingCount > 0 ? (
-            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-teal-600 text-white rounded-full animate-pulse">
+            <span className="flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-bold bg-primary-700 text-white rounded-full animate-pulse">
               {pendingCount > 99 ? '99+' : pendingCount}
             </span>
           ) : item.hasApprovalBadge && approvalCount > 0 ? (
@@ -440,10 +440,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
               toggleGroup(item.key)
             }
           }}
-          className={`w-full ${navClass(groupActive)}`}
+          className={`w-full ${navClass(groupActive)} ${groupActive ? 'nav-active-indicator' : ''}`}
         >
           <div className="flex items-center gap-3">
-            <Icon className={`w-5 h-5 ${groupActive ? 'text-teal-300' : ''}`} />
+            <Icon className={`w-5 h-5 ${groupActive ? 'text-primary-300' : ''}`} />
             <span className="text-sm">{item.label}</span>
           </div>
           <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
@@ -457,7 +457,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                 <Link key={child.href} href={child.href} className={`${subNavClass(childActive)} ${childLocked ? 'opacity-50' : ''}`} title={childLocked ? `Ingår i ${getPlanLabel(plan === 'starter' ? 'professional' : 'business')}` : undefined}>
                   <span className="flex items-center gap-2">
                     {child.label}
-                    {childLocked && <Lock className="w-3 h-3 text-teal-300/40" />}
+                    {childLocked && <Lock className="w-3 h-3 text-primary-300/40" />}
                     {child.dotKey === 'automation_failed' && automationFailed && (
                       <span className="w-2 h-2 rounded-full bg-red-500 inline-block" title="Misslyckad automation" />
                     )}
@@ -506,7 +506,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
           <div className="relative" ref={notifRef}>
             <button
               onClick={openNotifications}
-              className="relative p-2 rounded-lg text-teal-200/70 hover:text-white hover:bg-white/10 transition-all"
+              className="relative p-2 rounded-lg text-primary-200/70 hover:text-white hover:bg-white/10 transition-all"
               aria-label="Notifikationer"
             >
               <Bell className="w-5 h-5" />
@@ -519,13 +519,13 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
             {/* Notification dropdown */}
             {notifOpen && (
-              <div className="absolute left-0 top-full mt-2 w-80 bg-[#0f2a35] border border-white/10 rounded-xl shadow-2xl z-50 max-h-[70vh] flex flex-col">
+              <div className="absolute left-0 top-full mt-2 w-80 bg-sidebar-dark border border-white/10 rounded-xl shadow-2xl z-50 max-h-[70vh] flex flex-col">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                   <span className="text-sm font-semibold text-white">Notifikationer</span>
                   {notifCount > 0 && (
                     <button
                       onClick={markAllRead}
-                      className="text-xs text-teal-400 hover:text-teal-300 transition-colors"
+                      className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
                     >
                       Markera alla som lästa
                     </button>
@@ -533,9 +533,9 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                 </div>
                 <div className="overflow-y-auto flex-1">
                   {notifLoading ? (
-                    <div className="p-6 text-center text-teal-300/50 text-sm">Laddar...</div>
+                    <div className="p-6 text-center text-primary-300/50 text-sm">Laddar...</div>
                   ) : notifications.length === 0 ? (
-                    <div className="p-6 text-center text-teal-300/50 text-sm">Inga notifikationer</div>
+                    <div className="p-6 text-center text-primary-300/50 text-sm">Inga notifikationer</div>
                   ) : (
                     notifications.map(n => (
                       <div
@@ -554,16 +554,16 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
                       >
                         <div className="flex items-start gap-3">
                           {!n.is_read && (
-                            <div className="w-2 h-2 rounded-full bg-teal-400 mt-1.5 flex-shrink-0" />
+                            <div className="w-2 h-2 rounded-full bg-primary-400 mt-1.5 flex-shrink-0" />
                           )}
                           <div className={`flex-1 min-w-0 ${n.is_read ? 'ml-5' : ''}`}>
-                            <p className={`text-sm truncate ${n.is_read ? 'text-teal-200/60' : 'text-white font-medium'}`}>
+                            <p className={`text-sm truncate ${n.is_read ? 'text-primary-200/60' : 'text-white font-medium'}`}>
                               {n.title}
                             </p>
                             {n.message && (
-                              <p className="text-xs text-teal-300/40 mt-0.5 truncate">{n.message}</p>
+                              <p className="text-xs text-primary-300/40 mt-0.5 truncate">{n.message}</p>
                             )}
-                            <p className="text-[10px] text-teal-300/30 mt-1">{timeAgo(n.created_at)}</p>
+                            <p className="text-[10px] text-primary-300/30 mt-1">{timeAgo(n.created_at)}</p>
                           </div>
                         </div>
                       </div>
@@ -603,16 +603,16 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
             </div>
             <div className="min-w-0 flex-1 text-left">
               <p className="text-sm text-white truncate">{currentUser?.name || businessName}</p>
-              <p className="text-xs text-teal-300/50 truncate">{currentUser?.email || ''}</p>
+              <p className="text-xs text-primary-300/50 truncate">{currentUser?.email || ''}</p>
             </div>
-            <ChevronDown className={`w-4 h-4 text-teal-300/50 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown className={`w-4 h-4 text-primary-300/50 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {userMenuOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-[#0f2a35] border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
+            <div className="absolute bottom-full left-0 right-0 mb-2 bg-sidebar-dark border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
               <Link
                 href="/dashboard/profile"
-                className="flex items-center gap-2 px-4 py-3 text-sm text-teal-200 hover:bg-white/10 transition-all"
+                className="flex items-center gap-2 px-4 py-3 text-sm text-primary-200 hover:bg-white/10 transition-all"
               >
                 <User className="w-4 h-4" />
                 Min profil
@@ -620,7 +620,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
               <div className="border-t border-white/10" />
               <button
                 onClick={onLogout}
-                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-teal-300/50 hover:text-red-400 hover:bg-white/10 transition-all"
+                className="w-full flex items-center gap-2 px-4 py-3 text-sm text-primary-300/50 hover:text-red-400 hover:bg-white/10 transition-all"
               >
                 <LogOut className="w-4 h-4" />
                 Logga ut
@@ -642,7 +642,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       >
         <Menu className="w-5 h-5" />
         {pendingCount > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-teal-600 text-white rounded-full">
+          <span className="absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center text-xs font-bold bg-primary-700 text-white rounded-full">
             {pendingCount > 9 ? '9+' : pendingCount}
           </span>
         )}
@@ -658,13 +658,13 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
       {/* Sidebar - Mobile */}
       <div
-        className={`fixed left-0 top-0 h-screen w-72 bg-[#1a3a4a] border-r border-white/10 flex flex-col z-50 transition-transform duration-300 md:hidden ${
+        className={`fixed left-0 top-0 h-screen w-72 bg-sidebar border-r border-white/10 flex flex-col z-50 transition-transform duration-300 md:hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <button
           onClick={() => setIsMobileOpen(false)}
-          className="absolute top-4 right-4 p-2 text-teal-200/70 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
+          className="absolute top-4 right-4 p-2 text-primary-200/70 hover:text-white rounded-lg min-w-[40px] min-h-[40px] flex items-center justify-center"
           aria-label="Stäng meny"
         >
           <X className="w-5 h-5" />
@@ -673,7 +673,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       </div>
 
       {/* Sidebar - Desktop */}
-      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-[#1a3a4a] border-r border-white/10 flex-col z-50">
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-sidebar border-r border-white/10 flex-col z-50">
         {sidebarContent}
       </div>
     </>

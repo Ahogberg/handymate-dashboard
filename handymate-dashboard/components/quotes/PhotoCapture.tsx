@@ -70,7 +70,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
                 onClick={() => cameraInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 px-5 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+                className="flex items-center justify-center gap-2 px-5 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
               >
                 <Camera className="w-5 h-5" />
                 Ta bild
@@ -120,7 +120,7 @@ export default function PhotoCapture({ onCapture, onBack, analyzing }: PhotoCapt
             </button>
             <button
               onClick={submitImage}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 min-h-[48px]"
             >
               Analysera bild
             </button>

@@ -44,7 +44,7 @@ export function UpgradeModal({ feature, onClose }: UpgradeModalProps) {
 
           <Link
             href="/dashboard/settings/billing"
-            className="block w-full bg-teal-700 text-white py-3 rounded-xl font-medium hover:bg-teal-800 transition-colors"
+            className="block w-full bg-primary-800 text-white py-3 rounded-xl font-medium hover:bg-primary-800 transition-colors"
             onClick={onClose}
           >
             Uppgradera nu →

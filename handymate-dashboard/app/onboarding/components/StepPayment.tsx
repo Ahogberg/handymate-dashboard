@@ -103,12 +103,12 @@ function PaymentForm({ selectedPlan: initialPlan, onComplete, onBack }: StepPaym
             onClick={() => setSelectedPlan(plan.id)}
             className={`relative text-left p-4 rounded-2xl border-2 transition-all ${
               selectedPlan === plan.id
-                ? 'border-teal-600 bg-teal-50/50 shadow-sm'
+                ? 'border-primary-700 bg-primary-50/50 shadow-sm'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
             {plan.popular && (
-              <span className="absolute -top-2.5 right-4 bg-teal-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+              <span className="absolute -top-2.5 right-4 bg-primary-700 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                 Populärast
               </span>
             )}
@@ -122,7 +122,7 @@ function PaymentForm({ selectedPlan: initialPlan, onComplete, onBack }: StepPaym
             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
               {plan.features.map(f => (
                 <span key={f} className="text-xs text-gray-500 flex items-center gap-1">
-                  <Check className="w-3 h-3 text-teal-600" />{f}
+                  <Check className="w-3 h-3 text-primary-700" />{f}
                 </span>
               ))}
             </div>
@@ -148,7 +148,7 @@ function PaymentForm({ selectedPlan: initialPlan, onComplete, onBack }: StepPaym
         </label>
         {loading ? (
           <div className="flex items-center justify-center py-4">
-            <Loader2 className="w-5 h-5 text-teal-600 animate-spin" />
+            <Loader2 className="w-5 h-5 text-primary-700 animate-spin" />
           </div>
         ) : (
           <>
@@ -193,7 +193,7 @@ function PaymentForm({ selectedPlan: initialPlan, onComplete, onBack }: StepPaym
         <button
           type="submit"
           disabled={!stripe || processing || !clientSecret || !cardReady}
-          className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {processing
             ? <><Loader2 className="w-4 h-4 animate-spin" /> Behandlar...</>

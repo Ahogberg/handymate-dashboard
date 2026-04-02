@@ -189,8 +189,8 @@ export default function EditInvoicePage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-6xl mx-auto">
@@ -213,7 +213,7 @@ export default function EditInvoicePage() {
           <button
             onClick={() => handleSave(false)}
             disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Spara
@@ -233,7 +233,7 @@ export default function EditInvoicePage() {
                     type="date"
                     value={invoiceDate}
                     onChange={(e) => { setInvoiceDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -242,7 +242,7 @@ export default function EditInvoicePage() {
                     type="date"
                     value={dueDate}
                     onChange={(e) => { setDueDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -251,7 +251,7 @@ export default function EditInvoicePage() {
                     type="text"
                     value={ourReference}
                     onChange={(e) => { setOurReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -260,7 +260,7 @@ export default function EditInvoicePage() {
                     type="text"
                     value={yourReference}
                     onChange={(e) => { setYourReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -274,7 +274,7 @@ export default function EditInvoicePage() {
                   <select
                     value={vatRate}
                     onChange={(e) => { setVatRate(Number(e.target.value)); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value={25}>25%</option>
                     <option value={12}>12%</option>
@@ -287,7 +287,7 @@ export default function EditInvoicePage() {
                   <select
                     value={rotRutType}
                     onChange={(e) => { setRotRutType(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value="">Inget avdrag</option>
                     <option value="rot">ROT-avdrag (30%)</option>

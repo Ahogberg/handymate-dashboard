@@ -49,7 +49,7 @@ export default function CallsPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-teal-600/20 to-teal-500/20 text-white border border-teal-300'
+                  ? 'bg-gradient-to-r from-primary-700/20 to-primary-600/20 text-white border border-primary-300'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >

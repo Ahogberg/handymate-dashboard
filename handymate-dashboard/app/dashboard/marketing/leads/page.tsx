@@ -18,7 +18,7 @@ type StatusFilter = 'all' | 'draft' | 'approved' | 'sent'
 const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   draft: { label: 'Utkast', cls: 'bg-gray-100 text-gray-600' },
   approved: { label: 'Godkänd', cls: 'bg-blue-100 text-blue-700' },
-  sent: { label: 'Skickad', cls: 'bg-teal-100 text-teal-700' },
+  sent: { label: 'Skickad', cls: 'bg-primary-100 text-primary-700' },
   delivered: { label: 'Levererad', cls: 'bg-emerald-100 text-emerald-700' },
 }
 
@@ -173,7 +173,7 @@ export default function LeadsOutboundPage() {
           <button
             onClick={handleScan}
             disabled={scanning}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-xl font-medium hover:bg-primary-700 disabled:opacity-50"
           >
             {scanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
             {scanning ? 'Skannar...' : 'Skanna fastigheter'}
@@ -187,7 +187,7 @@ export default function LeadsOutboundPage() {
             <p className="text-sm text-amber-800 flex-1">
               Ladda upp din logotyp i Inställningar innan du kan skicka brev — det tar 30 sekunder
             </p>
-            <Link href="/dashboard/settings?tab=company" className="text-sm text-teal-600 font-medium hover:underline whitespace-nowrap">
+            <Link href="/dashboard/settings?tab=company" className="text-sm text-primary-700 font-medium hover:underline whitespace-nowrap">
               Gå till Inställningar <ArrowRight className="w-3 h-3 inline" />
             </Link>
           </div>
@@ -196,7 +196,7 @@ export default function LeadsOutboundPage() {
         {/* Quota bar */}
         {usage && (
           <div className="mb-6 bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
-            <Package className="w-5 h-5 text-teal-600" />
+            <Package className="w-5 h-5 text-primary-700" />
             <div className="flex-1">
               <div className="flex justify-between text-sm mb-1">
                 <span className="text-gray-600">{usage.letters_sent} av {usage.letters_quota} brev använda denna månad</span>
@@ -204,7 +204,7 @@ export default function LeadsOutboundPage() {
               </div>
               <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-teal-500 rounded-full transition-all"
+                  className="h-full bg-primary-600 rounded-full transition-all"
                   style={{ width: `${Math.min((usage.letters_sent / usage.letters_quota) * 100, 100)}%` }}
                 />
               </div>
@@ -214,13 +214,13 @@ export default function LeadsOutboundPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6">
-          <button onClick={() => setTab('outbound')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'outbound' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('outbound')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'outbound' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
             <Mail className="w-4 h-4 inline mr-1.5 -mt-0.5" />Utskick
           </button>
-          <button onClick={() => setTab('neighbours')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'neighbours' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('neighbours')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'neighbours' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
             <Home className="w-4 h-4 inline mr-1.5 -mt-0.5" />Grannkampanjer
           </button>
-          <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-teal-600 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
             <BarChart3 className="w-4 h-4 inline mr-1.5 -mt-0.5" />Statistik
           </button>
         </div>
@@ -234,14 +234,14 @@ export default function LeadsOutboundPage() {
                   <button
                     key={s}
                     onClick={() => setStatusFilter(s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${statusFilter === s ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium ${statusFilter === s ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'}`}
                   >
                     {s === 'all' ? 'Alla' : STATUS_CONFIG[s]?.label || s} {s === 'all' ? `(${leads.length})` : ''}
                   </button>
                 ))}
               </div>
               {draftCount > 0 && (
-                <button onClick={handleBatchApprove} className="text-sm text-teal-600 font-medium hover:underline">
+                <button onClick={handleBatchApprove} className="text-sm text-primary-700 font-medium hover:underline">
                   Godkänn alla ({draftCount})
                 </button>
               )}
@@ -249,7 +249,7 @@ export default function LeadsOutboundPage() {
 
             {/* Leads list */}
             {loading ? (
-              <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-teal-600 animate-spin" /></div>
+              <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
             ) : filteredLeads.length === 0 ? (
               <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
                 <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
@@ -259,8 +259,8 @@ export default function LeadsOutboundPage() {
               <div className="space-y-2">
                 {filteredLeads.map(lead => (
                   <div key={lead.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center shrink-0">
-                      <Home className="w-5 h-5 text-teal-600" />
+                    <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
+                      <Home className="w-5 h-5 text-primary-700" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
@@ -290,7 +290,7 @@ export default function LeadsOutboundPage() {
                           onClick={() => handleSend(lead.id)}
                           disabled={sendingId === lead.id || !hasLogo}
                           title={!hasLogo ? 'Logotyp krävs' : 'Skicka brev'}
-                          className="px-3 py-1.5 bg-teal-600 text-white text-xs font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 flex items-center gap-1"
+                          className="px-3 py-1.5 bg-primary-700 text-white text-xs font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1"
                         >
                           {sendingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
                           Skicka
@@ -379,7 +379,7 @@ export default function LeadsOutboundPage() {
                     </button>
                     <button
                       onClick={() => { handleSaveLetter().then(() => handleApprove(selectedLead.id)) }}
-                      className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700"
+                      className="flex-1 px-4 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-700"
                     >
                       Spara & Godkänn
                     </button>
@@ -389,7 +389,7 @@ export default function LeadsOutboundPage() {
                   <button
                     onClick={() => handleSend(selectedLead.id)}
                     disabled={!hasLogo || sendingId === selectedLead.id}
-                    className="flex-1 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="flex-1 px-4 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
                   >
                     {sendingId === selectedLead.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     Skicka brev (15 kr)
@@ -438,7 +438,7 @@ function NeighbourCampaignsTab() {
     setStats(data.stats || stats)
   }
 
-  if (loading) return <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 text-teal-700 animate-spin" /></div>
+  if (loading) return <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
 
   return (
     <div className="space-y-4">
@@ -450,7 +450,7 @@ function NeighbourCampaignsTab() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <p className="text-xs text-gray-400">Konverterade</p>
-          <p className="text-xl font-bold text-teal-700">{stats.totalConverted}</p>
+          <p className="text-xl font-bold text-primary-700">{stats.totalConverted}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
           <p className="text-xs text-gray-400">Spenderat</p>
@@ -483,7 +483,7 @@ function NeighbourCampaignsTab() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-900">{c.job_type || 'Jobb'} · {c.source_address}</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      c.status === 'sent' ? 'bg-teal-100 text-teal-700' :
+                      c.status === 'sent' ? 'bg-primary-100 text-primary-700' :
                       c.status === 'approved' ? 'bg-blue-100 text-blue-700' :
                       'bg-gray-100 text-gray-600'
                     }`}>
@@ -494,13 +494,13 @@ function NeighbourCampaignsTab() {
                     <span>{c.neighbour_count} brev</span>
                     <span>{Number(c.cost_sek || 0)} kr</span>
                     {c.sent_at && <span>{new Date(c.sent_at).toLocaleDateString('sv-SE')}</span>}
-                    {c.converted_count > 0 && <span className="text-teal-600 font-medium">{c.converted_count} jobb</span>}
+                    {c.converted_count > 0 && <span className="text-primary-700 font-medium">{c.converted_count} jobb</span>}
                   </div>
                 </div>
                 {c.status === 'sent' && (
                   <button
                     onClick={() => markConverted(c.id, (c.converted_count || 0) + 1)}
-                    className="text-xs text-teal-700 hover:underline shrink-0"
+                    className="text-xs text-primary-700 hover:underline shrink-0"
                   >
                     + Blev jobb
                   </button>
@@ -553,8 +553,8 @@ function LeadsUpgradePage() {
       <div className="max-w-3xl mx-auto">
         {/* Hero */}
         <div className="text-center mb-10 pt-8">
-          <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
-            <Mail className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <Mail className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">Handymate Leads</h1>
           <p className="text-lg text-gray-500 max-w-md mx-auto">Nå rätt kunder automatiskt — direkt i brevlådan</p>
@@ -575,10 +575,10 @@ function LeadsUpgradePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           {plans.map(plan => (
             <div key={plan.tier} className={`bg-white rounded-xl border-2 p-6 relative ${
-              plan.popular ? 'border-teal-500 shadow-lg' : 'border-gray-200'
+              plan.popular ? 'border-primary-600 shadow-lg' : 'border-gray-200'
             }`}>
               {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-teal-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-700 text-white text-xs font-semibold px-3 py-1 rounded-full">
                   Populärast
                 </span>
               )}
@@ -588,17 +588,17 @@ function LeadsUpgradePage() {
                 <span className="text-gray-500 text-sm">kr/mån</span>
               </div>
               <ul className="text-sm text-gray-600 space-y-2 mb-6">
-                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />{plan.quota} brev/månad inkluderade</li>
-                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />Extra brev: {plan.perLetter} kr/st</li>
-                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />AI-genererade brev</li>
-                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-teal-500 shrink-0" />Lagfarter + Granneffekten</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />{plan.quota} brev/månad inkluderade</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />Extra brev: {plan.perLetter} kr/st</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />AI-genererade brev</li>
+                <li className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-primary-600 shrink-0" />Lagfarter + Granneffekten</li>
               </ul>
               <button
                 onClick={() => activate(plan.tier)}
                 disabled={activating !== null}
                 className={`w-full py-3 rounded-xl font-semibold text-sm transition-colors ${
                   plan.popular
-                    ? 'bg-teal-700 text-white hover:bg-teal-800'
+                    ? 'bg-primary-700 text-white hover:bg-primary-800'
                     : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
                 } disabled:opacity-50`}
               >

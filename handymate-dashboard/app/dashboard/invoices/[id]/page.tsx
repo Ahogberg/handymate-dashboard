@@ -311,7 +311,7 @@ export default function InvoiceDetailPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-teal-600/20 text-teal-500 border-teal-500/30'
+      case 'sent': return 'bg-primary-700/20 text-primary-600 border-primary-600/30'
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-500/30'
       case 'credited': return 'bg-orange-100 text-orange-600 border-orange-500/30'
@@ -402,8 +402,8 @@ export default function InvoiceDetailPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -436,7 +436,7 @@ export default function InvoiceDetailPage() {
                   type="date"
                   value={paymentData.paid_at}
                   onChange={(e) => setPaymentData({ ...paymentData, paid_at: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -449,7 +449,7 @@ export default function InvoiceDetailPage() {
                       onClick={() => setPaymentData({ ...paymentData, payment_method: method.value })}
                       className={`flex items-center gap-2 p-3 rounded-xl border transition-all ${
                         paymentData.payment_method === method.value
-                          ? 'bg-teal-100 border-teal-500 text-gray-900'
+                          ? 'bg-primary-100 border-primary-600 text-gray-900'
                           : 'bg-gray-100 border-gray-300 text-gray-500 hover:border-gray-300'
                       }`}
                     >
@@ -467,7 +467,7 @@ export default function InvoiceDetailPage() {
                     type="number"
                     value={paymentData.paid_amount}
                     onChange={(e) => setPaymentData({ ...paymentData, paid_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-12"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-12"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                 </div>
@@ -604,7 +604,7 @@ export default function InvoiceDetailPage() {
                 <select
                   value={creditReason}
                   onChange={(e) => setCreditReason(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   <option value="">Välj anledning...</option>
                   <option value="Felaktig faktura">Felaktig faktura</option>
@@ -700,7 +700,7 @@ export default function InvoiceDetailPage() {
               <div className="relative group">
                 <button
                   disabled={sending}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white hover:opacity-90 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white hover:opacity-90 disabled:opacity-50"
                 >
                   {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Skicka
@@ -784,7 +784,7 @@ export default function InvoiceDetailPage() {
               const Icon = event.icon
               const colorClasses: Record<string, string> = {
                 zinc: 'bg-gray-100 text-gray-500 border-gray-300',
-                blue: 'bg-teal-600/20 text-teal-500 border-teal-500/30',
+                blue: 'bg-primary-700/20 text-primary-600 border-primary-600/30',
                 red: 'bg-red-100 text-red-600 border-red-500/30',
                 amber: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
                 emerald: 'bg-emerald-100 text-emerald-600 border-emerald-500/30',
@@ -969,7 +969,7 @@ export default function InvoiceDetailPage() {
                   href={`/api/invoices/${invoiceId}/reminder-pdf`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-sky-700 hover:text-teal-700 flex items-center gap-1"
+                  className="text-xs text-sky-700 hover:text-primary-700 flex items-center gap-1"
                 >
                   <Eye className="w-3 h-3" />
                   Visa påminnelse-PDF
@@ -998,7 +998,7 @@ export default function InvoiceDetailPage() {
                       <td className="px-6 py-3">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${
                           reminder.sent_method === 'sms' ? 'bg-green-100 text-green-700' :
-                          reminder.sent_method === 'email' ? 'bg-teal-100 text-teal-700' :
+                          reminder.sent_method === 'email' ? 'bg-primary-100 text-primary-700' :
                           'bg-red-100 text-red-700'
                         }`}>
                           {reminder.sent_method === 'sms' ? 'SMS' :

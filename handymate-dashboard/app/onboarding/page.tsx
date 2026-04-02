@@ -260,7 +260,7 @@ export default function OnboardingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -270,15 +270,15 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
         <div className="max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto">
-            <Mail className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto">
+            <Mail className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Bekräfta din e-post</h1>
           <p className="text-gray-500">
             Vi har skickat ett mail till <span className="text-gray-900 font-medium">{pendingEmail}</span>.
             Klicka på länken för att aktivera ditt konto.
           </p>
-          <a href="/login" className="block w-full py-3 bg-teal-600 text-white rounded-xl font-medium hover:bg-teal-700">
+          <a href="/login" className="block w-full py-3 bg-primary-700 text-white rounded-xl font-medium hover:bg-primary-700">
             Gå till inloggning
           </a>
         </div>
@@ -310,11 +310,11 @@ export default function OnboardingPage() {
           </div>
           {/* Progress bar */}
           <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-teal-600 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="h-full bg-primary-700 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
           <div className="flex justify-between mt-2">
             {STEPS.map((s, i) => (
-              <span key={s.label} className={`text-[10px] font-medium ${i <= step ? 'text-teal-600' : 'text-gray-300'}`}>
+              <span key={s.label} className={`text-[10px] font-medium ${i <= step ? 'text-primary-700' : 'text-gray-300'}`}>
                 {i < step ? '✓' : ''} {s.label}
               </span>
             ))}
@@ -346,14 +346,14 @@ export default function OnboardingPage() {
                   </div>
                 )}
                 <div>
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-100">
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 text-sm font-medium rounded-lg hover:bg-primary-100">
                     <Upload className="w-3.5 h-3.5" />
                     {logoUrl ? 'Byt logga' : 'Ladda upp'}
                     <input type="file" className="hidden" accept=".png,.jpg,.jpeg,.svg,.webp"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }}
                     />
                   </label>
-                  {uploadingLogo && <Loader2 className="w-4 h-4 text-teal-500 animate-spin inline ml-2" />}
+                  {uploadingLogo && <Loader2 className="w-4 h-4 text-primary-600 animate-spin inline ml-2" />}
                   <p className="text-xs text-gray-400 mt-1">Syns på offerter, fakturor och brev. PNG/JPG/SVG, max 2MB</p>
                 </div>
               </div>
@@ -366,20 +366,20 @@ export default function OnboardingPage() {
                   <label className="block text-sm text-gray-500 mb-1">Org-nummer</label>
                   <input type="text" value={orgNumber} onChange={e => setOrgNumber(e.target.value)}
                     placeholder="XXXXXX-XXXX"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
                   />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Tjänsteområde</label>
                   <input type="text" value={serviceArea} onChange={e => setServiceArea(e.target.value)}
                     placeholder="Postnummer eller stad"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
                   />
                 </div>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={fSkatt} onChange={e => setFSkatt(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 rounded border-gray-300 focus:ring-teal-500"
+                  className="w-4 h-4 text-primary-700 rounded border-gray-300 focus:ring-primary-600"
                 />
                 <span className="text-sm text-gray-700">F-skattsedel innehas</span>
               </label>
@@ -429,13 +429,13 @@ export default function OnboardingPage() {
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Lägg till manuellt</h3>
               <div className="flex gap-2">
                 <input type="text" value={manualName} onChange={e => setManualName(e.target.value)}
-                  placeholder="Namn" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Namn" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/30"
                 />
                 <input type="tel" value={manualPhone} onChange={e => setManualPhone(e.target.value)}
-                  placeholder="Telefon" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+                  placeholder="Telefon" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/30"
                 />
                 <button onClick={addManualCustomer} disabled={!manualName.trim() || !manualPhone.trim()}
-                  className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+                  className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
                   Lägg till
                 </button>
               </div>
@@ -444,7 +444,7 @@ export default function OnboardingPage() {
             {/* CSV upload */}
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Eller ladda upp CSV</h3>
-              <label className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-teal-400 hover:text-teal-600 cursor-pointer transition-colors">
+              <label className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-primary-500 hover:text-primary-700 cursor-pointer transition-colors">
                 <Upload className="w-4 h-4" />
                 Välj CSV-fil med kunder
                 <input type="file" className="hidden" accept=".csv"
@@ -455,7 +455,7 @@ export default function OnboardingPage() {
                   }}
                 />
               </label>
-              {csvFile && <p className="text-xs text-teal-600 mt-2">Vald fil: {csvFile.name}</p>}
+              {csvFile && <p className="text-xs text-primary-700 mt-2">Vald fil: {csvFile.name}</p>}
             </div>
 
             {/* Imported list */}
@@ -478,7 +478,7 @@ export default function OnboardingPage() {
                 <ArrowLeft className="w-4 h-4 inline mr-1" />Tillbaka
               </button>
               <button onClick={async () => { await saveProgress(4); setStep(4) }}
-                className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-medium text-sm hover:bg-teal-700">
+                className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-medium text-sm hover:bg-primary-700">
                 {importedCustomers.length > 0 ? 'Fortsätt' : 'Hoppa över — lägg till senare'}
               </button>
             </div>
@@ -507,14 +507,14 @@ export default function OnboardingPage() {
                     onChange={e => setSmsText(e.target.value)}
                     rows={3}
                     maxLength={320}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/30 resize-y"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 resize-y"
                   />
                   <p className="text-xs text-gray-400 mt-1">{smsText.length}/320 tecken</p>
 
                   {/* SMS preview */}
                   <div className="mt-4 bg-gray-50 rounded-xl p-4">
                     <p className="text-xs text-gray-400 mb-2">Förhandsvisning:</p>
-                    <div className="bg-teal-600 text-white rounded-2xl rounded-bl-md px-4 py-2.5 text-sm max-w-[85%]">
+                    <div className="bg-primary-700 text-white rounded-2xl rounded-bl-md px-4 py-2.5 text-sm max-w-[85%]">
                       {smsText.replace('[namn]', importedCustomers[0]?.name || 'Kund').replace('[name]', importedCustomers[0]?.name || 'Kund')}
                     </div>
                   </div>
@@ -527,7 +527,7 @@ export default function OnboardingPage() {
                     <input type="range" min={1} max={importedCustomers.length}
                       value={smsCount || importedCustomers.length}
                       onChange={e => setSmsCount(parseInt(e.target.value))}
-                      className="w-full mt-1 accent-teal-600"
+                      className="w-full mt-1 accent-primary-700"
                     />
                     <p className="text-xs text-gray-400 mt-1">
                       Uppskattad kostnad: {smsCount || importedCustomers.length} × 0,89 kr = {((smsCount || importedCustomers.length) * 0.89).toFixed(0)} kr
@@ -536,9 +536,9 @@ export default function OnboardingPage() {
                 </div>
 
                 {sendingSms && (
-                  <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 text-center">
-                    <Loader2 className="w-5 h-5 text-teal-600 animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-teal-700">Skickar... {smsSent}/{smsCount || importedCustomers.length}</p>
+                  <div className="bg-primary-50 border border-primary-300 rounded-xl p-4 text-center">
+                    <Loader2 className="w-5 h-5 text-primary-700 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-primary-700">Skickar... {smsSent}/{smsCount || importedCustomers.length}</p>
                   </div>
                 )}
 
@@ -548,7 +548,7 @@ export default function OnboardingPage() {
                     Hoppa över
                   </button>
                   <button onClick={handleSendSms} disabled={sendingSms || !smsText.trim()}
-                    className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
                     <Send className="w-4 h-4" />
                     Skicka nu
                   </button>
@@ -560,7 +560,7 @@ export default function OnboardingPage() {
                 <h2 className="text-xl font-bold text-gray-900">{smsSent} SMS skickade!</h2>
                 <p className="text-sm text-gray-500">Du får en notis när någon svarar.</p>
                 <button onClick={() => router.push('/dashboard')}
-                  className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700">
+                  className="w-full py-3 bg-primary-700 text-white rounded-xl font-semibold hover:bg-primary-700">
                   Gå till Dashboard
                 </button>
               </div>
@@ -572,7 +572,7 @@ export default function OnboardingPage() {
                   Lägg till kunder och skicka din första kampanj från Marknadsföring → SMS-kampanjer
                 </p>
                 <button onClick={completeOnboarding}
-                  className="w-full py-3 bg-teal-600 text-white rounded-xl font-semibold hover:bg-teal-700">
+                  className="w-full py-3 bg-primary-700 text-white rounded-xl font-semibold hover:bg-primary-700">
                   Gå till Dashboard
                 </button>
               </div>

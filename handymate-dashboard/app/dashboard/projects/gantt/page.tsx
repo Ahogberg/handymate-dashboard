@@ -176,7 +176,7 @@ export default function GanttPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gantt-vy</h1>
             <p className="text-gray-500 mt-1">Visualisera projekt och bokningar på en tidslinje</p>
           </div>
-          <Link href="/dashboard/projects" className="text-sm text-sky-700 hover:text-teal-600">
+          <Link href="/dashboard/projects" className="text-sm text-sky-700 hover:text-primary-700">
             ← Tillbaka till projekt
           </Link>
         </div>
@@ -248,7 +248,7 @@ export default function GanttPage() {
                       return (
                         <div
                           key={i}
-                          className={`text-center text-[10px] py-1 border-r border-gray-50 ${isWeekend ? 'bg-gray-50/50' : ''} ${isToday ? 'bg-teal-50' : ''}`}
+                          className={`text-center text-[10px] py-1 border-r border-gray-50 ${isWeekend ? 'bg-gray-50/50' : ''} ${isToday ? 'bg-primary-50' : ''}`}
                           style={{ width: `${100 / totalDays}%` }}
                         >
                           {showLabel ? day.getDate() : ''}
@@ -342,7 +342,7 @@ export default function GanttPage() {
                             </div>
                             <div className="flex-1 relative py-3 px-1">
                               <div
-                                className="absolute top-2 h-7 rounded-md bg-gradient-to-r from-emerald-400 to-teal-400 flex items-center px-2 text-[10px] text-white font-medium"
+                                className="absolute top-2 h-7 rounded-md bg-gradient-to-r from-emerald-400 to-primary-500 flex items-center px-2 text-[10px] text-white font-medium"
                                 style={{ left: bar.left, width: bar.width, minWidth: '4px' }}
                               />
                             </div>
@@ -372,11 +372,11 @@ export default function GanttPage() {
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-4 mt-4 text-xs text-gray-500">
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-3 rounded bg-gradient-to-r from-teal-600 to-teal-600" />
+            <div className="w-6 h-3 rounded bg-gradient-to-r from-primary-700 to-primary-700" />
             Projekt
           </div>
           <div className="flex items-center gap-1.5">
-            <div className="w-6 h-3 rounded bg-gradient-to-r from-emerald-400 to-teal-400" />
+            <div className="w-6 h-3 rounded bg-gradient-to-r from-emerald-400 to-primary-500" />
             Bokning
           </div>
           <div className="flex items-center gap-1.5">

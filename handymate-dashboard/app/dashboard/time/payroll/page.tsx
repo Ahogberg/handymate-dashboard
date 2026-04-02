@@ -210,9 +210,9 @@ export default function PayrollPage() {
                     )}
                     {p.allowance_days > 0 && (
                       <div className="text-center">
-                        <p className="text-xs text-teal-600">Traktamente</p>
-                        <p className="text-sm font-bold text-teal-600">{p.allowance_days}d</p>
-                        <p className="text-xs text-teal-400">{fmtKr(p.allowance_amount)}</p>
+                        <p className="text-xs text-primary-700">Traktamente</p>
+                        <p className="text-sm font-bold text-primary-700">{p.allowance_days}d</p>
+                        <p className="text-xs text-primary-500">{fmtKr(p.allowance_amount)}</p>
                       </div>
                     )}
                   </div>

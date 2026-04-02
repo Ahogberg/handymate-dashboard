@@ -179,7 +179,7 @@ function StandardTextPicker({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-xs text-sky-700 hover:text-teal-800 transition-colors"
+        className="text-xs text-sky-700 hover:text-primary-800 transition-colors"
       >
         Välj standardtext
       </button>
@@ -199,7 +199,7 @@ function StandardTextPicker({
               >
                 <span className="font-medium">{t.name}</span>
                 {t.is_default && (
-                  <span className="ml-1 text-[10px] text-sky-700 bg-teal-50 px-1 rounded">
+                  <span className="ml-1 text-[10px] text-sky-700 bg-primary-50 px-1 rounded">
                     standard
                   </span>
                 )}
@@ -1244,7 +1244,7 @@ export default function NewQuotePage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -1400,9 +1400,9 @@ export default function NewQuotePage() {
                   {/* Text description */}
                   <div>
                     <p className="text-[12px] text-[#64748B] mb-1">Beskriv jobbet — AI genererar offertrader</p>
-                    <div className="bg-teal-50 border border-teal-200 rounded-lg px-3 py-2 mb-2">
-                      <p className="text-[11px] text-teal-700 font-medium mb-1">Tips för bästa resultat:</p>
-                      <ul className="text-[11px] text-teal-600 space-y-0.5 list-disc list-inside">
+                    <div className="bg-primary-50 border border-primary-300 rounded-lg px-3 py-2 mb-2">
+                      <p className="text-[11px] text-primary-700 font-medium mb-1">Tips för bästa resultat:</p>
+                      <ul className="text-[11px] text-primary-700 space-y-0.5 list-disc list-inside">
                         <li>Ange rum/plats (kök, badrum, fasad)</li>
                         <li>Beskriv yta eller antal (15 m², 3 uttag)</li>
                         <li>Nämn material om du vet (klinker, gips, LED)</li>
@@ -1414,7 +1414,7 @@ export default function NewQuotePage() {
                       onChange={(e) => setAiTextInput(e.target.value)}
                       placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
                       rows={3}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-y"
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 resize-y"
                     />
                     <button
                       type="button"
@@ -1439,7 +1439,7 @@ export default function NewQuotePage() {
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 appearance-auto"
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 appearance-auto"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map((c) => (
@@ -1449,16 +1449,16 @@ export default function NewQuotePage() {
                     ))}
                   </select>
                   {customerPriceListInfo && (
-                    <div className="mt-2 bg-teal-50 border border-teal-200 rounded-lg p-2.5 space-y-1.5">
+                    <div className="mt-2 bg-primary-50 border border-primary-300 rounded-lg p-2.5 space-y-1.5">
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="text-teal-600">📋</span>
-                        <span className="text-teal-800">
+                        <span className="text-primary-700">📋</span>
+                        <span className="text-primary-800">
                           Prislista: <strong>{customerPriceListInfo.name}</strong>
                           {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
                           {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
                         </span>
                       </div>
-                      <div className="flex flex-wrap gap-3 text-[11px] text-teal-700">
+                      <div className="flex flex-wrap gap-3 text-[11px] text-primary-700">
                         {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate} kr</span> : null}
                         {customerPriceListInfo.materialMarkup ? <span>Materialpåslag: {customerPriceListInfo.materialMarkup}%</span> : null}
                         {customerPriceListInfo.calloutFee ? <span>Utryckningsavgift: {customerPriceListInfo.calloutFee} kr</span> : null}
@@ -1480,7 +1480,7 @@ export default function NewQuotePage() {
                             }))
                             setItems(newItems as any)
                           }}
-                          className="text-[11px] text-teal-600 hover:text-teal-800 font-medium underline underline-offset-2"
+                          className="text-[11px] text-primary-700 hover:text-primary-800 font-medium underline underline-offset-2"
                         >
                           Lägg till {customerPriceListInfo.items.length} poster från prislistan
                         </button>
@@ -1794,7 +1794,7 @@ export default function NewQuotePage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingFile}
-                  className="flex items-center gap-1.5 text-[12px] text-[#0F766E] hover:text-teal-800 disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-[12px] text-[#0F766E] hover:text-primary-800 disabled:opacity-50"
                 >
                   {uploadingFile ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
                   Bifoga fil
@@ -1819,7 +1819,7 @@ export default function NewQuotePage() {
                     <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-teal-700 hover:underline truncate">
+                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-primary-700 hover:underline truncate">
                           {att.name}
                         </a>
                         {att.size ? <span className="text-[10px] text-gray-400 shrink-0">{(att.size / 1024).toFixed(0)} KB</span> : null}
@@ -1990,9 +1990,9 @@ export default function NewQuotePage() {
                 </div>
               )}
               {priceAlts.length > 0 && (
-                <div className="bg-teal-50 border border-teal-200 rounded-lg p-3 mb-4 space-y-1.5">
+                <div className="bg-primary-50 border border-primary-300 rounded-lg p-3 mb-4 space-y-1.5">
                   {priceAlts.map((a, i) => (
-                    <p key={i} className="text-xs text-teal-800">
+                    <p key={i} className="text-xs text-primary-800">
                       💡 {a.cheaper_supplier} har {a.product_name} {a.savings_pct}% billigare ({a.cheaper_price} kr)
                     </p>
                   ))}

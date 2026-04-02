@@ -315,7 +315,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
   }
 
   const toolBtnClass = (t: ToolMode) =>
-    `p-2 rounded-lg transition ${tool === t ? 'bg-teal-100 text-teal-700 border border-teal-300' : 'text-gray-500 hover:bg-gray-100 border border-transparent'}`
+    `p-2 rounded-lg transition ${tool === t ? 'bg-primary-100 text-primary-700 border border-primary-300' : 'text-gray-500 hover:bg-gray-100 border border-transparent'}`
 
   if (fabricError) {
     return (
@@ -330,7 +330,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
   if (!fabricLoaded) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
         <span className="ml-2 text-sm text-gray-500">Laddar rityta...</span>
       </div>
     )
@@ -396,7 +396,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
                   <button
                     key={c}
                     onClick={() => { setColor(c); setShowColorPicker(false) }}
-                    className={`w-6 h-6 rounded-full border-2 transition ${color === c ? 'border-teal-500 scale-110' : 'border-gray-200 hover:border-gray-400'}`}
+                    className={`w-6 h-6 rounded-full border-2 transition ${color === c ? 'border-primary-600 scale-110' : 'border-gray-200 hover:border-gray-400'}`}
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -412,7 +412,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
               key={w}
               onClick={() => setStrokeWidth(w)}
               className={`px-1.5 py-1 rounded text-[10px] font-medium transition ${
-                strokeWidth === w ? 'bg-teal-100 text-teal-700' : 'text-gray-400 hover:text-gray-600'
+                strokeWidth === w ? 'bg-primary-100 text-primary-700' : 'text-gray-400 hover:text-gray-600'
               }`}
             >
               {w}px
@@ -446,7 +446,7 @@ export default function ProjectCanvas({ projectId, entityType, entityId, title }
         <button
           onClick={() => saveCanvas()}
           disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white text-sm rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition"
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 text-white text-sm rounded-lg font-medium hover:opacity-90 disabled:opacity-50 transition"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
           Spara

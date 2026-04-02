@@ -45,7 +45,7 @@ export default function FeedbackWidget() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 left-6 z-40 p-3 bg-teal-600 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+        className="fixed bottom-6 left-6 z-40 p-3 bg-primary-700 text-white rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all"
         title="Ge feedback"
       >
         <MessageSquarePlus className="w-5 h-5" />
@@ -70,7 +70,7 @@ export default function FeedbackWidget() {
                   onClick={() => setType(t)}
                   className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     type === t
-                      ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                      ? 'bg-primary-100 text-primary-700 border border-primary-200'
                       : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
                   }`}
                 >
@@ -103,13 +103,13 @@ export default function FeedbackWidget() {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Beskriv din feedback..."
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 resize-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-primary-600 resize-none"
             />
 
             <button
               onClick={submit}
               disabled={!message.trim() || sending}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:opacity-90 disabled:opacity-50 transition-opacity"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Skicka

@@ -471,7 +471,7 @@ export default function AutomationsPage() {
                                   disabled={toggling === rule.id}
                                   className="sr-only peer"
                                 />
-                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
+                                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-700" />
                               </label>
                             ) : tmpl.requiresIntegration ? (
                               <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1 italic">
@@ -510,7 +510,7 @@ export default function AutomationsPage() {
                                   <div className="flex items-center gap-3 pt-1">
                                     <button
                                       onClick={() => { setEditRule(rule); setShowBuilder(true) }}
-                                      className="text-xs text-teal-700 hover:text-teal-800 font-medium"
+                                      className="text-xs text-primary-700 hover:text-primary-800 font-medium"
                                     >
                                       Redigera inställningar
                                     </button>
@@ -543,7 +543,7 @@ export default function AutomationsPage() {
             </p>
             <button
               onClick={() => { setEditRule(null); setShowBuilder(true) }}
-              className="px-4 py-2 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 transition-colors"
+              className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 transition-colors"
             >
               + Ny regel
             </button>
@@ -556,7 +556,7 @@ export default function AutomationsPage() {
               <p className="text-gray-400 mb-3">Inga egna regler ännu</p>
               <button
                 onClick={() => { setEditRule(null); setShowBuilder(true) }}
-                className="text-sm text-teal-700 font-medium hover:text-teal-800"
+                className="text-sm text-primary-700 font-medium hover:text-primary-800"
               >
                 Skapa din första regel →
               </button>
@@ -587,7 +587,7 @@ export default function AutomationsPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => { setEditRule(rule); setShowBuilder(true) }}
-                        className="p-1.5 text-gray-400 hover:text-teal-600 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-primary-700 transition-colors"
                         title="Redigera"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
@@ -620,7 +620,7 @@ export default function AutomationsPage() {
                           disabled={toggling === rule.id}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-teal-600" />
+                        <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-700" />
                       </label>
                     </div>
                   </div>

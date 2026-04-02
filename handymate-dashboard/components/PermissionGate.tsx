@@ -27,7 +27,7 @@ export function PermissionGate({ permission, children, fallback }: PermissionGat
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -65,7 +65,7 @@ export function RequireRole({ roles, children, fallback }: {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
-        <div className="animate-spin h-8 w-8 border-4 border-teal-500 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-4 border-primary-600 border-t-transparent rounded-full" />
       </div>
     )
   }

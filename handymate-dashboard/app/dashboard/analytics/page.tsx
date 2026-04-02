@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-teal-400"
+            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
           >
             <option value="30d">Senaste 30 dagar</option>
             <option value="90d">Senaste 90 dagar</option>
@@ -207,7 +207,7 @@ export default function AnalyticsPage() {
                       {[
                         { label: 'Din vinst (est.)', value: Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead), color: 'bg-emerald-500' },
                         { label: 'Material', value: econ.materialCost, color: 'bg-sky-500' },
-                        { label: 'Din tid', value: econ.laborCost, color: 'bg-teal-500' },
+                        { label: 'Din tid', value: econ.laborCost, color: 'bg-primary-600' },
                         { label: 'Overhead', value: econ.overhead, color: 'bg-gray-400' },
                       ].filter(r => r.value > 0).map(row => {
                         const pct = Math.round((row.value / econ.invoiced) * 100)
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
                 )}
 
                 {!econ.overheadSet && (
-                  <a href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-teal-600 transition-colors">
+                  <a href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-primary-700 transition-colors">
                     Justera kostnadsinställningar för bättre estimat →
                   </a>
                 )}
@@ -271,7 +271,7 @@ export default function AnalyticsPage() {
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="p-1.5 rounded-lg bg-teal-100"><TrendingUp className="w-4 h-4 text-sky-700" /></div>
+                  <div className="p-1.5 rounded-lg bg-primary-100"><TrendingUp className="w-4 h-4 text-sky-700" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Vunnet totalt</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{formatValue(winLossData?.won_value || 0)}</p>
@@ -302,16 +302,16 @@ export default function AnalyticsPage() {
 
             {/* AI Insights */}
             {insights.length > 0 && (
-              <div className="bg-gradient-to-r from-teal-50 to-teal-50 rounded-xl border border-teal-200 p-5">
-                <h3 className="text-sm font-semibold text-teal-900 flex items-center gap-2 mb-3">
+              <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-xl border border-primary-200 p-5">
+                <h3 className="text-sm font-semibold text-primary-900 flex items-center gap-2 mb-3">
                   <Lightbulb className="w-4 h-4 text-sky-700" />
                   AI-insikter
                 </h3>
                 <div className="space-y-2">
                   {insights.map((insight, i) => (
                     <div key={i} className="flex items-start gap-2">
-                      <span className="text-teal-500 mt-0.5">•</span>
-                      <p className="text-sm text-teal-800">{insight}</p>
+                      <span className="text-primary-600 mt-0.5">•</span>
+                      <p className="text-sm text-primary-800">{insight}</p>
                     </div>
                   ))}
                 </div>
@@ -342,7 +342,7 @@ export default function AnalyticsPage() {
                           <div key={bucket.key} className="flex items-center gap-2 text-sm">
                             <span className="w-16 text-gray-500 text-right text-xs">{bucket.label}</span>
                             <div className="flex-1 bg-gray-100 rounded-full h-3">
-                              <div className="h-3 rounded-full bg-teal-600 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
+                              <div className="h-3 rounded-full bg-primary-700 transition-all" style={{ width: `${Math.max(pct, 1)}%` }} />
                             </div>
                             <span className="w-8 text-gray-600 text-xs text-right font-medium">{count}</span>
                             <span className="w-12 text-gray-400 text-xs text-right">({Math.round(pct)}%)</span>

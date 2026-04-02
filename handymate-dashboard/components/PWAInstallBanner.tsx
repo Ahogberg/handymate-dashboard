@@ -114,8 +114,8 @@ export default function PWAInstallBanner() {
     <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
       <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-4 shadow-2xl shadow-black/50">
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 bg-teal-600/20 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Smartphone className="w-5 h-5 text-teal-400" />
+          <div className="w-10 h-10 bg-primary-700/20 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Smartphone className="w-5 h-5 text-primary-500" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm">Installera Handymate</p>
@@ -125,7 +125,7 @@ export default function PWAInstallBanner() {
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleInstall}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white text-xs font-medium rounded-lg transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 hover:bg-primary-600 text-white text-xs font-medium rounded-lg transition-all"
               >
                 <Bell className="w-3.5 h-3.5" />
                 Installera

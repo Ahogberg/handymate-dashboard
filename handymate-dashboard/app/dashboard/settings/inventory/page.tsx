@@ -126,7 +126,7 @@ export default function InventorySettingsPage() {
   const lowStockCount = items.filter(i => i.min_stock > 0 && i.current_stock <= i.min_stock).length
 
   if (!business.business_id) {
-    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-teal-600 animate-spin" /></div>
+    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
   }
 
   return (
@@ -144,14 +144,14 @@ export default function InventorySettingsPage() {
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-teal-600 animate-spin" /></div>
+          <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
         ) : (
           <>
             {/* Lagerplatser */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900">Lagerplatser</h2>
-                <button onClick={() => setShowNewLocation(true)} className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium">
+                <button onClick={() => setShowNewLocation(true)} className="flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-700 font-medium">
                   <Plus className="w-4 h-4" /> Ny plats
                 </button>
               </div>
@@ -162,10 +162,10 @@ export default function InventorySettingsPage() {
                   {locations.map(loc => (
                     <div key={loc.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
-                        {loc.name.toLowerCase().includes('bil') ? <Truck className="w-5 h-5 text-teal-600" /> : <Warehouse className="w-5 h-5 text-gray-500" />}
+                        {loc.name.toLowerCase().includes('bil') ? <Truck className="w-5 h-5 text-primary-700" /> : <Warehouse className="w-5 h-5 text-gray-500" />}
                         <div>
                           <span className="font-medium text-gray-900 text-sm">{loc.name}</span>
-                          {loc.is_default && <span className="ml-2 text-xs text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded-full">standard</span>}
+                          {loc.is_default && <span className="ml-2 text-xs text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded-full">standard</span>}
                           {loc.description && <p className="text-xs text-gray-400">{loc.description}</p>}
                         </div>
                       </div>
@@ -186,7 +186,7 @@ export default function InventorySettingsPage() {
                     setShowNewItem(true)
                   }}
                   disabled={locations.length === 0}
-                  className="flex items-center gap-1.5 text-sm text-teal-600 hover:text-teal-700 font-medium disabled:opacity-50"
+                  className="flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-700 font-medium disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" /> Ny artikel
                 </button>
@@ -199,7 +199,7 @@ export default function InventorySettingsPage() {
                   value={search}
                   onChange={e => setSearch(e.target.value)}
                   placeholder="Sök artiklar..."
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                 />
                 <select
                   value={filterLocation}
@@ -267,16 +267,16 @@ export default function InventorySettingsPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Namn *</label>
-                <input type="text" value={newLocName} onChange={e => setNewLocName(e.target.value)} placeholder="t.ex. Servicebilen" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" autoFocus />
+                <input type="text" value={newLocName} onChange={e => setNewLocName(e.target.value)} placeholder="t.ex. Servicebilen" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none" autoFocus />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Beskrivning</label>
-                <input type="text" value={newLocDesc} onChange={e => setNewLocDesc(e.target.value)} placeholder="Valfri beskrivning" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" />
+                <input type="text" value={newLocDesc} onChange={e => setNewLocDesc(e.target.value)} placeholder="Valfri beskrivning" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowNewLocation(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Avbryt</button>
-              <button onClick={createLocation} disabled={!newLocName.trim() || saving} className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium">
+              <button onClick={createLocation} disabled={!newLocName.trim() || saving} className="px-4 py-2 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
                 {saving ? 'Sparar...' : 'Skapa'}
               </button>
             </div>
@@ -295,7 +295,7 @@ export default function InventorySettingsPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Artikel *</label>
-                <input type="text" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="t.ex. Jordfelsbrytare 1-pol" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none" autoFocus />
+                <input type="text" value={newItem.name} onChange={e => setNewItem({ ...newItem, name: e.target.value })} placeholder="t.ex. Jordfelsbrytare 1-pol" className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none" autoFocus />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Lagerplats *</label>
@@ -332,7 +332,7 @@ export default function InventorySettingsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowNewItem(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Avbryt</button>
-              <button onClick={createItem} disabled={!newItem.name.trim() || !newItem.location_id || saving} className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 font-medium">
+              <button onClick={createItem} disabled={!newItem.name.trim() || !newItem.location_id || saving} className="px-4 py-2 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium">
                 {saving ? 'Sparar...' : 'Spara artikel'}
               </button>
             </div>

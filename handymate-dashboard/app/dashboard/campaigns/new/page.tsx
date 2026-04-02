@@ -323,8 +323,8 @@ const messageSuggestions = [
     <div className="p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -352,7 +352,7 @@ const messageSuggestions = [
             <div key={s.num} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step >= s.num 
-                  ? 'bg-teal-600 text-white' 
+                  ? 'bg-primary-700 text-white' 
                   : 'bg-gray-100 text-gray-400'
               }`}>
                 {step > s.num ? <Check className="w-4 h-4" /> : s.num}
@@ -387,7 +387,7 @@ const messageSuggestions = [
                     onClick={() => setFilterType(f.id as FilterType)}
                     className={`p-4 rounded-xl border text-left transition-all ${
                       filterType === f.id 
-                        ? 'bg-teal-50 border-teal-300' 
+                        ? 'bg-primary-50 border-primary-300' 
                         : 'bg-gray-50 border-gray-300 hover:border-gray-300'
                     }`}
                   >
@@ -411,10 +411,10 @@ const messageSuggestions = [
                         placeholder="Sök kund..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
-                    <button onClick={selectAll} className="text-sm text-sky-700 hover:text-teal-600">
+                    <button onClick={selectAll} className="text-sm text-sky-700 hover:text-primary-700">
                       Välj alla
                     </button>
                     <button onClick={deselectAll} className="text-sm text-gray-400 hover:text-gray-700">
@@ -432,7 +432,7 @@ const messageSuggestions = [
                         key={customer.customer_id}
                         className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${
                           selectedCustomers.has(customer.customer_id)
-                            ? 'bg-teal-50 border border-teal-300'
+                            ? 'bg-primary-50 border border-primary-300'
                             : 'bg-gray-50 border border-transparent hover:bg-gray-100'
                         }`}
                       >
@@ -440,7 +440,7 @@ const messageSuggestions = [
                           type="checkbox"
                           checked={selectedCustomers.has(customer.customer_id)}
                           onChange={() => toggleCustomer(customer.customer_id)}
-                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700 focus:ring-teal-500/50 mr-3"
+                          className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700 focus:ring-primary-600/50 mr-3"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-gray-900 truncate">{customer.name || 'Okänd'}</p>
@@ -460,7 +460,7 @@ const messageSuggestions = [
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-teal-100">
+                  <div className="p-2 rounded-lg bg-primary-100">
                     <Users className="w-5 h-5 text-sky-700" />
                   </div>
                   <div>
@@ -471,7 +471,7 @@ const messageSuggestions = [
                 <button
                   onClick={() => setStep(2)}
                   disabled={recipientCount === 0}
-                  className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Fortsätt
                 </button>
@@ -490,7 +490,7 @@ const messageSuggestions = [
         value={campaignName}
         onChange={(e) => setCampaignName(e.target.value)}
         placeholder="T.ex. Vårens reaktivering"
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
       />
     </div>
 
@@ -502,7 +502,7 @@ const messageSuggestions = [
           onClick={() => setCampaignType('interactive')}
           className={`p-4 rounded-xl border text-left transition-all ${
             campaignType === 'interactive'
-              ? 'bg-teal-50 border-teal-300'
+              ? 'bg-primary-50 border-primary-300'
               : 'bg-gray-50 border-gray-300 hover:border-gray-300'
           }`}
         >
@@ -521,7 +521,7 @@ const messageSuggestions = [
           onClick={() => setCampaignType('broadcast')}
           className={`p-4 rounded-xl border text-left transition-all ${
             campaignType === 'broadcast'
-              ? 'bg-teal-50 border-teal-300'
+              ? 'bg-primary-50 border-primary-300'
               : 'bg-gray-50 border-gray-300 hover:border-gray-300'
           }`}
         >
@@ -571,7 +571,7 @@ const messageSuggestions = [
               onClick={() => setPurposeType(opt.id as typeof purposeType)}
               className={`px-3 py-1.5 text-sm rounded-lg border transition-all ${
                 purposeType === opt.id
-                  ? 'bg-teal-50 border-teal-400 text-teal-700 font-medium'
+                  ? 'bg-primary-50 border-primary-500 text-primary-700 font-medium'
                   : 'bg-white border-gray-300 text-gray-600 hover:border-gray-400'
               }`}
             >
@@ -597,7 +597,7 @@ const messageSuggestions = [
               setGeneratingText(false)
             }}
             disabled={generatingText}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
           >
             {generatingText
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Genererar...</>
@@ -627,7 +627,7 @@ const messageSuggestions = [
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Skriv ditt meddelande här..."
         rows={5}
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
       />
       
       <div className="flex items-center justify-between mt-3">
@@ -654,7 +654,7 @@ const messageSuggestions = [
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Förhandsgranskning</h2>
       <div className="bg-gray-50 rounded-2xl p-4 max-w-sm">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-8 h-8 bg-teal-600 rounded-full flex items-center justify-center">
+          <div className="w-8 h-8 bg-primary-700 rounded-full flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-gray-900" />
           </div>
           <span className="text-sm font-medium text-gray-900">{business.business_name}</span>
@@ -668,7 +668,7 @@ const messageSuggestions = [
         {campaignType === 'interactive' && (
           <div className="space-y-2">
             <div className="flex justify-end">
-              <div className="bg-teal-700 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
+              <div className="bg-primary-800 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
                 <p className="text-sm text-gray-900">JA, gärna!</p>
               </div>
             </div>
@@ -694,7 +694,7 @@ const messageSuggestions = [
       <button
         onClick={() => setStep(3)}
         disabled={!campaignName || !message}
-        className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Fortsätt
       </button>
@@ -754,7 +754,7 @@ const messageSuggestions = [
                     onClick={() => setScheduleType('now')}
                     className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
                       scheduleType === 'now'
-                        ? 'bg-teal-50 border-teal-300'
+                        ? 'bg-primary-50 border-primary-300'
                         : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -768,7 +768,7 @@ const messageSuggestions = [
                     onClick={() => setScheduleType('later')}
                     className={`flex items-center gap-3 p-4 rounded-xl border text-left transition-all ${
                       scheduleType === 'later'
-                        ? 'bg-teal-50 border-teal-300'
+                        ? 'bg-primary-50 border-primary-300'
                         : 'bg-gray-50 border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -789,7 +789,7 @@ const messageSuggestions = [
                         value={scheduledDate}
                         min={minDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                     <div>
@@ -798,7 +798,7 @@ const messageSuggestions = [
                         type="time"
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                   </div>
@@ -826,7 +826,7 @@ const messageSuggestions = [
               <button
                 onClick={handleSend}
                 disabled={sending || (scheduleType === 'later' && !scheduledDate)}
-                className="flex items-center px-8 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-8 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {sending ? (
                   <>

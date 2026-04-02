@@ -146,7 +146,7 @@ export default function MorningBriefWidget() {
                 onClick={() => detail.link && router.push(detail.link)}
               >
                 <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${URGENCY_DOT[detail.urgency] || 'bg-gray-300'}`} />
-                <span className={`text-xs leading-relaxed ${detail.link ? 'text-gray-700 hover:text-teal-700' : 'text-gray-600'}`}>
+                <span className={`text-xs leading-relaxed ${detail.link ? 'text-gray-700 hover:text-primary-700' : 'text-gray-600'}`}>
                   {detail.text}
                 </span>
                 {detail.link && <span className="text-gray-300 text-xs ml-auto shrink-0">→</span>}

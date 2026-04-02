@@ -20,7 +20,7 @@ export default function IntegrationsPage() {
   if (!business.business_id) {
     return (
       <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -32,7 +32,7 @@ export default function IntegrationsPage() {
       description: 'Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt',
       href: '/dashboard/settings/website-widget',
       connected: false,
-      color: 'text-teal-600 bg-teal-50',
+      color: 'text-primary-700 bg-primary-50',
     },
     {
       icon: Calendar,
@@ -72,7 +72,7 @@ export default function IntegrationsPage() {
             <Link
               key={item.title}
               href={item.href}
-              className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:border-teal-200 hover:shadow-sm transition-all"
+              className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all"
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}>
                 <item.icon className="w-5 h-5" />

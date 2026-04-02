@@ -172,7 +172,7 @@ export default function OnboardingChecklist({
 
   if (showConfetti) {
     return (
-      <div className="relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-6 mb-6 text-center overflow-hidden">
+      <div className="relative bg-gradient-to-r from-emerald-50 to-primary-50 border border-emerald-200 rounded-2xl p-6 mb-6 text-center overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
           {Array.from({ length: 20 }).map((_, i) => (
             <div
@@ -209,11 +209,11 @@ export default function OnboardingChecklist({
   }
 
   return (
-    <div className="bg-gradient-to-r from-teal-600/10 to-teal-500/10 border border-teal-500/20 rounded-2xl p-5 mb-6">
+    <div className="bg-gradient-to-r from-primary-700/10 to-primary-600/10 border border-primary-600/20 rounded-2xl p-5 mb-6">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-teal-600">
+          <div className="p-2 rounded-xl bg-primary-700">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -233,7 +233,7 @@ export default function OnboardingChecklist({
       {/* Progress bar */}
       <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-5">
         <div
-          className="h-full bg-teal-600 rounded-full transition-all duration-700"
+          className="h-full bg-primary-700 rounded-full transition-all duration-700"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
@@ -291,7 +291,7 @@ export default function OnboardingChecklist({
                       {!item.completed && item.link && (
                         <Link
                           href={item.link}
-                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-teal-700 hover:text-teal-800 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors flex-shrink-0"
+                          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-primary-700 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors flex-shrink-0"
                         >
                           Konfigurera
                           <ChevronRight className="w-3 h-3" />

@@ -231,7 +231,7 @@ export default function EmailTemplatesPage() {
           </div>
           <button
             onClick={openCreate}
-            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-teal-500 to-teal-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
+            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny mall
@@ -244,7 +244,7 @@ export default function EmailTemplatesPage() {
             <div className="p-12 text-center">
               <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-400">Inga e-postmallar</p>
-              <button onClick={openCreate} className="mt-4 text-teal-600 hover:text-teal-500">
+              <button onClick={openCreate} className="mt-4 text-primary-700 hover:text-primary-600">
                 Skapa din första mall →
               </button>
             </div>
@@ -257,7 +257,7 @@ export default function EmailTemplatesPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <FileText className="w-4 h-4 text-gray-400" />
                         <h3 className="font-semibold text-gray-900">{t.name}</h3>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-teal-50 text-teal-600 border border-teal-200">
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700 border border-primary-300">
                           {getCategoryLabel(t.category)}
                         </span>
                       </div>
@@ -295,7 +295,7 @@ export default function EmailTemplatesPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setShowPreview(!showPreview)}
-                  className={`px-3 py-1.5 text-sm rounded-lg font-medium ${showPreview ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}
+                  className={`px-3 py-1.5 text-sm rounded-lg font-medium ${showPreview ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}
                 >
                   <Eye className="w-4 h-4 inline mr-1" />
                   Förhandsvisa
@@ -321,7 +321,7 @@ export default function EmailTemplatesPage() {
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="T.ex. Faktura-påminnelse"
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                   </div>
                   <div>
@@ -329,7 +329,7 @@ export default function EmailTemplatesPage() {
                     <select
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       {CATEGORIES.map(c => (
                         <option key={c.id} value={c.id}>{c.label}</option>
@@ -344,7 +344,7 @@ export default function EmailTemplatesPage() {
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     placeholder="E-postens ämnesrad"
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -354,7 +354,7 @@ export default function EmailTemplatesPage() {
                     onChange={(e) => setForm({ ...form, body: e.target.value })}
                     placeholder="Skriv ditt e-postmeddelande här..."
                     rows={10}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none font-mono text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none font-mono text-sm"
                   />
                 </div>
                 <div>
@@ -364,7 +364,7 @@ export default function EmailTemplatesPage() {
                       <button
                         key={v.key}
                         onClick={() => insertVariable(v.key)}
-                        className="px-2.5 py-1 text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded-lg hover:bg-teal-100"
+                        className="px-2.5 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-300 rounded-lg hover:bg-primary-100"
                       >
                         {v.label}
                       </button>
@@ -381,7 +381,7 @@ export default function EmailTemplatesPage() {
               <button
                 onClick={handleSave}
                 disabled={actionLoading}
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-teal-500 to-teal-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
                 {editingTemplate ? 'Uppdatera' : 'Skapa'}

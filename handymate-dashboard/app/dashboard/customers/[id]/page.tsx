@@ -559,7 +559,7 @@ export default function CustomerDetailPage() {
   const getJobStatusBadge = (status: string) => {
     switch (status) {
       case 'scheduled':
-        return <span className="px-2 py-1 text-xs rounded-full bg-teal-600/20 text-teal-500 border border-teal-500/30">Schemalagt</span>
+        return <span className="px-2 py-1 text-xs rounded-full bg-primary-700/20 text-primary-600 border border-primary-600/30">Schemalagt</span>
       case 'in_progress':
         return <span className="px-2 py-1 text-xs rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">Pågående</span>
       case 'completed':
@@ -591,8 +591,8 @@ export default function CustomerDetailPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-6xl mx-auto">
@@ -675,7 +675,7 @@ export default function CustomerDetailPage() {
 
                 {customer.email && (
                   <a href={`mailto:${customer.email}`} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
-                    <Mail className="w-4 h-4 text-teal-500" />
+                    <Mail className="w-4 h-4 text-primary-600" />
                     <span className="text-gray-900 text-sm truncate">{customer.email}</span>
                   </a>
                 )}
@@ -746,7 +746,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowSendSMSModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <MessageSquare className="w-4 h-4 text-teal-600" />
+                  <MessageSquare className="w-4 h-4 text-primary-700" />
                   <span className="text-gray-900 text-sm">Skicka SMS</span>
                 </button>
                 
@@ -754,7 +754,7 @@ export default function CustomerDetailPage() {
                   onClick={() => setShowAddNoteModal(true)}
                   className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
                 >
-                  <FileText className="w-4 h-4 text-teal-400" />
+                  <FileText className="w-4 h-4 text-primary-500" />
                   <span className="text-gray-900 text-sm">Lägg till anteckning</span>
                 </button>
                 
@@ -839,7 +839,7 @@ export default function CustomerDetailPage() {
                   <button
                     onClick={generatePortalLink}
                     disabled={generatingPortal}
-                    className="w-full flex items-center justify-center gap-2 p-3 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+                    className="w-full flex items-center justify-center gap-2 p-3 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
                   >
                     {generatingPortal ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -870,7 +870,7 @@ export default function CustomerDetailPage() {
                   <p className="text-xs text-gray-400">Fakturor</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-teal-600">
+                  <p className="text-xl font-bold text-primary-700">
                     {invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_amount || 0), 0).toLocaleString('sv-SE')} kr
                   </p>
                   <p className="text-xs text-gray-400">Totalt betalt</p>
@@ -895,7 +895,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('timeline')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'timeline'
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -905,7 +905,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('bookings')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'bookings'
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -915,7 +915,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('documents')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'documents'
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -925,7 +925,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('projects')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'projects'
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -935,7 +935,7 @@ export default function CustomerDetailPage() {
                 onClick={() => setActiveTab('tasks')}
                 className={`px-4 py-2 rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === 'tasks'
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
@@ -955,7 +955,7 @@ export default function CustomerDetailPage() {
                   <div className="p-8 text-center">
                     <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-400">Inga bokningar</p>
-                    <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-teal-600 mt-2 inline-block">
+                    <Link href="/dashboard/bookings" className="text-sm text-sky-700 hover:text-primary-700 mt-2 inline-block">
                       Skapa första bokningen →
                     </Link>
                   </div>
@@ -1017,7 +1017,7 @@ export default function CustomerDetailPage() {
                     <select
                       value={uploadCategory}
                       onChange={(e) => setUploadCategory(e.target.value)}
-                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 min-h-[44px]"
+                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 min-h-[44px]"
                     >
                       <option value="drawing">Ritning</option>
                       <option value="sketch">Skiss</option>
@@ -1027,7 +1027,7 @@ export default function CustomerDetailPage() {
                       <option value="other">Övrigt</option>
                     </select>
 
-                    <label className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 cursor-pointer transition-all min-h-[44px]">
+                    <label className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90 cursor-pointer transition-all min-h-[44px]">
                       {uploading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
@@ -1062,7 +1062,7 @@ export default function CustomerDetailPage() {
                         <div key={doc.id} className="p-4 hover:bg-gray-50 transition-all flex items-center gap-4">
                           <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
                             {doc.file_type?.startsWith('image/') ? (
-                              <Image className="w-5 h-5 text-teal-600" />
+                              <Image className="w-5 h-5 text-primary-700" />
                             ) : doc.file_type?.includes('pdf') ? (
                               <FileText className="w-5 h-5 text-red-500" />
                             ) : (
@@ -1084,7 +1084,7 @@ export default function CustomerDetailPage() {
                               href={doc.file_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2.5 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+                              className="p-2.5 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                               title="Öppna"
                             >
                               <Download className="w-4 h-4" />
@@ -1114,7 +1114,7 @@ export default function CustomerDetailPage() {
                     <h3 className="text-sm font-semibold text-gray-900">Ärenden i säljtratten</h3>
                     <a
                       href={`/dashboard/pipeline?newDeal=true&customer_id=${customer.customer_id}&customer_name=${encodeURIComponent(customer.name)}`}
-                      className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                      className="text-xs text-primary-700 hover:text-primary-700 font-medium"
                     >
                       + Ny deal
                     </a>
@@ -1133,7 +1133,7 @@ export default function CustomerDetailPage() {
                             {deal.value != null && deal.value > 0 && (
                               <span className="text-sm font-medium text-gray-700">{deal.value.toLocaleString('sv-SE')} kr</span>
                             )}
-                            <span className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-full">
+                            <span className="text-xs bg-primary-50 text-primary-700 px-2 py-1 rounded-full">
                               {(deal.stage as any)?.label || 'Okänt steg'}
                             </span>
                           </div>
@@ -1173,7 +1173,7 @@ export default function CustomerDetailPage() {
                             )}
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               project.status === 'completed' ? 'bg-green-50 text-green-700' :
-                              project.status === 'active' ? 'bg-teal-50 text-teal-700' :
+                              project.status === 'active' ? 'bg-primary-50 text-primary-700' :
                               'bg-gray-100 text-gray-500'
                             }`}>
                               {project.status === 'completed' ? 'Klart' : project.status === 'active' ? 'Pågår' : project.status || 'Utkast'}
@@ -1210,7 +1210,7 @@ export default function CustomerDetailPage() {
                             <span className="text-sm font-medium text-gray-700">{(quote.total_amount || 0).toLocaleString('sv-SE')} kr</span>
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               quote.status === 'signed' || quote.status === 'accepted' ? 'bg-green-50 text-green-700' :
-                              quote.status === 'sent' ? 'bg-teal-50 text-teal-700' :
+                              quote.status === 'sent' ? 'bg-primary-50 text-primary-700' :
                               quote.status === 'draft' ? 'bg-gray-100 text-gray-500' :
                               'bg-red-50 text-red-600'
                             }`}>
@@ -1251,7 +1251,7 @@ export default function CustomerDetailPage() {
                             <span className="text-sm font-medium text-gray-700">{(invoice.total_amount || 0).toLocaleString('sv-SE')} kr</span>
                             <span className={`text-xs px-2 py-1 rounded-full ${
                               invoice.status === 'paid' ? 'bg-green-50 text-green-700' :
-                              invoice.status === 'sent' ? 'bg-teal-50 text-teal-700' :
+                              invoice.status === 'sent' ? 'bg-primary-50 text-primary-700' :
                               invoice.status === 'overdue' ? 'bg-red-50 text-red-600' :
                               'bg-gray-100 text-gray-500'
                             }`}>
@@ -1279,19 +1279,19 @@ export default function CustomerDetailPage() {
                       value={newTaskTitle}
                       onChange={e => setNewTaskTitle(e.target.value)}
                       placeholder="Ny uppgift..."
-                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 min-h-[44px]"
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-500 min-h-[44px]"
                       onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
                     />
                     <input
                       type="date"
                       value={newTaskDueDate}
                       onChange={e => setNewTaskDueDate(e.target.value)}
-                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-teal-400 min-h-[44px]"
+                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-primary-500 min-h-[44px]"
                     />
                     <button
                       onClick={handleAddTask}
                       disabled={!newTaskTitle.trim() || taskSaving}
-                      className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-xl hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] flex items-center gap-1.5"
+                      className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-xl hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px] flex items-center gap-1.5"
                     >
                       {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       Lägg till
@@ -1309,7 +1309,7 @@ export default function CustomerDetailPage() {
                     {tasks.map(task => (
                       <div key={task.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group">
                         <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
-                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-teal-400'}`}>
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-primary-500'}`}>
                             {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                           </div>
                         </button>
@@ -1361,7 +1361,7 @@ export default function CustomerDetailPage() {
                       onClick={() => setEditForm({ ...editForm, customer_type: value })}
                       className={`flex flex-col items-center gap-1 p-3 rounded-xl border text-sm font-medium transition-all min-h-[44px] ${
                         editForm.customer_type === value
-                          ? 'bg-teal-50 border-teal-400 text-teal-700'
+                          ? 'bg-primary-50 border-primary-500 text-primary-700'
                           : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                       }`}
                     >
@@ -1380,7 +1380,7 @@ export default function CustomerDetailPage() {
                   type="text"
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -1389,12 +1389,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Organisationsnummer</label>
                     <input type="text" value={editForm.org_number || ''} onChange={(e) => setEditForm({ ...editForm, org_number: e.target.value })} placeholder="XXXXXX-XXXX"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Kontaktperson</label>
                     <input type="text" value={editForm.contact_person || ''} onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                   </div>
                 </>
               )}
@@ -1402,19 +1402,19 @@ export default function CustomerDetailPage() {
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Telefon *</label>
                 <input type="tel" value={editForm.phone_number || ''} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} placeholder="+46..."
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">E-post</label>
                 <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Adress</label>
                 <input type="text" value={editForm.address_line || ''} onChange={(e) => setEditForm({ ...editForm, address_line: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
               </div>
 
               {(editForm.customer_type === 'company' || editForm.customer_type === 'brf') && (
@@ -1422,12 +1422,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Referens / Er märkning</label>
                     <input type="text" value={editForm.reference || ''} onChange={(e) => setEditForm({ ...editForm, reference: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
                     <input type="text" value={editForm.invoice_address || ''} onChange={(e) => setEditForm({ ...editForm, invoice_address: e.target.value })} placeholder="Om annan än besöksadress"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                   </div>
                 </>
               )}
@@ -1436,7 +1436,7 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Antal lägenheter</label>
                   <input type="number" value={editForm.apartment_count || ''} onChange={(e) => setEditForm({ ...editForm, apartment_count: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                 </div>
               )}
 
@@ -1444,14 +1444,14 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
                   <input type="text" value={editForm.personal_number || ''} onChange={(e) => setEditForm({ ...editForm, personal_number: e.target.value })} placeholder="YYYYMMDD-XXXX"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
                 </div>
               )}
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Fastighetsbeteckning</label>
                 <input type="text" value={editForm.property_designation || ''} onChange={(e) => setEditForm({ ...editForm, property_designation: e.target.value })} placeholder="T.ex. Stockholm Söder 1:23"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50" />
+                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
               </div>
             </div>
 
@@ -1462,7 +1462,7 @@ export default function CustomerDetailPage() {
               <button
                 onClick={saveEdit}
                 disabled={editSaving}
-                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
               >
                 {editSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Spara
@@ -1561,7 +1561,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('outbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'outbound'
-                    ? 'bg-teal-100 border border-teal-300 text-gray-900'
+                    ? 'bg-primary-100 border border-primary-300 text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1572,7 +1572,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('inbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'inbound'
-                    ? 'bg-teal-100 border border-teal-300 text-gray-900'
+                    ? 'bg-primary-100 border border-primary-300 text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1589,7 +1589,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
               placeholder="5"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
@@ -1600,7 +1600,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Vad pratade ni om?"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
             />
           </div>
         </div>
@@ -1615,7 +1615,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : 'Spara'}
           </button>
@@ -1666,7 +1666,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
           rows={4}
           placeholder="Skriv din anteckning..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
         />
 
         <div className="flex gap-3 mt-6">
@@ -1679,7 +1679,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving || !note.trim()}
-            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : 'Spara'}
           </button>
@@ -1758,7 +1758,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           rows={4}
           placeholder="Skriv ditt meddelande..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
         />
         
         <p className="text-xs text-gray-400 mt-2">{message.length} tecken</p>
@@ -1773,7 +1773,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           <button
             onClick={handleSend}
             disabled={sending || !message.trim()}
-            className="flex-1 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {sending ? 'Skickar...' : 'Skicka'}
           </button>

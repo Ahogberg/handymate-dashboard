@@ -46,8 +46,8 @@ export default function PartnerRegisterPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-teal-700" />
+          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900 mb-3">Ansökan skickad!</h1>
           <p className="text-gray-600 mb-6">
@@ -56,7 +56,7 @@ export default function PartnerRegisterPage() {
           </p>
           <Link
             href="https://handymate.se/partners"
-            className="text-teal-700 hover:text-teal-800 font-medium text-sm"
+            className="text-primary-700 hover:text-primary-800 font-medium text-sm"
           >
             Tillbaka till startsidan
           </Link>
@@ -80,7 +80,7 @@ export default function PartnerRegisterPage() {
       <div className="flex items-center justify-center py-12 sm:py-20 px-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="w-12 h-12 bg-teal-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 bg-primary-800 rounded-xl flex items-center justify-center mx-auto mb-4">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Bli Handymate-partner</h1>
@@ -95,7 +95,7 @@ export default function PartnerRegisterPage() {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="Ditt fullständiga namn"
               />
             </div>
@@ -106,7 +106,7 @@ export default function PartnerRegisterPage() {
                 type="text"
                 value={company}
                 onChange={e => setCompany(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="Företagsnamn (valfritt)"
               />
             </div>
@@ -118,7 +118,7 @@ export default function PartnerRegisterPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="din@epost.se"
               />
             </div>
@@ -131,7 +131,7 @@ export default function PartnerRegisterPage() {
                 onChange={e => setPassword(e.target.value)}
                 required
                 minLength={8}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="Minst 8 tecken"
               />
             </div>
@@ -143,7 +143,7 @@ export default function PartnerRegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-teal-700 text-white font-medium rounded-lg hover:bg-teal-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-primary-800 text-white font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -157,7 +157,7 @@ export default function PartnerRegisterPage() {
 
             <p className="text-center text-sm text-gray-500">
               Har du redan ett konto?{' '}
-              <Link href="/partners/login" className="text-teal-700 hover:text-teal-800 font-medium">
+              <Link href="/partners/login" className="text-primary-700 hover:text-primary-800 font-medium">
                 Logga in
               </Link>
             </p>

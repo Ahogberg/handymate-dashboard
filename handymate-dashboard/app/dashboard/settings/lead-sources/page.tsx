@@ -122,7 +122,7 @@ export default function LeadSourcesPage() {
   if (!business.business_id) {
     return (
       <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -141,7 +141,7 @@ export default function LeadSourcesPage() {
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Lägg till källa
@@ -151,7 +151,7 @@ export default function LeadSourcesPage() {
         {/* Lista */}
         {loading ? (
           <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+            <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
           </div>
         ) : sources.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -163,7 +163,7 @@ export default function LeadSourcesPage() {
             </p>
             <button
               onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
             >
               <Plus className="w-4 h-4" />
               Lägg till din första källa
@@ -185,8 +185,8 @@ export default function LeadSourcesPage() {
                   {/* Rad 1: Namn + status */}
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center">
-                        <Link2 className="w-5 h-5 text-teal-600" />
+                      <div className="w-9 h-9 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <Link2 className="w-5 h-5 text-primary-700" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">{source.name}</h3>
@@ -201,8 +201,8 @@ export default function LeadSourcesPage() {
                       >
                         {source.is_active ? (
                           <>
-                            <ToggleRight className="w-5 h-5 text-teal-600" />
-                            <span className="text-teal-700 font-medium">Aktiv</span>
+                            <ToggleRight className="w-5 h-5 text-primary-700" />
+                            <span className="text-primary-700 font-medium">Aktiv</span>
                           </>
                         ) : (
                           <>
@@ -219,14 +219,14 @@ export default function LeadSourcesPage() {
                     <span className="text-xs text-gray-500 truncate flex-1 font-mono">{portalUrl}</span>
                     <button
                       onClick={() => copyToClipboard(portalUrl, source.id + '-url')}
-                      className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium flex-shrink-0"
+                      className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-700 font-medium flex-shrink-0"
                     >
                       {copiedId === source.id + '-url' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       {copiedId === source.id + '-url' ? 'Kopierad!' : 'Kopiera'}
                     </button>
                     <a
                       href={getMailtoUrl(source)}
-                      className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium flex-shrink-0"
+                      className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-700 font-medium flex-shrink-0"
                     >
                       <Mail className="w-3.5 h-3.5" />
                       Skicka via mail
@@ -267,7 +267,7 @@ export default function LeadSourcesPage() {
                         href={portalUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-1.5 text-gray-400 hover:text-teal-600 transition-colors"
+                        className="p-1.5 text-gray-400 hover:text-primary-700 transition-colors"
                         title="Öppna portal"
                       >
                         <ExternalLink className="w-4 h-4" />
@@ -307,7 +307,7 @@ export default function LeadSourcesPage() {
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                   placeholder="t.ex. Webolia"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                   autoFocus
                 />
               </div>
@@ -318,7 +318,7 @@ export default function LeadSourcesPage() {
                   onChange={e => setNewNotes(e.target.value)}
                   placeholder="t.ex. Säljer leads inom el och VVS"
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-none"
                 />
               </div>
             </div>
@@ -333,7 +333,7 @@ export default function LeadSourcesPage() {
               <button
                 onClick={handleCreate}
                 disabled={!newName.trim() || creating}
-                className="px-4 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {creating && <Loader2 className="w-4 h-4 animate-spin" />}
                 Skapa

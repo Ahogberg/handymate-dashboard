@@ -54,7 +54,7 @@ export default function PartnerLoginPage() {
       <div className="flex items-center justify-center py-12 sm:py-20 px-4">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="w-12 h-12 bg-teal-700 rounded-xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-12 h-12 bg-primary-800 rounded-xl flex items-center justify-center mx-auto mb-4">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Partnerportal</h1>
@@ -69,7 +69,7 @@ export default function PartnerLoginPage() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="din@epost.se"
               />
             </div>
@@ -81,7 +81,7 @@ export default function PartnerLoginPage() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600"
                 placeholder="Ditt lösenord"
               />
             </div>
@@ -93,7 +93,7 @@ export default function PartnerLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-teal-700 text-white font-medium rounded-lg hover:bg-teal-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-primary-800 text-white font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -107,7 +107,7 @@ export default function PartnerLoginPage() {
 
             <p className="text-center text-sm text-gray-500">
               Inget konto?{' '}
-              <Link href="/partners/register" className="text-teal-700 hover:text-teal-800 font-medium">
+              <Link href="/partners/register" className="text-primary-700 hover:text-primary-800 font-medium">
                 Bli partner
               </Link>
             </p>

@@ -109,7 +109,7 @@ export default function SignReportPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-700 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -153,7 +153,7 @@ export default function SignReportPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="text-center max-w-sm">
-          <CheckCircle className="w-12 h-12 text-teal-500 mx-auto mb-3" />
+          <CheckCircle className="w-12 h-12 text-primary-600 mx-auto mb-3" />
           <h2 className="text-xl font-bold text-gray-900 mb-2">Redan signerad</h2>
           <p className="text-gray-500">Signerades av {report.signed_by} den {report.signed_at ? formatDate(report.signed_at) : '—'}.</p>
         </div>
@@ -232,7 +232,7 @@ export default function SignReportPage() {
                 value={signerName}
                 onChange={e => setSignerName(e.target.value)}
                 placeholder="För- och efternamn"
-                className="w-full border border-gray-300 rounded-xl p-3 mt-1 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                className="w-full border border-gray-300 rounded-xl p-3 mt-1 text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
               />
             </div>
             <div>
@@ -242,7 +242,7 @@ export default function SignReportPage() {
                 onChange={e => setNote(e.target.value)}
                 placeholder="Eventuella synpunkter..."
                 rows={2}
-                className="w-full border border-gray-300 rounded-xl p-3 mt-1 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                className="w-full border border-gray-300 rounded-xl p-3 mt-1 text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
               />
             </div>
           </div>
@@ -251,7 +251,7 @@ export default function SignReportPage() {
         <button
           onClick={handleSign}
           disabled={!signerName.trim() || signing}
-          className="w-full bg-teal-700 text-white py-4 rounded-2xl font-semibold text-lg mb-3 disabled:opacity-40 hover:bg-teal-800 transition-colors"
+          className="w-full bg-primary-800 text-white py-4 rounded-2xl font-semibold text-lg mb-3 disabled:opacity-40 hover:bg-primary-800 transition-colors"
         >
           {signing ? 'Signerar...' : 'Jag godkänner arbetet'}
         </button>

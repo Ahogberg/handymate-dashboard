@@ -122,14 +122,14 @@ const UNIT_OPTIONS = [
 
 const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
   item: 'bg-gray-50',
-  heading: 'bg-teal-50 font-bold',
+  heading: 'bg-primary-50 font-bold',
   text: 'bg-gray-50 italic',
   subtotal: 'bg-gray-100 font-medium',
   discount: 'bg-red-50',
 }
 
 const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string }> = {
-  item: { label: 'Post', cls: 'bg-teal-100 text-teal-700' },
+  item: { label: 'Post', cls: 'bg-primary-100 text-primary-700' },
   heading: { label: 'Rubrik', cls: 'bg-indigo-100 text-indigo-700' },
   text: { label: 'Text', cls: 'bg-gray-200 text-gray-600' },
   subtotal: { label: 'Delsumma', cls: 'bg-gray-300 text-gray-700' },
@@ -207,7 +207,7 @@ function StandardTextPicker({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-xs text-sky-700 hover:text-teal-800 transition-colors"
+        className="text-xs text-sky-700 hover:text-primary-800 transition-colors"
       >
         Välj standardtext
       </button>
@@ -227,7 +227,7 @@ function StandardTextPicker({
               >
                 <span className="font-medium">{t.name}</span>
                 {t.is_default && (
-                  <span className="ml-1 text-[10px] text-sky-700 bg-teal-50 px-1 rounded">
+                  <span className="ml-1 text-[10px] text-sky-700 bg-primary-50 px-1 rounded">
                     standard
                   </span>
                 )}
@@ -964,8 +964,8 @@ export default function EditQuotePage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto">
@@ -1030,7 +1030,7 @@ export default function EditQuotePage() {
           <button
             onClick={() => saveQuote(true)}
             disabled={saving || !selectedCustomer}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             <Send className="w-4 h-4" />
             <span className="hidden sm:inline">Skicka</span>
@@ -1045,7 +1045,7 @@ export default function EditQuotePage() {
             {/* ── Customer & Basic Info ──────────────────────────────── */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <User className="w-5 h-5 text-teal-600" />
+                <User className="w-5 h-5 text-primary-700" />
                 Kundinformation
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1054,7 +1054,7 @@ export default function EditQuotePage() {
                   <select
                     value={selectedCustomer}
                     onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value="">Välj kund...</option>
                     {customers.map((c) => (
@@ -1069,7 +1069,7 @@ export default function EditQuotePage() {
                   <select
                     value={validDays}
                     onChange={(e) => setValidDays(parseInt(e.target.value))}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value={14}>14 dagar</option>
                     <option value={30}>30 dagar</option>
@@ -1084,7 +1084,7 @@ export default function EditQuotePage() {
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="T.ex. Elinstallation kök"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -1094,7 +1094,7 @@ export default function EditQuotePage() {
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Beskriv arbetet som ska utföras..."
                     rows={2}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                   />
                 </div>
               </div>
@@ -1103,7 +1103,7 @@ export default function EditQuotePage() {
             {/* ── Reference Fields ───────────────────────────────────── */}
             <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-teal-600" />
+                <MapPin className="w-5 h-5 text-primary-700" />
                 Referenser
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1114,7 +1114,7 @@ export default function EditQuotePage() {
                     value={referencePerson}
                     onChange={(e) => setReferencePerson(e.target.value)}
                     placeholder="Namn"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -1124,7 +1124,7 @@ export default function EditQuotePage() {
                     value={customerReference}
                     onChange={(e) => setCustomerReference(e.target.value)}
                     placeholder="Referensnummer"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -1134,7 +1134,7 @@ export default function EditQuotePage() {
                     value={projectAddress}
                     onChange={(e) => setProjectAddress(e.target.value)}
                     placeholder="Adress"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -1173,7 +1173,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setIntroductionText(e.target.value)}
                       placeholder="Hälsningsfras och inledning..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                     />
                   </div>
                   {/* Conclusion */}
@@ -1190,7 +1190,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setConclusionText(e.target.value)}
                       placeholder="Avslutande text..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                     />
                   </div>
                   {/* Not included */}
@@ -1207,7 +1207,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setNotIncluded(e.target.value)}
                       placeholder="Vad ingår inte..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                     />
                   </div>
                   {/* ATA terms */}
@@ -1224,7 +1224,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setAtaTerms(e.target.value)}
                       placeholder="Ändrings- och tilläggsarbeten..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                     />
                   </div>
                   {/* Payment terms */}
@@ -1241,7 +1241,7 @@ export default function EditQuotePage() {
                       onChange={(e) => setPaymentTermsText(e.target.value)}
                       placeholder="Betalningsvillkor..."
                       rows={3}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-y"
+                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
                     />
                   </div>
                 </div>
@@ -1261,7 +1261,7 @@ export default function EditQuotePage() {
               <div className="flex flex-wrap gap-2 mb-4">
                 <button
                   onClick={() => addItem('item')}
-                  className="px-3 py-1.5 bg-teal-100 border border-teal-200 rounded-lg text-teal-700 text-sm hover:bg-teal-200 flex items-center gap-1"
+                  className="px-3 py-1.5 bg-primary-100 border border-primary-300 rounded-lg text-primary-700 text-sm hover:bg-primary-300 flex items-center gap-1"
                 >
                   <Plus className="w-3.5 h-3.5" /> Post
                 </button>
@@ -1358,7 +1358,7 @@ export default function EditQuotePage() {
                 <div className="mt-4 pt-4 border-t border-gray-200">
                   <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
                   <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
-                    className="text-sm text-teal-600 hover:underline mt-1 inline-block">
+                    className="text-sm text-primary-700 hover:underline mt-1 inline-block">
                     + Bygg din prislista →
                   </a>
                   <p className="text-xs text-gray-300 mt-0.5">Öppnas i ny flik</p>
@@ -1408,7 +1408,7 @@ export default function EditQuotePage() {
                               updatePaymentPlanEntry(idx, 'label', e.target.value)
                             }
                             placeholder="T.ex. Vid start"
-                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                           />
                           <div className="flex items-center gap-1">
                             <input
@@ -1421,7 +1421,7 @@ export default function EditQuotePage() {
                                   parseFloat(e.target.value) || 0
                                 )
                               }
-                              className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                              className="w-full px-2 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                             />
                             <span className="text-gray-400 text-sm">%</span>
                           </div>
@@ -1435,7 +1435,7 @@ export default function EditQuotePage() {
                               updatePaymentPlanEntry(idx, 'due_description', e.target.value)
                             }
                             placeholder="Förfallodatum/villkor"
-                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                            className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                           />
                           <button
                             onClick={() => removePaymentPlanEntry(idx)}
@@ -1488,7 +1488,7 @@ export default function EditQuotePage() {
                     <select
                       value={detailLevel}
                       onChange={(e) => setDetailLevel(e.target.value as DetailLevel)}
-                      className="w-full sm:w-64 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full sm:w-64 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       <option value="detailed">Detaljerad (alla rader)</option>
                       <option value="subtotals_only">Endast delsummor</option>
@@ -1501,7 +1501,7 @@ export default function EditQuotePage() {
                         type="checkbox"
                         checked={showUnitPrices}
                         onChange={(e) => setShowUnitPrices(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
+                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-primary-600"
                       />
                       <span className="text-sm text-gray-700 flex items-center gap-1">
                         {showUnitPrices ? (
@@ -1517,7 +1517,7 @@ export default function EditQuotePage() {
                         type="checkbox"
                         checked={showQuantities}
                         onChange={(e) => setShowQuantities(e.target.checked)}
-                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-teal-500"
+                        className="w-4 h-4 rounded border-gray-300 text-sky-700 focus:ring-primary-600"
                       />
                       <span className="text-sm text-gray-700 flex items-center gap-1">
                         {showQuantities ? (
@@ -1665,7 +1665,7 @@ export default function EditQuotePage() {
                           value={personnummer}
                           onChange={(e) => setPersonnummer(e.target.value)}
                           placeholder="YYYYMMDD-XXXX"
-                          className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                          className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                         />
                       </div>
                       {hasRotItems && (
@@ -1678,7 +1678,7 @@ export default function EditQuotePage() {
                             value={fastighetsbeteckning}
                             onChange={(e) => setFastighetsbeteckning(e.target.value)}
                             placeholder="T.ex. Stockholm Söder 1:23"
-                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                           />
                         </div>
                       )}
@@ -1731,7 +1731,7 @@ export default function EditQuotePage() {
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               />
             </div>
             <div className="flex gap-3">
@@ -1744,7 +1744,7 @@ export default function EditQuotePage() {
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {savingTemplate ? (
                   <Loader2 className="w-4 h-4 animate-spin mx-auto" />

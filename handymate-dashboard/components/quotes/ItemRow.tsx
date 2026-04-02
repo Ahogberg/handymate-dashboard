@@ -28,7 +28,7 @@ export const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
 }
 
 export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string }> = {
-  item: { label: 'Post', cls: 'bg-teal-50 text-teal-700' },
+  item: { label: 'Post', cls: 'bg-primary-50 text-primary-700' },
   heading: { label: 'Rubrik', cls: 'bg-indigo-50 text-indigo-700' },
   text: { label: 'Text', cls: 'bg-gray-100 text-gray-600' },
   subtotal: { label: 'Delsumma', cls: 'bg-gray-200 text-gray-700' },
@@ -110,7 +110,7 @@ export default function ItemRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-lg border hover:border-gray-300 hover:bg-slate-50/50 transition-colors ${rowStyle} ${isDragging ? 'border-teal-400 shadow-lg bg-white' : 'border-gray-200'}`}
+      className={`group relative rounded-lg border hover:border-gray-300 hover:bg-slate-50/50 transition-colors ${rowStyle} ${isDragging ? 'border-primary-500 shadow-lg bg-white' : 'border-gray-200'}`}
     >
 
       {/* ── Mobile layout (< md) ─────────────────────────────── */}
@@ -132,7 +132,7 @@ export default function ItemRow({
             value={item.description}
             onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
             placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : 'Beskrivning'}
-            className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 ${
+            className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
               item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
           />
           <button onClick={() => onRemove(item.id)} className="p-1 text-gray-300 hover:text-red-500 shrink-0">
@@ -145,14 +145,14 @@ export default function ItemRow({
           <div className="flex items-center gap-1.5">
             <input type="number" value={item.quantity} onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className="w-14 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
+              className="w-14 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
             <select value={item.unit} onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-              className="w-16 px-1 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500">
+              className="w-16 px-1 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600">
               {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
             </select>
             <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
               onFocus={(e) => e.target.select()}
-              className="w-20 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
+              className="w-20 px-1.5 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
             <span className="flex-1 text-right text-xs font-medium text-gray-900 whitespace-nowrap">{formatCurrency(displayTotal)}</span>
           </div>
         )}
@@ -185,7 +185,7 @@ export default function ItemRow({
           value={item.description}
           onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
           placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : item.item_type === 'subtotal' ? 'Delsumma' : 'Beskrivning'}
-          className={`w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 ${
+          className={`w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 ${
             item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
         />
 
@@ -193,13 +193,13 @@ export default function ItemRow({
         {isEditable ? (
           <input type="number" value={item.quantity} onChange={(e) => onUpdate(item.id, 'quantity', parseFloat(e.target.value) || 0)}
             onFocus={(e) => e.target.select()}
-            className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
+            className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-center focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
         ) : <span />}
 
         {/* Unit */}
         {isEditable ? (
           <select value={item.unit} onChange={(e) => onUpdate(item.id, 'unit', e.target.value)}
-            className="w-full min-w-0 px-0.5 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-teal-500">
+            className="w-full min-w-0 px-0.5 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600">
             {UNIT_OPTIONS.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
           </select>
         ) : <span />}
@@ -208,7 +208,7 @@ export default function ItemRow({
         {isEditable ? (
           <input type="number" value={item.unit_price} onChange={(e) => onUpdate(item.id, 'unit_price', parseFloat(e.target.value) || 0)}
             onFocus={(e) => e.target.select()}
-            className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-teal-500" min={0} step="any" />
+            className="w-full min-w-0 px-1 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs text-right focus:outline-none focus:ring-1 focus:ring-primary-600" min={0} step="any" />
         ) : <span />}
 
         {/* Total */}
@@ -230,7 +230,7 @@ export default function ItemRow({
         {isEditable ? (
           <select value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
             onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
-            className="w-full min-w-0 text-[10px] border border-gray-200 rounded-md px-1 py-1 text-gray-600 bg-white focus:ring-1 focus:ring-teal-500">
+            className="w-full min-w-0 text-[10px] border border-gray-200 rounded-md px-1 py-1 text-gray-600 bg-white focus:ring-1 focus:ring-primary-600">
             <option value="">—</option><option value="rot">ROT</option><option value="rut">RUT</option>
           </select>
         ) : <span />}
@@ -272,7 +272,7 @@ function CategorySelect({
           else if (e.key === 'Escape') { setShowNewCategoryInput(null); setNewCategoryLabel('') }
         }}
         placeholder="Namn..."
-        className="w-full px-1.5 py-1 text-[10px] border border-teal-500 rounded bg-white text-gray-900 focus:outline-none" />
+        className="w-full px-1.5 py-1 text-[10px] border border-primary-600 rounded bg-white text-gray-900 focus:outline-none" />
     )
   }
 
@@ -283,7 +283,7 @@ function CategorySelect({
           setShowNewCategoryInput(item.id); setNewCategoryLabel('')
         } else { onUpdate(item.id, 'category_slug', e.target.value || undefined) }
       }}
-      className="w-full min-w-0 px-1 py-1 text-[10px] border border-gray-200 rounded-md bg-white text-gray-500 focus:outline-none focus:border-teal-500">
+      className="w-full min-w-0 px-1 py-1 text-[10px] border border-gray-200 rounded-md bg-white text-gray-500 focus:outline-none focus:border-primary-600">
       <option value="">Kategori</option>
       <optgroup label="Arbete">
         {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => <option key={c.slug} value={c.slug}>{c.label}</option>)}

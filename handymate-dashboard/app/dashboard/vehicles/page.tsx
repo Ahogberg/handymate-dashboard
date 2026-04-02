@@ -202,7 +202,7 @@ export default function VehiclesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-primary-700" />
       </div>
     )
   }
@@ -213,7 +213,7 @@ export default function VehiclesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Car className="w-5 h-5 text-teal-600" />
+            <Car className="w-5 h-5 text-primary-700" />
             Fordon
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Körrapporter och fordonskostnader</p>
@@ -227,7 +227,7 @@ export default function VehiclesPage() {
           </button>
           <button
             onClick={() => { setEditingReport(null); setShowReportModal(true) }}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800"
           >
             <Plus className="w-4 h-4" />
             Ny rapport
@@ -274,7 +274,7 @@ export default function VehiclesPage() {
         </div>
         <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
           <p className="text-xs text-gray-500">Fakturerbart</p>
-          <p className="text-lg font-bold text-teal-700">{weekBillableAmount.toLocaleString('sv-SE', { minimumFractionDigits: 0 })} kr</p>
+          <p className="text-lg font-bold text-primary-700">{weekBillableAmount.toLocaleString('sv-SE', { minimumFractionDigits: 0 })} kr</p>
         </div>
       </div>
 
@@ -286,12 +286,12 @@ export default function VehiclesPage() {
 
         return (
           <div key={dateStr} className="mb-4">
-            <div className={`flex items-center gap-2 mb-2 px-1 ${isToday ? 'text-teal-700' : 'text-gray-500'}`}>
+            <div className={`flex items-center gap-2 mb-2 px-1 ${isToday ? 'text-primary-700' : 'text-gray-500'}`}>
               <Calendar className="w-3.5 h-3.5" />
               <span className="text-xs font-medium uppercase tracking-wide">
                 {day.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
               </span>
-              {isToday && <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-medium">Idag</span>}
+              {isToday && <span className="text-[10px] bg-primary-100 text-primary-700 px-1.5 py-0.5 rounded-full font-medium">Idag</span>}
             </div>
 
             {dayReports.length === 0 ? (
@@ -313,7 +313,7 @@ export default function VehiclesPage() {
                             <span className="text-xs text-gray-400">{r.vehicle.reg_number}</span>
                           )}
                           {r.project && (
-                            <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">
+                            <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">
                               {r.project.name}
                             </span>
                           )}
@@ -326,7 +326,7 @@ export default function VehiclesPage() {
                             <span className="text-gray-300">→</span>
                             <span className="truncate">{r.end_address}</span>
                             {r.google_maps_url && (
-                              <a href={r.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-teal-600 hover:text-teal-700 flex-shrink-0">
+                              <a href={r.google_maps_url} target="_blank" rel="noopener noreferrer" className="text-primary-700 hover:text-primary-700 flex-shrink-0">
                                 <ExternalLink className="w-3 h-3" />
                               </a>
                             )}
@@ -345,7 +345,7 @@ export default function VehiclesPage() {
                             </span>
                           )}
                           {r.billable && (
-                            <span className="text-teal-600 font-medium">Fakturerbar</span>
+                            <span className="text-primary-700 font-medium">Fakturerbar</span>
                           )}
                           {r.invoiced && (
                             <span className="text-blue-600 font-medium">Fakturerad</span>
@@ -388,7 +388,7 @@ export default function VehiclesPage() {
           <p className="text-sm text-gray-500 mb-4">Lägg till ditt första fordon för att börja spåra körrapporter</p>
           <button
             onClick={() => { setEditingVehicle(null); setShowVehicleModal(true) }}
-            className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700"
+            className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800"
           >
             Lägg till fordon
           </button>
@@ -564,7 +564,7 @@ function ReportModal({
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -613,7 +613,7 @@ function ReportModal({
                   onClick={() => setReportType(val)}
                   className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
                     reportType === val
-                      ? 'bg-teal-50 border-teal-300 text-teal-700'
+                      ? 'bg-primary-50 border-primary-300 text-primary-700'
                       : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -649,7 +649,7 @@ function ReportModal({
               <button
                 onClick={calculateDistance}
                 disabled={calculating || !startAddress.trim() || !endAddress.trim()}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-teal-200 rounded-lg text-teal-700 hover:bg-teal-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                 Beräkna med Google Maps
@@ -699,7 +699,7 @@ function ReportModal({
               type="checkbox"
               checked={billable}
               onChange={e => setBillable(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+              className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600"
             />
             <span className="text-sm text-gray-700">Fakturerbar</span>
           </label>
@@ -712,9 +712,9 @@ function ReportModal({
 
           {/* Amount preview */}
           {amount > 0 && (
-            <div className="bg-teal-50 border border-teal-200 rounded-lg px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-teal-700">Beräknat belopp</span>
-              <span className="text-lg font-bold text-teal-800">{amount.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
+            <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-primary-700">Beräknat belopp</span>
+              <span className="text-lg font-bold text-primary-800">{amount.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
             </div>
           )}
         </div>
@@ -726,7 +726,7 @@ function ReportModal({
           <button
             onClick={handleSubmit}
             disabled={saving || !vehicleId}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : editing ? 'Uppdatera' : 'Spara rapport'}
           </button>
@@ -777,7 +777,7 @@ function ManageVehiclesModal({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => onToggleActive(v)}
-                    className={`px-2 py-1 text-[10px] rounded-md border ${v.is_active ? 'border-gray-200 text-gray-500 hover:bg-gray-100' : 'border-teal-200 text-teal-600 hover:bg-teal-50'}`}
+                    className={`px-2 py-1 text-[10px] rounded-md border ${v.is_active ? 'border-gray-200 text-gray-500 hover:bg-gray-100' : 'border-primary-200 text-primary-700 hover:bg-primary-50'}`}
                   >
                     {v.is_active ? 'Inaktivera' : 'Aktivera'}
                   </button>
@@ -796,7 +796,7 @@ function ManageVehiclesModal({
         <div className="px-4 pb-4">
           <button
             onClick={onAdd}
-            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-teal-300 hover:text-teal-600"
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-primary-300 hover:text-primary-700"
           >
             <Plus className="w-4 h-4" />
             Lägg till fordon
@@ -835,7 +835,7 @@ function VehicleModal({
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
@@ -879,7 +879,7 @@ function VehicleModal({
           <button
             onClick={handleSubmit}
             disabled={saving || !name.trim()}
-            className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50"
+            className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
           >
             {saving ? 'Sparar...' : editing ? 'Uppdatera' : 'Spara'}
           </button>

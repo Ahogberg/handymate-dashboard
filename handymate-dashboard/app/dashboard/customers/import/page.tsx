@@ -283,8 +283,8 @@ export default function ImportCustomersPage() {
     <div className="p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative max-w-4xl mx-auto">
@@ -313,7 +313,7 @@ export default function ImportCustomersPage() {
             <div key={s.num} className="flex items-center">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                 step >= s.num 
-                  ? 'bg-teal-600 text-white' 
+                  ? 'bg-primary-700 text-white' 
                   : 'bg-gray-100 text-gray-400'
               }`}>
                 {step > s.num ? <Check className="w-4 h-4" /> : s.num}
@@ -331,7 +331,7 @@ export default function ImportCustomersPage() {
           <div className="space-y-6">
             <div 
               className={`bg-white shadow-sm rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
-                dragOver ? 'border-teal-500 bg-teal-50' : 'border-gray-300 hover:border-gray-300'
+                dragOver ? 'border-primary-600 bg-primary-50' : 'border-gray-300 hover:border-gray-300'
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
@@ -342,7 +342,7 @@ export default function ImportCustomersPage() {
                 Dra och släpp din fil här
               </h3>
               <p className="text-gray-400 mb-6">eller</p>
-              <label className="inline-flex items-center px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 cursor-pointer">
+              <label className="inline-flex items-center px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 cursor-pointer">
                 <FileSpreadsheet className="w-5 h-5 mr-2" />
                 Välj fil
                 <input
@@ -374,7 +374,7 @@ export default function ImportCustomersPage() {
               
               <button
                 onClick={downloadTemplate}
-                className="flex items-center gap-2 mt-6 text-sm text-sky-700 hover:text-teal-600"
+                className="flex items-center gap-2 mt-6 text-sm text-sky-700 hover:text-primary-700"
               >
                 <Download className="w-4 h-4" />
                 Ladda ner exempelmall
@@ -416,7 +416,7 @@ export default function ImportCustomersPage() {
                         ...mapping,
                         [field.key]: e.target.value === '' ? null : parseInt(e.target.value)
                       })}
-                      className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       <option value="">-- Välj kolumn --</option>
                       {headers.map((header, index) => (
@@ -479,7 +479,7 @@ export default function ImportCustomersPage() {
               <button
                 onClick={prepareData}
                 disabled={mapping.phone_number === null}
-                className="px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Fortsätt
               </button>
@@ -591,7 +591,7 @@ export default function ImportCustomersPage() {
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className="flex items-center px-8 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-8 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {importing ? (
                   <>
@@ -660,7 +660,7 @@ export default function ImportCustomersPage() {
                     sessionStorage.setItem('importedCustomerIds', JSON.stringify(importResult.importedIds))
                     router.push('/dashboard/campaigns/new?source=import')
                   }}
-                  className="flex items-center justify-center gap-3 w-full mt-6 px-6 py-4 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 transition-all"
+                  className="flex items-center justify-center gap-3 w-full mt-6 px-6 py-4 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 transition-all"
                 >
                   <Megaphone className="w-5 h-5" />
                   Skicka reaktiverings-SMS till dessa {importResult.success} kunder

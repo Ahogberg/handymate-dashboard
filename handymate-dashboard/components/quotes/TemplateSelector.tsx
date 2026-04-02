@@ -105,7 +105,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
             onClick={() => setCategoryFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
               categoryFilter === 'all'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
             }`}
           >
@@ -117,7 +117,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
               onClick={() => setCategoryFilter(cat)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 categoryFilter === cat
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
@@ -148,7 +148,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
             return (
               <div
                 key={t.id}
-                className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-teal-300 transition-all group"
+                className="flex items-center gap-3 p-4 bg-gray-50 border border-gray-200 rounded-xl hover:border-primary-300 transition-all group"
               >
                 <button
                   onClick={() => toggleFavorite(t.id, !!t.is_favorite)}
@@ -168,7 +168,7 @@ export default function TemplateSelector({ onSelect, onBack }: TemplateSelectorP
                       </span>
                     )}
                     {t.category && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-sky-700 rounded">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary-100 text-sky-700 rounded">
                         {t.category}
                       </span>
                     )}

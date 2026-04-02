@@ -414,8 +414,8 @@ export default function InboxPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -430,7 +430,7 @@ export default function InboxPage() {
       <div className="relative max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center mb-6">
-          <div className="p-3 rounded-xl bg-teal-600 mr-4">
+          <div className="p-3 rounded-xl bg-primary-700 mr-4">
             <Inbox className="w-6 h-6 text-gray-900" />
           </div>
           <div>
@@ -445,7 +445,7 @@ export default function InboxPage() {
             onClick={() => setActiveTab('suggestions')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'suggestions'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
             }`}
           >
@@ -462,7 +462,7 @@ export default function InboxPage() {
             onClick={() => setActiveTab('recordings')}
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'recordings'
-                ? 'bg-teal-600 text-white'
+                ? 'bg-primary-700 text-white'
                 : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
             }`}
           >
@@ -519,7 +519,7 @@ export default function InboxPage() {
                 onClick={() => setStatusFilter('all')}
                 className={`p-4 rounded-xl border transition-all ${
                   statusFilter === 'all'
-                    ? 'bg-teal-100 border-teal-300'
+                    ? 'bg-primary-100 border-primary-300'
                     : 'bg-white border-gray-200 hover:border-gray-300'
                 }`}
               >
@@ -575,8 +575,8 @@ export default function InboxPage() {
                                 }}
                                 className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                                   playingId === group.recording.recording_id
-                                    ? 'bg-teal-600 border-teal-300'
-                                    : 'bg-gray-50 border-gray-300 hover:border-teal-300'
+                                    ? 'bg-primary-700 border-primary-300'
+                                    : 'bg-gray-50 border-gray-300 hover:border-primary-300'
                                 }`}
                               >
                                 {playingId === group.recording.recording_id ? (
@@ -707,7 +707,7 @@ export default function InboxPage() {
                                   <div className="flex items-start justify-between gap-4">
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
                                       <div className={`p-2 rounded-lg ${
-                                        suggestion.status === 'pending' ? 'bg-teal-100' : 'bg-gray-200/50'
+                                        suggestion.status === 'pending' ? 'bg-primary-100' : 'bg-gray-200/50'
                                       }`}>
                                         <Icon className={`w-4 h-4 ${
                                           suggestion.status === 'pending' ? 'text-sky-700' : 'text-gray-400'
@@ -866,9 +866,9 @@ export default function InboxPage() {
                           disabled={!recording.recording_url}
                           className={`w-11 h-11 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                             playingId === recording.recording_id
-                              ? 'bg-teal-600 border-teal-300'
+                              ? 'bg-primary-700 border-primary-300'
                               : recording.recording_url
-                              ? 'bg-gray-50 border-gray-300 hover:border-teal-300'
+                              ? 'bg-gray-50 border-gray-300 hover:border-primary-300'
                               : 'bg-gray-100/30 border-gray-200 opacity-50'
                           }`}
                         >
@@ -910,7 +910,7 @@ export default function InboxPage() {
                           <button
                             onClick={() => handleTranscribe(recording.recording_id)}
                             disabled={actionLoading === recording.recording_id}
-                            className="flex items-center gap-2 px-3 py-2.5 bg-teal-100 border border-teal-300 rounded-lg text-sky-700 text-sm hover:bg-teal-600/30 disabled:opacity-50 min-h-[44px]"
+                            className="flex items-center gap-2 px-3 py-2.5 bg-primary-100 border border-primary-300 rounded-lg text-sky-700 text-sm hover:bg-primary-700/30 disabled:opacity-50 min-h-[44px]"
                           >
                             {actionLoading === recording.recording_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />

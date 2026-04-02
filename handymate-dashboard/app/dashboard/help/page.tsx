@@ -82,21 +82,21 @@ const quickLinks = [
     description: 'Generera en ny offert med AI-hjälp',
     href: '/dashboard/quotes/new',
     icon: <FileText className="w-6 h-6" />,
-    color: 'from-teal-600 to-teal-500',
+    color: 'from-primary-700 to-primary-600',
   },
   {
     title: 'Kunder',
     description: 'Hantera din kunddatabas',
     href: '/dashboard/customers',
     icon: <Users className="w-6 h-6" />,
-    color: 'from-emerald-500 to-teal-500',
+    color: 'from-emerald-500 to-primary-600',
   },
   {
     title: 'Schema',
     description: 'Se och hantera dina bokningar',
     href: '/dashboard/schedule',
     icon: <Calendar className="w-6 h-6" />,
-    color: 'from-teal-500 to-teal-600',
+    color: 'from-primary-600 to-primary-700',
   },
   {
     title: 'Samtal',
@@ -140,7 +140,7 @@ export default function HelpPage() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-teal-600 shadow-lg shadow-teal-500/25 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-700 shadow-lg shadow-primary-600/25 mb-4">
             <HelpCircle className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
@@ -162,14 +162,14 @@ export default function HelpPage() {
               setSearchQuery(e.target.value)
               setOpenIndex(null)
             }}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 shadow-sm transition-all text-base"
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600 shadow-sm transition-all text-base"
           />
         </div>
 
         {/* FAQ Accordion */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-teal-600" />
+            <MessageSquare className="w-5 h-5 text-primary-700" />
             Vanliga frågor
           </h2>
           <div className="space-y-3">
@@ -181,7 +181,7 @@ export default function HelpPage() {
                 </p>
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="mt-3 text-teal-600 hover:text-sky-700 text-sm font-medium transition-colors"
+                  className="mt-3 text-primary-700 hover:text-sky-700 text-sm font-medium transition-colors"
                 >
                   Rensa sökning
                 </button>
@@ -198,7 +198,7 @@ export default function HelpPage() {
                       onClick={() => toggleFAQ(index)}
                       className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
                     >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-teal-50 to-teal-50 border border-teal-100 flex items-center justify-center text-teal-600">
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-50 to-primary-50 border border-primary-100 flex items-center justify-center text-primary-700">
                         {item.icon}
                       </div>
                       <span className="flex-1 text-sm sm:text-base font-medium text-slate-900">
@@ -231,7 +231,7 @@ export default function HelpPage() {
         {/* Quick Links */}
         <section className="mb-12">
           <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Zap className="w-5 h-5 text-teal-600" />
+            <Zap className="w-5 h-5 text-primary-700" />
             Snabblänkar
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -239,7 +239,7 @@ export default function HelpPage() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-teal-200 transition-all"
+                className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary-300 transition-all"
               >
                 <div className="flex items-start gap-4">
                   <div
@@ -263,12 +263,12 @@ export default function HelpPage() {
         {/* Contact Support */}
         <section>
           <h2 className="text-xl font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Mail className="w-5 h-5 text-teal-600" />
+            <Mail className="w-5 h-5 text-primary-700" />
             Kontakta support
           </h2>
           <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-teal-600 flex items-center justify-center text-white shadow-lg shadow-teal-500/20">
+              <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-600/20">
                 <Mail className="w-7 h-7" />
               </div>
               <div className="flex-1">
@@ -280,10 +280,10 @@ export default function HelpPage() {
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-teal-600" />
+                    <Mail className="w-4 h-4 text-primary-700" />
                     <a
                       href="mailto:support@handymate.se"
-                      className="text-sky-700 hover:text-teal-700 font-medium text-sm transition-colors"
+                      className="text-sky-700 hover:text-primary-700 font-medium text-sm transition-colors"
                     >
                       support@handymate.se
                     </a>

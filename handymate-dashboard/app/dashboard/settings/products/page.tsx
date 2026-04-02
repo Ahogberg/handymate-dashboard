@@ -137,7 +137,7 @@ export default function ProductsPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -156,7 +156,7 @@ export default function ProductsPage() {
           </div>
           <button
             onClick={() => setShowNewModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
           >
             <Plus className="w-4 h-4" /> Ny produkt
           </button>
@@ -171,13 +171,13 @@ export default function ProductsPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Sök produkter..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
             />
           </div>
           <select
             value={categoryFilter}
             onChange={e => setCategoryFilter(e.target.value)}
-            className="px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-teal-400"
+            className="px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
           >
             <option value="">Alla kategorier</option>
             {CATEGORY_OPTIONS.map(c => (
@@ -209,7 +209,7 @@ export default function ProductsPage() {
                 {!search && (
                   <button
                     onClick={() => setShowNewModal(true)}
-                    className="mt-3 text-sm text-teal-600 hover:text-teal-700 font-medium"
+                    className="mt-3 text-sm text-primary-700 hover:text-primary-700 font-medium"
                   >
                     + Lägg till din första produkt
                   </button>
@@ -236,7 +236,7 @@ export default function ProductsPage() {
                     <span className="text-sm font-medium text-gray-900 truncate">{product.name}</span>
                     <span className={`px-1.5 py-0.5 text-[10px] rounded-full ${
                       product.category.startsWith('arbete')
-                        ? 'bg-teal-100 text-teal-600'
+                        ? 'bg-primary-100 text-primary-700'
                         : product.category === 'hyra'
                           ? 'bg-purple-100 text-purple-600'
                           : product.category.startsWith('material')
@@ -282,7 +282,7 @@ export default function ProductsPage() {
                 <div className="flex items-center gap-1 justify-end">
                   <button
                     onClick={() => setEditingProduct(product)}
-                    className="p-1.5 text-gray-400 hover:text-teal-600 transition"
+                    className="p-1.5 text-gray-400 hover:text-primary-700 transition"
                   >
                     <Edit className="w-3.5 h-3.5" />
                   </button>
@@ -299,7 +299,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Info box */}
-        <div className="mt-4 bg-teal-50 border border-teal-200 rounded-xl p-5 text-sm text-teal-700">
+        <div className="mt-4 bg-primary-50 border border-primary-300 rounded-xl p-5 text-sm text-primary-700">
           <p className="font-medium mb-1">Tips</p>
           <p>Produkter du lägger till här kan snabbsökas i offertformuläret. Markera favoriter med stjärnan för snabbåtkomst.</p>
         </div>
@@ -341,7 +341,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
   const sales = parseFloat(salesPrice) || 0
   const markup = purchase > 0 ? Math.round(((sales - purchase) / purchase) * 100) : null
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   const handleSubmit = () => {
     if (!name.trim() || !salesPrice) return
@@ -429,17 +429,17 @@ function ProductModal({ product, saving, onSave, onClose }: {
 
           {/* Markup display */}
           {markup !== null && (
-            <p className="text-sm text-teal-600">Påslag: {markup}%</p>
+            <p className="text-sm text-primary-700">Påslag: {markup}%</p>
           )}
 
           {/* Toggles */}
           <div className="space-y-3 pt-2">
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={rotEligible} onChange={e => { setRotEligible(e.target.checked); if (e.target.checked) setRutEligible(false) }} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <input type="checkbox" checked={rotEligible} onChange={e => { setRotEligible(e.target.checked); if (e.target.checked) setRutEligible(false) }} className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600" />
               <span className="text-sm text-gray-700">ROT-berättigad</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" checked={rutEligible} onChange={e => { setRutEligible(e.target.checked); if (e.target.checked) setRotEligible(false) }} className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500" />
+              <input type="checkbox" checked={rutEligible} onChange={e => { setRutEligible(e.target.checked); if (e.target.checked) setRotEligible(false) }} className="w-4 h-4 rounded border-gray-300 text-primary-700 focus:ring-primary-600" />
               <span className="text-sm text-gray-700">RUT-berättigad</span>
             </label>
             <label className="flex items-center gap-3 cursor-pointer">
@@ -459,7 +459,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
           <button
             onClick={handleSubmit}
             disabled={saving || !name.trim() || !salesPrice}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {product ? 'Spara' : 'Lägg till'}

@@ -346,7 +346,7 @@ export default function CommunicationPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-teal-600">
+            <div className="p-2 rounded-xl bg-primary-700">
               <Zap className="w-6 h-6 text-white" />
             </div>
             Smart Kundkommunikation
@@ -415,7 +415,7 @@ export default function CommunicationPage() {
           {logs.length > 5 && (
             <button
               onClick={() => setShowAllLogs(!showAllLogs)}
-              className="text-sm text-sky-700 hover:text-teal-600"
+              className="text-sm text-sky-700 hover:text-primary-700"
             >
               {showAllLogs ? 'Visa färre' : `Visa alla (${logs.length})`}
             </button>
@@ -438,7 +438,7 @@ export default function CommunicationPage() {
                 <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-teal-50' : 'bg-purple-50'}`}>
+                      <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-primary-50' : 'bg-purple-50'}`}>
                         <ChannelIcon className={`w-3.5 h-3.5 ${log.channel === 'sms' ? 'text-sky-700' : 'text-purple-600'}`} />
                       </div>
                       <span className="text-sm font-medium text-gray-900">
@@ -542,7 +542,7 @@ export default function CommunicationPage() {
                         setEditingRule(rule)
                         setEditTemplate(rule.message_template)
                       }}
-                      className="p-2 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg"
                       title="Redigera mall"
                     >
                       <Pencil className="w-4 h-4" />
@@ -600,7 +600,7 @@ export default function CommunicationPage() {
                       onClick={() => setSettings({ ...settings, tone })}
                       className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all ${
                         settings.tone === tone
-                          ? 'bg-teal-50 border-teal-300 text-teal-700'
+                          ? 'bg-primary-50 border-primary-300 text-primary-700'
                           : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                       }`}
                     >
@@ -618,7 +618,7 @@ export default function CommunicationPage() {
                 <select
                   value={settings.max_sms_per_customer_per_week}
                   onChange={e => setSettings({ ...settings, max_sms_per_customer_per_week: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   {[1, 2, 3, 4, 5, 7, 10].map(n => (
                     <option key={n} value={n}>{n}</option>
@@ -636,14 +636,14 @@ export default function CommunicationPage() {
                     type="time"
                     value={settings.quiet_hours_start}
                     onChange={e => setSettings({ ...settings, quiet_hours_start: e.target.value })}
-                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <span className="text-gray-400">–</span>
                   <input
                     type="time"
                     value={settings.quiet_hours_end}
                     onChange={e => setSettings({ ...settings, quiet_hours_end: e.target.value })}
-                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -659,7 +659,7 @@ export default function CommunicationPage() {
                       <div
                         className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
                           settings[key]
-                            ? 'bg-teal-700 border-teal-600'
+                            ? 'bg-primary-700 border-primary-700'
                             : 'bg-white border-gray-300 group-hover:border-gray-400'
                         }`}
                         onClick={() => setSettings({ ...settings, [key]: !settings[key] })}
@@ -683,7 +683,7 @@ export default function CommunicationPage() {
               <button
                 onClick={saveSettings}
                 disabled={savingSettings}
-                className="px-6 py-2.5 bg-teal-700 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                className="px-6 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
               >
                 {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Spara inställningar
@@ -714,7 +714,7 @@ export default function CommunicationPage() {
                   value={editTemplate}
                   onChange={e => setEditTemplate(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">
                   {smsInfo(editTemplate)}
@@ -728,7 +728,7 @@ export default function CommunicationPage() {
                     <button
                       key={v}
                       onClick={() => setEditTemplate(editTemplate + v)}
-                      className="px-2 py-1 text-xs bg-teal-50 text-sky-700 rounded-md hover:bg-teal-100"
+                      className="px-2 py-1 text-xs bg-primary-50 text-sky-700 rounded-md hover:bg-primary-100"
                     >
                       {v}
                     </button>
@@ -761,7 +761,7 @@ export default function CommunicationPage() {
                 <button
                   onClick={saveRuleTemplate}
                   disabled={savingRule}
-                  className="px-6 py-2.5 bg-teal-700 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+                  className="px-6 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
                 >
                   {savingRule ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   Spara

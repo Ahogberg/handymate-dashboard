@@ -159,7 +159,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
         {/* Step indicator */}
         <div className="px-5 pt-4 flex gap-1">
           {[1, 2, 3, 4, 5].map(s => (
-            <div key={s} className={`h-1 flex-1 rounded ${s <= step ? 'bg-teal-600' : 'bg-gray-200'}`} />
+            <div key={s} className={`h-1 flex-1 rounded ${s <= step ? 'bg-primary-700' : 'bg-gray-200'}`} />
           ))}
         </div>
 
@@ -175,7 +175,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     onClick={() => { setTriggerType(t.value); setTriggerConfig({}) }}
                     className={`w-full text-left p-3 rounded-lg border transition-colors ${
                       triggerType === t.value
-                        ? 'border-teal-500 bg-teal-50'
+                        ? 'border-primary-600 bg-primary-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -308,7 +308,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     onClick={() => { setActionType(a.value); setActionConfig({}) }}
                     className={`text-left p-3 rounded-lg border text-sm transition-colors ${
                       actionType === a.value
-                        ? 'border-teal-500 bg-teal-50 font-medium'
+                        ? 'border-primary-600 bg-primary-50 font-medium'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
@@ -459,7 +459,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     type="checkbox"
                     checked={requiresApproval}
                     onChange={e => setRequiresApproval(e.target.checked)}
-                    className="w-4 h-4 rounded text-teal-600"
+                    className="w-4 h-4 rounded text-primary-700"
                   />
                   <span className="text-sm text-gray-700">Kräv godkännande före körning</span>
                 </label>
@@ -468,7 +468,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     type="checkbox"
                     checked={respectsWorkHours}
                     onChange={e => setRespectsWorkHours(e.target.checked)}
-                    className="w-4 h-4 rounded text-teal-600"
+                    className="w-4 h-4 rounded text-primary-700"
                   />
                   <span className="text-sm text-gray-700">Respektera arbetstider</span>
                 </label>
@@ -477,7 +477,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
                     type="checkbox"
                     checked={respectsNightMode}
                     onChange={e => setRespectsNightMode(e.target.checked)}
-                    className="w-4 h-4 rounded text-teal-600"
+                    className="w-4 h-4 rounded text-primary-700"
                   />
                   <span className="text-sm text-gray-700">Respektera nattspärr</span>
                 </label>
@@ -498,7 +498,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
             <button
               onClick={() => setStep(step + 1)}
               disabled={!canProceed()}
-              className="px-5 py-2 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-colors"
+              className="px-5 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors"
             >
               Nästa
             </button>
@@ -506,7 +506,7 @@ export default function AutomationRuleBuilder({ onClose, onSaved, editRule }: Ru
             <button
               onClick={handleSave}
               disabled={saving || !name}
-              className="px-5 py-2 bg-teal-700 text-white rounded-lg text-sm font-medium hover:bg-teal-800 disabled:opacity-50 transition-colors"
+              className="px-5 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors"
             >
               {saving ? 'Sparar...' : editRule ? 'Uppdatera regel' : 'Skapa regel'}
             </button>

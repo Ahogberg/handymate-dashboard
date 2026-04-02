@@ -7,7 +7,7 @@ import Sidebar from '@/components/Sidebar'
 
 const Jobbkompisen = dynamic(() => import('@/components/Jobbkompisen'), {
   ssr: false,
-  loading: () => <div className="fixed bottom-6 right-6 w-14 h-14 bg-teal-100 rounded-2xl animate-pulse z-40" />,
+  loading: () => <div className="fixed bottom-6 right-6 w-14 h-14 bg-primary-100 rounded-2xl animate-pulse z-40" />,
 })
 import WelcomeModal from '@/components/WelcomeModal'
 import FeedbackWidget from '@/components/FeedbackWidget'

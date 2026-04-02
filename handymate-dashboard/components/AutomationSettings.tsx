@@ -99,7 +99,7 @@ export default function AutomationSettings() {
                   onClick={() => toggleDay(day.value)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     settings.work_days.includes(day.value)
-                      ? 'bg-teal-100 text-teal-800 border border-teal-300'
+                      ? 'bg-primary-100 text-primary-800 border border-primary-300'
                       : 'bg-gray-100 text-gray-500 border border-gray-200'
                   }`}
                 >
@@ -142,7 +142,7 @@ export default function AutomationSettings() {
               onChange={e => setSettings({ ...settings, night_mode_enabled: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-700"></div>
           </label>
         </div>
         <p className="text-sm text-gray-500">
@@ -182,7 +182,7 @@ export default function AutomationSettings() {
                 onChange={e => setSettings({ ...settings, auto_reject_below_minimum: e.target.checked })}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-700"></div>
             </label>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function AutomationSettings() {
                   onChange={e => setSettings({ ...settings, [item.key]: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-700"></div>
               </label>
             </div>
           ))}
@@ -253,12 +253,12 @@ export default function AutomationSettings() {
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-6 py-2.5 bg-teal-700 text-white rounded-lg font-medium hover:bg-teal-800 disabled:opacity-50 transition-colors"
+          className="px-6 py-2.5 bg-primary-700 text-white rounded-lg font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors"
         >
           {saving ? 'Sparar...' : 'Spara inställningar'}
         </button>
         {saved && (
-          <span className="text-sm text-teal-600 font-medium">Sparat!</span>
+          <span className="text-sm text-primary-700 font-medium">Sparat!</span>
         )}
       </div>
     </div>

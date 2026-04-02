@@ -19,7 +19,7 @@ export default function InputSelector({ onSelect, hasCallSuggestions }: InputSel
   ]
 
   const colorMap: Record<string, string> = {
-    teal: 'from-teal-600/20 to-teal-500/5 border-teal-300 hover:border-teal-500/60',
+    teal: 'from-primary-700/20 to-primary-600/5 border-primary-300 hover:border-primary-600/60',
     sky: 'from-sky-500/20 to-sky-500/5 border-sky-300 hover:border-sky-500/60',
     slate: 'from-slate-500/20 to-slate-500/5 border-slate-300 hover:border-slate-500/60',
     amber: 'from-amber-500/20 to-amber-500/5 border-amber-200 hover:border-amber-500/60',
@@ -27,7 +27,7 @@ export default function InputSelector({ onSelect, hasCallSuggestions }: InputSel
   }
 
   const iconColorMap: Record<string, string> = {
-    teal: 'text-teal-600',
+    teal: 'text-primary-700',
     sky: 'text-sky-600',
     slate: 'text-slate-600',
     amber: 'text-amber-600',

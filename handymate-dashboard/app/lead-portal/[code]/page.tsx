@@ -160,7 +160,7 @@ export default function LeadPortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -191,7 +191,7 @@ export default function LeadPortalPage() {
             {data.business.logo_url ? (
               <img src={data.business.logo_url} alt="" className="w-10 h-10 rounded-lg object-cover" />
             ) : (
-              <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center text-white font-bold text-lg">
+              <div className="w-10 h-10 rounded-lg bg-primary-700 flex items-center justify-center text-white font-bold text-lg">
                 {data.business.business_name.charAt(0)}
               </div>
             )}
@@ -208,7 +208,7 @@ export default function LeadPortalPage() {
         <div className="flex gap-3 mb-6">
           <button
             onClick={() => { setShowForm(true); setTab('form'); setSubmitted(null) }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
           >
             <Plus className="w-4 h-4" />
             Skicka nytt lead
@@ -256,7 +256,7 @@ export default function LeadPortalPage() {
                     value={formName}
                     onChange={e => setFormName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                     placeholder="Erik Andersson"
                   />
                 </div>
@@ -267,7 +267,7 @@ export default function LeadPortalPage() {
                     value={formPhone}
                     onChange={e => setFormPhone(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                     placeholder="0701234567"
                   />
                 </div>
@@ -278,7 +278,7 @@ export default function LeadPortalPage() {
                   type="email"
                   value={formEmail}
                   onChange={e => setFormEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                   placeholder="erik@example.com"
                 />
               </div>
@@ -292,7 +292,7 @@ export default function LeadPortalPage() {
                     <select
                       value={formService}
                       onChange={e => setFormService(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none bg-white"
                     >
                       <option value="">Välj...</option>
                       {serviceOptions.map(s => (
@@ -306,7 +306,7 @@ export default function LeadPortalPage() {
                       type="number"
                       value={formValue}
                       onChange={e => setFormValue(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                       placeholder="50000"
                     />
                   </div>
@@ -317,7 +317,7 @@ export default function LeadPortalPage() {
                     value={formDescription}
                     onChange={e => setFormDescription(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-none"
                     placeholder="Beskriv uppdraget..."
                   />
                 </div>
@@ -328,7 +328,7 @@ export default function LeadPortalPage() {
                       type="text"
                       value={formAddress}
                       onChange={e => setFormAddress(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                       placeholder="Storgatan 1, Stockholm"
                     />
                   </div>
@@ -338,7 +338,7 @@ export default function LeadPortalPage() {
                       type="date"
                       value={formDate}
                       onChange={e => setFormDate(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                     />
                   </div>
                 </div>
@@ -352,7 +352,7 @@ export default function LeadPortalPage() {
                     type="text"
                     value={formRef}
                     onChange={e => setFormRef(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                     placeholder="Ert interna ID för denna lead"
                   />
                 </div>
@@ -370,7 +370,7 @@ export default function LeadPortalPage() {
                 <button
                   type="submit"
                   disabled={!formName.trim() || !formPhone.trim() || submitting}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   Skicka lead
@@ -474,7 +474,7 @@ export default function LeadPortalPage() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-xs text-gray-400">
-          Drivs av <span className="font-medium text-teal-600">Handymate</span>
+          Drivs av <span className="font-medium text-primary-700">Handymate</span>
         </div>
       </div>
     </div>

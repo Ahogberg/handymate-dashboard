@@ -25,7 +25,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 // Agent avatar lookup
 const AVATAR_BASE = 'https://pktaqedooyzgvzwipslu.supabase.co/storage/v1/object/sign/team-avatars'
 const AGENT_INFO: Record<string, { name: string; role: string; color: string; initials: string }> = {
-  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-teal-600', initials: 'M' },
+  matte: { name: 'Matte', role: 'Chefsassistent', color: 'bg-primary-700', initials: 'M' },
   karin: { name: 'Karin', role: 'Ekonom', color: 'bg-blue-600', initials: 'K' },
   hanna: { name: 'Hanna', role: 'Marknadschef', color: 'bg-purple-600', initials: 'H' },
   daniel: { name: 'Daniel', role: 'Säljare', color: 'bg-amber-600', initials: 'D' },
@@ -79,7 +79,7 @@ interface Approval {
 
 const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgColor: string; textColor: string }> = {
   send_sms: { label: 'SMS', icon: MessageSquare, bgColor: 'bg-blue-50', textColor: 'text-blue-600' },
-  send_quote: { label: 'Offert', icon: FileText, bgColor: 'bg-teal-50', textColor: 'text-teal-600' },
+  send_quote: { label: 'Offert', icon: FileText, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   send_invoice: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-purple-50', textColor: 'text-purple-600' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
@@ -312,8 +312,8 @@ export default function ApprovalsPage() {
       <div className="px-4 sm:px-8 pt-6 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-              <Bot className="w-5 h-5 text-teal-700" />
+            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+              <Bot className="w-5 h-5 text-primary-700" />
             </div>
             <div>
               <h1 className="text-xl font-bold text-gray-900">Godkännanden</h1>
@@ -321,7 +321,7 @@ export default function ApprovalsPage() {
             </div>
           </div>
           {feedbackMsg && (
-            <div className="px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-teal-700 font-medium">
+            <div className="px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-primary-700 font-medium">
               ✓ {feedbackMsg}
             </div>
           )}
@@ -343,7 +343,7 @@ export default function ApprovalsPage() {
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
@@ -372,8 +372,8 @@ export default function ApprovalsPage() {
           </div>
         ) : approvals.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-teal-600" />
+            <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-primary-700" />
             </div>
             <p className="text-gray-900 font-medium text-lg mb-1">
               {activeTab === 'pending' ? 'Inget att godkänna' : 'Inga hanterade ännu'}
@@ -397,7 +397,7 @@ export default function ApprovalsPage() {
 
                 return (
                   <div key={approval.id} className={`border-2 rounded-xl transition-all ${
-                    approval.status === 'pending' ? 'border-teal-200 bg-teal-50/30' : 'border-gray-100 opacity-75'
+                    approval.status === 'pending' ? 'border-primary-200 bg-primary-50/30' : 'border-gray-100 opacity-75'
                   }`}>
                     <div className="p-5">
                       <div className="flex items-start justify-between mb-3">
@@ -409,7 +409,7 @@ export default function ApprovalsPage() {
                           <p className="text-sm text-gray-500">{approval.package_data.customer_name} · {approval.description}</p>
                         </div>
                         {approval.status === 'pending' && (
-                          <span className="text-xs bg-teal-100 text-teal-700 px-2 py-1 rounded-full font-medium">
+                          <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
                             {activeCount} förslag
                           </span>
                         )}
@@ -436,7 +436,7 @@ export default function ApprovalsPage() {
                               isRejected ? 'bg-gray-50 border border-gray-200 opacity-50' :
                               'bg-white border border-gray-200'
                             }`}>
-                              <ActIcon className={`w-4 h-4 flex-shrink-0 ${isDone ? 'text-green-600' : isRejected ? 'text-gray-400' : 'text-teal-600'}`} />
+                              <ActIcon className={`w-4 h-4 flex-shrink-0 ${isDone ? 'text-green-600' : isRejected ? 'text-gray-400' : 'text-primary-700'}`} />
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900">{act.title}</p>
                                 <p className="text-xs text-gray-500 truncate">{act.description}</p>
@@ -455,7 +455,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAutopilotApprove(approval, Array.from(rejectedSet))}
                             disabled={actionLoading !== null || activeCount === 0}
-                            className="flex-1 bg-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 transition-all"
+                            className="flex-1 bg-primary-700 text-white py-3 rounded-xl font-semibold text-sm hover:bg-primary-800 disabled:opacity-50 transition-all"
                           >
                             {actionLoading === approval.id + 'approve' ? 'Godkänner...' : `✅ Godkänn allt (${activeCount})`}
                           </button>
@@ -690,7 +690,7 @@ export default function ApprovalsPage() {
                               value={editText}
                               onChange={e => setEditText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 border border-teal-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                              className="w-full px-3 py-2 border border-primary-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
                             />
                           </div>
                         )}
@@ -705,7 +705,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => submitEdit(approval)}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
                             Godkänn med ändringar
@@ -722,7 +722,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => requestApprove(approval)}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-4 py-2 bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
                             {actionLoading === approval.id + 'approve' ? 'Godkänner...' : 'Godkänn'}
@@ -815,7 +815,7 @@ export default function ApprovalsPage() {
 
                   {recipient && !isCampaign && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MessageSquare className="w-4 h-4 text-teal-600" />
+                      <MessageSquare className="w-4 h-4 text-primary-700" />
                       <span>Till: <strong>{recipient}</strong></span>
                     </div>
                   )}
@@ -844,7 +844,7 @@ export default function ApprovalsPage() {
                   <button
                     onClick={confirmAndExecute}
                     disabled={actionLoading !== null}
-                    className="flex-1 px-4 py-3 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 disabled:opacity-50"
+                    className="flex-1 px-4 py-3 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 disabled:opacity-50"
                   >
                     {actionLoading ? 'Utför...' : info.btn}
                   </button>

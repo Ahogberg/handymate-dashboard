@@ -136,7 +136,7 @@ function getStatusLabel(status: string): { text: string; className: string } {
     case 'active':
       return { text: 'Aktiv', className: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
     case 'trialing':
-      return { text: 'Provperiod', className: 'bg-teal-100 text-teal-700 border-teal-200' }
+      return { text: 'Provperiod', className: 'bg-primary-100 text-primary-700 border-primary-300' }
     case 'past_due':
       return { text: 'Forfallt', className: 'bg-red-100 text-red-700 border-red-200' }
     case 'cancelled':
@@ -243,8 +243,8 @@ export default function BillingPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative max-w-5xl mx-auto">
@@ -284,7 +284,7 @@ export default function BillingPage() {
               <div className="p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-xl bg-primary-700 flex items-center justify-center flex-shrink-0">
                       <CreditCard className="w-6 h-6 text-white" />
                     </div>
                     <div>
@@ -326,7 +326,7 @@ export default function BillingPage() {
                     <button
                       onClick={handleManageSubscription}
                       disabled={portalLoading}
-                      className="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+                      className="flex items-center gap-2 px-5 py-2.5 bg-primary-700 text-white rounded-xl font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
                     >
                       {portalLoading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -410,13 +410,13 @@ export default function BillingPage() {
                       key={plan.id}
                       className={`relative bg-white rounded-2xl border-2 p-6 transition-all ${
                         isCurrent
-                          ? 'border-teal-400 shadow-md shadow-cyan-100'
+                          ? 'border-primary-500 shadow-md shadow-cyan-100'
                           : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       {isCurrent && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                          <span className="bg-teal-600 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                          <span className="bg-primary-700 text-white text-xs font-semibold px-3 py-1 rounded-full">
                             Nuvarande plan
                           </span>
                         </div>
@@ -450,7 +450,7 @@ export default function BillingPage() {
                         <button
                           onClick={() => handleCheckout(plan.id)}
                           disabled={checkoutLoading === plan.id}
-                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-teal-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-primary-700 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                         >
                           {checkoutLoading === plan.id ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
@@ -595,7 +595,7 @@ function UsageBar({
       {isAtLimit && (
         <Link
           href="/dashboard/settings/billing"
-          className="mt-2 text-xs text-teal-600 hover:underline flex items-center gap-1"
+          className="mt-2 text-xs text-primary-700 hover:underline flex items-center gap-1"
         >
           Uppgradera för mer <ChevronRight className="w-3 h-3" />
         </Link>
@@ -612,7 +612,7 @@ function BillingEventIcon({ type }: { type: string }) {
     case 'refund':
       return <ArrowDownRight className="w-4 h-4 text-emerald-500" />
     case 'upgrade':
-      return <ArrowUpRight className="w-4 h-4 text-teal-600" />
+      return <ArrowUpRight className="w-4 h-4 text-primary-700" />
     case 'downgrade':
       return <ArrowDownRight className="w-4 h-4 text-amber-500" />
     default:

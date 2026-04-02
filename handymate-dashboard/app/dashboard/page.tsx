@@ -456,10 +456,31 @@ export default function DashboardPage() {
     if (value === 0) return null
     const isPositive = value > 0
     return (
-      <span className={`flex items-center text-xs ${isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
-        {isPositive ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
+      <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium px-1.5 py-0.5 rounded-md ${
+        isPositive
+          ? 'text-emerald-700 bg-emerald-50'
+          : 'text-red-700 bg-red-50'
+      }`}>
+        {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
         {Math.abs(value)}%
       </span>
+    )
+  }
+
+  const MiniSparkBars = ({ data }: { data: { date: string; count: number }[] }) => {
+    if (!data || data.length === 0) return null
+    const max = Math.max(...data.map(d => d.count), 1)
+    return (
+      <div className="flex items-end gap-[3px] h-8 mt-2">
+        {data.slice(-7).map((d, i) => (
+          <div
+            key={i}
+            className="flex-1 rounded-sm bg-primary-200 min-h-[2px] transition-all"
+            style={{ height: `${Math.max((d.count / max) * 100, 8)}%` }}
+            title={`${d.date}: ${d.count}`}
+          />
+        ))}
+      </div>
     )
   }
 
@@ -482,13 +503,13 @@ export default function DashboardPage() {
                 <div
                   className={`w-full max-w-[56px] rounded-t-md transition-all ${
                     isToday
-                      ? 'bg-teal-500'
+                      ? 'bg-primary-600'
                       : 'bg-gray-200 hover:bg-gray-300'
                   }`}
                   style={{ height: `${height}%`, minHeight: '4px' }}
                 />
               </div>
-              <span className={`text-xs mt-1.5 font-medium ${isToday ? 'text-sky-700' : 'text-gray-400'}`}>
+              <span className={`text-xs mt-1.5 font-medium ${isToday ? 'text-secondary-700' : 'text-gray-400'}`}>
                 {dayName}
               </span>
             </div>
@@ -502,16 +523,16 @@ export default function DashboardPage() {
     switch (type) {
       case 'booking_created':
       case 'booking_updated':
-        return <Calendar className="w-3.5 h-3.5 text-sky-600" />
+        return <Calendar className="w-3.5 h-3.5 text-secondary-600" />
       case 'quote_sent':
       case 'quote_accepted':
       case 'quote_declined':
-        return <FileText className="w-3.5 h-3.5 text-teal-600" />
+        return <FileText className="w-3.5 h-3.5 text-primary-700" />
       case 'invoice_sent':
       case 'invoice_paid':
         return <Receipt className="w-3.5 h-3.5 text-amber-500" />
       case 'call_recorded':
-        return <Mic className="w-3.5 h-3.5 text-teal-500" />
+        return <Mic className="w-3.5 h-3.5 text-primary-600" />
       default:
         return <Activity className="w-3.5 h-3.5 text-gray-400" />
     }
@@ -540,8 +561,8 @@ export default function DashboardPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-sky-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-secondary-50 rounded-full blur-[128px]"></div>
       </div>
 
       <div className="relative">
@@ -557,7 +578,7 @@ export default function DashboardPage() {
 
         {/* Welcome popup — visas bara en gång */}
         {showWelcome && (
-          <div className="mb-6 p-5 bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl relative">
+          <div className="mb-6 p-5 bg-gradient-to-r from-primary-50 to-emerald-50 border border-primary-200 rounded-2xl relative">
             <button
               onClick={closeWelcome}
               className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white/60 transition-colors"
@@ -565,7 +586,7 @@ export default function DashboardPage() {
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-start gap-4">
-              <div className="p-2.5 rounded-xl bg-teal-600 flex-shrink-0">
+              <div className="p-2.5 rounded-xl bg-primary-700 flex-shrink-0">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -575,7 +596,7 @@ export default function DashboardPage() {
                 </p>
                 <button
                   onClick={closeWelcome}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors"
                 >
                   Kom igång
                   <ArrowRight className="w-4 h-4" />
@@ -587,7 +608,7 @@ export default function DashboardPage() {
 
         {/* Morning report popup */}
         {morningReport && (
-          <div className="mb-6 p-5 bg-gradient-to-r from-teal-50 to-sky-50 border border-teal-200 rounded-2xl relative">
+          <div className="mb-6 p-5 bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 rounded-2xl relative">
             <button
               onClick={() => {
                 const today = new Date().toISOString().slice(0, 10)
@@ -599,8 +620,8 @@ export default function DashboardPage() {
               <X className="w-4 h-4" />
             </button>
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center shrink-0">
-                <Sparkles className="w-5 h-5 text-teal-600" />
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center shrink-0">
+                <Sparkles className="w-5 h-5 text-primary-700" />
               </div>
               <div>
                 <h3 className="font-semibold text-gray-900 mb-1">Din dagliga rapport</h3>
@@ -617,8 +638,8 @@ export default function DashboardPage() {
           <div className="mb-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center">
-                  <Zap className="w-4 h-4 text-teal-700" />
+                <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+                  <Zap className="w-4 h-4 text-primary-700" />
                 </div>
                 <h2 className="font-semibold text-gray-900">Dagens plan</h2>
               </div>
@@ -637,7 +658,7 @@ export default function DashboardPage() {
                   <div className="text-sm font-mono text-gray-500 w-12 flex-shrink-0">
                     {formatTime(booking.scheduled_start)}
                   </div>
-                  <div className="w-1 h-8 rounded-full bg-teal-400 flex-shrink-0" />
+                  <div className="w-1 h-8 rounded-full bg-primary-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {(booking.customer as any)?.name || 'Kund'}
@@ -646,7 +667,7 @@ export default function DashboardPage() {
                       {getServiceFromNotes(booking.notes)}
                     </p>
                   </div>
-                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-sky-600 transition-colors flex-shrink-0" />
+                  <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-secondary-600 transition-colors flex-shrink-0" />
                 </Link>
               ))}
             </div>
@@ -654,7 +675,7 @@ export default function DashboardPage() {
             {bookings.length > 4 && (
               <Link
                 href="/dashboard/schedule"
-                className="mt-3 flex items-center justify-center gap-1 text-xs text-sky-700 hover:text-teal-700 font-medium py-2"
+                className="mt-3 flex items-center justify-center gap-1 text-xs text-secondary-700 hover:text-primary-700 font-medium py-2"
               >
                 Visa alla {bookings.length} bokningar
                 <ArrowRight className="w-3 h-3" />
@@ -671,7 +692,7 @@ export default function DashboardPage() {
                   </div>
                 )}
                 {(stats.ai?.pending_suggestions ?? 0) > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-sky-700">
+                  <div className="flex items-center gap-2 text-xs text-secondary-700">
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>{stats.ai.pending_suggestions} AI-förslag att granska</span>
                   </div>
@@ -696,10 +717,10 @@ export default function DashboardPage() {
         {/* AI Inbox Banner — fixed: no floating "0" when pending_suggestions is 0 */}
         {(stats?.ai?.pending_suggestions ?? 0) > 0 && (
           <Link href="/dashboard/ai-inbox">
-            <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-xl hover:border-teal-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-teal-600">
+                  <div className="p-2 rounded-lg bg-primary-700">
                     <Sparkles className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -711,7 +732,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <ArrowRight className="w-5 h-5 text-sky-700" />
+                <ArrowRight className="w-5 h-5 text-secondary-700" />
               </div>
             </div>
           </Link>
@@ -720,10 +741,10 @@ export default function DashboardPage() {
         {/* Phone setup banner — show when phone not configured and onboarding dismissed */}
         {!showOnboarding && onboardingData && !onboardingData.assigned_phone_number && (
           <Link href="/dashboard/settings/phone">
-            <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-xl hover:border-teal-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-teal-600">
+                  <div className="p-2 rounded-lg bg-primary-700">
                     <Phone className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -735,7 +756,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <span className="text-sky-700 font-medium text-sm flex items-center gap-1">
+                <span className="text-secondary-700 font-medium text-sm flex items-center gap-1">
                   Kom igång <ArrowRight className="w-4 h-4" />
                 </span>
               </div>
@@ -751,7 +772,7 @@ export default function DashboardPage() {
               reminders.push({ id: 'google', icon: Calendar, bgColor: 'bg-orange-50', border: 'border-orange-200', iconBg: 'bg-orange-100', iconColor: 'text-orange-600', title: 'Koppla Google Calendar för att synka bokningar', desc: 'Dina bokningar visas i Google Calendar automatiskt.', href: '/dashboard/settings?tab=integrations', cta: 'Koppla nu' })
             }
             if (!onboardingData.gmail_enabled && !dismissedReminders.has('gmail')) {
-              reminders.push({ id: 'gmail', icon: Mail, bgColor: 'bg-teal-50', border: 'border-teal-200', iconBg: 'bg-teal-100', iconColor: 'text-teal-600', title: 'Koppla Gmail för att se all kundkommunikation', desc: 'Se email-historik direkt i kundkortet.', href: '/dashboard/settings?tab=integrations', cta: 'Aktivera' })
+              reminders.push({ id: 'gmail', icon: Mail, bgColor: 'bg-primary-50', border: 'border-primary-200', iconBg: 'bg-primary-100', iconColor: 'text-primary-700', title: 'Koppla Gmail för att se all kundkommunikation', desc: 'Se email-historik direkt i kundkortet.', href: '/dashboard/settings?tab=integrations', cta: 'Aktivera' })
             }
             if ((!onboardingData.lead_sources || onboardingData.lead_sources.length === 0) && !dismissedReminders.has('leads')) {
               reminders.push({ id: 'leads', icon: Globe, bgColor: 'bg-emerald-50', border: 'border-emerald-200', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', title: 'Konfigurera lead-källor för att få in kunder automatiskt', desc: 'Ta emot förfrågningar från Offerta, ServiceFinder m.fl.', href: '/dashboard/settings?tab=integrations', cta: 'Kom igång' })
@@ -771,7 +792,7 @@ export default function DashboardPage() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-2 ml-3">
-                    <Link href={r.href} className="text-sky-700 font-medium text-sm flex items-center gap-1 whitespace-nowrap">
+                    <Link href={r.href} className="text-secondary-700 font-medium text-sm flex items-center gap-1 whitespace-nowrap">
                       {r.cta} <ArrowRight className="w-4 h-4" />
                     </Link>
                     <button
@@ -811,47 +832,60 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-teal-50">
-                    <Calendar className="w-4 h-4 text-teal-600" />
-                  </div>
+              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bokningar</p>
                   <TrendIndicator value={stats?.bookings?.trend || 0} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{stats?.bookings?.week || 0}</p>
-                <p className="text-xs text-gray-400">Bokningar denna vecka</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.bookings?.week || 0}</p>
+                  <p className="text-sm text-gray-400">denna vecka</p>
+                </div>
+                <MiniSparkBars data={stats?.bookings_per_day || []} />
               </div>
 
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-sky-50">
-                    <Users className="w-4 h-4 text-sky-600" />
-                  </div>
+              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nya kunder</p>
                   <TrendIndicator value={stats?.customers?.trend || 0} />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{stats?.customers?.new_this_month || 0}</p>
-                <p className="text-xs text-gray-400">Nya kunder i månad</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.customers?.new_this_month || 0}</p>
+                  <p className="text-sm text-gray-400">i månaden</p>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                  <Users className="w-3 h-3" />
+                  <span>{stats?.customers?.total || 0} totalt</span>
+                </div>
               </div>
 
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-amber-50">
-                    <Clock className="w-4 h-4 text-amber-600" />
-                  </div>
+              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Arbetad tid</p>
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{stats?.time?.week_hours || 0}h</p>
-                <p className="text-xs text-gray-400">Arbetad tid vecka</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.time?.week_hours || 0}<span className="text-lg font-medium text-gray-400">h</span></p>
+                  <p className="text-sm text-gray-400">vecka</p>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                  <Clock className="w-3 h-3" />
+                  <span>{stats?.time?.month_hours || 0}h denna månad</span>
+                </div>
               </div>
 
-              <Link href="/dashboard/projects" className="bg-white shadow-sm rounded-xl p-4 border border-gray-200 hover:border-teal-300 transition-all">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="p-2 rounded-lg bg-slate-100">
-                    <FolderKanban className="w-4 h-4 text-slate-600" />
-                  </div>
-                  <ArrowRight className="w-3 h-3 text-gray-400" />
+              <Link href="/dashboard/projects" className="bg-white rounded-xl p-4 border border-gray-200 card-base group cursor-pointer">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projekt</p>
+                  <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
                 </div>
-                <p className="text-2xl font-bold text-gray-900">{activeProjects}</p>
-                <p className="text-xs text-gray-400">Aktiva projekt</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-gray-900 font-heading">{activeProjects}</p>
+                  <p className="text-sm text-gray-400">aktiva</p>
+                </div>
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                  <FolderKanban className="w-3 h-3" />
+                  <span>Se alla projekt</span>
+                </div>
               </Link>
             </>
           )}
@@ -861,14 +895,14 @@ export default function DashboardPage() {
         <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 mb-8">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-teal-600" />
+              <ClipboardList className="w-4 h-4 text-primary-700" />
               Att göra idag
               {todayItems.filter(i => i.status === 'pending').length > 0 && (
-                <span className="text-xs font-normal bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">{todayItems.filter(i => i.status === 'pending').length}</span>
+                <span className="text-xs font-normal bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">{todayItems.filter(i => i.status === 'pending').length}</span>
               )}
             </h2>
             {savedTimeText && (
-              <span className="text-xs text-teal-600 flex items-center gap-1">
+              <span className="text-xs text-primary-700 flex items-center gap-1">
                 <Zap className="w-3 h-3" />
                 {savedTimeText}
               </span>
@@ -891,7 +925,7 @@ export default function DashboardPage() {
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
                     item.type === 'booking' ? 'bg-blue-50 text-blue-600' :
-                    item.type === 'approval' ? 'bg-teal-50 text-teal-600' :
+                    item.type === 'approval' ? 'bg-primary-50 text-primary-700' :
                     item.type === 'overdue_invoice' ? 'bg-red-50 text-red-600' :
                     item.type === 'work_order' ? 'bg-amber-50 text-amber-600' :
                     'bg-gray-50 text-gray-500'
@@ -943,10 +977,10 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-sky-700" />
+                <TrendingUp className="w-4 h-4 text-secondary-700" />
                 Säljtratt
               </h2>
-              <Link href="/dashboard/pipeline" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
+              <Link href="/dashboard/pipeline" className="text-xs text-secondary-700 hover:text-secondary-600 flex items-center gap-1">
                 Pipeline <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -956,7 +990,7 @@ export default function DashboardPage() {
                 return (
                   <div className="py-4 text-center">
                     <p className="text-sm text-gray-400">Ingen pipeline-data ännu</p>
-                    <Link href="/dashboard/pipeline" className="text-sm text-sky-700 hover:text-sky-600 mt-1 inline-block">
+                    <Link href="/dashboard/pipeline" className="text-sm text-secondary-700 hover:text-secondary-600 mt-1 inline-block">
                       Gå till pipeline →
                     </Link>
                   </div>
@@ -976,7 +1010,7 @@ export default function DashboardPage() {
                     {pipelineStats.totalValue > 0 && (
                       <p className="text-sm text-gray-500 mt-1">{formatCurrency(pipelineStats.totalValue)} kr exkl. moms i pipeline</p>
                     )}
-                    <Link href="/dashboard/pipeline" className="text-sm text-sky-700 hover:text-sky-600 mt-2 inline-block">
+                    <Link href="/dashboard/pipeline" className="text-sm text-secondary-700 hover:text-secondary-600 mt-2 inline-block">
                       Öppna pipeline →
                     </Link>
                   </div>
@@ -1068,10 +1102,10 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-sky-700" />
+                <BarChart3 className="w-4 h-4 text-secondary-700" />
                 Ekonomi
               </h2>
-              <Link href="/dashboard/analytics" className="text-xs text-sky-700 hover:text-sky-600 flex items-center gap-1">
+              <Link href="/dashboard/analytics" className="text-xs text-secondary-700 hover:text-secondary-600 flex items-center gap-1">
                 Visa analys <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
@@ -1098,7 +1132,7 @@ export default function DashboardPage() {
                   </Link>
                 )}
                 {!economics.overheadSet && (
-                  <Link href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-teal-600 transition-colors mt-1">
+                  <Link href="/dashboard/settings" className="block text-xs text-gray-400 hover:text-primary-700 transition-colors mt-1">
                     Sätt overhead i inställningar för bättre estimat →
                   </Link>
                 )}
@@ -1113,7 +1147,7 @@ export default function DashboardPage() {
           <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-teal-600" />
+                <Activity className="w-4 h-4 text-primary-700" />
                 Senaste aktivitet
               </h2>
             </div>

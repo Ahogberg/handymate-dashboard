@@ -46,7 +46,7 @@ import dynamic from 'next/dynamic'
 const TeamPageContent = dynamic(() => import('@/app/dashboard/team/page'), {
   loading: () => (
     <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+      <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
     </div>
   ),
 })
@@ -199,7 +199,7 @@ function AutoInvoiceButton({ businessId, autoSend, maxAmount }: { businessId: st
       <button
         onClick={runAutoGenerate}
         disabled={running}
-        className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
+        className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-primary-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
       >
         {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
         {running ? 'Genererar...' : 'Generera fakturor nu'}
@@ -297,7 +297,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
         <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
           <div 
             className={`h-full rounded-full transition-all ${
-              percentUsed > 90 ? 'bg-red-500' : percentUsed > 70 ? 'bg-amber-500' : 'bg-teal-600'
+              percentUsed > 90 ? 'bg-red-500' : percentUsed > 70 ? 'bg-amber-500' : 'bg-primary-700'
             }`}
             style={{ width: `${percentUsed}%` }}
           />
@@ -1345,8 +1345,8 @@ export default function SettingsPage() {
     <PermissionGate permission="manage_settings">
     <div className="p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {toast.show && (
@@ -1366,7 +1366,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+            className="flex items-center px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : <Save className="w-5 h-5 mr-2" />}
             Spara ändringar
@@ -1386,7 +1386,7 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                   activeTab === tab.id
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-primary-700 text-white'
                     : 'bg-white text-gray-500 border border-gray-200'
                 }`}
               >
@@ -1421,11 +1421,11 @@ export default function SettingsPage() {
                       onClick={() => setActiveTab(tab.id)}
                       className={`w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors text-left ${
                         activeTab === tab.id
-                          ? 'bg-teal-50 text-teal-700 font-medium border-l-2 border-teal-600'
+                          ? 'bg-primary-50 text-primary-700 font-medium border-l-2 border-primary-700'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                       }`}
                     >
-                      <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-teal-600' : 'text-gray-400'}`} />
+                      <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-primary-700' : 'text-gray-400'}`} />
                       {tab.label}
                     </button>
                   )
@@ -1462,7 +1462,7 @@ export default function SettingsPage() {
                   </div>
                 )}
                 <div>
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 text-teal-700 text-sm font-medium rounded-lg hover:bg-teal-100 transition-colors">
+                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 text-sm font-medium rounded-lg hover:bg-primary-100 transition-colors">
                     <Upload className="w-3.5 h-3.5" />
                     {config.logo_url ? 'Byt logga' : 'Ladda upp'}
                     <input
@@ -1505,7 +1505,7 @@ export default function SettingsPage() {
                   type="text"
                   value={config.business_name || ''}
                   onChange={(e) => setConfig({ ...config, business_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
                 <p className="text-xs text-gray-400 mt-1">Visas i SMS och används av AI-assistenten</p>
               </div>
@@ -1518,7 +1518,7 @@ export default function SettingsPage() {
                   type="text"
                   value={config.contact_name || ''}
                   onChange={(e) => setConfig({ ...config, contact_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -1531,7 +1531,7 @@ export default function SettingsPage() {
                   type="email"
                   value={config.contact_email || ''}
                   onChange={(e) => setConfig({ ...config, contact_email: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -1544,7 +1544,7 @@ export default function SettingsPage() {
                   type="tel"
                   value={config.phone_number || ''}
                   onChange={(e) => setConfig({ ...config, phone_number: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
             </div>
@@ -1560,7 +1560,7 @@ export default function SettingsPage() {
                   value={config.service_area || ''}
                   onChange={(e) => setConfig({ ...config, service_area: e.target.value })}
                   placeholder="T.ex. Stockholm, Solna, Sundbyberg"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
                 <p className="text-xs text-gray-400 mt-1">AI-assistenten berättar för kunder var ni jobbar</p>
               </div>
@@ -1574,7 +1574,7 @@ export default function SettingsPage() {
                   value={(config as any).org_number || ''}
                   onChange={(e) => setConfig({ ...config, org_number: e.target.value } as any)}
                   placeholder="XXXXXX-XXXX"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
                 <p className="text-xs text-gray-400 mt-1">Visas på offerter och fakturor</p>
               </div>
@@ -1583,24 +1583,24 @@ export default function SettingsPage() {
             {/* Länk till prislista */}
             <Link
               href="/dashboard/settings/pricelist"
-              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-teal-300 transition-all group"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-teal-600/20 to-teal-500/20 border border-teal-300">
-                  <FileText className="w-5 h-5 text-sky-700" />
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-700/20 to-primary-600/20 border border-primary-300">
+                  <FileText className="w-5 h-5 text-secondary-700" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Grossistprislista</p>
                   <p className="text-sm text-gray-400">Hantera leverantörer och produktpriser</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
 
             {/* Länk till produktregister */}
             <Link
               href="/dashboard/settings/products"
-              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-teal-300 transition-all group"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-amber-600/20 to-amber-500/20 border border-amber-300">
@@ -1611,50 +1611,50 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-400">Sökbart register för offerter och fakturor</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
 
             {/* Länk till offertkategorier */}
             <Link
               href="/dashboard/settings/quote-categories"
-              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-teal-300 transition-all group"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
             >
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-br from-teal-600/20 to-teal-500/20 border border-teal-300">
-                  <FileText className="w-5 h-5 text-teal-700" />
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-700/20 to-primary-600/20 border border-primary-300">
+                  <FileText className="w-5 h-5 text-primary-700" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Offertkategorier</p>
                   <p className="text-sm text-gray-400">Egna kategorier för offertrader</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
 
             {/* Länk till formulärmallar */}
             <Link
               href="/dashboard/settings/form-templates"
-              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-teal-300 transition-all group"
+              className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-sky-600/20 to-sky-500/20 border border-sky-300">
-                  <FileText className="w-5 h-5 text-sky-700" />
+                  <FileText className="w-5 h-5 text-secondary-700" />
                 </div>
                 <div>
                   <p className="font-medium text-gray-900">Formulärmallar</p>
                   <p className="text-sm text-gray-400">Egenkontroller, säkerhetschecklistor och egna formulär</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-sky-700 transition-colors" />
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
 
             <div>
               <label className="text-sm text-gray-500 mb-2 block">Tjänster ni erbjuder</label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {config.services_offered?.map((service) => (
-                  <span key={service} className="flex items-center px-3 py-1.5 bg-teal-100 border border-teal-300 rounded-lg text-sm text-teal-600">
+                  <span key={service} className="flex items-center px-3 py-1.5 bg-primary-100 border border-primary-300 rounded-lg text-sm text-primary-700">
                     {service}
-                    <button onClick={() => removeService(service)} className="ml-2 text-sky-700 hover:text-gray-900">
+                    <button onClick={() => removeService(service)} className="ml-2 text-secondary-700 hover:text-gray-900">
                       <X className="w-3 h-3" />
                     </button>
                   </span>
@@ -1667,7 +1667,7 @@ export default function SettingsPage() {
                   onChange={(e) => setNewService(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && addService()}
                   placeholder="Lägg till tjänst..."
-                  className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
                 <button
                   onClick={addService}
@@ -1705,7 +1705,7 @@ export default function SettingsPage() {
                       type="checkbox"
                       checked={hours.enabled}
                       onChange={(e) => updateHours(day, 'enabled', e.target.checked)}
-                      className="w-5 h-5 rounded border-gray-300 bg-gray-200 text-sky-700 focus:ring-teal-500/50"
+                      className="w-5 h-5 rounded border-gray-300 bg-gray-200 text-secondary-700 focus:ring-primary-600/50"
                     />
                     <span className={`font-medium ${hours.enabled ? 'text-gray-900' : 'text-gray-400'}`}>
                       {DAY_NAMES[day]}
@@ -1718,14 +1718,14 @@ export default function SettingsPage() {
                         type="time"
                         value={hours.open}
                         onChange={(e) => updateHours(day, 'open', e.target.value)}
-                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                       <span className="text-gray-400">–</span>
                       <input
                         type="time"
                         value={hours.close}
                         onChange={(e) => updateHours(day, 'close', e.target.value)}
-                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                        className="px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                       />
                     </div>
                   ) : (
@@ -1747,10 +1747,10 @@ export default function SettingsPage() {
               {config.assigned_phone_number ? (
                 // Har redan ett nummer
                 <div className="space-y-4">
-                  <div className="p-4 bg-gradient-to-r from-teal-600/10 to-teal-500/10 border border-teal-300 rounded-xl">
+                  <div className="p-4 bg-gradient-to-r from-primary-700/10 to-primary-600/10 border border-primary-300 rounded-xl">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-teal-600 rounded-xl">
+                        <div className="p-3 bg-primary-700 rounded-xl">
                           <Phone className="w-6 h-6 text-gray-900" />
                         </div>
                         <div>
@@ -1775,7 +1775,7 @@ export default function SettingsPage() {
                       value={config.forward_phone_number || ''}
                       onChange={(e) => setConfig({ ...config, forward_phone_number: e.target.value })}
                       placeholder="+46701234567"
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                     <p className="text-xs text-gray-400 mt-1">Din mobil eller fast telefon dit samtal kopplas</p>
                   </div>
@@ -1803,7 +1803,7 @@ export default function SettingsPage() {
                       value={forwardNumber}
                       onChange={(e) => setForwardNumber(e.target.value)}
                       placeholder="+46701234567"
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                     <p className="text-xs text-gray-400 mt-1">
                       Samtal till ditt Handymate-nummer kopplas hit efter GDPR-meddelandet
@@ -1813,7 +1813,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleProvisionPhone}
                     disabled={provisioning || !forwardNumber.trim()}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {provisioning ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1830,7 +1830,7 @@ export default function SettingsPage() {
             {config.assigned_phone_number && (
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
                 <div className="flex items-center gap-2 mb-4">
-                  <Mic className="w-5 h-5 text-sky-700" />
+                  <Mic className="w-5 h-5 text-secondary-700" />
                   <h2 className="text-lg font-semibold text-gray-900">Samtalsinspelning</h2>
                 </div>
 
@@ -1850,7 +1850,7 @@ export default function SettingsPage() {
                       })}
                       className={`w-12 h-6 rounded-full transition-all ${
                         config.call_recording_enabled
-                          ? 'bg-teal-600'
+                          ? 'bg-primary-700'
                           : 'bg-gray-200'
                       }`}
                     >
@@ -1874,7 +1874,7 @@ export default function SettingsPage() {
                         })}
                         placeholder="Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål."
                         rows={3}
-                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                       />
                       <p className="text-xs text-gray-400 mt-1">
                         Enligt GDPR måste du informera att samtalet spelas in
@@ -1883,8 +1883,8 @@ export default function SettingsPage() {
                   )}
 
                   {/* Info om vad som händer */}
-                  <div className="p-4 bg-teal-50 border border-teal-300 rounded-xl">
-                    <p className="text-sm text-teal-600">
+                  <div className="p-4 bg-primary-50 border border-primary-300 rounded-xl">
+                    <p className="text-sm text-primary-700">
                       <strong>Så här fungerar det:</strong>
                     </p>
                     <ol className="mt-2 space-y-1 text-sm text-gray-500">
@@ -1900,7 +1900,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleSavePhoneSettings}
                     disabled={savingPhone}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {savingPhone ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -1959,7 +1959,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleTestSms}
                     disabled={sendingTestSms}
-                    className="flex items-center gap-2 px-4 py-2.5 border border-teal-300 text-teal-700 rounded-xl text-sm font-medium hover:bg-teal-50 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-2 px-4 py-2.5 border border-primary-300 text-primary-700 rounded-xl text-sm font-medium hover:bg-primary-50 disabled:opacity-50 transition-colors"
                   >
                     {sendingTestSms ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
                     Skicka test-SMS
@@ -1988,7 +1988,7 @@ export default function SettingsPage() {
                   <select
                     value={config.default_payment_days || 30}
                     onChange={(e) => setConfig({ ...config, default_payment_days: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value={10}>10 dagar</option>
                     <option value={15}>15 dagar</option>
@@ -2005,7 +2005,7 @@ export default function SettingsPage() {
                       type="number"
                       value={config.late_fee_percent || 8}
                       onChange={(e) => setConfig({ ...config, late_fee_percent: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-12"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-12"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
@@ -2029,7 +2029,7 @@ export default function SettingsPage() {
                   })}
                   className={`w-12 h-6 rounded-full transition-all ${
                     config.f_skatt_registered
-                      ? 'bg-teal-600'
+                      ? 'bg-primary-700'
                       : 'bg-gray-200'
                   }`}
                 >
@@ -2053,7 +2053,7 @@ export default function SettingsPage() {
                     value={config.bankgiro || ''}
                     onChange={(e) => setConfig({ ...config, bankgiro: e.target.value })}
                     placeholder="123-4567"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
 
@@ -2064,7 +2064,7 @@ export default function SettingsPage() {
                     value={config.plusgiro || ''}
                     onChange={(e) => setConfig({ ...config, plusgiro: e.target.value })}
                     placeholder="12 34 56-7"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
 
@@ -2075,7 +2075,7 @@ export default function SettingsPage() {
                     value={config.swish_number || ''}
                     onChange={(e) => setConfig({ ...config, swish_number: e.target.value })}
                     placeholder="123 456 78 90"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <p className="text-xs text-gray-400 mt-1.5">Ditt Swish-nummer visas som QR-kod på fakturor — kunden skannar och betalar direkt.</p>
                 </div>
@@ -2087,7 +2087,7 @@ export default function SettingsPage() {
                     value={config.bank_account_number || ''}
                     onChange={(e) => setConfig({ ...config, bank_account_number: e.target.value })}
                     placeholder="1234-12 345 67"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -2105,7 +2105,7 @@ export default function SettingsPage() {
                     value={config.invoice_prefix || 'FV'}
                     onChange={(e) => setConfig({ ...config, invoice_prefix: e.target.value })}
                     placeholder="FV"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <p className="text-xs text-gray-400 mt-1">Prefix för fakturanummer, t.ex. FV-2026-001</p>
                 </div>
@@ -2117,7 +2117,7 @@ export default function SettingsPage() {
                     value={config.next_invoice_number || 1}
                     onChange={(e) => setConfig({ ...config, next_invoice_number: parseInt(e.target.value) || 1 })}
                     min={1}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                   <p className="text-xs text-gray-400 mt-1">Numret som nästa faktura får</p>
                 </div>
@@ -2130,7 +2130,7 @@ export default function SettingsPage() {
                   onChange={(e) => setConfig({ ...config, invoice_footer_text: e.target.value })}
                   placeholder="Tack för att du anlitar oss! Vid frågor kontakta oss på..."
                   rows={3}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">Visas längst ner på varje faktura</p>
               </div>
@@ -2139,7 +2139,7 @@ export default function SettingsPage() {
             {/* Påminnelser */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Bell className="w-5 h-5 text-sky-700" />
+                <Bell className="w-5 h-5 text-secondary-700" />
                 <h2 className="text-lg font-semibold text-gray-900">Påminnelser</h2>
               </div>
 
@@ -2158,7 +2158,7 @@ export default function SettingsPage() {
                   })}
                   className={`w-12 h-6 rounded-full transition-all ${
                     config.auto_reminder_enabled
-                      ? 'bg-teal-600'
+                      ? 'bg-primary-700'
                       : 'bg-gray-200'
                   }`}
                 >
@@ -2175,7 +2175,7 @@ export default function SettingsPage() {
                     <select
                       value={config.auto_reminder_days || 7}
                       onChange={(e) => setConfig({ ...config, auto_reminder_days: parseInt(e.target.value) })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       <option value={3}>3 dagar efter förfall</option>
                       <option value={5}>5 dagar efter förfall</option>
@@ -2191,7 +2191,7 @@ export default function SettingsPage() {
                         type="number"
                         value={config.reminder_fee || 60}
                         onChange={(e) => setConfig({ ...config, reminder_fee: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-12"
+                        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-12"
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                     </div>
@@ -2202,7 +2202,7 @@ export default function SettingsPage() {
                     <select
                       value={config.max_auto_reminders || 3}
                       onChange={(e) => setConfig({ ...config, max_auto_reminders: parseInt(e.target.value) })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       <option value={1}>1 påminnelse</option>
                       <option value={2}>2 påminnelser</option>
@@ -2222,7 +2222,7 @@ export default function SettingsPage() {
                   onChange={(e) => setConfig({ ...config, reminder_sms_template: e.target.value })}
                   placeholder="Påminnelse: Faktura {invoice_number} på {amount} kr förföll {due_date}. Betala till bankgiro {bankgiro} eller Swish {swish}. //{business_name}"
                   rows={4}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
                 <div className="mt-2 text-xs text-gray-400">
                   <p className="font-medium mb-1">Tillgängliga variabler:</p>
@@ -2252,7 +2252,7 @@ export default function SettingsPage() {
                       type="number"
                       value={config.default_hourly_rate || 500}
                       onChange={(e) => setConfig({ ...config, default_hourly_rate: parseFloat(e.target.value) || 0 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-16"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-16"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr/tim</span>
                   </div>
@@ -2264,7 +2264,7 @@ export default function SettingsPage() {
                   <select
                     value={config.time_rounding_minutes || 15}
                     onChange={(e) => setConfig({ ...config, time_rounding_minutes: parseInt(e.target.value) })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   >
                     <option value={1}>1 minut (ingen avrundning)</option>
                     <option value={5}>5 minuter</option>
@@ -2283,7 +2283,7 @@ export default function SettingsPage() {
                       step="0.5"
                       value={config.standard_work_hours || 8}
                       onChange={(e) => setConfig({ ...config, standard_work_hours: parseFloat(e.target.value) || 8 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-20"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-20"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">tim/dag</span>
                   </div>
@@ -2297,7 +2297,7 @@ export default function SettingsPage() {
                       step="0.5"
                       value={config.overtime_after || 8}
                       onChange={(e) => setConfig({ ...config, overtime_after: parseFloat(e.target.value) || 8 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-16"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-16"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">timmar</span>
                   </div>
@@ -2312,7 +2312,7 @@ export default function SettingsPage() {
                       step="0.5"
                       value={config.break_after_hours || 5}
                       onChange={(e) => setConfig({ ...config, break_after_hours: parseFloat(e.target.value) || 5 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-16"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-16"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">timmar</span>
                   </div>
@@ -2325,7 +2325,7 @@ export default function SettingsPage() {
                       type="number"
                       value={config.default_break_minutes || 30}
                       onChange={(e) => setConfig({ ...config, default_break_minutes: parseInt(e.target.value) || 30 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-16"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-16"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">minuter</span>
                   </div>
@@ -2341,7 +2341,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => setConfig({ ...config, time_require_description: !config.time_require_description })}
-                    className={`w-12 h-6 rounded-full transition-all ${config.time_require_description ? 'bg-teal-600' : 'bg-gray-200'}`}
+                    className={`w-12 h-6 rounded-full transition-all ${config.time_require_description ? 'bg-primary-700' : 'bg-gray-200'}`}
                   >
                     <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.time_require_description ? 'translate-x-6' : 'translate-x-0.5'}`} />
                   </button>
@@ -2354,7 +2354,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => setConfig({ ...config, require_gps_checkin: !config.require_gps_checkin })}
-                    className={`w-12 h-6 rounded-full transition-all ${config.require_gps_checkin ? 'bg-teal-600' : 'bg-gray-200'}`}
+                    className={`w-12 h-6 rounded-full transition-all ${config.require_gps_checkin ? 'bg-primary-700' : 'bg-gray-200'}`}
                   >
                     <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.require_gps_checkin ? 'translate-x-6' : 'translate-x-0.5'}`} />
                   </button>
@@ -2367,7 +2367,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => setConfig({ ...config, require_project: !config.require_project })}
-                    className={`w-12 h-6 rounded-full transition-all ${config.require_project ? 'bg-teal-600' : 'bg-gray-200'}`}
+                    className={`w-12 h-6 rounded-full transition-all ${config.require_project ? 'bg-primary-700' : 'bg-gray-200'}`}
                   >
                     <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.require_project ? 'translate-x-6' : 'translate-x-0.5'}`} />
                   </button>
@@ -2389,7 +2389,7 @@ export default function SettingsPage() {
                       step="0.5"
                       value={config.mileage_rate || 25}
                       onChange={(e) => setConfig({ ...config, mileage_rate: parseFloat(e.target.value) || 25 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-14"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-14"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr/km</span>
                   </div>
@@ -2403,7 +2403,7 @@ export default function SettingsPage() {
                       type="number"
                       value={config.allowance_full_day || 290}
                       onChange={(e) => setConfig({ ...config, allowance_full_day: parseInt(e.target.value) || 290 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-10"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-10"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                   </div>
@@ -2417,7 +2417,7 @@ export default function SettingsPage() {
                       type="number"
                       value={config.allowance_half_day || 145}
                       onChange={(e) => setConfig({ ...config, allowance_half_day: parseInt(e.target.value) || 145 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-10"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-10"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                   </div>
@@ -2440,7 +2440,7 @@ export default function SettingsPage() {
                       step="0.05"
                       value={Math.round((config.ob1_rate || 1.3) * 100)}
                       onChange={(e) => setConfig({ ...config, ob1_rate: (parseInt(e.target.value) || 130) / 100 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
@@ -2454,7 +2454,7 @@ export default function SettingsPage() {
                       step="0.05"
                       value={Math.round((config.ob2_rate || 1.7) * 100)}
                       onChange={(e) => setConfig({ ...config, ob2_rate: (parseInt(e.target.value) || 170) / 100 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
@@ -2468,7 +2468,7 @@ export default function SettingsPage() {
                       step="0.05"
                       value={Math.round((config.overtime_50_rate || 1.5) * 100)}
                       onChange={(e) => setConfig({ ...config, overtime_50_rate: (parseInt(e.target.value) || 150) / 100 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
@@ -2482,7 +2482,7 @@ export default function SettingsPage() {
                       step="0.05"
                       value={Math.round((config.overtime_100_rate || 2.0) * 100)}
                       onChange={(e) => setConfig({ ...config, overtime_100_rate: (parseInt(e.target.value) || 200) / 100 })}
-                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                      className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                     />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                   </div>
@@ -2499,7 +2499,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setShowAddWorkType(!showAddWorkType)}
-                  className="flex items-center gap-2 px-4 py-2 bg-teal-100 border border-teal-300 rounded-xl text-sm text-teal-600 hover:bg-teal-600/30"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-100 border border-primary-300 rounded-xl text-sm text-primary-700 hover:bg-primary-700/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till
@@ -2515,7 +2515,7 @@ export default function SettingsPage() {
                       value={newWorkType.name}
                       onChange={(e) => setNewWorkType({ ...newWorkType, name: e.target.value })}
                       placeholder="Namn på arbetstyp"
-                      className="px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                     <div className="relative">
                       <input
@@ -2523,7 +2523,7 @@ export default function SettingsPage() {
                         step="0.1"
                         value={newWorkType.multiplier}
                         onChange={(e) => setNewWorkType({ ...newWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
-                        className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                        className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">x</span>
                     </div>
@@ -2532,7 +2532,7 @@ export default function SettingsPage() {
                         type="checkbox"
                         checked={newWorkType.billable_default}
                         onChange={(e) => setNewWorkType({ ...newWorkType, billable_default: e.target.checked })}
-                        className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700"
+                        className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-secondary-700"
                       />
                       <span className="text-sm text-gray-700">Fakturerbar</span>
                     </label>
@@ -2541,7 +2541,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleAddWorkType}
                       disabled={!newWorkType.name.trim() || savingWorkType}
-                      className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-xl text-sm text-white hover:opacity-90 disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-sm text-white hover:opacity-90 disabled:opacity-50"
                     >
                       {savingWorkType ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                       Spara
@@ -2566,7 +2566,7 @@ export default function SettingsPage() {
                           type="text"
                           value={editingWorkType.name}
                           onChange={(e) => setEditingWorkType({ ...editingWorkType, name: e.target.value })}
-                          className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                          className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                         />
                         <div className="relative">
                           <input
@@ -2574,7 +2574,7 @@ export default function SettingsPage() {
                             step="0.1"
                             value={editingWorkType.multiplier}
                             onChange={(e) => setEditingWorkType({ ...editingWorkType, multiplier: parseFloat(e.target.value) || 1.0 })}
-                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50 pr-8"
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-8"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">x</span>
                         </div>
@@ -2583,7 +2583,7 @@ export default function SettingsPage() {
                             type="checkbox"
                             checked={editingWorkType.billable_default}
                             onChange={(e) => setEditingWorkType({ ...editingWorkType, billable_default: e.target.checked })}
-                            className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-sky-700"
+                            className="w-4 h-4 rounded border-gray-300 bg-gray-200 text-secondary-700"
                           />
                           <span className="text-xs text-gray-700">Fakturerbar</span>
                         </label>
@@ -2591,7 +2591,7 @@ export default function SettingsPage() {
                           <button
                             onClick={() => handleUpdateWorkType(editingWorkType)}
                             disabled={savingWorkType}
-                            className="px-3 py-1.5 bg-teal-100 border border-teal-300 rounded-lg text-xs text-teal-600 hover:bg-teal-600/30 disabled:opacity-50"
+                            className="px-3 py-1.5 bg-primary-100 border border-primary-300 rounded-lg text-xs text-primary-700 hover:bg-primary-700/30 disabled:opacity-50"
                           >
                             Spara
                           </button>
@@ -2609,7 +2609,7 @@ export default function SettingsPage() {
                           <div>
                             <p className="font-medium text-gray-900">{wt.name}</p>
                             <div className="flex items-center gap-2 mt-1">
-                              <span className="px-2 py-0.5 bg-teal-100 text-teal-600 text-xs rounded-lg">
+                              <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-lg">
                                 {wt.multiplier}x
                               </span>
                               {wt.billable_default ? (
@@ -2674,7 +2674,7 @@ export default function SettingsPage() {
                   onClick={() => setConfig({ ...config, auto_invoice_enabled: !config.auto_invoice_enabled })}
                   className={`w-12 h-6 rounded-full transition-all ${
                     config.auto_invoice_enabled
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                      ? 'bg-gradient-to-r from-emerald-500 to-primary-600'
                       : 'bg-gray-200'
                   }`}
                 >
@@ -2696,7 +2696,7 @@ export default function SettingsPage() {
                       onClick={() => setConfig({ ...config, auto_invoice_send: !config.auto_invoice_send })}
                       className={`w-12 h-6 rounded-full transition-all ${
                         config.auto_invoice_send
-                          ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                          ? 'bg-gradient-to-r from-emerald-500 to-primary-600'
                           : 'bg-gray-200'
                       }`}
                     >
@@ -2741,7 +2741,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setConfig({ ...config, auto_invoice_on_complete: !config.auto_invoice_on_complete })}
-                  className={`w-12 h-6 rounded-full transition-all flex-shrink-0 ${config.auto_invoice_on_complete ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gray-200'}`}
+                  className={`w-12 h-6 rounded-full transition-all flex-shrink-0 ${config.auto_invoice_on_complete ? 'bg-gradient-to-r from-emerald-500 to-primary-600' : 'bg-gray-200'}`}
                 >
                   <div className={`w-5 h-5 bg-white rounded-full transition-transform ${config.auto_invoice_on_complete ? 'translate-x-6' : 'translate-x-0.5'}`} />
                 </button>
@@ -2766,8 +2766,8 @@ export default function SettingsPage() {
             {/* Google Calendar Integration */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-teal-100">
-                  <CalendarDays className="w-6 h-6 text-teal-500" />
+                <div className="p-2 rounded-lg bg-primary-100">
+                  <CalendarDays className="w-6 h-6 text-primary-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Google Calendar</h2>
@@ -2797,7 +2797,7 @@ export default function SettingsPage() {
                     <select
                       value={googleStatus.syncDirection || 'both'}
                       onChange={(e) => handleChangeSyncDirection(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     >
                       <option value="both">Båda riktningar</option>
                       <option value="export">Endast export (Handymate &rarr; Google)</option>
@@ -2834,7 +2834,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleGoogleSync}
                     disabled={googleSyncing}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-teal-100 border border-teal-300 rounded-xl text-teal-600 hover:bg-teal-600/30 disabled:opacity-50 transition-colors"
+                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-100 border border-primary-300 rounded-xl text-primary-700 hover:bg-primary-700/30 disabled:opacity-50 transition-colors"
                   >
                     {googleSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CalendarDays className="w-4 h-4" />}
                     Synka nu
@@ -2886,7 +2886,7 @@ export default function SettingsPage() {
                         <button
                           onClick={() => handleToggleGmailSync(!googleStatus?.gmailSyncEnabled)}
                           className={`relative w-11 h-6 rounded-full transition-colors ${
-                            googleStatus?.gmailSyncEnabled ? 'bg-teal-600' : 'bg-gray-300'
+                            googleStatus?.gmailSyncEnabled ? 'bg-primary-700' : 'bg-gray-300'
                           }`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -2896,7 +2896,7 @@ export default function SettingsPage() {
                       ) : (
                         <button
                           onClick={handleConnectGoogle}
-                          className="px-3 py-1.5 text-xs font-medium text-sky-700 bg-teal-50 border border-teal-200 rounded-lg hover:bg-teal-100 transition-colors"
+                          className="px-3 py-1.5 text-xs font-medium text-secondary-700 bg-primary-50 border border-primary-200 rounded-lg hover:bg-primary-100 transition-colors"
                         >
                           Koppla om
                         </button>
@@ -2931,7 +2931,7 @@ export default function SettingsPage() {
                             }).then(() => showToast(next ? 'Lead-import aktiverad' : 'Lead-import inaktiverad', 'success'))
                               .catch(() => showToast('Fel vid sparning', 'error'))
                           }}
-                          className={`relative w-11 h-6 rounded-full transition-colors ${gmailLeadEnabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                          className={`relative w-11 h-6 rounded-full transition-colors ${gmailLeadEnabled ? 'bg-primary-700' : 'bg-gray-300'}`}
                         >
                           <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${gmailLeadEnabled ? 'translate-x-5' : ''}`} />
                         </button>
@@ -2948,7 +2948,7 @@ export default function SettingsPage() {
                               value={gmailLeadApprovedSenders}
                               onChange={(e) => setGmailLeadApprovedSenders(e.target.value)}
                               placeholder="t.ex. blocket.se, hemnet.se, @gmail.com"
-                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
                             />
                             <p className="text-xs text-gray-400 mt-0.5">Kommaseparerade domäner/e-poster som alltid är leads</p>
                           </div>
@@ -2961,13 +2961,13 @@ export default function SettingsPage() {
                               value={gmailLeadBlockedSenders}
                               onChange={(e) => setGmailLeadBlockedSenders(e.target.value)}
                               placeholder="t.ex. noreply@, newsletter@"
-                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-teal-500 focus:border-teal-500"
+                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
                             />
                           </div>
                           <button
                             onClick={handleSaveGmailLeadSettings}
                             disabled={gmailLeadSaving}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50"
                           >
                             {gmailLeadSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                             Spara filter
@@ -2997,15 +2997,15 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-500 mb-3">Koppla Google Calendar för att:</p>
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-500 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-600 rounded-full" />
                         Synka ditt schema med Google Calendar
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-500 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-600 rounded-full" />
                         Se externa events som upptagen tid
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-500 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-600 rounded-full" />
                         Automatisk tvåvägssynk
                       </li>
                     </ul>
@@ -3014,7 +3014,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleConnectGoogle}
                     disabled={googleLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ExternalLink className="w-5 h-5" />}
                     Anslut Google Calendar
@@ -3028,8 +3028,8 @@ export default function SettingsPage() {
             </div>
 
             {/* Email info */}
-            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4">
-              <p className="text-sm text-teal-700">
+            <div className="bg-primary-50 border border-primary-200 rounded-2xl p-4">
+              <p className="text-sm text-primary-700">
                 <strong>Om e-post:</strong> Utgående e-post skickas via Handymate (Resend). Med Gmail-koppling kan du se inkommande kundmail direkt i kundkortet.
               </p>
             </div>
@@ -3038,8 +3038,8 @@ export default function SettingsPage() {
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-teal-100">
-                    <MailCheck className="w-5 h-5 text-teal-600" />
+                  <div className="p-2 rounded-lg bg-primary-100">
+                    <MailCheck className="w-5 h-5 text-primary-700" />
                   </div>
                   <div>
                     <p className="font-semibold text-gray-900 text-sm">Bekräftelsemail vid godkänd offert</p>
@@ -3057,7 +3057,7 @@ export default function SettingsPage() {
                         .upsert({ business_id: config?.business_id, quote_signed_email_enabled: newVal }, { onConflict: 'business_id' })
                     } catch { /* non-blocking */ }
                   }}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${quoteSignedEmailEnabled ? 'bg-teal-700' : 'bg-gray-300'}`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${quoteSignedEmailEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
                 >
                   <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${quoteSignedEmailEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
@@ -3086,7 +3086,7 @@ export default function SettingsPage() {
                     value={googleReviewUrl}
                     onChange={e => setGoogleReviewUrl(e.target.value)}
                     placeholder="https://g.page/r/ditt-foretagsnamn/review"
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-500"
                   />
                   <p className="text-xs text-gray-400 mt-1">
                     Sök på ditt företag i Google Maps → Dela → Kopiera länk, eller gå till Google Business Profile → Be om recensioner
@@ -3100,7 +3100,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => setReviewRequestEnabled(!reviewRequestEnabled)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reviewRequestEnabled ? 'bg-teal-700' : 'bg-gray-300'}`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${reviewRequestEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${reviewRequestEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
@@ -3112,7 +3112,7 @@ export default function SettingsPage() {
                     <select
                       value={reviewRequestDelayDays}
                       onChange={e => setReviewRequestDelayDays(parseInt(e.target.value))}
-                      className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-400"
+                      className="px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-500"
                     >
                       <option value={1}>1 dag efter slutfört jobb</option>
                       <option value={3}>3 dagar efter slutfört jobb</option>
@@ -3125,18 +3125,18 @@ export default function SettingsPage() {
                   <div className="p-3 bg-gray-50 rounded-xl">
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Förhandsvisning SMS</p>
                     <p className="text-sm text-gray-700">
-                      Hej {'{'}<span className="text-sky-700">kundnamn</span>{'}'}! Tack för att du valde {config?.business_name || 'oss'}. Vi hoppas du är nöjd med resultatet! Om du har en minut skulle vi uppskatta en recension: {googleReviewUrl.substring(0, 30)}... /Mvh {config?.business_name || 'oss'}
+                      Hej {'{'}<span className="text-secondary-700">kundnamn</span>{'}'}! Tack för att du valde {config?.business_name || 'oss'}. Vi hoppas du är nöjd med resultatet! Om du har en minut skulle vi uppskatta en recension: {googleReviewUrl.substring(0, 30)}... /Mvh {config?.business_name || 'oss'}
                     </p>
                   </div>
                 )}
 
                 {reviewStats.sent > 0 && (
-                  <div className="p-3 bg-teal-50 border border-teal-200 rounded-xl">
-                    <p className="text-xs text-teal-600 uppercase tracking-wider font-semibold mb-1">Statistik</p>
-                    <p className="text-sm text-teal-800">
+                  <div className="p-3 bg-primary-50 border border-primary-200 rounded-xl">
+                    <p className="text-xs text-primary-700 uppercase tracking-wider font-semibold mb-1">Statistik</p>
+                    <p className="text-sm text-primary-800">
                       {reviewStats.sent} förfrågningar skickade · {reviewStats.clicked} klickade på länken
                       {reviewStats.sent > 0 && (
-                        <span className="text-teal-600"> ({Math.round((reviewStats.clicked / reviewStats.sent) * 100)}%)</span>
+                        <span className="text-primary-700"> ({Math.round((reviewStats.clicked / reviewStats.sent) * 100)}%)</span>
                       )}
                     </p>
                   </div>
@@ -3145,7 +3145,7 @@ export default function SettingsPage() {
                 <button
                   onClick={handleSaveReviewSettings}
                   disabled={savingReview}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-xl text-white font-medium text-sm hover:opacity-90 disabled:opacity-50 transition-all"
                 >
                   {savingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Spara recensionsinställningar
@@ -3157,8 +3157,8 @@ export default function SettingsPage() {
             {/* Outlook Calendar (placeholder) */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 opacity-60">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-teal-700/20">
-                  <CalendarDays className="w-6 h-6 text-teal-700" />
+                <div className="p-2 rounded-lg bg-primary-800/20">
+                  <CalendarDays className="w-6 h-6 text-primary-700" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Microsoft Outlook</h2>
@@ -3230,7 +3230,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handleSyncCustomersToFortnox}
                         disabled={syncingCustomers}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-100 border border-teal-300 rounded-xl text-sm text-teal-600 hover:bg-teal-600/30 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-100 border border-primary-300 rounded-xl text-sm text-primary-700 hover:bg-primary-700/30 disabled:opacity-50 transition-colors"
                       >
                         {syncingCustomers ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -3268,7 +3268,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handleSyncInvoicesToFortnox}
                         disabled={syncingInvoices}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-100 border border-teal-300 rounded-xl text-sm text-teal-600 hover:bg-teal-600/30 disabled:opacity-50 transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-100 border border-primary-300 rounded-xl text-sm text-primary-700 hover:bg-primary-700/30 disabled:opacity-50 transition-colors"
                       >
                         {syncingInvoices ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -3338,19 +3338,19 @@ export default function SettingsPage() {
                     <p className="text-sm text-gray-500 mb-3">Koppla Fortnox för att:</p>
                     <ul className="space-y-2 text-sm text-gray-700">
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-600 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-700 rounded-full" />
                         Synkronisera kunder mellan systemen
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-600 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-700 rounded-full" />
                         Exportera fakturor direkt till bokföringen
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-600 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-700 rounded-full" />
                         Importera artiklar och prislista
                       </li>
                       <li className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 bg-teal-600 rounded-full" />
+                        <div className="w-1.5 h-1.5 bg-primary-700 rounded-full" />
                         Automatisk bokföring av betalningar
                       </li>
                     </ul>
@@ -3359,7 +3359,7 @@ export default function SettingsPage() {
                   <button
                     onClick={handleConnectFortnox}
                     disabled={fortnoxLoading}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
                   >
                     {fortnoxLoading ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -3379,8 +3379,8 @@ export default function SettingsPage() {
             {/* Hemsideintegration (Embed Widget) */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 rounded-lg bg-teal-100">
-                  <ExternalLink className="w-6 h-6 text-teal-500" />
+                <div className="p-2 rounded-lg bg-primary-100">
+                  <ExternalLink className="w-6 h-6 text-primary-600" />
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Hemsideintegration</h2>
@@ -3410,7 +3410,7 @@ export default function SettingsPage() {
                           )
                           showToast('Kod kopierad!', 'success')
                         }}
-                        className="absolute top-2 right-2 px-3 py-1.5 bg-teal-600 text-white text-xs rounded-lg hover:opacity-90"
+                        className="absolute top-2 right-2 px-3 py-1.5 bg-primary-700 text-white text-xs rounded-lg hover:opacity-90"
                       >
                         Kopiera
                       </button>
@@ -3426,7 +3426,7 @@ export default function SettingsPage() {
                         )
                         showToast('Kod kopierad!', 'success')
                       }}
-                      className="flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90"
+                      className="flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
                     >
                       <Download className="w-4 h-4" />
                       Kopiera kod
@@ -3512,7 +3512,7 @@ export default function SettingsPage() {
                           <button
                             onClick={() => handleSyncPrices(supplier.key)}
                             disabled={syncLoading === supplier.key}
-                            className="px-3 py-1.5 text-xs bg-teal-100 text-sky-700 border border-teal-300 rounded-lg hover:bg-teal-600/30 disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs bg-primary-100 text-secondary-700 border border-primary-300 rounded-lg hover:bg-primary-700/30 disabled:opacity-50"
                           >
                             {syncLoading === supplier.key ? 'Synkar...' : 'Synka priser'}
                           </button>
@@ -3529,7 +3529,7 @@ export default function SettingsPage() {
                             setConnectingSupplier(supplier.key)
                             setCredentialForm({})
                           }}
-                          className="px-3 py-1.5 text-xs bg-teal-600 text-white rounded-lg hover:opacity-90"
+                          className="px-3 py-1.5 text-xs bg-primary-700 text-white rounded-lg hover:opacity-90"
                         >
                           Anslut
                         </button>
@@ -3566,7 +3566,7 @@ export default function SettingsPage() {
                             value={credentialForm[field.key] || ''}
                             onChange={e => setCredentialForm(prev => ({ ...prev, [field.key]: e.target.value }))}
                             placeholder={field.placeholder}
-                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:outline-none"
+                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:outline-none"
                           />
                         </div>
                       ))}
@@ -3581,7 +3581,7 @@ export default function SettingsPage() {
                       <button
                         onClick={handleConnectGrossist}
                         disabled={connectLoading}
-                        className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                        className="flex-1 px-4 py-2 bg-primary-700 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                       >
                         {connectLoading ? 'Ansluter...' : 'Testa & Anslut'}
                       </button>
@@ -3619,7 +3619,7 @@ export default function SettingsPage() {
                 </div>
                 <button
                   onClick={() => setShowAddLeadSource(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:opacity-90"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-700 text-white rounded-lg hover:opacity-90"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till
@@ -3634,7 +3634,7 @@ export default function SettingsPage() {
                     <select
                       value={newLeadSourcePlatform}
                       onChange={e => setNewLeadSourcePlatform(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-teal-400"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-500"
                     >
                       <option value="offerta">Offerta.se</option>
                       <option value="servicefinder">ServiceFinder</option>
@@ -3651,7 +3651,7 @@ export default function SettingsPage() {
                       value={newLeadSourceName}
                       onChange={e => setNewLeadSourceName(e.target.value)}
                       placeholder="T.ex. Offerta Stockholm"
-                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-500"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -3664,7 +3664,7 @@ export default function SettingsPage() {
                     <button
                       onClick={handleAddLeadSource}
                       disabled={addingLeadSource || !newLeadSourceName.trim()}
-                      className="flex-1 px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                      className="flex-1 px-3 py-2 text-sm bg-primary-700 text-white rounded-lg hover:opacity-90 disabled:opacity-50"
                     >
                       {addingLeadSource ? 'Lägger till...' : 'Lägg till källa'}
                     </button>
@@ -3694,7 +3694,7 @@ export default function SettingsPage() {
                     }
                     const platformColors: Record<string, string> = {
                       offerta: 'bg-orange-100 text-orange-700',
-                      servicefinder: 'bg-teal-100 text-teal-700',
+                      servicefinder: 'bg-primary-100 text-primary-700',
                       byggahus: 'bg-yellow-100 text-yellow-700',
                       website: 'bg-purple-100 text-purple-700',
                       email: 'bg-gray-100 text-gray-700',
@@ -3718,7 +3718,7 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleToggleLeadSource(source.id, source.is_active)}
-                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${source.is_active ? 'bg-teal-700' : 'bg-gray-300'}`}
+                              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${source.is_active ? 'bg-primary-800' : 'bg-gray-300'}`}
                             >
                               <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${source.is_active ? 'translate-x-4' : 'translate-x-0.5'}`} />
                             </button>
@@ -3736,7 +3736,7 @@ export default function SettingsPage() {
                           <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200">
                             <p className="text-xs text-gray-500 mb-1">Vidarebefodra leads till denna adress:</p>
                             <div className="flex items-center gap-2">
-                              <code className="flex-1 text-xs text-sky-700 bg-teal-50 px-2 py-1 rounded font-mono break-all">
+                              <code className="flex-1 text-xs text-secondary-700 bg-primary-50 px-2 py-1 rounded font-mono break-all">
                                 {source.inbound_email}
                               </code>
                               <button
@@ -3744,7 +3744,7 @@ export default function SettingsPage() {
                                   navigator.clipboard.writeText(source.inbound_email)
                                   showToast('Kopierad!', 'success')
                                 }}
-                                className="px-2 py-1 text-xs text-sky-700 bg-teal-50 rounded hover:bg-teal-100"
+                                className="px-2 py-1 text-xs text-secondary-700 bg-primary-50 rounded hover:bg-primary-100"
                               >
                                 Kopiera
                               </button>
@@ -3764,9 +3764,9 @@ export default function SettingsPage() {
                           </div>
                         )}
                         {source.platform === 'servicefinder' && (
-                          <div className="mt-3 p-3 bg-teal-50 rounded-lg border border-teal-200">
-                            <p className="text-xs font-medium text-teal-800 mb-1">Så kopplar du ServiceFinder:</p>
-                            <ol className="text-xs text-teal-700 space-y-0.5 list-decimal list-inside">
+                          <div className="mt-3 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                            <p className="text-xs font-medium text-primary-800 mb-1">Så kopplar du ServiceFinder:</p>
+                            <ol className="text-xs text-primary-700 space-y-0.5 list-decimal list-inside">
                               <li>Logga in på ServiceFinder → Mitt konto → Notiser</li>
                               <li>Ställ in e-postadressen ovan för jobbnotiser</li>
                               <li>Nya jobb importeras automatiskt som leads</li>
@@ -3787,8 +3787,8 @@ export default function SettingsPage() {
 
               {/* Info about how lead import works */}
               {leadSources.length > 0 && (
-                <div className="mt-4 p-3 bg-teal-50 rounded-lg border border-teal-200">
-                  <p className="text-xs text-teal-700">
+                <div className="mt-4 p-3 bg-primary-50 rounded-lg border border-primary-200">
+                  <p className="text-xs text-primary-700">
                     <strong>Så fungerar det:</strong> När e-post tas emot på den unika adressen parsas innehållet och skapar automatiskt en lead i din pipeline med rätt källa markerad.
                   </p>
                 </div>
@@ -3841,27 +3841,27 @@ export default function SettingsPage() {
                 onChange={(e) => setConfig({ ...config, greeting_script: e.target.value })}
                 placeholder={`Hej och välkommen till ${config.business_name}! Mitt namn är Lisa, hur kan jag hjälpa dig idag?`}
                 rows={4}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
               />
               <p className="text-xs text-gray-400 mt-1">Detta säger AI-assistenten när den svarar</p>
               <Link
               href="/dashboard/settings/knowledge"
-              className="mt-4 flex items-center justify-between p-4 bg-gradient-to-r from-teal-600/10 to-teal-500/10 border border-teal-300 rounded-xl hover:bg-teal-100 transition-all"
+              className="mt-4 flex items-center justify-between p-4 bg-gradient-to-r from-primary-700/10 to-primary-600/10 border border-primary-300 rounded-xl hover:bg-primary-100 transition-all"
             >
               <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-sky-700" />
+                <FileText className="w-5 h-5 text-secondary-700" />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">Knowledge Base</p>
                   <p className="text-xs text-gray-500">Lär AI:n om dina tjänster, priser och policyer</p>
                 </div>
               </div>
-              <ChevronRight className="w-5 h-5 text-sky-700" />
+              <ChevronRight className="w-5 h-5 text-secondary-700" />
             </Link>
             </div>
 
-            <div className="p-4 bg-teal-50 border border-teal-300 rounded-xl">
+            <div className="p-4 bg-primary-50 border border-primary-300 rounded-xl">
               <div className="flex items-start gap-3">
-                <Bot className="w-5 h-5 text-sky-700 mt-0.5" />
+                <Bot className="w-5 h-5 text-secondary-700 mt-0.5" />
                 <div>
                   <p className="font-medium text-gray-900 text-sm">AI-röst</p>
                   <p className="text-xs text-gray-500 mt-1">
@@ -3905,7 +3905,7 @@ export default function SettingsPage() {
                   setConfig({ ...config, autopilot_enabled: newVal })
                   await supabase.from('business_config').update({ autopilot_enabled: newVal }).eq('business_id', business.business_id)
                 }}
-                className={`relative w-12 h-7 rounded-full transition-colors ${config.autopilot_enabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                className={`relative w-12 h-7 rounded-full transition-colors ${config.autopilot_enabled ? 'bg-primary-700' : 'bg-gray-300'}`}
               >
                 <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${config.autopilot_enabled ? 'translate-x-5' : ''}`} />
               </button>
@@ -3924,7 +3924,7 @@ export default function SettingsPage() {
                       setConfig({ ...config, autopilot_auto_book: newVal })
                       await supabase.from('business_config').update({ autopilot_auto_book: newVal }).eq('business_id', business.business_id)
                     }}
-                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_book !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_book !== false ? 'bg-primary-700' : 'bg-gray-300'}`}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_book !== false ? 'translate-x-4' : ''}`} />
                   </button>
@@ -3976,7 +3976,7 @@ export default function SettingsPage() {
                       setConfig({ ...config, autopilot_auto_sms: newVal })
                       await supabase.from('business_config').update({ autopilot_auto_sms: newVal }).eq('business_id', business.business_id)
                     }}
-                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_sms !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_sms !== false ? 'bg-primary-700' : 'bg-gray-300'}`}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_sms !== false ? 'translate-x-4' : ''}`} />
                   </button>
@@ -3993,7 +3993,7 @@ export default function SettingsPage() {
                       setConfig({ ...config, autopilot_auto_materials: newVal })
                       await supabase.from('business_config').update({ autopilot_auto_materials: newVal }).eq('business_id', business.business_id)
                     }}
-                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_materials !== false ? 'bg-teal-600' : 'bg-gray-300'}`}
+                    className={`relative w-10 h-6 rounded-full transition-colors ${config.autopilot_auto_materials !== false ? 'bg-primary-700' : 'bg-gray-300'}`}
                   >
                     <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.autopilot_auto_materials !== false ? 'translate-x-4' : ''}`} />
                   </button>
@@ -4023,7 +4023,7 @@ export default function SettingsPage() {
                     setConfig({ ...config, four_eyes_enabled: newVal })
                     await supabase.from('business_config').update({ four_eyes_enabled: newVal }).eq('business_id', business.business_id)
                   }}
-                  className={`relative w-10 h-6 rounded-full transition-colors ${config.four_eyes_enabled ? 'bg-teal-600' : 'bg-gray-300'}`}
+                  className={`relative w-10 h-6 rounded-full transition-colors ${config.four_eyes_enabled ? 'bg-primary-700' : 'bg-gray-300'}`}
                 >
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.four_eyes_enabled ? 'translate-x-4' : ''}`} />
                 </button>
@@ -4044,7 +4044,7 @@ export default function SettingsPage() {
                           await supabase.from('business_config').update({ four_eyes_threshold_sek: val }).eq('business_id', business.business_id)
                         }}
                         onFocus={(e) => e.target.select()}
-                        className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:border-teal-500"
+                        className="w-28 px-3 py-2 border border-gray-200 rounded-lg text-sm text-right focus:outline-none focus:border-primary-600"
                       />
                       <span className="text-sm text-gray-500">kr</span>
                     </div>
@@ -4069,7 +4069,7 @@ export default function SettingsPage() {
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Din prenumeration</h2>
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-teal-600/10 to-teal-500/10 border border-teal-300 rounded-xl mb-4 gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-gradient-to-r from-primary-700/10 to-primary-600/10 border border-primary-300 rounded-xl mb-4 gap-4">
                 <div>
                   <p className="text-gray-900 font-semibold text-lg">{currentPlan}</p>
                   <p className="text-gray-500 text-sm">
@@ -4100,7 +4100,7 @@ export default function SettingsPage() {
                 className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors group"
               >
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-teal-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-lg bg-primary-700 flex items-center justify-center">
                     <CreditCard className="w-5 h-5 text-white" />
                   </div>
                   <div>
@@ -4139,7 +4139,7 @@ export default function SettingsPage() {
                     type="number"
                     value={econPrefs.hourly_cost_sek}
                     onChange={e => setEconPrefs(p => ({ ...p, hourly_cost_sek: Number(e.target.value) || 0 }))}
-                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-500"
                     min={0}
                   />
                   <span className="text-sm text-gray-400">kr/h</span>
@@ -4153,7 +4153,7 @@ export default function SettingsPage() {
                     type="number"
                     value={econPrefs.overhead_monthly_sek}
                     onChange={e => setEconPrefs(p => ({ ...p, overhead_monthly_sek: Number(e.target.value) || 0 }))}
-                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-500"
                     min={0}
                   />
                   <span className="text-sm text-gray-400">kr/månad</span>
@@ -4167,7 +4167,7 @@ export default function SettingsPage() {
                     type="number"
                     value={econPrefs.margin_target_percent}
                     onChange={e => setEconPrefs(p => ({ ...p, margin_target_percent: Number(e.target.value) || 0 }))}
-                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-teal-400"
+                    className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-primary-500"
                     min={0}
                     max={100}
                   />
@@ -4198,7 +4198,7 @@ export default function SettingsPage() {
                   setEconSaving(false)
                 }}
                 disabled={econSaving}
-                className="px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-colors"
+                className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-colors"
               >
                 {econSaving ? 'Sparar...' : 'Spara'}
               </button>
@@ -4286,8 +4286,8 @@ function PreferencesTab({ businessId }: { businessId: string }) {
 
       <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
         <div className="flex items-center gap-3 mb-2">
-          <div className="p-2 rounded-lg bg-teal-100">
-            <Star className="w-5 h-5 text-teal-600" />
+          <div className="p-2 rounded-lg bg-primary-100">
+            <Star className="w-5 h-5 text-primary-700" />
           </div>
           <h2 className="text-lg font-semibold text-gray-900">AI-preferenser</h2>
         </div>
@@ -4339,7 +4339,7 @@ function PreferencesTab({ businessId }: { businessId: string }) {
               placeholder="Nyckel, ex: min_job_value_sek"
               value={newKey}
               onChange={e => setNewKey(e.target.value)}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent outline-none"
             />
             <input
               type="text"
@@ -4347,12 +4347,12 @@ function PreferencesTab({ businessId }: { businessId: string }) {
               value={newValue}
               onChange={e => setNewValue(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleAdd()}
-              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent outline-none"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-600 focus:border-transparent outline-none"
             />
             <button
               onClick={handleAdd}
               disabled={saving || !newKey.trim() || !newValue.trim()}
-              className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center gap-1"
+              className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50 transition-all flex items-center gap-1"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               Lägg till
@@ -4400,7 +4400,7 @@ function ReferralWidget({ businessId }: { businessId: string }) {
         />
         <button
           onClick={copyUrl}
-          className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-medium rounded-lg transition-all"
+          className="px-4 py-2 bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-all"
         >
           {copied ? 'Kopierat!' : 'Kopiera'}
         </button>
@@ -4461,7 +4461,7 @@ function CallHandlingModeSection({ businessId }: { businessId: string }) {
   return (
     <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
       <div className="flex items-center gap-2 mb-4">
-        <PhoneCall className="w-5 h-5 text-teal-600" />
+        <PhoneCall className="w-5 h-5 text-primary-700" />
         <h2 className="text-lg font-semibold text-gray-900">Samtalsläge</h2>
       </div>
       <p className="text-sm text-gray-400 mb-4">Hur vill du hantera inkommande samtal?</p>
@@ -4473,17 +4473,17 @@ function CallHandlingModeSection({ businessId }: { businessId: string }) {
             disabled={saving}
             className={`w-full p-4 rounded-xl border text-left transition-all ${
               mode === m.value
-                ? 'bg-teal-50 border-teal-300'
+                ? 'bg-primary-50 border-primary-300'
                 : 'bg-gray-50 border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                mode === m.value ? 'border-teal-600' : 'border-gray-300'
+                mode === m.value ? 'border-primary-700' : 'border-gray-300'
               }`}>
-                {mode === m.value && <div className="w-2 h-2 rounded-full bg-teal-600" />}
+                {mode === m.value && <div className="w-2 h-2 rounded-full bg-primary-700" />}
               </div>
-              <p className={`text-sm font-medium ${mode === m.value ? 'text-teal-700' : 'text-gray-900'}`}>{m.label}</p>
+              <p className={`text-sm font-medium ${mode === m.value ? 'text-primary-700' : 'text-gray-900'}`}>{m.label}</p>
             </div>
             <p className="text-xs text-gray-400 mt-1 ml-6">{m.description}</p>
           </button>
@@ -4560,7 +4560,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
       </div>
     )
   }
@@ -4593,7 +4593,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
               <span className="text-sm text-gray-900">{label}</span>
               <div
                 className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                  (settings as any)[key] ? 'bg-teal-600' : 'bg-gray-200'
+                  (settings as any)[key] ? 'bg-primary-700' : 'bg-gray-200'
                 }`}
                 onClick={() => setSettings(prev => ({ ...prev, [key]: !(prev as any)[key] }))}
               >
@@ -4612,7 +4612,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
             <span className="text-sm text-gray-900">Analysera samtal och identifiera kundintent</span>
             <div
               className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                settings.ai_analyze_calls ? 'bg-teal-600' : 'bg-gray-200'
+                settings.ai_analyze_calls ? 'bg-primary-700' : 'bg-gray-200'
               }`}
               onClick={() => setSettings(prev => ({ ...prev, ai_analyze_calls: !prev.ai_analyze_calls }))}
             >
@@ -4625,7 +4625,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
           <div className="p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-900">Tröskelvärde för automatisk flytt</span>
-              <span className="text-sm text-sky-700 font-mono">{settings.ai_auto_move_threshold}%</span>
+              <span className="text-sm text-secondary-700 font-mono">{settings.ai_auto_move_threshold}%</span>
             </div>
             <input
               type="range"
@@ -4641,7 +4641,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
           <div className="p-3 bg-gray-50 rounded-xl">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-900">Tröskelvärde för lead-skapande</span>
-              <span className="text-sm text-sky-700 font-mono">{settings.ai_create_lead_threshold}%</span>
+              <span className="text-sm text-secondary-700 font-mono">{settings.ai_create_lead_threshold}%</span>
             </div>
             <input
               type="range"
@@ -4658,7 +4658,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
             <span className="text-sm text-gray-900">Visa AI-aktivitet i pipeline</span>
             <div
               className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                settings.show_ai_activity ? 'bg-teal-600' : 'bg-gray-200'
+                settings.show_ai_activity ? 'bg-primary-700' : 'bg-gray-200'
               }`}
               onClick={() => setSettings(prev => ({ ...prev, show_ai_activity: !prev.show_ai_activity }))}
             >
@@ -4672,7 +4672,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
         <button
           onClick={saveSettings}
           disabled={saving}
-          className="mt-6 flex items-center px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+          className="mt-6 flex items-center px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
           Spara pipeline-inställningar
@@ -4717,7 +4717,7 @@ function PipelineSettings({ businessId }: { businessId: string }) {
                 <span className="text-gray-900 text-sm flex-1">{stage.label}</span>
                 <div
                   className={`w-10 h-6 rounded-full transition-all relative cursor-pointer ${
-                    stage.creates_project ? 'bg-teal-600' : 'bg-gray-200'
+                    stage.creates_project ? 'bg-primary-700' : 'bg-gray-200'
                   }`}
                   onClick={async (e) => {
                     e.preventDefault()

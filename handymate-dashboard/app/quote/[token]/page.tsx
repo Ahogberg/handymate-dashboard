@@ -396,12 +396,12 @@ export default function QuoteSignPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center relative overflow-hidden">
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
         </div>
         <div className="relative w-full max-w-md mx-4">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
+            <div className="w-16 h-16 bg-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-600/10">
               <Zap className="w-8 h-8 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Handymate</h1>
@@ -438,7 +438,7 @@ export default function QuoteSignPage() {
           <p className="text-gray-500 mb-6">{errorMessage}</p>
           <a
             href="/"
-            className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-teal-600 transition-colors"
+            className="inline-block px-6 py-3 text-sm font-medium text-sky-700 hover:text-primary-700 transition-colors"
           >
             Tillbaka till startsidan
           </a>
@@ -513,7 +513,7 @@ export default function QuoteSignPage() {
             <CheckCircle className="w-10 h-10 text-emerald-600" />
           </div>
           <h2 className="text-2xl font-bold mb-2">
-            <span className="text-teal-600">Tack!</span>
+            <span className="text-primary-700">Tack!</span>
           </h2>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Offerten är godkänd</h3>
           <p className="text-gray-500 text-sm mb-4">
@@ -577,18 +577,18 @@ export default function QuoteSignPage() {
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-teal-50 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-teal-500/10">
+          <div className="w-16 h-16 bg-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-600/10">
             <Zap className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold">
-            <span className="text-teal-600">{business?.name || 'Offert'}</span>
+            <span className="text-primary-700">{business?.name || 'Offert'}</span>
           </h1>
           <p className="text-gray-500 mt-1 text-sm">Offert</p>
         </div>
@@ -614,7 +614,7 @@ export default function QuoteSignPage() {
           {/* Title & Description */}
           <div className="mb-6">
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
                 <FileText className="w-5 h-5 text-sky-700" />
               </div>
               <div>
@@ -797,8 +797,8 @@ export default function QuoteSignPage() {
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
                 >
-                  <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center shrink-0">
-                    <FileText className="w-4 h-4 text-teal-700" />
+                  <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4 text-primary-700" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm text-gray-900 truncate">{att.name}</p>
@@ -813,7 +813,7 @@ export default function QuoteSignPage() {
         {/* Signature Card */}
         <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4">
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-teal-50 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
               <PenTool className="w-5 h-5 text-sky-700" />
             </div>
             <div>
@@ -834,7 +834,7 @@ export default function QuoteSignPage() {
               onChange={(e) => setName(e.target.value)}
               placeholder="Ditt fullständiga namn"
               required
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 transition-all"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 transition-all"
             />
           </div>
 
@@ -884,7 +884,7 @@ export default function QuoteSignPage() {
               type="checkbox"
               checked={termsAccepted}
               onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-teal-600"
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary-700"
             />
             <span className="text-sm text-gray-500 leading-relaxed">
               Jag har läst och godkänner offerten och förstår att min digitala signatur är bindande.
@@ -903,7 +903,7 @@ export default function QuoteSignPage() {
             type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="w-full py-4 bg-teal-600 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 bg-primary-700 rounded-xl font-semibold text-white hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting && !showDeclineForm ? (
               <>
@@ -1017,7 +1017,7 @@ export default function QuoteSignPage() {
         {/* Footer */}
         <p className="text-center text-xs text-gray-400 pb-8">
           Drivs av{' '}
-          <span className="text-teal-600 font-medium">Handymate</span>
+          <span className="text-primary-700 font-medium">Handymate</span>
         </p>
       </div>
     </div>

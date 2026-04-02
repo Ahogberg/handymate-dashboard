@@ -179,7 +179,7 @@ export default function AllowancesPage() {
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Ny ersättning
@@ -210,7 +210,7 @@ export default function AllowancesPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Debiterbart</p>
-            <p className="text-lg font-semibold text-teal-600">{fmtKr(weekBillable)}</p>
+            <p className="text-lg font-semibold text-primary-700">{fmtKr(weekBillable)}</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Löneunderlag</p>
@@ -221,7 +221,7 @@ export default function AllowancesPage() {
         {/* Report list by day */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+            <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
           </div>
         ) : reports.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
@@ -249,7 +249,7 @@ export default function AllowancesPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-gray-900">{report.allowance_type?.name || 'Okänd typ'}</p>
                           {report.billable && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-teal-50 text-teal-600 border border-teal-200 rounded-full">Debiterbar</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-primary-50 text-primary-700 border border-primary-300 rounded-full">Debiterbar</span>
                           )}
                         </div>
                         {report.project && (
@@ -400,7 +400,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             <select
               value={typeId}
               onChange={e => setTypeId(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             >
               <option value="">Välj ersättningstyp...</option>
               {systemTypes.length > 0 && (
@@ -424,7 +424,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             </select>
             <button
               onClick={onCreateType}
-              className="mt-2 text-xs text-teal-600 hover:text-teal-700 font-medium"
+              className="mt-2 text-xs text-primary-700 hover:text-primary-700 font-medium"
             >
               + Skapa ny typ
             </button>
@@ -436,7 +436,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             <select
               value={projectId}
               onChange={e => setProjectId(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             >
               <option value="">Inget projekt</option>
               {projects.map(p => (
@@ -452,7 +452,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
@@ -468,7 +468,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               placeholder="0"
               min="0"
               step="0.5"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
             {selectedType && quantity && (
               <p className="text-xs text-gray-500 mt-1">
@@ -487,7 +487,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
                   value={fromAddress}
                   onChange={e => setFromAddress(e.target.value)}
                   placeholder="Startadress"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
               <div>
@@ -497,7 +497,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
                   value={toAddress}
                   onChange={e => setToAddress(e.target.value)}
                   placeholder="Slutadress"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
             </div>
@@ -511,7 +511,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Valfri kommentar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
@@ -521,7 +521,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             onClick={() => setBillable(v => !v)}
             className="flex items-center gap-3 w-full text-left"
           >
-            <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${billable ? 'bg-teal-600' : 'bg-gray-300'}`}>
+            <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${billable ? 'bg-primary-700' : 'bg-gray-300'}`}>
               <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${billable ? 'left-[18px]' : 'left-0.5'}`} />
             </div>
             <span className="text-sm text-gray-700">Debiterbar till kund</span>
@@ -535,7 +535,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
           <button
             onClick={handleSave}
             disabled={saving || !typeId || !quantity}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Spara
@@ -606,7 +606,7 @@ function NewTypeModal({ onClose, onSaved }: {
               onChange={e => setName(e.target.value)}
               placeholder="T.ex. Reseersättning"
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
@@ -622,7 +622,7 @@ function NewTypeModal({ onClose, onSaved }: {
                   else if (e.target.value === 'hourly') setUnit('tim')
                   else setUnit('st')
                 }}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               >
                 <option value="mileage">Milersättning</option>
                 <option value="daily">Dagersättning</option>
@@ -635,7 +635,7 @@ function NewTypeModal({ onClose, onSaved }: {
               <select
                 value={unit}
                 onChange={e => setUnit(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
               >
                 <option value="km">km</option>
                 <option value="dag">dag</option>
@@ -653,19 +653,19 @@ function NewTypeModal({ onClose, onSaved }: {
               onChange={e => setRate(e.target.value)}
               placeholder="0"
               min="0"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
 
           <div className="space-y-3">
             <button type="button" onClick={() => setIsTaxable(v => !v)} className="flex items-center gap-3 w-full text-left">
-              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${isTaxable ? 'bg-teal-600' : 'bg-gray-300'}`}>
+              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${isTaxable ? 'bg-primary-700' : 'bg-gray-300'}`}>
                 <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${isTaxable ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
               <span className="text-sm text-gray-700">Skattepliktig</span>
             </button>
             <button type="button" onClick={() => setBillable(v => !v)} className="flex items-center gap-3 w-full text-left">
-              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${billable ? 'bg-teal-600' : 'bg-gray-300'}`}>
+              <div className={`w-10 h-6 rounded-full transition-colors relative flex-shrink-0 ${billable ? 'bg-primary-700' : 'bg-gray-300'}`}>
                 <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-transform ${billable ? 'left-[18px]' : 'left-0.5'}`} />
               </div>
               <span className="text-sm text-gray-700">Debiterbar till kund som standard</span>
@@ -680,7 +680,7 @@ function NewTypeModal({ onClose, onSaved }: {
           <button
             onClick={handleSave}
             disabled={saving || !name.trim() || !rate}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-teal-600 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             Skapa

@@ -181,7 +181,7 @@ function ReadOnlyField({ label, value, missing }: { label: string; value?: strin
         <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           {missing || 'Ej angiven'}
-          <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+          <a href="/dashboard/settings" className="ml-auto text-primary-700 hover:underline text-xs font-medium">Inställningar</a>
         </div>
       )}
     </div>
@@ -400,7 +400,7 @@ export default function WebsitePage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -415,8 +415,8 @@ export default function WebsitePage() {
           }`}>{toast.message}</div>
         )}
         <div className="max-w-2xl mx-auto text-center py-16">
-          <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <Globe className="w-8 h-8 text-teal-600" />
+          <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Globe className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">Din hemsida</h1>
           <p className="text-gray-500 text-lg mb-8">
@@ -439,7 +439,7 @@ export default function WebsitePage() {
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="inline-flex items-center px-8 py-4 bg-teal-600 rounded-xl font-semibold text-white text-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-teal-500/25"
+            className="inline-flex items-center px-8 py-4 bg-primary-700 rounded-xl font-semibold text-white text-lg hover:opacity-90 disabled:opacity-50 transition-all shadow-lg shadow-primary-600/25"
           >
             {generating ? (
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
@@ -468,7 +468,7 @@ export default function WebsitePage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Din hemsida</h1>
             <div className="flex items-center gap-2 mt-1">
-              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-700 hover:text-teal-700 flex items-center gap-1">
+              <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-700 hover:text-primary-700 flex items-center gap-1">
                 {siteUrl} <ExternalLink className="w-3.5 h-3.5" />
               </a>
               <button
@@ -541,7 +541,7 @@ export default function WebsitePage() {
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sky-700 border border-teal-200 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sky-700 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
                   Regenerera med AI
@@ -551,7 +551,7 @@ export default function WebsitePage() {
               <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden mb-3">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
-                    completeness >= 80 ? 'bg-emerald-500' : completeness >= 50 ? 'bg-teal-500' : 'bg-amber-500'
+                    completeness >= 80 ? 'bg-emerald-500' : completeness >= 50 ? 'bg-primary-500' : 'bg-amber-500'
                   }`}
                   style={{ width: `${completeness}%` }}
                 />
@@ -592,7 +592,7 @@ export default function WebsitePage() {
                   value={editHeadline}
                   onChange={e => setEditHeadline(e.target.value)}
                   placeholder="Din slagkraftiga rubrik..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                 />
               </div>
 
@@ -604,7 +604,7 @@ export default function WebsitePage() {
                   onChange={e => setEditDescription(e.target.value)}
                   rows={3}
                   placeholder="Kort beskrivning av ditt företag..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
               </div>
 
@@ -622,13 +622,13 @@ export default function WebsitePage() {
                 {workingHoursSummary ? (
                   <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
                     <p className="text-sm text-gray-900">{workingHoursSummary}</p>
-                    <a href="/dashboard/settings" className="text-teal-600 hover:underline text-xs font-medium">Ändra</a>
+                    <a href="/dashboard/settings" className="text-primary-700 hover:underline text-xs font-medium">Ändra</a>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     Inga öppettider inställda
-                    <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+                    <a href="/dashboard/settings" className="ml-auto text-primary-700 hover:underline text-xs font-medium">Inställningar</a>
                   </div>
                 )}
               </div>
@@ -648,12 +648,12 @@ export default function WebsitePage() {
                       key={img.url}
                       onClick={() => setEditHeroImageUrl(img.url)}
                       className={`relative rounded-xl overflow-hidden aspect-video border-2 transition-all ${
-                        editHeroImageUrl === img.url ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-gray-200 hover:border-gray-300'
+                        editHeroImageUrl === img.url ? 'border-primary-600 ring-2 ring-primary-600/30' : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <img src={img.url.replace('w=1920', 'w=400')} alt={img.label} className="w-full h-full object-cover" loading="lazy" />
                       {editHeroImageUrl === img.url && (
-                        <div className="absolute inset-0 bg-teal-500/20 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-primary-500/20 flex items-center justify-center">
                           <Check className="w-8 h-8 text-white drop-shadow-lg" />
                         </div>
                       )}
@@ -671,7 +671,7 @@ export default function WebsitePage() {
                     value={customImageUrl}
                     onChange={e => setCustomImageUrl(e.target.value)}
                     placeholder="Eller klistra in en egen bild-URL..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   />
                   <button
                     onClick={() => {
@@ -681,7 +681,7 @@ export default function WebsitePage() {
                       }
                     }}
                     disabled={!customImageUrl.trim()}
-                    className="px-3 py-2 bg-teal-600 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
+                    className="px-3 py-2 bg-primary-700 text-white text-sm rounded-lg hover:opacity-90 disabled:opacity-50"
                   >
                     Använd
                   </button>
@@ -707,7 +707,7 @@ export default function WebsitePage() {
                       key={opt.id}
                       onClick={() => setEditColorScheme(opt.id)}
                       className={`relative rounded-xl overflow-hidden border-2 transition-all ${
-                        editColorScheme === opt.id ? 'border-teal-500 ring-2 ring-teal-500/30' : 'border-gray-200 hover:border-gray-300'
+                        editColorScheme === opt.id ? 'border-primary-600 ring-2 ring-primary-600/30' : 'border-gray-200 hover:border-gray-300'
                       }`}
                     >
                       <div className={`h-16 bg-gradient-to-br ${opt.gradient}`} />
@@ -736,9 +736,9 @@ export default function WebsitePage() {
                 {(businessConfig?.services_offered?.length || 0) > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     {businessConfig!.services_offered.map(s => (
-                      <span key={s} className="px-3 py-1.5 bg-teal-50 text-teal-700 rounded-lg text-sm font-medium">{s}</span>
+                      <span key={s} className="px-3 py-1.5 bg-primary-50 text-primary-700 rounded-lg text-sm font-medium">{s}</span>
                     ))}
-                    <a href="/dashboard/settings" className="px-3 py-1.5 border border-dashed border-gray-300 text-gray-400 rounded-lg text-sm hover:border-teal-300 hover:text-teal-600 transition-colors">
+                    <a href="/dashboard/settings" className="px-3 py-1.5 border border-dashed border-gray-300 text-gray-400 rounded-lg text-sm hover:border-primary-300 hover:text-primary-700 transition-colors">
                       + Redigera
                     </a>
                   </div>
@@ -746,7 +746,7 @@ export default function WebsitePage() {
                   <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     Inga tjänster tillagda
-                    <a href="/dashboard/settings" className="ml-auto text-teal-600 hover:underline text-xs font-medium">Inställningar</a>
+                    <a href="/dashboard/settings" className="ml-auto text-primary-700 hover:underline text-xs font-medium">Inställningar</a>
                   </div>
                 )}
               </div>
@@ -759,7 +759,7 @@ export default function WebsitePage() {
                   onChange={e => setEditAbout(e.target.value)}
                   rows={6}
                   placeholder="Beskriv ditt företag, er erfarenhet och vad som gör er unika..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
               </div>
             </SectionCard>
@@ -777,7 +777,7 @@ export default function WebsitePage() {
                   onChange={e => setEditCertifications(e.target.value)}
                   rows={2}
                   placeholder="T.ex. Auktoriserad elektriker, F-skattsedel, Behörig elinstallatör..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">Separera med kommatecken. Visas som trust-badges på hemsidan.</p>
               </div>
@@ -801,7 +801,7 @@ export default function WebsitePage() {
                     type="text"
                     value={editSlug}
                     onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -812,7 +812,7 @@ export default function WebsitePage() {
                   value={editMetaTitle}
                   onChange={e => setEditMetaTitle(e.target.value)}
                   maxLength={60}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-400 mt-1">{editMetaTitle.length}/60</p>
               </div>
@@ -823,7 +823,7 @@ export default function WebsitePage() {
                   onChange={e => setEditMetaDescription(e.target.value)}
                   maxLength={160}
                   rows={2}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">{editMetaDescription.length}/160</p>
               </div>
@@ -836,7 +836,7 @@ export default function WebsitePage() {
                   type="checkbox"
                   checked={editShowWidget}
                   onChange={e => setEditShowWidget(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  className="w-4 h-4 text-primary-700 border-gray-300 rounded focus:ring-primary-600"
                 />
                 <span className="text-sm text-gray-700">Visa AI-chatbot på hemsidan</span>
               </label>
@@ -845,7 +845,7 @@ export default function WebsitePage() {
                   type="checkbox"
                   checked={editPublished}
                   onChange={e => setEditPublished(e.target.checked)}
-                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                  className="w-4 h-4 text-primary-700 border-gray-300 rounded focus:ring-primary-600"
                 />
                 <span className="text-sm text-gray-700">Publicerad (synlig för besökare)</span>
               </label>
@@ -861,7 +861,7 @@ export default function WebsitePage() {
                         checked={editSections.includes(sectionId)}
                         onChange={() => toggleSection(sectionId)}
                         disabled={sectionId === 'hero'}
-                        className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                        className="w-4 h-4 text-primary-700 border-gray-300 rounded focus:ring-primary-600"
                       />
                       <span className="text-sm text-gray-700">
                         {({ hero: 'Hero', services: 'Tjänster', about: 'Om oss', gallery: 'Bildgalleri', reviews: 'Recensioner', contact: 'Kontakt' } as Record<string, string>)[sectionId] || sectionId}
@@ -878,7 +878,7 @@ export default function WebsitePage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center px-6 py-3 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-all"
+                className="flex items-center px-6 py-3 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-all"
               >
                 {saving ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
                 Spara ändringar

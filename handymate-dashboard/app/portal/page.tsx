@@ -59,7 +59,7 @@ export default function CustomerPortalPageWrapper() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     }>
       <CustomerPortalPage />
@@ -115,10 +115,10 @@ function CustomerPortalPage() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       confirmed: 'bg-emerald-100 text-emerald-700',
-      completed: 'bg-teal-100 text-teal-700',
+      completed: 'bg-primary-100 text-primary-700',
       cancelled: 'bg-red-100 text-red-700',
       paid: 'bg-emerald-100 text-emerald-700',
-      sent: 'bg-teal-100 text-teal-700',
+      sent: 'bg-primary-100 text-primary-700',
       overdue: 'bg-red-100 text-red-700',
       draft: 'bg-gray-100 text-gray-500',
       accepted: 'bg-emerald-100 text-emerald-700',
@@ -149,7 +149,7 @@ function CustomerPortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-teal-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -204,7 +204,7 @@ function CustomerPortalPage() {
         {/* Quick stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <Calendar className="w-5 h-5 text-teal-600 mb-2" />
+            <Calendar className="w-5 h-5 text-primary-700 mb-2" />
             <p className="text-2xl font-bold text-gray-900">{upcomingBookings.length}</p>
             <p className="text-xs text-gray-400">Kommande bokningar</p>
           </div>
@@ -214,7 +214,7 @@ function CustomerPortalPage() {
             <p className="text-xs text-gray-400">Obetald fakturor</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-4">
-            <FileText className="w-5 h-5 text-teal-500 mb-2" />
+            <FileText className="w-5 h-5 text-primary-600 mb-2" />
             <p className="text-2xl font-bold text-gray-900">{openQuotes.length}</p>
             <p className="text-xs text-gray-400">Öppna offerter</p>
           </div>
@@ -238,7 +238,7 @@ function CustomerPortalPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
-                activeTab === tab.id ? 'bg-teal-50 text-sky-700' : 'text-gray-500 hover:text-gray-900'
+                activeTab === tab.id ? 'bg-primary-50 text-sky-700' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               <tab.icon className="w-4 h-4" />
@@ -274,8 +274,8 @@ function CustomerPortalPage() {
 
             {/* Open quotes */}
             {openQuotes.length > 0 && (
-              <div className="bg-teal-50 border border-teal-200 rounded-xl p-5">
-                <h2 className="font-semibold text-teal-900 mb-4">Offerter som väntar på ditt svar</h2>
+              <div className="bg-primary-50 border border-primary-200 rounded-xl p-5">
+                <h2 className="font-semibold text-primary-900 mb-4">Offerter som väntar på ditt svar</h2>
                 {openQuotes.map(q => (
                   <div key={q.quote_id} className="flex items-center justify-between p-3 bg-white rounded-lg mb-2">
                     <div>

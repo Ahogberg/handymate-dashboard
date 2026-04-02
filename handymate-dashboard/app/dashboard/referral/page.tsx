@@ -85,7 +85,7 @@ export default function ReferralPage() {
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin h-8 w-8 border-2 border-teal-600 border-t-transparent rounded-full" />
+        <div className="animate-spin h-8 w-8 border-2 border-primary-700 border-t-transparent rounded-full" />
       </div>
     )
   }
@@ -121,7 +121,7 @@ export default function ReferralPage() {
             </div>
             <button
               onClick={() => copyToClipboard(data.referral_url, 'link')}
-              className="flex items-center gap-2 px-4 py-3 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors whitespace-nowrap"
+              className="flex items-center gap-2 px-4 py-3 bg-primary-700 text-white rounded-lg hover:bg-primary-800 transition-colors whitespace-nowrap"
             >
               {copied === 'link' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied === 'link' ? 'Kopierad!' : 'Kopiera'}
@@ -139,7 +139,7 @@ export default function ReferralPage() {
             </div>
             <button
               onClick={() => copyToClipboard(smsMessage, 'sms')}
-              className="mt-2 text-sm text-teal-600 hover:text-teal-700 flex items-center gap-1"
+              className="mt-2 text-sm text-primary-700 hover:text-primary-800 flex items-center gap-1"
             >
               {copied === 'sms' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied === 'sms' ? 'Kopierad!' : 'Kopiera SMS-text'}
@@ -155,7 +155,7 @@ export default function ReferralPage() {
           <div className="text-sm text-zinc-500 mt-1">Hänvisade kollegor</div>
         </div>
         <div className="bg-white border border-zinc-200 rounded-xl p-4 text-center">
-          <div className="text-3xl font-bold text-teal-600">{activeCount}</div>
+          <div className="text-3xl font-bold text-primary-700">{activeCount}</div>
           <div className="text-sm text-zinc-500 mt-1">Har aktiverat</div>
         </div>
       </div>
@@ -201,7 +201,7 @@ export default function ReferralPage() {
             'När din vän aktiverar sin prenumeration får du 50% rabatt på nästa faktura',
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-6 h-6 bg-teal-100 text-teal-700 rounded-full flex items-center justify-center text-xs font-bold">
+              <div className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold">
                 {i + 1}
               </div>
               <p className="text-sm text-zinc-600 pt-0.5">{step}</p>

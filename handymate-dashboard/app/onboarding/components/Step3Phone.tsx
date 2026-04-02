@@ -72,7 +72,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
   const Feature = ({ ok, text }: { ok: boolean; text: string }) => (
     <div className="flex items-center gap-2 text-sm">
       {ok ? (
-        <Check className="w-4 h-4 text-teal-600 shrink-0" />
+        <Check className="w-4 h-4 text-primary-700 shrink-0" />
       ) : (
         <X className="w-4 h-4 text-gray-300 shrink-0" />
       )}
@@ -88,13 +88,13 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
 
       {/* Sektion 1 — Reserverat nummer */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 text-center shadow-sm">
-        <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-3">
-          <Phone className="w-6 h-6 text-teal-600" />
+        <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <Phone className="w-6 h-6 text-primary-700" />
         </div>
         <p className="text-2xl font-bold text-gray-900 tracking-wider mb-1">+4676•••••••</p>
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-teal-50 border border-teal-200 rounded-full">
-          <Lock className="w-3 h-3 text-teal-600" />
-          <span className="text-xs font-medium text-teal-700">Reserverat åt dig</span>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary-50 border border-primary-300 rounded-full">
+          <Lock className="w-3 h-3 text-primary-700" />
+          <span className="text-xs font-medium text-primary-700">Reserverat åt dig</span>
         </div>
         <p className="text-xs text-gray-400 mt-2">Aktiveras automatiskt när du slutför betalningen</p>
       </div>
@@ -112,11 +112,11 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
             onClick={() => setNumberChoice('new')}
             className={`relative text-left p-4 rounded-xl border-2 transition-all ${
               numberChoice === 'new'
-                ? 'border-teal-600 bg-teal-50/50'
+                ? 'border-primary-700 bg-primary-50/50'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
-            <span className="absolute -top-2.5 right-3 bg-teal-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+            <span className="absolute -top-2.5 right-3 bg-primary-700 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
               ⭐ Rekommenderat
             </span>
             <div className="text-xl mb-2">🆕</div>
@@ -134,7 +134,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
             onClick={() => setNumberChoice('keep')}
             className={`relative text-left p-4 rounded-xl border-2 transition-all ${
               numberChoice === 'keep'
-                ? 'border-teal-600 bg-teal-50/50'
+                ? 'border-primary-700 bg-primary-50/50'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
@@ -165,16 +165,16 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
             onClick={() => setCallHandlingMode(mode.value)}
             className={`w-full p-4 rounded-xl border text-left transition-all ${
               callHandlingMode === mode.value
-                ? 'bg-teal-50 border-teal-300'
+                ? 'bg-primary-50 border-primary-300'
                 : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
             <div className="flex items-center gap-2">
               <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                callHandlingMode === mode.value ? 'border-teal-600' : 'border-gray-300'
+                callHandlingMode === mode.value ? 'border-primary-700' : 'border-gray-300'
               }`}>
                 {callHandlingMode === mode.value && (
-                  <div className="w-2 h-2 rounded-full bg-teal-600" />
+                  <div className="w-2 h-2 rounded-full bg-primary-700" />
                 )}
               </div>
               <p className="text-gray-900 text-sm font-medium">{mode.label}</p>
@@ -187,7 +187,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
       {/* Sektion 4 — Privat mobilnummer */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-3">
         <h3 className="text-gray-900 font-medium flex items-center gap-2">
-          <Phone className="w-4 h-4 text-teal-600" />
+          <Phone className="w-4 h-4 text-primary-700" />
           Ditt privata mobilnummer
         </h3>
         <p className="text-xs text-gray-500">
@@ -197,7 +197,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
           type="tel"
           value={personalPhone}
           onChange={(e) => setPersonalPhone(e.target.value)}
-          className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+          className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
           placeholder="+46708379552"
         />
       </div>
@@ -212,7 +212,7 @@ export default function Step3Phone({ data, onNext, onBack, saving }: StepProps) 
         <button
           onClick={handleContinue}
           disabled={phoneSaving || saving}
-          className="flex-1 py-3 bg-teal-600 text-white rounded-xl font-semibold text-sm hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+          className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {phoneSaving ? 'Sparar...' : <>Välj plan och aktivera <ArrowRight className="w-4 h-4" /></>}
         </button>

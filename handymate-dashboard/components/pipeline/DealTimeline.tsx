@@ -196,7 +196,7 @@ export function DealTimeline({ dealId, customerId, businessId }: Props) {
             )}
             <p className="text-[11px] text-gray-400 mt-0.5">{timeAgo(event.timestamp)}</p>
             {event.link && (
-              <a href={event.link.href} className="text-[11px] text-teal-600 hover:underline mt-0.5 inline-block">
+              <a href={event.link.href} className="text-[11px] text-primary-700 hover:underline mt-0.5 inline-block">
                 {event.link.label} →
               </a>
             )}

@@ -290,7 +290,7 @@ export default function PricingSettingsPage() {
   if (loading) {
     return (
       <div className="p-6 max-w-4xl mx-auto flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 text-teal-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -334,13 +334,13 @@ export default function PricingSettingsPage() {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Ny kundtyp..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
               onKeyDown={e => e.key === 'Enter' && addSegment()}
             />
             <button
               onClick={addSegment}
               disabled={!newName.trim()}
-              className="flex items-center gap-1 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -355,7 +355,7 @@ export default function PricingSettingsPage() {
                 {seg.description && <p className="text-xs text-gray-500">{seg.description}</p>}
               </div>
               {seg.is_default && (
-                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">Standard</span>
+                <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">Standard</span>
               )}
               <button onClick={() => setEditSegment({ ...seg })} className="p-1 text-gray-400 hover:text-gray-900">
                 <Pencil className="w-4 h-4" />
@@ -383,7 +383,7 @@ export default function PricingSettingsPage() {
               value={newName}
               onChange={e => setNewName(e.target.value)}
               placeholder="Ny avtalsform..."
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
               onKeyDown={e => e.key === 'Enter' && addContractType()}
             />
             <select
@@ -398,7 +398,7 @@ export default function PricingSettingsPage() {
             <button
               onClick={addContractType}
               disabled={!newName.trim()}
-              className="flex items-center gap-1 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors disabled:opacity-50"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -414,7 +414,7 @@ export default function PricingSettingsPage() {
                 </p>
               </div>
               {ct.is_default && (
-                <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">Standard</span>
+                <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">Standard</span>
               )}
               <button onClick={() => setEditContract({ ...ct })} className="p-1 text-gray-400 hover:text-gray-900">
                 <Pencil className="w-4 h-4" />
@@ -439,7 +439,7 @@ export default function PricingSettingsPage() {
           <div className="flex justify-end">
             <button
               onClick={createPriceList}
-              className="flex items-center gap-2 px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 transition-colors"
             >
               <Plus className="w-4 h-4" />
               Ny prislista
@@ -453,7 +453,7 @@ export default function PricingSettingsPage() {
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold text-gray-900">{pl.name}</h3>
                     {pl.is_default && (
-                      <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">Standard</span>
+                      <span className="text-xs bg-primary-50 text-primary-700 px-2 py-0.5 rounded-full">Standard</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
@@ -534,7 +534,7 @@ export default function PricingSettingsPage() {
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <button onClick={() => setEditSegment(null)} className="px-4 py-2 text-sm text-gray-500">Avbryt</button>
-            <button onClick={saveSegment} disabled={saving} className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-50">
+            <button onClick={saveSegment} disabled={saving} className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50">
               {saving ? 'Sparar...' : 'Spara'}
             </button>
           </div>
@@ -577,7 +577,7 @@ export default function PricingSettingsPage() {
           </div>
           <div className="flex justify-end gap-2 mt-6">
             <button onClick={() => setEditContract(null)} className="px-4 py-2 text-sm text-gray-500">Avbryt</button>
-            <button onClick={saveContractType} disabled={saving} className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-50">
+            <button onClick={saveContractType} disabled={saving} className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50">
               {saving ? 'Sparar...' : 'Spara'}
             </button>
           </div>
@@ -722,7 +722,7 @@ export default function PricingSettingsPage() {
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Specifika rader</p>
                 <button
                   onClick={addPriceListItem}
-                  className="flex items-center gap-1 text-xs text-teal-700 font-medium hover:underline"
+                  className="flex items-center gap-1 text-xs text-primary-700 font-medium hover:underline"
                 >
                   <Plus className="w-3 h-3" />
                   Lägg till
@@ -765,7 +765,7 @@ export default function PricingSettingsPage() {
                           type="checkbox"
                           checked={item.is_rot_eligible}
                           onChange={e => updatePriceListItem(i, { is_rot_eligible: e.target.checked })}
-                          className="rounded border-gray-300 text-teal-700 focus:ring-teal-500"
+                          className="rounded border-gray-300 text-primary-700 focus:ring-primary-600"
                         />
                         <span className="text-xs text-gray-500">ROT</span>
                       </label>
@@ -786,7 +786,7 @@ export default function PricingSettingsPage() {
             <button
               onClick={savePriceList}
               disabled={saving}
-              className="px-4 py-2 bg-teal-700 text-white text-sm font-medium rounded-lg hover:bg-teal-800 disabled:opacity-50"
+              className="px-4 py-2 bg-primary-700 text-white text-sm font-medium rounded-lg hover:bg-primary-800 disabled:opacity-50"
             >
               {saving ? 'Sparar...' : 'Spara'}
             </button>

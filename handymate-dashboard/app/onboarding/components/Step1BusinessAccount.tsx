@@ -123,7 +123,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
       {/* Business Info */}
       <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <Building2 className="w-5 h-5 text-teal-600" />
+          <Building2 className="w-5 h-5 text-primary-700" />
           Företagsinformation
         </h2>
 
@@ -134,7 +134,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="text"
               value={form.business_name}
               onChange={(e) => setForm({ ...form, business_name: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="T.ex. Anderssons El AB"
             />
           </div>
@@ -144,7 +144,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="text"
               value={form.display_name}
               onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="Kort namn för SMS & samtal"
             />
           </div>
@@ -159,7 +159,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
                 onClick={() => setForm({ ...form, branch: b.value })}
                 className={`px-3 py-2.5 rounded-xl border text-sm transition-all ${
                   form.branch === b.value
-                    ? 'bg-teal-50 border-teal-500 text-teal-700 font-medium'
+                    ? 'bg-primary-50 border-primary-600 text-primary-700 font-medium'
                     : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
@@ -178,7 +178,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
             type="text"
             value={form.service_area}
             onChange={(e) => setForm({ ...form, service_area: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
             placeholder="T.ex. Stockholm, Södertälje, Nynäshamn"
           />
         </div>
@@ -187,7 +187,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
       {/* Account Info */}
       <div className="bg-white border border-gray-200 shadow-sm rounded-xl p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-          <User className="w-5 h-5 text-teal-600" />
+          <User className="w-5 h-5 text-primary-700" />
           Kontouppgifter
         </h2>
 
@@ -198,7 +198,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="text"
               value={form.contact_name}
               onChange={(e) => setForm({ ...form, contact_name: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="Ditt namn"
             />
           </div>
@@ -210,7 +210,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="tel"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="+46 70 123 45 67"
             />
           </div>
@@ -224,7 +224,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
             type="email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
-            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+            className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
             placeholder="din@email.se"
           />
         </div>
@@ -238,7 +238,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="Minst 6 tecken"
             />
           </div>
@@ -248,7 +248,7 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
               type="password"
               value={form.password_confirm}
               onChange={(e) => setForm({ ...form, password_confirm: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500"
+              className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
               placeholder="Skriv lösenordet igen"
             />
           </div>
@@ -264,13 +264,13 @@ export default function Step1BusinessAccount({ onComplete }: Step1Props) {
       <button
         onClick={handleSubmit}
         disabled={loading}
-        className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-gray-900 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+        className="w-full py-3 bg-primary-700 hover:bg-primary-700 text-gray-900 rounded-xl font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
       >
         {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>Skapa konto <ArrowRight className="w-5 h-5" /></>}
       </button>
 
       <p className="text-center text-sm text-gray-400">
-        Har du redan ett konto? <a href="/login" className="text-teal-600 hover:underline">Logga in</a>
+        Har du redan ett konto? <a href="/login" className="text-primary-700 hover:underline">Logga in</a>
       </p>
     </div>
   )

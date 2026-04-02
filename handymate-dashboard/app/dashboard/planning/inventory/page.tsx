@@ -143,7 +143,7 @@ export default function PlanningInventoryPage() {
   }
 
   if (loading) {
-    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-teal-600 animate-spin" /></div>
+    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
   }
 
   return (
@@ -153,7 +153,7 @@ export default function PlanningInventoryPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <Package className="w-5 h-5 text-teal-600" />
+              <Package className="w-5 h-5 text-primary-700" />
               Lager
             </h1>
             <p className="text-sm text-gray-500">
@@ -163,7 +163,7 @@ export default function PlanningInventoryPage() {
           <button
             onClick={() => setShowWithdraw(true)}
             disabled={items.length === 0}
-            className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm font-medium disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50"
           >
             <ArrowDown className="w-4 h-4" />
             Rapportera uttag
@@ -185,7 +185,7 @@ export default function PlanningInventoryPage() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Sök artikel..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
           />
         </div>
 
@@ -249,7 +249,7 @@ export default function PlanningInventoryPage() {
                       </div>
                       {item.min_stock > 0 && (
                         <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-teal-500 rounded-full transition-all" style={{ width: `${getStockPercent(item)}%` }} />
+                          <div className="h-full bg-primary-600 rounded-full transition-all" style={{ width: `${getStockPercent(item)}%` }} />
                         </div>
                       )}
                     </div>
@@ -318,7 +318,7 @@ export default function PlanningInventoryPage() {
                 ))}
                 <button
                   onClick={() => setWithdrawLines([...withdrawLines, { itemId: '', quantity: 1 }])}
-                  className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
+                  className="text-sm text-primary-700 hover:text-primary-700 font-medium flex items-center gap-1"
                 >
                   <Plus className="w-4 h-4" /> Lägg till artikel
                 </button>
@@ -329,7 +329,7 @@ export default function PlanningInventoryPage() {
               <button
                 onClick={handleWithdraw}
                 disabled={withdrawing || withdrawLines.every(l => !l.itemId)}
-                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Rapportera uttag
@@ -356,7 +356,7 @@ export default function PlanningInventoryPage() {
                 min={1}
                 value={restockQty}
                 onChange={e => setRestockQty(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 outline-none"
                 autoFocus
               />
               <p className="text-xs text-gray-400 mt-1">Nytt saldo: {restockItem.current_stock + restockQty} {restockItem.unit}</p>
@@ -365,7 +365,7 @@ export default function PlanningInventoryPage() {
               <button
                 onClick={handleRestock}
                 disabled={restockQty <= 0 || restocking}
-                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50"
+                className="flex-1 bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50"
               >
                 {restocking ? 'Sparar...' : 'Registrera påfyllning'}
               </button>

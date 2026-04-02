@@ -178,7 +178,7 @@ function getStatusBadge(status: string) {
       )
     case 'completed':
       return (
-        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-teal-100 text-teal-600 rounded-full">
+        <span className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">
           <CheckCircle2 className="w-3 h-3" /> Klar
         </span>
       )
@@ -668,7 +668,7 @@ export default function DocumentsPage() {
           </div>
           <button
             onClick={startCreate}
-            className="flex items-center gap-2 px-5 py-2.5 bg-teal-700 rounded-xl font-medium text-sm transition-all shadow-lg shadow-teal-500/10"
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary-800 rounded-xl font-medium text-sm transition-all shadow-lg shadow-primary-600/10"
           >
             <Plus className="w-4 h-4" /> Nytt dokument
           </button>
@@ -679,19 +679,19 @@ export default function DocumentsPage() {
           <div className="flex bg-white rounded-xl p-1 border border-gray-200">
             <button
               onClick={() => { setView('documents'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-teal-700 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Mina dokument ({documents.length})
             </button>
             <button
               onClick={() => { setView('uploads'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'uploads' ? 'bg-teal-700 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'uploads' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Uppladdade filer ({uploadedFiles.length})
             </button>
             <button
               onClick={() => { setView('templates'); setSelectedCategory(null) }}
-              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'templates' ? 'bg-teal-700 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
+              className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'templates' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
             >
               Mallar ({templates.length})
             </button>
@@ -705,14 +705,14 @@ export default function DocumentsPage() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Sök dokument..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-500"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-600"
               />
             </div>
             {view === 'documents' && (
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
               >
                 <option value="">Alla status</option>
                 <option value="draft">Utkast</option>
@@ -731,7 +731,7 @@ export default function DocumentsPage() {
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                  !selectedCategory ? 'bg-teal-100 text-teal-600' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                  !selectedCategory ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 <FolderOpen className="w-4 h-4" />
@@ -742,7 +742,7 @@ export default function DocumentsPage() {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
-                    selectedCategory === cat.id ? 'bg-teal-100 text-teal-600' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                    selectedCategory === cat.id ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                   }`}
                 >
                   {getCategoryIcon(cat.icon, 'w-4 h-4')}
@@ -758,7 +758,7 @@ export default function DocumentsPage() {
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                  !selectedCategory ? 'bg-teal-700 text-gray-900' : 'bg-gray-100 text-gray-500'
+                  !selectedCategory ? 'bg-primary-800 text-gray-900' : 'bg-gray-100 text-gray-500'
                 }`}
               >
                 Alla
@@ -768,7 +768,7 @@ export default function DocumentsPage() {
                   key={cat.id}
                   onClick={() => setSelectedCategory(cat.id)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs transition-all ${
-                    selectedCategory === cat.id ? 'bg-teal-700 text-gray-900' : 'bg-gray-100 text-gray-500'
+                    selectedCategory === cat.id ? 'bg-primary-800 text-gray-900' : 'bg-gray-100 text-gray-500'
                   }`}
                 >
                   {cat.name}
@@ -788,7 +788,7 @@ export default function DocumentsPage() {
                   <p className="text-gray-400 text-sm mb-6">Skapa ditt första dokument från en mall</p>
                   <button
                     onClick={startCreate}
-                    className="px-5 py-2.5 bg-teal-700 rounded-xl text-sm font-medium"
+                    className="px-5 py-2.5 bg-primary-800 rounded-xl text-sm font-medium"
                   >
                     <Plus className="w-4 h-4 inline mr-2" /> Nytt dokument
                   </button>
@@ -801,7 +801,7 @@ export default function DocumentsPage() {
                       className="bg-white shadow-sm border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all group"
                     >
                       <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           {doc.template?.category ? getCategoryIcon(doc.template.category.icon, 'w-5 h-5 text-sky-700') : <FileText className="w-5 h-5 text-sky-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -894,7 +894,7 @@ export default function DocumentsPage() {
                           <h3 className="text-sm font-medium text-gray-900 truncate mb-1">{file.file_name}</h3>
                           <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400">
                             <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full ${
-                              file.source === 'customer' ? 'bg-teal-50 text-sky-700' : 'bg-teal-50 text-teal-600'
+                              file.source === 'customer' ? 'bg-primary-50 text-sky-700' : 'bg-primary-50 text-primary-700'
                             }`}>
                               {file.source === 'customer' ? <Users className="w-3 h-3" /> : <FolderKanban className="w-3 h-3" />}
                               {file.source === 'customer' ? 'Kund' : 'Projekt'}
@@ -954,11 +954,11 @@ export default function DocumentsPage() {
                   {filteredTemplates.map(tpl => (
                     <div
                       key={tpl.id}
-                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 hover:border-teal-300 transition-all group cursor-pointer"
+                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 hover:border-primary-300 transition-all group cursor-pointer"
                       onClick={() => { selectTemplate(tpl); setShowCreate(true) }}
                     >
                       <div className="flex items-start gap-3 mb-3">
-                        <div className="w-10 h-10 bg-teal-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           {tpl.category ? getCategoryIcon(tpl.category.icon, 'w-5 h-5 text-sky-700') : <FileText className="w-5 h-5 text-sky-700" />}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -966,7 +966,7 @@ export default function DocumentsPage() {
                           <p className="text-xs text-gray-400">{tpl.category?.name}</p>
                         </div>
                         {tpl.is_system ? (
-                          <span className="px-2 py-0.5 bg-teal-50 text-sky-700 text-xs rounded-full">System</span>
+                          <span className="px-2 py-0.5 bg-primary-50 text-sky-700 text-xs rounded-full">System</span>
                         ) : (
                           <span className="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs rounded-full">Egen</span>
                         )}
@@ -1019,7 +1019,7 @@ export default function DocumentsPage() {
                 <div className="flex items-center gap-2 mt-2">
                   {[1, 2, 3].map(step => (
                     <div key={step} className={`h-1.5 rounded-full transition-all ${
-                      step <= wizardStep ? 'w-12 bg-teal-600' : 'w-8 bg-gray-200'
+                      step <= wizardStep ? 'w-12 bg-primary-700' : 'w-8 bg-gray-200'
                     }`} />
                   ))}
                 </div>
@@ -1044,7 +1044,7 @@ export default function DocumentsPage() {
                             <button
                               key={tpl.id}
                               onClick={() => selectTemplate(tpl)}
-                              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-teal-300 rounded-xl text-left transition-all"
+                              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-primary-300 rounded-xl text-left transition-all"
                             >
                               {getCategoryIcon(cat.icon, 'w-5 h-5 text-sky-700')}
                               <div className="flex-1 min-w-0">
@@ -1076,7 +1076,7 @@ export default function DocumentsPage() {
                       type="text"
                       value={createTitle}
                       onChange={e => setCreateTitle(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                     />
                   </div>
                   <div>
@@ -1084,7 +1084,7 @@ export default function DocumentsPage() {
                     <select
                       value={createCustomerId}
                       onChange={e => setCreateCustomerId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                     >
                       <option value="">Ingen kund vald</option>
                       {customers.map(c => (
@@ -1097,7 +1097,7 @@ export default function DocumentsPage() {
                     <select
                       value={createProjectId}
                       onChange={e => setCreateProjectId(e.target.value)}
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                     >
                       <option value="">Inget projekt valt</option>
                       {projects.map(p => (
@@ -1114,7 +1114,7 @@ export default function DocumentsPage() {
                     </button>
                     <button
                       onClick={() => setWizardStep(3)}
-                      className="flex-1 px-4 py-2.5 bg-teal-700 rounded-xl text-sm font-medium transition-all"
+                      className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all"
                     >
                       Nästa <ChevronRight className="w-4 h-4 inline ml-1" />
                     </button>
@@ -1136,7 +1136,7 @@ export default function DocumentsPage() {
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
                             rows={3}
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500 resize-none"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600 resize-none"
                           />
                         ) : v.input_type === 'checkbox' ? (
                           <label className="flex items-center gap-3 cursor-pointer">
@@ -1152,7 +1152,7 @@ export default function DocumentsPage() {
                           <select
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                           >
                             <option value="">Välj...</option>
                             {v.options.map(opt => (
@@ -1164,7 +1164,7 @@ export default function DocumentsPage() {
                             type={v.input_type === 'date' ? 'date' : 'text'}
                             value={variableValues[v.key] || ''}
                             onChange={e => setVariableValues(prev => ({ ...prev, [v.key]: e.target.value }))}
-                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                           />
                         )}
                       </div>
@@ -1180,7 +1180,7 @@ export default function DocumentsPage() {
                     <button
                       onClick={createDocument}
                       disabled={creating}
-                      className="flex-1 px-4 py-2.5 bg-teal-700 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                      className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
                     >
                       {creating ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <Plus className="w-4 h-4 inline mr-2" />}
                       Skapa dokument
@@ -1227,7 +1227,7 @@ export default function DocumentsPage() {
               {viewDoc.status === 'draft' && (
                 <button
                   onClick={() => { setViewDoc(null); openEdit(viewDoc) }}
-                  className="px-4 py-2 bg-teal-700 hover:bg-teal-600 rounded-xl text-sm font-medium transition-all"
+                  className="px-4 py-2 bg-primary-800 hover:bg-primary-700 rounded-xl text-sm font-medium transition-all"
                 >
                   <PenTool className="w-4 h-4 inline mr-2" /> Redigera
                 </button>
@@ -1287,7 +1287,7 @@ export default function DocumentsPage() {
                             value={editVars[field.variable] || ''}
                             onChange={e => setEditVars(prev => ({ ...prev, [field.variable]: e.target.value }))}
                             rows={2}
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-teal-500 resize-none"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-600 resize-none"
                           />
                         ) : field.type === 'checkbox' ? (
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -1304,7 +1304,7 @@ export default function DocumentsPage() {
                             type="text"
                             value={editVars[field.variable] || ''}
                             onChange={e => setEditVars(prev => ({ ...prev, [field.variable]: e.target.value }))}
-                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                            className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                           />
                         )}
                       </div>
@@ -1328,7 +1328,7 @@ export default function DocumentsPage() {
               <button
                 onClick={saveDocument}
                 disabled={saving}
-                className="flex-1 px-4 py-2.5 bg-teal-700 hover:bg-teal-600 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary-800 hover:bg-primary-700 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : null}
                 Spara utkast
@@ -1366,7 +1366,7 @@ export default function DocumentsPage() {
                   value={signName}
                   onChange={e => setSignName(e.target.value)}
                   placeholder="Ditt namn"
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-teal-500"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
                 />
               </div>
               <div>
@@ -1402,7 +1402,7 @@ export default function DocumentsPage() {
               <button
                 onClick={submitSignature}
                 disabled={!signName || signing}
-                className="flex-1 px-4 py-2.5 bg-teal-700 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary-800 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
               >
                 {signing ? <Loader2 className="w-4 h-4 inline animate-spin mr-2" /> : <PenTool className="w-4 h-4 inline mr-2" />}
                 Signera

@@ -98,8 +98,8 @@ export default function OnMyWayButton({
         onClick={handleOpen}
         disabled={sent}
         className={compact
-          ? 'flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 text-white rounded-lg text-xs font-medium hover:bg-teal-700 transition-colors disabled:opacity-50'
-          : 'flex items-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors shadow-sm disabled:opacity-50'
+          ? 'flex items-center gap-1.5 px-3 py-1.5 bg-primary-700 text-white rounded-lg text-xs font-medium hover:bg-primary-800 transition-colors disabled:opacity-50'
+          : 'flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 transition-colors shadow-sm disabled:opacity-50'
         }
       >
         <Car className={compact ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
@@ -113,7 +113,7 @@ export default function OnMyWayButton({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div className="flex items-center gap-2">
-                <Car className="w-5 h-5 text-teal-600" />
+                <Car className="w-5 h-5 text-primary-700" />
                 <h3 className="font-semibold text-gray-900">På väg till {firstName}</h3>
               </div>
               <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-600">
@@ -129,13 +129,13 @@ export default function OnMyWayButton({
                   <div>
                     <p className="text-sm text-gray-700">{customerAddress}</p>
                     {gettingLocation && (
-                      <p className="text-xs text-teal-600 mt-1 flex items-center gap-1">
+                      <p className="text-xs text-primary-700 mt-1 flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" />
                         Hämtar din position för ETA...
                       </p>
                     )}
                     {location && !gettingLocation && (
-                      <p className="text-xs text-teal-600 mt-1">GPS-position hämtad</p>
+                      <p className="text-xs text-primary-700 mt-1">GPS-position hämtad</p>
                     )}
                   </div>
                 </div>
@@ -149,14 +149,14 @@ export default function OnMyWayButton({
                   onChange={(e) => setMessage(e.target.value)}
                   rows={4}
                   maxLength={320}
-                  className="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none"
+                  className="w-full border border-gray-200 rounded-xl p-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600 resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">{message.length}/320</p>
               </div>
 
               {eta && (
-                <div className="bg-teal-50 border border-teal-200 rounded-xl p-3 text-center">
-                  <p className="text-sm text-teal-700 font-medium">Beräknad ankomst: {eta}</p>
+                <div className="bg-primary-50 border border-primary-200 rounded-xl p-3 text-center">
+                  <p className="text-sm text-primary-700 font-medium">Beräknad ankomst: {eta}</p>
                 </div>
               )}
 
@@ -175,7 +175,7 @@ export default function OnMyWayButton({
                   <button
                     onClick={handleSend}
                     disabled={sending || !message.trim()}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-semibold hover:bg-teal-700 transition-colors disabled:opacity-50"
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 transition-colors disabled:opacity-50"
                   >
                     {sending ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

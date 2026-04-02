@@ -862,7 +862,7 @@ export default function SchedulePage() {
           {getTypeIcon(entry.type)}
           <span className="truncate">{entry.title}</span>
           {isExternal && (
-            <span className="ml-auto text-[9px] text-teal-500 bg-teal-50 px-1 rounded flex-shrink-0">Google</span>
+            <span className="ml-auto text-[9px] text-primary-600 bg-primary-50 px-1 rounded flex-shrink-0">Google</span>
           )}
         </div>
         {height > 36 && (
@@ -953,7 +953,7 @@ export default function SchedulePage() {
               return (
                 <div
                   key={day.toISOString()}
-                  className={`relative border-l border-gray-200 ${todayHighlight ? 'bg-teal-600/[0.03]' : ''}`}
+                  className={`relative border-l border-gray-200 ${todayHighlight ? 'bg-primary-700/[0.03]' : ''}`}
                 >
                   {/* Hour grid lines & click zones */}
                   {Array.from({ length: TOTAL_HOURS }, (_, i) => (
@@ -1014,7 +1014,7 @@ export default function SchedulePage() {
               >
                 <div
                   className={`text-xs font-medium mb-1 w-6 h-6 flex items-center justify-center rounded-full ${
-                    today ? 'bg-teal-600 text-gray-900' : 'text-gray-500'
+                    today ? 'bg-primary-700 text-gray-900' : 'text-gray-500'
                   }`}
                 >
                   {format(day, 'd')}
@@ -1033,7 +1033,7 @@ export default function SchedulePage() {
                         className={`flex items-center gap-1 w-full text-left ${isExternal ? 'opacity-75' : ''}`}
                       >
                         {isExternal ? (
-                          <CalendarDays className="w-2.5 h-2.5 text-teal-500 flex-shrink-0" />
+                          <CalendarDays className="w-2.5 h-2.5 text-primary-600 flex-shrink-0" />
                         ) : (
                           <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
                         )}
@@ -1160,7 +1160,7 @@ export default function SchedulePage() {
           {/* Team heading */}
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900">Team</h3>
-            <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-teal-600">
+            <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-primary-700">
               {allSelected ? 'Avmarkera' : 'Markera alla'}
             </button>
           </div>
@@ -1219,7 +1219,7 @@ export default function SchedulePage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-semibold text-gray-900">Ledighetsansokningar</h3>
-                <span className="text-xs bg-teal-100 text-sky-700 px-2 py-0.5 rounded-full">
+                <span className="text-xs bg-primary-100 text-sky-700 px-2 py-0.5 rounded-full">
                   {timeOffRequests.length}
                 </span>
               </div>
@@ -1267,8 +1267,8 @@ export default function SchedulePage() {
     <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       {/* Toast */}
@@ -1306,7 +1306,7 @@ export default function SchedulePage() {
                 <select
                   value={entryForm.business_user_id}
                   onChange={(e) => setEntryForm({ ...entryForm, business_user_id: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   <option value="">Valj person...</option>
                   {teamMembers.map((m) => (
@@ -1323,7 +1323,7 @@ export default function SchedulePage() {
                 <select
                   value={entryForm.project_id}
                   onChange={(e) => handleProjectChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   <option value="">Inget projekt</option>
                   {projects.map((p) => (
@@ -1342,7 +1342,7 @@ export default function SchedulePage() {
                   value={entryForm.title}
                   onChange={(e) => setEntryForm({ ...entryForm, title: e.target.value })}
                   placeholder="Vad ska goras?"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -1353,7 +1353,7 @@ export default function SchedulePage() {
                   type="date"
                   value={entryForm.date}
                   onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 />
               </div>
 
@@ -1363,7 +1363,7 @@ export default function SchedulePage() {
                   type="button"
                   onClick={() => setEntryForm({ ...entryForm, all_day: !entryForm.all_day })}
                   className={`w-10 h-6 rounded-full transition-colors ${
-                    entryForm.all_day ? 'bg-teal-600' : 'bg-gray-200'
+                    entryForm.all_day ? 'bg-primary-700' : 'bg-gray-200'
                   } relative`}
                 >
                   <div
@@ -1384,7 +1384,7 @@ export default function SchedulePage() {
                       type="time"
                       value={entryForm.start_time}
                       onChange={(e) => setEntryForm({ ...entryForm, start_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                   </div>
                   <div>
@@ -1393,7 +1393,7 @@ export default function SchedulePage() {
                       type="time"
                       value={entryForm.end_time}
                       onChange={(e) => setEntryForm({ ...entryForm, end_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                   </div>
                 </div>
@@ -1410,7 +1410,7 @@ export default function SchedulePage() {
                       onClick={() => setEntryForm({ ...entryForm, type: opt.value })}
                       className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                         entryForm.type === opt.value
-                          ? 'bg-teal-100 text-sky-700 border border-teal-500/40'
+                          ? 'bg-primary-100 text-sky-700 border border-primary-600/40'
                           : 'bg-gray-100 text-gray-500 border border-gray-300 hover:border-gray-300'
                       }`}
                     >
@@ -1431,7 +1431,7 @@ export default function SchedulePage() {
                   onChange={(e) => setEntryForm({ ...entryForm, description: e.target.value })}
                   rows={2}
                   placeholder="Valfria anteckningar..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
               </div>
 
@@ -1520,7 +1520,7 @@ export default function SchedulePage() {
                 <button
                   onClick={handleEntrySubmit}
                   disabled={actionLoading}
-                  className="flex items-center px-5 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                  className="flex items-center px-5 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   {editingEntry ? 'Spara' : 'Skapa'}
@@ -1552,7 +1552,7 @@ export default function SchedulePage() {
                     type="date"
                     value={timeOffForm.start_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, start_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
                 <div>
@@ -1561,7 +1561,7 @@ export default function SchedulePage() {
                     type="date"
                     value={timeOffForm.end_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, end_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                   />
                 </div>
               </div>
@@ -1571,7 +1571,7 @@ export default function SchedulePage() {
                 <select
                   value={timeOffForm.type}
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                 >
                   {TIME_OFF_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -1588,7 +1588,7 @@ export default function SchedulePage() {
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, note: e.target.value })}
                   rows={2}
                   placeholder="Valfri kommentar..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
                 />
               </div>
             </div>
@@ -1600,7 +1600,7 @@ export default function SchedulePage() {
               <button
                 onClick={handleTimeOffSubmit}
                 disabled={actionLoading}
-                className="flex items-center px-5 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
+                className="flex items-center px-5 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Skicka ansokan
@@ -1618,7 +1618,7 @@ export default function SchedulePage() {
           <div className="absolute top-28 left-4 right-4 bg-white border border-gray-200 rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">Filtrera team</h3>
-              <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-teal-600">
+              <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-primary-700">
                 {allSelected ? 'Avmarkera' : 'Markera alla'}
               </button>
             </div>
@@ -1669,7 +1669,7 @@ export default function SchedulePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-teal-600/20 to-teal-500/20 rounded-xl flex items-center justify-center border border-teal-300">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300">
               <CalendarDays className="w-5 h-5 text-sky-700" />
             </div>
             <div>
@@ -1688,7 +1688,7 @@ export default function SchedulePage() {
                   } catch {}
                   setSyncing(false)
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-700 hover:border-teal-300 transition"
+                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-700 hover:border-primary-300 transition"
                 title="Synka med Google Calendar"
               >
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -1697,7 +1697,7 @@ export default function SchedulePage() {
             )}
             <button
               onClick={() => openCreateModal()}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 transition-opacity min-h-[44px]"
             >
               <Plus className="w-4 h-4" />
               Ny post
@@ -1713,7 +1713,7 @@ export default function SchedulePage() {
               onClick={() => setMode('calendar')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'calendar'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'text-gray-500 hover:text-white'
               }`}
             >
@@ -1724,7 +1724,7 @@ export default function SchedulePage() {
               onClick={() => setMode('utilization')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                 mode === 'utilization'
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'text-gray-500 hover:text-white'
               }`}
             >
@@ -1826,7 +1826,7 @@ export default function SchedulePage() {
                               <div
                                 key={day.toISOString()}
                                 className={`text-center py-3 border-l border-gray-200 ${
-                                  today ? 'bg-teal-600/[0.05]' : ''
+                                  today ? 'bg-primary-700/[0.05]' : ''
                                 }`}
                               >
                                 <p className="text-xs text-gray-400 uppercase">
@@ -1856,7 +1856,7 @@ export default function SchedulePage() {
                         <div className="flex-1">
                           <div
                             className={`text-center py-3 ${
-                              isToday(currentDate) ? 'bg-teal-600/[0.05]' : ''
+                              isToday(currentDate) ? 'bg-primary-700/[0.05]' : ''
                             }`}
                           >
                             <p className="text-xs text-gray-400 uppercase">
@@ -1886,7 +1886,7 @@ export default function SchedulePage() {
                       <p className="text-gray-400">Inga poster under denna period</p>
                       <button
                         onClick={() => openCreateModal()}
-                        className="mt-4 text-sky-700 hover:text-teal-600 text-sm"
+                        className="mt-4 text-sky-700 hover:text-primary-700 text-sm"
                       >
                         Lagg till en post
                       </button>

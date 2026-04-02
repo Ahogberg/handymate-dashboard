@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   --foreground-rgb: 30, 41, 59;
@@ -12,6 +12,10 @@
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
+  font-family: 'DM Sans', system-ui, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6 {
   font-family: 'Space Grotesk', system-ui, sans-serif;
 }
 
@@ -27,3 +31,33 @@ body {
 /* Sidebar keeps dark scrollbar */
 .sidebar-dark ::-webkit-scrollbar-thumb { background: #475569; }
 .sidebar-dark ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Sidebar active nav indicator */
+.nav-active-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: #5eead4; /* primary-300 */
+}
+
+/* Card elevation system */
+.card-base {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+}
+
+.card-base:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+  border-color: #d1d5db;
+}
+
+.card-elevated {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+}

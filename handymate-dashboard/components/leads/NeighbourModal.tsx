@@ -100,7 +100,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
 
           {loading ? (
             <div className="py-12 flex items-center justify-center">
-              <Loader2 className="w-6 h-6 text-teal-700 animate-spin" />
+              <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
             </div>
           ) : (
             <>
@@ -114,7 +114,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                       onClick={() => setCount(n)}
                       className={`flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                         count === n
-                          ? 'bg-teal-700 text-white shadow-md'
+                          ? 'bg-primary-800 text-white shadow-md'
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                       }`}
                     >
@@ -153,7 +153,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                     value={letterContent}
                     onChange={e => setLetterContent(e.target.value)}
                     rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-y"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-y"
                   />
                 </div>
               )}
@@ -164,7 +164,7 @@ export default function NeighbourModal({ jobType, address, jobId, onClose, onCre
                   <button
                     onClick={handleSend}
                     disabled={saving || !letterContent.trim()}
-                    className="flex-1 flex items-center justify-center gap-2 bg-teal-700 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-teal-800 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 bg-primary-800 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 hover:bg-primary-800 transition-colors"
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     {saving ? 'Skapar...' : `Skicka till ${count} grannar · ${totalCost} kr`}

@@ -63,7 +63,7 @@ import { DealTimeline } from '@/components/pipeline/DealTimeline'
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
     <div className="flex items-center justify-center py-16">
-      <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+      <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
     </div>
   ),
   ssr: false,
@@ -302,7 +302,7 @@ function getTriggeredByLabel(t: string): string {
 
 function getTriggeredByStyle(t: string): string {
   switch (t) {
-    case 'ai': return 'bg-teal-100 text-sky-700 border-teal-200'
+    case 'ai': return 'bg-primary-100 text-sky-700 border-primary-200'
     case 'user': return 'bg-gray-100 text-gray-600 border-gray-200'
     case 'system': return 'bg-gray-100 text-gray-500 border-gray-200'
     default: return 'bg-gray-100 text-gray-500 border-gray-200'
@@ -1454,8 +1454,8 @@ export default function PipelinePage() {
   return (
     <div className="min-h-screen bg-slate-50 relative">
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-teal-50 rounded-full blur-[128px]" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary-50 rounded-full blur-[128px]" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative z-10 flex flex-col h-screen">
@@ -1463,7 +1463,7 @@ export default function PipelinePage() {
         <header className="flex-shrink-0 px-4 lg:px-6 py-4 border-b border-gray-200 bg-white/60 backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-primary-700 flex items-center justify-center">
                 <FolderKanban className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -1493,10 +1493,10 @@ export default function PipelinePage() {
 
               <div className="relative" ref={filterRef}>
                 <button onClick={() => setShowFilter(!showFilter)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-teal-50 border-teal-300 text-sky-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-primary-50 border-primary-300 text-sky-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
                   <Filter className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">Filter</span>
-                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-teal-600" />}
+                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-700" />}
                 </button>
                 {showFilter && (
                   <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-4 shadow-xl z-50">
@@ -1506,13 +1506,13 @@ export default function PipelinePage() {
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input type="text" placeholder="Sök deal eller kund..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         </div>
                       </div>
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-teal-400">
+                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                           <option value="all">Alla</option>
                           <option value="urgent">Brådskande</option>
                           <option value="high">Hög</option>
@@ -1520,20 +1520,20 @@ export default function PipelinePage() {
                           <option value="low">Låg</option>
                         </select>
                       </div>
-                      {hasActiveFilters && <button onClick={() => { setFilterSearch(''); setFilterPriority('all') }} className="text-xs text-sky-700 hover:text-teal-600">Rensa filter</button>}
+                      {hasActiveFilters && <button onClick={() => { setFilterSearch(''); setFilterPriority('all') }} className="text-xs text-sky-700 hover:text-primary-700">Rensa filter</button>}
                     </div>
                   </div>
                 )}
               </div>
               <button onClick={toggleHideEmpty}
-                className={`hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${hideEmpty ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-white text-gray-500 border-gray-200 hover:text-gray-900'}`}
+                className={`hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${hideEmpty ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-white text-gray-500 border-gray-200 hover:text-gray-900'}`}
                 title={hideEmpty ? 'Visa alla steg' : 'Dölj tomma steg'}>
                 <Eye className="w-4 h-4" />
                 <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
               </button>
               {/* Stage settings removed — stages are locked */}
               <button onClick={() => { setShowNewDeal(true); fetchCustomers() }}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all shadow-lg shadow-teal-500/10">
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-lg shadow-primary-600/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
               </button>
             </div>
@@ -1584,7 +1584,7 @@ export default function PipelinePage() {
           </div>
           {/* Toggle hide empty */}
           <button onClick={toggleHideEmpty}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hideEmpty ? 'bg-teal-50 text-teal-700 border border-teal-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hideEmpty ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
             <Eye className="w-3.5 h-3.5" />
             {hideEmpty ? 'Visa alla steg' : 'Dölj tomma'}
           </button>
@@ -1615,7 +1615,7 @@ export default function PipelinePage() {
               const isDropTarget = dragOverStageId === stage.id
               return (
                 <div key={stage.id} id={`stage-${stage.id}`}
-                  className={`flex-1 min-w-[160px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-teal-400 bg-teal-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
+                  className={`flex-1 min-w-[160px] flex flex-col rounded-xl border transition-all duration-200 ${isDropTarget ? 'border-dashed border-primary-400 bg-primary-50/50 shadow-inner' : 'border-gray-200 bg-white/50'}`}
                   onDragOver={e => handleDragOver(e, stage.id)} onDragLeave={handleDragLeave} onDrop={e => handleDrop(e, stage)}>
                   <div className="flex-shrink-0 px-3 py-2.5 border-b border-gray-100">
                     <div className="flex items-center justify-between">
@@ -1635,7 +1635,7 @@ export default function PipelinePage() {
                         onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
                     ))}
                     {stage.id === 'won' && (
-                      <a href="/dashboard/projects" className="flex items-center justify-center gap-1.5 py-3 mt-1 text-xs text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-lg transition-colors">
+                      <a href="/dashboard/projects" className="flex items-center justify-center gap-1.5 py-3 mt-1 text-xs text-primary-700 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
                         <span>🚀</span>
                         <span>Vunna deals blir projekt →</span>
                       </a>
@@ -1727,7 +1727,7 @@ export default function PipelinePage() {
                       {act.ai_reason && <p className="text-xs text-gray-400 mt-1">{act.ai_reason}</p>}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-xs text-gray-400">{timeAgo(act.created_at)}</span>
-                        {act.ai_confidence != null && <span className="text-xs text-teal-600">{Math.round(act.ai_confidence * 100)}%</span>}
+                        {act.ai_confidence != null && <span className="text-xs text-primary-700">{Math.round(act.ai_confidence * 100)}%</span>}
                       </div>
                     </div>
                     {!act.undone_at ? (
@@ -1746,9 +1746,9 @@ export default function PipelinePage() {
         {stats && (
           <div className="flex-shrink-0 border-t border-gray-200 px-4 lg:px-6 py-3 bg-white/60 backdrop-blur-sm">
             <div className="flex items-center gap-4 lg:gap-8 overflow-x-auto text-xs">
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-teal-600" /><span className="text-gray-500">Aktiva:</span><span className="text-gray-900 font-medium">{stats.totalDeals}</span><span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span></div>
+              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-primary-700" /><span className="text-gray-500">Aktiva:</span><span className="text-gray-900 font-medium">{stats.totalDeals}</span><span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span></div>
               <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-gray-500">Vunna:</span><span className="text-gray-900 font-medium">{formatValueCompact(stats.wonValue)}</span></div>
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-teal-500" /><span className="text-gray-500">Nya idag:</span><span className="text-gray-900 font-medium">{stats.newLeadsToday}</span></div>
+              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-primary-500" /><span className="text-gray-500">Nya idag:</span><span className="text-gray-900 font-medium">{stats.newLeadsToday}</span></div>
               <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-gray-500">Uppföljning:</span><span className="text-gray-900 font-medium">{stats.needsFollowUp}</span></div>
             </div>
           </div>
@@ -1765,7 +1765,7 @@ export default function PipelinePage() {
               <div className="flex-shrink-0 px-6 pt-5 pb-0">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 bg-teal-600 text-white">{stage.name}</span>) : null })()}
+                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 bg-primary-700 text-white">{stage.name}</span>) : null })()}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>{getPriorityLabel(selectedDeal.priority)}</span>
                     {/* Flytta till dropdown */}
                     <div className="relative ml-auto flex-shrink-0">
@@ -1775,7 +1775,7 @@ export default function PipelinePage() {
                           const target = stages.find(s => s.id === e.target.value)
                           if (target) moveDealAction(selectedDeal.id, target.slug)
                         }}
-                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:border-teal-300 cursor-pointer focus:outline-none focus:border-teal-400"
+                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:border-primary-300 cursor-pointer focus:outline-none focus:border-primary-400"
                       >
                         {stages.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
@@ -1787,13 +1787,13 @@ export default function PipelinePage() {
                       {editingTitle ? (
                         <div className="flex items-center gap-2">
                           <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
-                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-teal-400" autoFocus
+                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-primary-400" autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
-                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-teal-50 text-sky-700 hover:bg-teal-100 transition-colors"><Save className="w-4 h-4" /></button>
+                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-4 h-4" /></button>
                         </div>
                       ) : (
                         <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full min-w-0">
-                          <span className="text-sm font-mono text-teal-600 flex-shrink-0">#{selectedDeal.deal_number || selectedDeal.id.slice(0, 6)}</span>
+                          <span className="text-sm font-mono text-primary-700 flex-shrink-0">#{selectedDeal.deal_number || selectedDeal.id.slice(0, 6)}</span>
                           <h2 className="text-lg font-bold text-gray-900 truncate">{selectedDeal.title}</h2>
                           <Edit3 className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                         </button>
@@ -1818,7 +1818,7 @@ export default function PipelinePage() {
                       onClick={() => setDealTab(tab.key)}
                       className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                         dealTab === tab.key
-                          ? 'border-teal-600 text-sky-700'
+                          ? 'border-primary-700 text-sky-700'
                           : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
                       }`}
                     >
@@ -1826,7 +1826,7 @@ export default function PipelinePage() {
                       <span className="hidden sm:inline">{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          dealTab === tab.key ? 'bg-teal-100 text-sky-700' : 'bg-gray-100 text-gray-500'
+                          dealTab === tab.key ? 'bg-primary-100 text-sky-700' : 'bg-gray-100 text-gray-500'
                         }`}>{tab.count}</span>
                       )}
                     </button>
@@ -1847,9 +1847,9 @@ export default function PipelinePage() {
                         {editingValue ? (
                           <div className="flex items-center gap-2">
                             <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
-                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-teal-400" autoFocus
+                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-400" autoFocus
                               onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
-                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-teal-50 text-sky-700 hover:bg-teal-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-semibold text-sm">
@@ -1861,7 +1861,7 @@ export default function PipelinePage() {
                         <span className="text-sm text-gray-400">Prioritet</span>
                         {editingPriority ? (
                           <select value={selectedDeal.priority} onChange={e => { updateDealField(selectedDeal.id, 'priority', e.target.value); setEditingPriority(false) }} onBlur={() => setEditingPriority(false)} autoFocus
-                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-teal-400">
+                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                             <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                           </select>
                         ) : (
@@ -1907,7 +1907,7 @@ export default function PipelinePage() {
                                 <div key={key} className="flex items-center gap-2 text-xs">
                                   <span className="w-16 text-gray-400 truncate">{meta.label}</span>
                                   <div className="flex-1 bg-gray-200 rounded-full h-1.5">
-                                    <div className="h-1.5 rounded-full bg-teal-600 transition-all" style={{ width: `${(val / meta.max) * 100}%` }} />
+                                    <div className="h-1.5 rounded-full bg-primary-700 transition-all" style={{ width: `${(val / meta.max) * 100}%` }} />
                                   </div>
                                   <span className="text-gray-500 w-10 text-right">{val}/{meta.max}</span>
                                 </div>
@@ -1934,7 +1934,7 @@ export default function PipelinePage() {
                       <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5">
                         <Zap className="w-4 h-4 text-amber-500" />
                         <span className="text-sm text-gray-400">Svarstid:</span>
-                        <span className="text-sm font-medium text-teal-700">
+                        <span className="text-sm font-medium text-primary-700">
                           {selectedDeal.response_time_seconds < 60
                             ? `${selectedDeal.response_time_seconds}s`
                             : selectedDeal.response_time_seconds < 3600
@@ -1976,7 +1976,7 @@ export default function PipelinePage() {
                               value={linkCustomerSearch}
                               onChange={e => setLinkCustomerSearch(e.target.value)}
                               placeholder="Sök kund..."
-                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
+                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
                               autoFocus
                             />
                             <div className="max-h-40 overflow-y-auto space-y-1">
@@ -1987,7 +1987,7 @@ export default function PipelinePage() {
                                   <button
                                     key={c.customer_id}
                                     onClick={() => handleLinkCustomer(c.customer_id)}
-                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-teal-50 transition-colors"
+                                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left hover:bg-primary-50 transition-colors"
                                   >
                                     <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                                     <div className="min-w-0">
@@ -2013,7 +2013,7 @@ export default function PipelinePage() {
                             <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
                             {selectedDeal.customer.customer_type && (
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                                selectedDeal.customer.customer_type === 'company' ? 'bg-teal-50 text-sky-700 border-teal-200' :
+                                selectedDeal.customer.customer_type === 'company' ? 'bg-primary-50 text-sky-700 border-primary-200' :
                                 selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
                                 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}>
@@ -2046,7 +2046,7 @@ export default function PipelinePage() {
                         </div>
                         <Link
                           href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
-                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-sky-700 hover:bg-teal-50 hover:text-teal-700 transition-colors"
+                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-sky-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                         >
                           <span className="font-medium">Visa kundkort</span>
                           <ChevronRight className="w-4 h-4" />
@@ -2062,11 +2062,11 @@ export default function PipelinePage() {
                           : selectedDeal.customer_id
                             ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
                             : `/dashboard/quotes/new?deal_id=${selectedDeal.id}`}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 text-sm text-primary-700 hover:bg-primary-50 transition-colors">
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' }) }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-teal-200 text-sm text-teal-700 hover:bg-teal-50 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 text-sm text-primary-700 hover:bg-primary-50 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
                       </div>
@@ -2091,7 +2091,7 @@ export default function PipelinePage() {
                             {detailActivities.filter(act => !act.undone_at).slice(0, 5).map(act => (
                               <div key={act.id} className="flex items-start gap-2.5 py-1.5">
                                 <div className="mt-0.5">
-                                  {act.triggered_by === 'ai' ? <Bot className="w-3.5 h-3.5 text-teal-600" /> : <Clock className="w-3.5 h-3.5 text-gray-300" />}
+                                  {act.triggered_by === 'ai' ? <Bot className="w-3.5 h-3.5 text-primary-700" /> : <Clock className="w-3.5 h-3.5 text-gray-300" />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span className="text-xs text-gray-600">{act.description || act.activity_type}</span>
@@ -2124,13 +2124,13 @@ export default function PipelinePage() {
                           value={newTaskTitle}
                           onChange={e => setNewTaskTitle(e.target.value)}
                           placeholder="Ny uppgift..."
-                          className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400"
+                          className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
                           onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
                         />
                         <button
                           onClick={handleAddTask}
                           disabled={!newTaskTitle.trim() || taskSaving}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-teal-700 text-white text-sm rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                          className="flex items-center gap-1.5 px-3 py-2 bg-primary-800 text-white text-sm rounded-lg hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                         >
                           {taskSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                           <span className="hidden sm:inline">Lägg till</span>
@@ -2141,12 +2141,12 @@ export default function PipelinePage() {
                           type="date"
                           value={newTaskDueDate}
                           onChange={e => setNewTaskDueDate(e.target.value)}
-                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 w-32"
+                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-32"
                         />
                         <select
                           value={newTaskDueTime}
                           onChange={e => setNewTaskDueTime(e.target.value)}
-                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 w-24"
+                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-24"
                         >
                           <option value="">Tid</option>
                           {Array.from({ length: 24 * 4 }, (_, i) => {
@@ -2159,7 +2159,7 @@ export default function PipelinePage() {
                           <select
                             value={newTaskAssignee}
                             onChange={e => setNewTaskAssignee(e.target.value)}
-                            className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-teal-400 flex-1 min-w-[120px]"
+                            className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 flex-1 min-w-[120px]"
                           >
                             <option value="">Tilldela...</option>
                             {teamMembers.map(m => (
@@ -2183,7 +2183,7 @@ export default function PipelinePage() {
                             <div key={task.id} className="rounded-lg border border-gray-100 hover:border-gray-200 transition-colors">
                               <div className={`flex items-center gap-3 px-3 py-2.5 group ${isOverdue ? 'bg-red-50/50' : ''}`}>
                                 <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0">
-                                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : isOverdue ? 'border-red-400 hover:border-red-500' : 'border-gray-300 hover:border-teal-400'}`}>
+                                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${task.status === 'done' ? 'bg-green-500 border-green-500' : isOverdue ? 'border-red-400 hover:border-red-500' : 'border-gray-300 hover:border-primary-400'}`}>
                                     {task.status === 'done' && <CheckCircle2 className="w-3.5 h-3.5 text-white" />}
                                   </div>
                                 </button>
@@ -2229,7 +2229,7 @@ export default function PipelinePage() {
                                           if (selectedDeal) fetchDealTasks(selectedDeal.id)
                                           fetchTaskActivities(task.id)
                                         }}
-                                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-teal-400"
+                                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                       >
                                         <option value="">Ej tilldelad</option>
                                         {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -2242,7 +2242,7 @@ export default function PipelinePage() {
                                         if (selectedDeal) fetchDealTasks(selectedDeal.id)
                                         fetchTaskActivities(task.id)
                                       }}
-                                      className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-teal-400"
+                                      className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                     >
                                       <option value="low">Låg</option>
                                       <option value="medium">Medium</option>
@@ -2257,7 +2257,7 @@ export default function PipelinePage() {
                                         {taskActivities.map(act => (
                                           <div key={act.id} className="flex items-start gap-2 text-[11px]">
                                             <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${
-                                              act.action === 'created' ? 'bg-teal-600' :
+                                              act.action === 'created' ? 'bg-primary-700' :
                                               act.action === 'completed' ? 'bg-green-500' :
                                               act.action === 'assigned' ? 'bg-purple-500' :
                                               act.action === 'deleted' ? 'bg-red-500' :
@@ -2300,7 +2300,7 @@ export default function PipelinePage() {
                       <select
                         value={dealUploadCategory}
                         onChange={(e) => setDealUploadCategory(e.target.value)}
-                        className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-teal-400"
+                        className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-primary-400"
                       >
                         <option value="drawing">Ritning</option>
                         <option value="sketch">Skiss</option>
@@ -2309,13 +2309,13 @@ export default function PipelinePage() {
                         <option value="photo">Foto</option>
                         <option value="other">Övrigt</option>
                       </select>
-                      <label className="flex items-center gap-1.5 px-4 py-2 bg-teal-50 border border-teal-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-teal-100 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-primary-100 cursor-pointer transition-colors">
                         {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                         {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
                         <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
                       </label>
                       {selectedDeal.customer_id && (
-                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-teal-600">
+                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-primary-700">
                           Visa alla i kundkort
                         </Link>
                       )}
@@ -2328,7 +2328,7 @@ export default function PipelinePage() {
                           <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
                             <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
                               {doc.file_type?.startsWith('image/') ? (
-                                <ImageIcon className="w-4 h-4 text-teal-600" />
+                                <ImageIcon className="w-4 h-4 text-primary-700" />
                               ) : doc.file_type?.includes('pdf') ? (
                                 <FileText className="w-4 h-4 text-red-500" />
                               ) : (
@@ -2345,7 +2345,7 @@ export default function PipelinePage() {
                                 <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
                               </div>
                             </div>
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Öppna">
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-primary-50 transition-colors" title="Öppna">
                               <Download className="w-4 h-4" />
                             </a>
                           </div>
@@ -2370,14 +2370,14 @@ export default function PipelinePage() {
                         value={newNoteContent}
                         onChange={e => setNewNoteContent(e.target.value)}
                         placeholder="Skriv en anteckning..."
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 resize-none"
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400 resize-none"
                         rows={3}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
                       />
                       <button
                         onClick={handleAddNote}
                         disabled={!newNoteContent.trim() || noteSaving}
-                        className="self-end px-4 py-2 bg-teal-700 text-white text-sm rounded-lg hover:bg-teal-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="self-end px-4 py-2 bg-primary-800 text-white text-sm rounded-lg hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
                         {noteSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Spara'}
                       </button>
@@ -2393,11 +2393,11 @@ export default function PipelinePage() {
                                 <textarea
                                   value={editNoteContent}
                                   onChange={e => setEditNoteContent(e.target.value)}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-teal-400 resize-none"
+                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-400 resize-none"
                                   rows={4}
                                 />
                                 <div className="flex gap-2">
-                                  <button onClick={() => handleUpdateNote(note.id)} className="px-3 py-1.5 text-xs bg-teal-700 text-white rounded-lg hover:bg-teal-800">Spara</button>
+                                  <button onClick={() => handleUpdateNote(note.id)} className="px-3 py-1.5 text-xs bg-primary-800 text-white rounded-lg hover:bg-primary-800">Spara</button>
                                   <button onClick={() => { setEditingNoteId(null); setEditNoteContent('') }} className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700">Avbryt</button>
                                 </div>
                               </div>
@@ -2410,7 +2410,7 @@ export default function PipelinePage() {
                                     {timeAgo(note.created_at)}
                                   </span>
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-teal-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-primary-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Ta bort"><Trash2 className="w-3.5 h-3.5" /></button>
                                   </div>
                                 </div>
@@ -2520,7 +2520,7 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Titel *</label>
                   <input type="text" value={newDealForm.title} onChange={e => setNewDealForm(prev => ({ ...prev, title: e.target.value }))} placeholder="T.ex. Badrumsrenovering Andersson"
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Kund</label>
@@ -2535,12 +2535,12 @@ export default function PipelinePage() {
                       }}
                       onFocus={() => { if (customerSearch && !newDealForm.customer_id) setShowCustomerDropdown(true) }}
                       placeholder="Sök kund..."
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                   </div>
                   {newDealForm.customer_id && (
                     <div className="mt-1.5 flex items-center gap-2">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                      <span className="text-xs text-teal-700 font-medium">{customers.find(c => c.customer_id === newDealForm.customer_id)?.name || customerSearch}</span>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-primary-700" />
+                      <span className="text-xs text-primary-700 font-medium">{customers.find(c => c.customer_id === newDealForm.customer_id)?.name || customerSearch}</span>
                       <button onClick={() => { setNewDealForm(prev => ({ ...prev, customer_id: '' })); setCustomerSearch('') }} className="text-xs text-gray-400 hover:text-gray-900"><X className="w-3 h-3" /></button>
                     </div>
                   )}
@@ -2562,7 +2562,7 @@ export default function PipelinePage() {
                               const parts = customerSearch.trim().split(/\s+/)
                               setNewCustomerForm({ firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '', phone: '', email: '' })
                             }}
-                            className="w-full text-left px-3 py-2 text-sm text-teal-700 font-medium hover:bg-teal-50 transition-colors flex items-center gap-2 border-t border-gray-100">
+                            className="w-full text-left px-3 py-2 text-sm text-primary-700 font-medium hover:bg-primary-50 transition-colors flex items-center gap-2 border-t border-gray-100">
                             <Plus className="w-3.5 h-3.5" /> Skapa ny kund: &ldquo;{customerSearch}&rdquo;
                           </button>
                         </>
@@ -2570,22 +2570,22 @@ export default function PipelinePage() {
                     </div>
                   )}
                   {showNewCustomerForm && !newDealForm.customer_id && (
-                    <div className="mt-2 p-3 bg-teal-50/50 border border-teal-200 rounded-lg space-y-2">
+                    <div className="mt-2 p-3 bg-primary-50/50 border border-primary-200 rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-teal-800">Ny kund</span>
+                        <span className="text-xs font-medium text-primary-800">Ny kund</span>
                         <button onClick={() => setShowNewCustomerForm(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input type="text" value={newCustomerForm.firstName} onChange={e => setNewCustomerForm(prev => ({ ...prev, firstName: e.target.value }))} placeholder="Förnamn *"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         <input type="text" value={newCustomerForm.lastName} onChange={e => setNewCustomerForm(prev => ({ ...prev, lastName: e.target.value }))} placeholder="Efternamn"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input type="tel" value={newCustomerForm.phone} onChange={e => setNewCustomerForm(prev => ({ ...prev, phone: e.target.value }))} placeholder="Telefon *"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         <input type="email" value={newCustomerForm.email} onChange={e => setNewCustomerForm(prev => ({ ...prev, email: e.target.value }))} placeholder="E-post (valfritt)"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                       </div>
                       <button
                         onClick={async () => {
@@ -2619,7 +2619,7 @@ export default function PipelinePage() {
                           }
                         }}
                         disabled={newCustomerSubmitting || !newCustomerForm.firstName.trim() || !newCustomerForm.phone.trim()}
-                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all disabled:opacity-50">
+                        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all disabled:opacity-50">
                         {newCustomerSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Skapa och välj
                       </button>
                     </div>
@@ -2629,12 +2629,12 @@ export default function PipelinePage() {
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Värde (kr)</label>
                     <input type="number" value={newDealForm.value} onChange={e => setNewDealForm(prev => ({ ...prev, value: e.target.value }))} placeholder="0"
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400" />
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                     <select value={newDealForm.priority} onChange={e => setNewDealForm(prev => ({ ...prev, priority: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-teal-400">
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                       <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                     </select>
                   </div>
@@ -2642,11 +2642,11 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
                   <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={3}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400 resize-y min-h-[80px] max-h-[300px]" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400 resize-y min-h-[80px] max-h-[300px]" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Dokument (valfritt)</label>
-                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-colors">
+                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
                     <Upload className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-500">Bifoga fil</span>
                     <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" className="hidden"
@@ -2674,7 +2674,7 @@ export default function PipelinePage() {
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
                 <button onClick={() => { setShowNewDeal(false); setNewDealFiles([]) }} className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
                 <button onClick={createDeal} disabled={newDealSubmitting || !newDealForm.title.trim()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-medium transition-all disabled:opacity-50">
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all disabled:opacity-50">
                   {newDealSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Skapa deal
                 </button>
               </div>
@@ -2722,7 +2722,7 @@ export default function PipelinePage() {
                       type="text"
                       value={stageEdits[stage.id]?.name || stage.name}
                       onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], name: e.target.value } }))}
-                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                     />
                   )}
 
@@ -2767,13 +2767,13 @@ export default function PipelinePage() {
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 placeholder="Nytt steg, t.ex. 'Platsbedömning'"
-                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 min-h-[44px]"
+                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 min-h-[44px]"
                 onKeyDown={(e) => e.key === 'Enter' && addNewStage()}
               />
               <button
                 onClick={addNewStage}
                 disabled={stageSaving || !newStageName.trim()}
-                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all min-h-[44px]"
               >
                 <Plus className="w-4 h-4" />
                 Lägg till
@@ -2787,7 +2787,7 @@ export default function PipelinePage() {
               <button
                 onClick={saveStageEdits}
                 disabled={stageSaving}
-                className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
+                className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 min-h-[44px]"
               >
                 {stageSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Spara ändringar
@@ -2849,7 +2849,7 @@ export default function PipelinePage() {
               value={quickSmsText}
               onChange={e => setQuickSmsText(e.target.value)}
               placeholder="Skriv ditt meddelande..."
-              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none resize-none"
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-none"
               rows={3}
               maxLength={320}
               autoFocus
@@ -2859,7 +2859,7 @@ export default function PipelinePage() {
               <button
                 onClick={sendQuickSms}
                 disabled={!quickSmsText.trim() || quickSmsSending}
-                className="flex-1 bg-teal-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+                className="flex-1 bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-primary-800 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
               >
                 {quickSmsSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                 Skicka
@@ -2920,7 +2920,7 @@ export default function PipelinePage() {
               {selectedDeal.customer?.phone_number && (
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={siteVisitForm.sendSms} onChange={e => setSiteVisitForm(p => ({ ...p, sendSms: e.target.checked }))}
-                    className="rounded border-gray-300 text-teal-700 focus:ring-teal-500" />
+                    className="rounded border-gray-300 text-primary-700 focus:ring-primary-600" />
                   <span className="text-sm text-gray-600">Skicka SMS till kund</span>
                 </label>
               )}
@@ -2940,7 +2940,7 @@ export default function PipelinePage() {
                         }))}
                         className={`px-2.5 py-1 rounded-lg text-xs border transition-colors ${
                           siteVisitForm.invitedTeam.includes(m.id)
-                            ? 'bg-teal-50 border-teal-400 text-teal-700'
+                            ? 'bg-primary-50 border-primary-400 text-primary-700'
                             : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
                         }`}>
                         {m.name}
@@ -2961,7 +2961,7 @@ export default function PipelinePage() {
             </div>
             <div className="flex gap-2 mt-5">
               <button onClick={bookSiteVisit} disabled={siteVisitSaving || !siteVisitForm.date}
-                className="flex-1 bg-teal-700 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50 hover:bg-teal-800 transition-colors">
+                className="flex-1 bg-primary-800 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50 hover:bg-primary-800 transition-colors">
                 {siteVisitSaving ? 'Bokar...' : 'Boka platsbesök'}
               </button>
               <button onClick={() => setShowSiteVisit(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">
@@ -2995,14 +2995,14 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <CopyId value={`D-${deal.deal_number || deal.id.slice(0, 6)}`} label={`Ärende #${deal.deal_number || deal.id.slice(0, 6)}`} className="text-teal-600" />
+          <CopyId value={`D-${deal.deal_number || deal.id.slice(0, 6)}`} label={`Ärende #${deal.deal_number || deal.id.slice(0, 6)}`} className="text-primary-700" />
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityDot(deal.priority)}`} />
             <h4 className="text-sm font-medium text-gray-900 truncate">{deal.title ? deal.title.charAt(0).toUpperCase() + deal.title.slice(1) : 'Utan titel'}</h4>
-            {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-teal-600 flex-shrink-0" /></span>}
+            {(deal.source === 'ai' || deal.source === 'call') && <span title="AI-skapad"><Bot className="w-3.5 h-3.5 text-primary-700 flex-shrink-0" /></span>}
             {deal.lead_source_platform && <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full flex-shrink-0 ${
               deal.lead_source_platform === 'offerta' ? 'bg-orange-100 text-orange-700' :
-              deal.lead_source_platform === 'servicefinder' ? 'bg-teal-100 text-teal-700' :
+              deal.lead_source_platform === 'servicefinder' ? 'bg-primary-100 text-primary-700' :
               deal.lead_source_platform === 'byggahus' ? 'bg-yellow-100 text-yellow-700' :
               'bg-gray-100 text-gray-600'
             }`}>{
@@ -3025,7 +3025,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       <div className="flex items-center justify-between mt-2 ml-3.5">
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-semibold text-gray-700">{deal.value != null && deal.value > 0 ? formatValueCompact(deal.value) : ''}</span>{deal.value != null && deal.value > 0 && <span className="text-[9px] text-gray-400 ml-0.5">exkl.</span>}
-          {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-teal-500'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
+          {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-primary-500'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
         </div>
         <div className="flex items-center gap-2">
           {deal.response_time_seconds != null && deal.response_time_seconds > 0 && (
@@ -3045,13 +3045,13 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
       {/* Snabbknappar — hover desktop, alltid mobil */}
       <div className="flex items-center justify-around mt-2 pt-2 border-t border-gray-100 opacity-0 group-hover:opacity-100 md:transition-opacity" onClick={e => e.stopPropagation()}>
         {deal.customer?.phone_number && (
-          <a href={`tel:${deal.customer.phone_number}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="Ring">
+          <a href={`tel:${deal.customer.phone_number}`} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-primary-700 transition-colors" title="Ring">
             <Phone className="w-3.5 h-3.5" />
             <span className="text-[10px]">Ring</span>
           </a>
         )}
         {deal.customer?.phone_number && onQuickSms && (
-          <button onClick={() => onQuickSms(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title="SMS">
+          <button onClick={() => onQuickSms(deal)} className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-primary-700 transition-colors" title="SMS">
             <MessageSquare className="w-3.5 h-3.5" />
             <span className="text-[10px]">SMS</span>
           </button>
@@ -3059,7 +3059,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
         {deal.customer?.address_line ? (
           <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deal.customer.address_line)}`}
             target="_blank" rel="noopener noreferrer"
-            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.customer.address_line} onClick={e => e.stopPropagation()}>
+            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-primary-700 transition-colors" title={deal.customer.address_line} onClick={e => e.stopPropagation()}>
             <MapPin className="w-3.5 h-3.5" />
             <span className="text-[10px]">Karta</span>
           </a>
@@ -3067,7 +3067,7 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
           <Link href={deal.quote_id
             ? `/dashboard/quotes/${deal.quote_id}`
             : `/dashboard/quotes/new?customer_id=${deal.customer_id || ''}&title=${encodeURIComponent(deal.title || '')}&deal_id=${deal.id}`}
-            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-teal-600 transition-colors" title={deal.quote_id ? 'Visa offert' : 'Skapa offert'} onClick={e => e.stopPropagation()}>
+            className="flex flex-col items-center gap-0.5 p-1.5 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-primary-700 transition-colors" title={deal.quote_id ? 'Visa offert' : 'Skapa offert'} onClick={e => e.stopPropagation()}>
             <FileText className="w-3.5 h-3.5" />
             <span className="text-[10px]">{deal.quote_id ? 'Offert' : 'Ny offert'}</span>
           </Link>

@@ -169,7 +169,7 @@ export default function AttestationPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-6 h-6 text-teal-700 animate-spin" />
+          <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
         </div>
       ) : (
         <div className="space-y-6">
@@ -183,7 +183,7 @@ export default function AttestationPage() {
                 {pending.length > 1 && (
                   <button
                     onClick={approveAll}
-                    className="text-xs font-medium text-teal-700 hover:underline"
+                    className="text-xs font-medium text-primary-700 hover:underline"
                   >
                     Attestera alla
                   </button>
@@ -264,7 +264,7 @@ function CheckinRow({
       rejected ? 'border-red-200' : done ? 'border-gray-100' : 'border-gray-200'
     }`}>
       {/* User avatar */}
-      <div className="w-9 h-9 bg-teal-100 rounded-full flex items-center justify-center text-xs font-semibold text-teal-700 shrink-0">
+      <div className="w-9 h-9 bg-primary-100 rounded-full flex items-center justify-center text-xs font-semibold text-primary-700 shrink-0">
         {(checkin.user_name || '??').slice(0, 2).toUpperCase()}
       </div>
 
@@ -292,7 +292,7 @@ function CheckinRow({
           <button
             onClick={onApprove}
             disabled={loading}
-            className="p-2 bg-teal-50 text-teal-700 rounded-lg hover:bg-teal-100 transition-colors disabled:opacity-50"
+            className="p-2 bg-primary-50 text-primary-700 rounded-lg hover:bg-primary-100 transition-colors disabled:opacity-50"
             title="Attestera"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
@@ -310,7 +310,7 @@ function CheckinRow({
 
       {/* Done indicator */}
       {done && !rejected && (
-        <CheckCircle className="w-5 h-5 text-teal-500 shrink-0" />
+        <CheckCircle className="w-5 h-5 text-primary-600 shrink-0" />
       )}
       {rejected && (
         <XCircle className="w-5 h-5 text-red-400 shrink-0" />

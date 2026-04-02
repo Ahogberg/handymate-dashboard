@@ -57,7 +57,7 @@ export default function ProjectComparisonPage() {
 
   const getProgressColor = (percent: number) => {
     if (percent <= 75) return 'bg-emerald-500'
-    if (percent <= 100) return 'bg-teal-600'
+    if (percent <= 100) return 'bg-primary-700'
     if (percent <= 120) return 'bg-orange-500'
     return 'bg-red-500'
   }
@@ -72,7 +72,7 @@ export default function ProjectComparisonPage() {
   return (
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]" />
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
 
       <div className="relative">
@@ -83,7 +83,7 @@ export default function ProjectComparisonPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-teal-600 mr-4">
+            <div className="p-3 rounded-xl bg-primary-700 mr-4">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -105,7 +105,7 @@ export default function ProjectComparisonPage() {
               onClick={() => setStatusFilter(opt.value)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 statusFilter === opt.value
-                  ? 'bg-teal-100 text-teal-700 border border-teal-200'
+                  ? 'bg-primary-100 text-primary-700 border border-primary-300'
                   : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
               }`}>
               {opt.label}
@@ -115,7 +115,7 @@ export default function ProjectComparisonPage() {
 
         {loading ? (
           <div className="flex items-center justify-center p-12">
-            <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           </div>
         ) : projects.length === 0 ? (
           <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
@@ -135,7 +135,7 @@ export default function ProjectComparisonPage() {
                         {proj.customer?.name || 'Ingen kund'}
                         <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
                           proj.status === 'active' ? 'bg-emerald-50 text-emerald-600' :
-                          proj.status === 'completed' ? 'bg-teal-50 text-sky-700' :
+                          proj.status === 'completed' ? 'bg-primary-50 text-sky-700' :
                           'bg-gray-100 text-gray-600'
                         }`}>{proj.status}</span>
                       </p>

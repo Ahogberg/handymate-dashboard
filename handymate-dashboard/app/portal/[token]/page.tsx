@@ -523,10 +523,10 @@ export default function CustomerPortalPage() {
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
-          <p className="text-sm text-teal-700 font-medium">{portal.business.name}</p>
+          <p className="text-sm text-primary-700 font-medium">{portal.business.name}</p>
           <h1 className="text-lg font-semibold text-gray-900">
             {selectedProject ? (
-              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-teal-700">
+              <button onClick={() => setSelectedProject(null)} className="flex items-center gap-2 hover:text-primary-700">
                 <ArrowLeft className="w-4 h-4" />
                 {selectedProjectData?.name}
               </button>
@@ -552,14 +552,14 @@ export default function CustomerPortalPage() {
                 onClick={() => { setActiveTab(tab.id); setSelectedInvoice(null) }}
                 className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-all ${
                   activeTab === tab.id
-                    ? 'border-teal-500 text-teal-700'
+                    ? 'border-primary-600 text-primary-700'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
                 {tab.label}
                 {tab.badge ? (
-                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-teal-600 text-gray-900 rounded-full">{tab.badge}</span>
+                  <span className="ml-1 px-1.5 py-0.5 text-xs bg-primary-700 text-gray-900 rounded-full">{tab.badge}</span>
                 ) : null}
               </button>
             ))}
@@ -587,13 +587,13 @@ export default function CustomerPortalPage() {
                   <button
                     key={p.project_id}
                     onClick={() => setSelectedProject(p.project_id)}
-                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all"
+                    className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-primary-300 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-semibold text-gray-900">{p.name}</h3>
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         p.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                        p.status === 'active' || p.status === 'in_progress' ? 'bg-teal-100 text-teal-700' :
+                        p.status === 'active' || p.status === 'in_progress' ? 'bg-primary-100 text-primary-700' :
                         'bg-gray-100 text-gray-600'
                       }`}>
                         {getProjectStatusText(p.status)}
@@ -607,13 +607,13 @@ export default function CustomerPortalPage() {
                           <span>{p.progress}%</span>
                         </div>
                         <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
+                          <div className="h-full bg-primary-700 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
                         </div>
                       </div>
                     )}
 
                     {p.nextVisit && (
-                      <div className="flex items-center gap-2 text-sm text-teal-700 mb-2">
+                      <div className="flex items-center gap-2 text-sm text-primary-700 mb-2">
                         <Calendar className="w-4 h-4" />
                         Nasta besok: {formatDateTime(p.nextVisit.start_time)}
                       </div>
@@ -642,7 +642,7 @@ export default function CustomerPortalPage() {
                     <span className="text-sm font-medium text-gray-500">Status</span>
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       selectedProjectData.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-teal-100 text-teal-700'
+                      'bg-primary-100 text-primary-700'
                     }`}>
                       {getProjectStatusText(selectedProjectData.status)}
                     </span>
@@ -654,7 +654,7 @@ export default function CustomerPortalPage() {
                         <span>{selectedProjectData.progress}%</span>
                       </div>
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-teal-600 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
+                        <div className="h-full bg-primary-700 rounded-full transition-all" style={{ width: `${selectedProjectData.progress}%` }} />
                       </div>
                     </div>
                   )}
@@ -670,12 +670,12 @@ export default function CustomerPortalPage() {
 
                 {/* Next visit */}
                 {selectedProjectData.nextVisit && (
-                  <div className="bg-teal-50 rounded-xl border border-teal-200 p-4">
-                    <div className="flex items-center gap-2 text-teal-700 font-medium mb-1">
+                  <div className="bg-primary-50 rounded-xl border border-primary-200 p-4">
+                    <div className="flex items-center gap-2 text-primary-700 font-medium mb-1">
                       <Calendar className="w-4 h-4" />
                       Kommande besok
                     </div>
-                    <p className="text-sm text-teal-700">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
+                    <p className="text-sm text-primary-700">{formatDateTime(selectedProjectData.nextVisit.start_time)}</p>
                     {selectedProjectData.nextVisit.title && (
                       <p className="text-sm text-sky-700 mt-1">{selectedProjectData.nextVisit.title}</p>
                     )}
@@ -692,8 +692,8 @@ export default function CustomerPortalPage() {
                           {m.status === 'completed' ? (
                             <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                           ) : m.status === 'in_progress' ? (
-                            <div className="w-5 h-5 border-2 border-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
-                              <div className="w-2 h-2 bg-teal-600 rounded-full" />
+                            <div className="w-5 h-5 border-2 border-primary-600 rounded-full flex items-center justify-center flex-shrink-0">
+                              <div className="w-2 h-2 bg-primary-700 rounded-full" />
                             </div>
                           ) : (
                             <div className="w-5 h-5 border-2 border-gray-300 rounded-full flex-shrink-0" />
@@ -733,7 +733,7 @@ export default function CustomerPortalPage() {
                             </span>
                           </div>
                           {ata.status === 'signed' && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 border border-teal-200">
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-200">
                               Signerad
                             </span>
                           )}
@@ -764,7 +764,7 @@ export default function CustomerPortalPage() {
 
                         {/* Signed info */}
                         {ata.signed_at && ata.signed_by_name && (
-                          <div className="flex items-center gap-2 text-xs text-teal-600 mt-2">
+                          <div className="flex items-center gap-2 text-xs text-primary-700 mt-2">
                             <CheckCircle className="w-3.5 h-3.5" />
                             Signerad av {ata.signed_by_name}, {formatDate(ata.signed_at)}
                           </div>
@@ -782,7 +782,7 @@ export default function CustomerPortalPage() {
                                     value={signerName}
                                     onChange={e => setSignerName(e.target.value)}
                                     placeholder="Förnamn Efternamn"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-teal-500"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-primary-600"
                                   />
                                 </div>
                                 <div>
@@ -811,7 +811,7 @@ export default function CustomerPortalPage() {
                                   <button
                                     onClick={() => signAta(ata.sign_token!)}
                                     disabled={!signerName.trim() || signingSaving}
-                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-white bg-teal-600 rounded-lg hover:bg-teal-700 disabled:opacity-50"
+                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-sm text-white bg-primary-700 rounded-lg hover:bg-primary-800 disabled:opacity-50"
                                   >
                                     {signingSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PenTool className="w-3.5 h-3.5" />}
                                     Signera
@@ -826,7 +826,7 @@ export default function CustomerPortalPage() {
                                     if (ataCanvasRef.current) initAtaCanvas(ataCanvasRef.current)
                                   }, 100)
                                 }}
-                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 transition-colors"
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-800 transition-colors"
                               >
                                 <PenTool className="w-4 h-4" />
                                 Granska och signera
@@ -885,7 +885,7 @@ export default function CustomerPortalPage() {
                         {['sent', 'opened'].includes(q.status) && q.sign_token && (
                           <button
                             onClick={() => { setSigningQuoteId(q.quote_id); setQuoteSignerName(portal?.customer.name || ''); initQuoteCanvas() }}
-                            className="px-3 py-2 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700 font-medium flex items-center gap-1"
+                            className="px-3 py-2 text-sm bg-primary-700 text-white rounded-lg hover:bg-primary-800 font-medium flex items-center gap-1"
                           >
                             <PenTool className="w-3.5 h-3.5" />
                             Godkänn och signera
@@ -906,7 +906,7 @@ export default function CustomerPortalPage() {
                             value={quoteSignerName}
                             onChange={e => setQuoteSignerName(e.target.value)}
                             placeholder="Förnamn Efternamn"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
                           />
                         </div>
 
@@ -952,7 +952,7 @@ export default function CustomerPortalPage() {
                           <button
                             onClick={() => signQuote(q.sign_token!)}
                             disabled={!quoteSignerName.trim() || !quoteSignatureDrawn || !quoteTermsAccepted || quoteSigningSaving}
-                            className="flex-1 py-2.5 bg-teal-600 text-white rounded-lg text-sm font-semibold hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 py-2.5 bg-primary-700 text-white rounded-lg text-sm font-semibold hover:bg-primary-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                           >
                             {quoteSigningSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                             {quoteSigningSaving ? 'Signerar...' : 'Godkänn offert'}
@@ -986,7 +986,7 @@ export default function CustomerPortalPage() {
                     <button
                       key={inv.invoice_id}
                       onClick={() => setSelectedInvoice(inv.invoice_id)}
-                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-teal-300 hover:shadow-sm transition-all"
+                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-primary-300 hover:shadow-sm transition-all"
                     >
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -1049,7 +1049,7 @@ export default function CustomerPortalPage() {
                   {/* Back button */}
                   <button
                     onClick={() => setSelectedInvoice(null)}
-                    className="flex items-center gap-2 text-sm text-sky-700 hover:text-teal-700 mb-2"
+                    className="flex items-center gap-2 text-sm text-sky-700 hover:text-primary-700 mb-2"
                   >
                     <ArrowLeft className="w-4 h-4" />
                     Tillbaka till fakturor
@@ -1059,7 +1059,7 @@ export default function CustomerPortalPage() {
                   <div className={`rounded-xl p-4 ${
                     inv.status === 'paid' ? 'bg-emerald-50 border border-emerald-200' :
                     inv.status === 'overdue' ? 'bg-red-50 border border-red-200' :
-                    'bg-teal-50 border border-teal-200'
+                    'bg-primary-50 border border-primary-200'
                   }`}>
                     <div className="flex items-center gap-3">
                       {inv.status === 'paid' ? (
@@ -1073,7 +1073,7 @@ export default function CustomerPortalPage() {
                         <h3 className={`font-semibold ${
                           inv.status === 'paid' ? 'text-emerald-700' :
                           inv.status === 'overdue' ? 'text-red-700' :
-                          'text-teal-700'
+                          'text-primary-700'
                         }`}>
                           {inv.status === 'paid' ? 'Betald' :
                            inv.status === 'overdue' ? `Forsenad - ${daysOverdue} dagar` :
@@ -1213,34 +1213,34 @@ export default function CustomerPortalPage() {
                         {paymentInfo.bankgiro && (
                           <div>
                             <p className="text-xs text-gray-400">Bankgiro</p>
-                            <p className="text-base font-semibold text-teal-500">{paymentInfo.bankgiro}</p>
+                            <p className="text-base font-semibold text-primary-600">{paymentInfo.bankgiro}</p>
                           </div>
                         )}
                         {paymentInfo.plusgiro && (
                           <div>
                             <p className="text-xs text-gray-400">Plusgiro</p>
-                            <p className="text-base font-semibold text-teal-500">{paymentInfo.plusgiro}</p>
+                            <p className="text-base font-semibold text-primary-600">{paymentInfo.plusgiro}</p>
                           </div>
                         )}
                         {paymentInfo.swish && (
                           <div>
                             <p className="text-xs text-gray-400">Swish</p>
-                            <p className="text-base font-semibold text-teal-500">{paymentInfo.swish}</p>
+                            <p className="text-base font-semibold text-primary-600">{paymentInfo.swish}</p>
                           </div>
                         )}
                         {paymentInfo.bank_account && (
                           <div>
                             <p className="text-xs text-gray-400">Bankkonto</p>
-                            <p className="text-base font-semibold text-teal-500">{paymentInfo.bank_account}</p>
+                            <p className="text-base font-semibold text-primary-600">{paymentInfo.bank_account}</p>
                           </div>
                         )}
                         <div>
                           <p className="text-xs text-gray-400">OCR-nummer</p>
-                          <p className="text-base font-mono font-semibold text-teal-500">{ocrNumber}</p>
+                          <p className="text-base font-mono font-semibold text-primary-600">{ocrNumber}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-400">Att betala</p>
-                          <p className="text-base font-semibold text-teal-500">
+                          <p className="text-base font-semibold text-primary-600">
                             {formatCurrency(inv.status === 'overdue' ? totalWithFees : amountToPay)}
                           </p>
                         </div>
@@ -1314,7 +1314,7 @@ export default function CustomerPortalPage() {
                     >
                       <div className={`rounded-2xl px-4 py-2.5 ${
                         msg.direction === 'inbound'
-                          ? 'bg-teal-600 text-gray-900 rounded-br-md'
+                          ? 'bg-primary-700 text-gray-900 rounded-br-md'
                           : 'bg-white border border-gray-200 text-gray-900 rounded-bl-md'
                       }`}>
                         <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
@@ -1336,12 +1336,12 @@ export default function CustomerPortalPage() {
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                       placeholder="Skriv meddelande..."
-                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-300"
+                      className="flex-1 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 focus:border-primary-300"
                     />
                     <button
                       onClick={sendMessage}
                       disabled={!newMessage.trim() || sendingMessage}
-                      className="px-4 py-3 bg-teal-600 text-gray-900 rounded-xl hover:bg-teal-700 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
+                      className="px-4 py-3 bg-primary-700 text-gray-900 rounded-xl hover:bg-primary-800 disabled:opacity-50 min-w-[48px] flex items-center justify-center"
                     >
                       {sendingMessage ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                     </button>
@@ -1424,7 +1424,7 @@ function ProjectTracker({
         <div className="absolute left-[19px] top-5 bottom-5 w-0.5 bg-gray-200" />
         {/* Progress line */}
         <div
-          className="absolute left-[19px] top-5 w-0.5 bg-teal-500 transition-all duration-1000"
+          className="absolute left-[19px] top-5 w-0.5 bg-primary-500 transition-all duration-1000"
           style={{ height: `${progressPct}%` }}
         />
 
@@ -1440,9 +1440,9 @@ function ProjectTracker({
                 <div
                   className={`relative z-10 w-9 h-9 rounded-full flex items-center justify-center text-sm flex-shrink-0 border-2 transition-all ${
                     isCompleted
-                      ? 'bg-teal-500 border-teal-500 text-white'
+                      ? 'bg-primary-500 border-primary-600 text-white'
                       : isCurrent
-                        ? 'bg-white border-teal-500'
+                        ? 'bg-white border-primary-600'
                         : 'bg-white border-gray-200'
                   } ${isCurrent ? 'animate-pulse' : ''}`}
                 >
@@ -1456,7 +1456,7 @@ function ProjectTracker({
                       isCompleted
                         ? 'text-gray-900'
                         : isCurrent
-                          ? 'text-teal-700'
+                          ? 'text-primary-700'
                           : 'text-gray-400'
                     }`}
                   >
@@ -1472,7 +1472,7 @@ function ProjectTracker({
                     </p>
                   )}
                   {isCurrent && !isCompleted && (
-                    <p className="text-xs text-teal-600 mt-0.5">Pågår nu...</p>
+                    <p className="text-xs text-primary-700 mt-0.5">Pågår nu...</p>
                   )}
                 </div>
               </div>
@@ -1496,7 +1496,7 @@ function ProjectTracker({
                   className="w-full h-full object-cover"
                 />
                 {photo.type === 'after' && (
-                  <span className="absolute top-1 right-1 text-[10px] bg-teal-500 text-white px-1.5 py-0.5 rounded-full">
+                  <span className="absolute top-1 right-1 text-[10px] bg-primary-500 text-white px-1.5 py-0.5 rounded-full">
                     Klart
                   </span>
                 )}

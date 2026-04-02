@@ -267,7 +267,7 @@ export default function WarrantiesPage() {
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-sky-700" />
               </div>
               <div>
@@ -310,7 +310,7 @@ export default function WarrantiesPage() {
           </div>
           <button
             onClick={openCreateModal}
-            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
+            className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-primary-600 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
           >
             <Plus className="w-4 h-4 mr-2" />
             Ny garanti
@@ -354,7 +354,7 @@ export default function WarrantiesPage() {
                           <span className={`px-2 py-0.5 text-xs rounded-full border font-medium ${getStatusStyle(w.status)}`}>
                             {getStatusText(w.status)}
                           </span>
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-teal-50 text-sky-700 border border-teal-200">
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-sky-700 border border-primary-200">
                             {getTypeText(w.warranty_type)}
                           </span>
                           {isExpiringSoon && (
@@ -482,7 +482,7 @@ export default function WarrantiesPage() {
               <button
                 onClick={handleSubmit}
                 disabled={actionLoading}
-                className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
+                className="flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-primary-600 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
                 {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingWarranty ? 'Spara' : 'Skapa'}

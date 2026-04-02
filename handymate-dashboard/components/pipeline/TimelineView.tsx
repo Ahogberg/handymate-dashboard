@@ -119,13 +119,13 @@ export function TimelineView({ deals, stages, onDealClick }: TimelineViewProps) 
               <div
                 key={i}
                 className={`px-1 py-2 text-center border-r border-gray-100 last:border-r-0 ${
-                  isToday ? 'bg-teal-50' : ''
+                  isToday ? 'bg-primary-50' : ''
                 }`}
               >
-                <div className={`text-[10px] ${isToday ? 'font-semibold text-teal-700' : 'text-gray-400'}`}>
+                <div className={`text-[10px] ${isToday ? 'font-semibold text-primary-700' : 'text-gray-400'}`}>
                   {formatDayLabel(d)}
                 </div>
-                <div className={`text-xs ${isToday ? 'font-bold text-teal-800' : 'text-gray-500'}`}>
+                <div className={`text-xs ${isToday ? 'font-bold text-primary-800' : 'text-gray-500'}`}>
                   {formatDate(d)}
                 </div>
               </div>
@@ -195,7 +195,7 @@ export function TimelineView({ deals, stages, onDealClick }: TimelineViewProps) 
                   return (
                     <div
                       key={i}
-                      className={`relative ${isToday ? 'bg-teal-50/30' : ''} border-r border-gray-50 last:border-r-0`}
+                      className={`relative ${isToday ? 'bg-primary-50/30' : ''} border-r border-gray-50 last:border-r-0`}
                     >
                       {isActive && (
                         <div

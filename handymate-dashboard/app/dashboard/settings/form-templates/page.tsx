@@ -185,7 +185,7 @@ export default function FormTemplatesPage() {
     setEditFields(fields)
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-teal-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   if (loading) {
     return (
@@ -201,7 +201,7 @@ export default function FormTemplatesPage() {
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen max-w-3xl mx-auto">
         <button
           onClick={() => setEditing(null)}
-          className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600 mb-6"
+          className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
         >
           <ArrowLeft className="w-4 h-4" /> Tillbaka till mallar
         </button>
@@ -264,7 +264,7 @@ export default function FormTemplatesPage() {
                         value={field.label}
                         onChange={e => updateField(idx, { label: e.target.value })}
                         placeholder={field.type === 'header' ? 'Rubriktext...' : 'Fältnamn...'}
-                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400"
+                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
                       />
                       {field.type !== 'header' && (
                         <div className="flex items-center gap-4">
@@ -273,7 +273,7 @@ export default function FormTemplatesPage() {
                               type="checkbox"
                               checked={field.required}
                               onChange={e => updateField(idx, { required: e.target.checked })}
-                              className="w-3.5 h-3.5 rounded border-gray-300 text-teal-600"
+                              className="w-3.5 h-3.5 rounded border-gray-300 text-primary-700"
                             />
                             Obligatoriskt
                           </label>
@@ -282,7 +282,7 @@ export default function FormTemplatesPage() {
                             value={field.description || ''}
                             onChange={e => updateField(idx, { description: e.target.value })}
                             placeholder="Beskrivning (valfri)"
-                            className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-teal-400"
+                            className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-primary-500"
                           />
                         </div>
                       )}
@@ -303,7 +303,7 @@ export default function FormTemplatesPage() {
             <div className="mt-3 relative">
               <button
                 onClick={() => setShowAddField(!showAddField)}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:text-teal-600 border border-dashed border-gray-300 rounded-lg hover:border-teal-400 transition w-full justify-center"
+                className="flex items-center gap-2 px-3 py-2 text-sm text-sky-700 hover:text-primary-700 border border-dashed border-gray-300 rounded-lg hover:border-primary-500 transition w-full justify-center"
               >
                 <Plus className="w-4 h-4" /> Lägg till fält
               </button>
@@ -339,7 +339,7 @@ export default function FormTemplatesPage() {
             <button
               onClick={handleSave}
               disabled={saving || !editName.trim()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               Spara mall
@@ -355,7 +355,7 @@ export default function FormTemplatesPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen max-w-3xl mx-auto">
       <button
         onClick={() => router.push('/dashboard/settings')}
-        className="flex items-center gap-1 text-sm text-sky-700 hover:text-teal-600 mb-6"
+        className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
       >
         <ArrowLeft className="w-4 h-4" /> Tillbaka till inställningar
       </button>
@@ -364,7 +364,7 @@ export default function FormTemplatesPage() {
         <h1 className="text-xl font-bold text-gray-900">Formulärmallar</h1>
         <button
           onClick={startNew}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-600 rounded-lg text-white text-sm font-medium hover:opacity-90"
+          className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
         >
           <Plus className="w-4 h-4" /> Ny mall
         </button>
@@ -380,7 +380,7 @@ export default function FormTemplatesPage() {
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-medium text-gray-900">{t.name}</h3>
                 {t.is_system && (
-                  <span className="px-2 py-0.5 text-xs bg-teal-100 text-teal-600 rounded-full">System</span>
+                  <span className="px-2 py-0.5 text-xs bg-primary-100 text-primary-700 rounded-full">System</span>
                 )}
               </div>
               {t.description && <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>}
@@ -401,7 +401,7 @@ export default function FormTemplatesPage() {
               </button>
               <button
                 onClick={() => startEditing(t)}
-                className="p-2 text-gray-400 hover:text-teal-600 transition"
+                className="p-2 text-gray-400 hover:text-primary-700 transition"
                 title="Redigera"
               >
                 <GripVertical className="w-4 h-4" />

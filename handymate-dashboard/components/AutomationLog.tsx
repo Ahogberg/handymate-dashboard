@@ -81,7 +81,7 @@ export default function AutomationLog() {
       <div className="flex gap-2 flex-wrap">
         <button
           onClick={() => { setStatusFilter(''); setPage(1) }}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-teal-100 text-teal-800' : 'bg-gray-100 text-gray-600'}`}
+          className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!statusFilter ? 'bg-primary-100 text-primary-800' : 'bg-gray-100 text-gray-600'}`}
         >
           Alla
         </button>
@@ -89,7 +89,7 @@ export default function AutomationLog() {
           <button
             key={key}
             onClick={() => { setStatusFilter(key); setPage(1) }}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === key ? 'bg-teal-100 text-teal-800' : 'bg-gray-100 text-gray-600'}`}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === key ? 'bg-primary-100 text-primary-800' : 'bg-gray-100 text-gray-600'}`}
           >
             {label}
           </button>

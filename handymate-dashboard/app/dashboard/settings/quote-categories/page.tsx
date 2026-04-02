@@ -123,7 +123,7 @@ export default function QuoteCategoriesPage() {
   if (loading) {
     return (
       <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-teal-700 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -153,7 +153,7 @@ export default function QuoteCategoriesPage() {
               <div key={cat.slug} className="flex items-center gap-3 px-5 py-2.5 text-sm text-gray-700">
                 <span className="flex-1">{cat.label}</span>
                 {cat.rot && (
-                  <span className="text-[10px] font-medium text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">ROT</span>
+                  <span className="text-[10px] font-medium text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded">ROT</span>
                 )}
                 {cat.rut && (
                   <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">RUT</span>
@@ -183,7 +183,7 @@ export default function QuoteCategoriesPage() {
                       type="text"
                       value={editLabel}
                       onChange={e => setEditLabel(e.target.value)}
-                      className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-teal-500"
+                      className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-600"
                     />
                     <label className="flex items-center gap-1 text-xs text-gray-500">
                       <input type="checkbox" checked={editRot} onChange={e => { setEditRot(e.target.checked); if (e.target.checked) setEditRut(false) }} className="w-3.5 h-3.5 rounded" />
@@ -193,7 +193,7 @@ export default function QuoteCategoriesPage() {
                       <input type="checkbox" checked={editRut} onChange={e => { setEditRut(e.target.checked); if (e.target.checked) setEditRot(false) }} className="w-3.5 h-3.5 rounded" />
                       RUT
                     </label>
-                    <button onClick={() => updateCategory(cat.id)} className="p-1.5 text-teal-600 hover:text-teal-700">
+                    <button onClick={() => updateCategory(cat.id)} className="p-1.5 text-primary-700 hover:text-primary-700">
                       <Check className="w-4 h-4" />
                     </button>
                     <button onClick={() => setEditingId(null)} className="p-1.5 text-gray-400 hover:text-gray-600">
@@ -204,7 +204,7 @@ export default function QuoteCategoriesPage() {
                   <>
                     <span className="flex-1 text-sm text-gray-900">{cat.label}</span>
                     {cat.rot_eligible && (
-                      <span className="text-[10px] font-medium text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">ROT</span>
+                      <span className="text-[10px] font-medium text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded">ROT</span>
                     )}
                     {cat.rut_eligible && (
                       <span className="text-[10px] font-medium text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">RUT</span>
@@ -229,7 +229,7 @@ export default function QuoteCategoriesPage() {
                 onChange={e => setNewLabel(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addCategory() }}
                 placeholder="Ny kategori, t.ex. Snickeri"
-                className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-teal-500 placeholder-gray-300"
+                className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
               />
               <label className="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap">
                 <input type="checkbox" checked={newRot} onChange={e => { setNewRot(e.target.checked); if (e.target.checked) setNewRut(false) }} className="w-3.5 h-3.5 rounded" />
@@ -242,7 +242,7 @@ export default function QuoteCategoriesPage() {
               <button
                 onClick={addCategory}
                 disabled={!newLabel.trim() || adding}
-                className="flex items-center gap-1 px-3 py-2 bg-teal-600 text-white rounded-lg text-sm font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex items-center gap-1 px-3 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {adding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 Lägg till
@@ -252,7 +252,7 @@ export default function QuoteCategoriesPage() {
         </div>
 
         {/* Info box */}
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-5 text-sm text-teal-700">
+        <div className="bg-primary-50 border border-primary-300 rounded-xl p-5 text-sm text-primary-700">
           <p className="font-medium mb-1">Tips</p>
           <p>Kategorier hjälper dig att gruppera offertrader. Aktivera &quot;Visa delsummor per kategori&quot; i offertens visningsinställningar för att visa delsummor per kategorigrupp i offerten.</p>
         </div>

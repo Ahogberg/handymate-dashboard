@@ -366,8 +366,8 @@ export default function AIInboxPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -383,7 +383,7 @@ export default function AIInboxPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
           <div className="flex items-center">
-            <div className="p-3 rounded-xl bg-teal-600 mr-4">
+            <div className="p-3 rounded-xl bg-primary-700 mr-4">
               <Sparkles className="w-6 h-6 text-gray-900" />
             </div>
             <div>
@@ -433,7 +433,7 @@ export default function AIInboxPage() {
             onClick={() => setStatusFilter('all')}
             className={`p-4 rounded-xl border transition-all ${
               statusFilter === 'all'
-                ? 'bg-teal-100 border-teal-300'
+                ? 'bg-primary-100 border-primary-300'
                 : 'bg-white border-gray-200 hover:border-gray-300'
             }`}
           >
@@ -488,8 +488,8 @@ export default function AIInboxPage() {
                             }}
                             className={`w-12 h-12 rounded-xl flex items-center justify-center border flex-shrink-0 transition-all ${
                               playingId === group.recording.recording_id
-                                ? 'bg-teal-600 border-teal-300'
-                                : 'bg-gray-50 border-gray-300 hover:border-teal-300'
+                                ? 'bg-primary-700 border-primary-300'
+                                : 'bg-gray-50 border-gray-300 hover:border-primary-300'
                             }`}
                           >
                             {playingId === group.recording.recording_id ? (
@@ -629,7 +629,7 @@ export default function AIInboxPage() {
                                 <div className="flex items-start gap-3 min-w-0 flex-1">
                                   <div className={`p-2 rounded-lg ${
                                     suggestion.status === 'pending'
-                                      ? 'bg-teal-100'
+                                      ? 'bg-primary-100'
                                       : 'bg-gray-200/50'
                                   }`}>
                                     <Icon className={`w-4 h-4 ${

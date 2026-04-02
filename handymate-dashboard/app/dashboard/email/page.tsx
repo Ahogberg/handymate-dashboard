@@ -101,7 +101,7 @@ export default function EmailInboxPage() {
   function getStatusBadge(status: string) {
     switch (status) {
       case 'new':
-        return <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 text-teal-700 rounded-full">Ny</span>
+        return <span className="px-2 py-0.5 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">Ny</span>
       case 'read':
         return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-600 rounded-full">Läst</span>
       case 'replied':
@@ -129,7 +129,7 @@ export default function EmailInboxPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-6 h-6 text-teal-600 animate-spin" />
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
@@ -150,7 +150,7 @@ export default function EmailInboxPage() {
               onClick={() => setFilter(f.key)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 filter === f.key
-                  ? 'bg-teal-600 text-white'
+                  ? 'bg-primary-700 text-white'
                   : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -186,7 +186,7 @@ export default function EmailInboxPage() {
                   key={email.id}
                   className={`bg-white rounded-xl border transition-all ${
                     email.status === 'new'
-                      ? 'border-teal-200 shadow-sm'
+                      ? 'border-primary-300 shadow-sm'
                       : 'border-gray-200'
                   }`}
                 >
@@ -200,10 +200,10 @@ export default function EmailInboxPage() {
                   >
                     {/* Icon */}
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      email.customer_id ? 'bg-teal-100' : 'bg-gray-100'
+                      email.customer_id ? 'bg-primary-100' : 'bg-gray-100'
                     }`}>
                       {email.customer_id ? (
-                        <User className="w-5 h-5 text-teal-600" />
+                        <User className="w-5 h-5 text-primary-700" />
                       ) : (
                         <Mail className="w-5 h-5 text-gray-400" />
                       )}
@@ -293,7 +293,7 @@ export default function EmailInboxPage() {
                           {email.customer_id && (
                             <Link
                               href={`/dashboard/customers/${email.customer_id}`}
-                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors"
                             >
                               <User className="w-3.5 h-3.5" />
                               Visa kund

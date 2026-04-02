@@ -176,7 +176,7 @@ export default function InvoicesPage() {
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-      case 'sent': return 'bg-teal-100 text-sky-700 border-teal-200'
+      case 'sent': return 'bg-primary-100 text-sky-700 border-primary-200'
       case 'paid': return 'bg-emerald-100 text-emerald-600 border-emerald-200'
       case 'overdue': return 'bg-red-100 text-red-600 border-red-200'
       case 'cancelled': return 'bg-gray-100 text-gray-500 border-gray-300'
@@ -268,8 +268,8 @@ export default function InvoicesPage() {
     <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-teal-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-teal-50 rounded-full blur-[128px]"></div>
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
+        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
 
       {/* Toast */}
@@ -290,7 +290,7 @@ export default function InvoicesPage() {
           </div>
           <Link
             href="/dashboard/invoices/new"
-            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-teal-600 rounded-xl font-medium text-white hover:opacity-90 shadow-md shadow-teal-500/20"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 shadow-md shadow-primary-600/20"
           >
             <Plus className="w-4 h-4" />
             Ny faktura
@@ -301,13 +301,13 @@ export default function InvoicesPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-teal-100 rounded-xl flex items-center justify-center">
-                <Clock className="w-5 h-5 text-teal-600" />
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-primary-700" />
               </div>
               <div>
                 <p className="text-xl font-bold text-gray-900">{stats.unpaidCount}</p>
                 <p className="text-xs text-gray-400">Obetalda</p>
-                <p className="text-xs text-teal-600 font-medium">{stats.unpaidValue.toLocaleString('sv-SE')} kr</p>
+                <p className="text-xs text-primary-700 font-medium">{stats.unpaidValue.toLocaleString('sv-SE')} kr</p>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@ export default function InvoicesPage() {
                 onClick={() => setFilter(f.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   filter === f.id
-                    ? 'bg-teal-600 text-white shadow-sm'
+                    ? 'bg-primary-700 text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
@@ -387,7 +387,7 @@ export default function InvoicesPage() {
               placeholder="Sök fakturanr eller kund..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
             />
           </div>
         </div>
@@ -400,7 +400,7 @@ export default function InvoicesPage() {
               <p className="text-gray-500 mb-2">Inga fakturor hittades</p>
               <Link
                 href="/dashboard/invoices/new"
-                className="text-sky-700 hover:text-teal-600 text-sm"
+                className="text-sky-700 hover:text-primary-700 text-sm"
               >
                 Skapa din första faktura
               </Link>
@@ -470,7 +470,7 @@ export default function InvoicesPage() {
                             <button
                               onClick={() => handleSend(invoice.invoice_id)}
                               disabled={sendingId === invoice.invoice_id}
-                              className="flex-1 flex items-center justify-center gap-2 p-2.5 text-sky-700 bg-teal-50 rounded-lg min-h-[44px] disabled:opacity-50"
+                              className="flex-1 flex items-center justify-center gap-2 p-2.5 text-sky-700 bg-primary-50 rounded-lg min-h-[44px] disabled:opacity-50"
                             >
                               {sendingId === invoice.invoice_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                               Skicka
@@ -527,7 +527,7 @@ export default function InvoicesPage() {
                     {filteredInvoices.map((invoice) => {
                       const daysUntilDue = getDaysUntilDue(invoice.due_date)
                       return (
-                        <tr key={invoice.invoice_id} className="hover:bg-teal-50/30 transition-colors group">
+                        <tr key={invoice.invoice_id} className="hover:bg-primary-50/30 transition-colors group">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <Link href={`/dashboard/invoices/${invoice.invoice_id}`} className="font-semibold text-gray-900 hover:text-sky-700">
@@ -587,7 +587,7 @@ export default function InvoicesPage() {
                               <button
                                 onClick={() => handleSyncToFortnox(invoice.invoice_id)}
                                 disabled={syncingId === invoice.invoice_id}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-gray-50 text-gray-500 hover:text-teal-600 hover:bg-teal-50 border border-gray-200 hover:border-teal-300 transition-colors disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-gray-50 text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-colors disabled:opacity-50"
                               >
                                 {syncingId === invoice.invoice_id ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -614,7 +614,7 @@ export default function InvoicesPage() {
 
                               <Link
                                 href={`/dashboard/invoices/${invoice.invoice_id}/edit`}
-                                className="p-2 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded-lg transition-all"
+                                className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all"
                                 title="Redigera"
                               >
                                 <Pencil className="w-4 h-4" />
@@ -625,7 +625,7 @@ export default function InvoicesPage() {
                                   <button
                                     onClick={() => handleSend(invoice.invoice_id)}
                                     disabled={sendingId === invoice.invoice_id}
-                                    className="p-2 text-gray-400 hover:text-sky-700 hover:bg-teal-50 rounded-lg transition-all disabled:opacity-50"
+                                    className="p-2 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all disabled:opacity-50"
                                     title="Skicka"
                                   >
                                     {sendingId === invoice.invoice_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

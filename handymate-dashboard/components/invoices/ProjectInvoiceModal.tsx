@@ -206,7 +206,7 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
 
         {loading ? (
           <div className="p-12 text-center">
-            <Loader2 className="w-6 h-6 text-teal-600 animate-spin mx-auto mb-2" />
+            <Loader2 className="w-6 h-6 text-primary-700 animate-spin mx-auto mb-2" />
             <p className="text-sm text-gray-400">Hämtar underlag...</p>
           </div>
         ) : error ? (
@@ -216,7 +216,7 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
             {/* Kund-info */}
             {data?.project.customer && (
               <div className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
-                <div className="w-9 h-9 bg-teal-100 rounded-full flex items-center justify-center text-teal-700 font-semibold text-sm">
+                <div className="w-9 h-9 bg-primary-100 rounded-full flex items-center justify-center text-primary-700 font-semibold text-sm">
                   {data.project.customer.name?.slice(0, 2).toUpperCase()}
                 </div>
                 <div>
@@ -289,7 +289,7 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
               )}
               <div className="flex justify-between text-base font-bold pt-2 border-t border-gray-200">
                 <span>Att betala</span>
-                <span className="text-teal-700">{formatCurrency(customerPays)}</span>
+                <span className="text-primary-700">{formatCurrency(customerPays)}</span>
               </div>
             </div>
 
@@ -344,7 +344,7 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
               <button
                 onClick={handleGenerate}
                 disabled={generating || allLines === 0}
-                className="flex items-center gap-2 px-5 py-2.5 bg-teal-700 text-white rounded-xl text-sm font-semibold hover:bg-teal-800 transition-colors disabled:opacity-40"
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary-800 text-white rounded-xl text-sm font-semibold hover:bg-primary-800 transition-colors disabled:opacity-40"
               >
                 {generating ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -430,7 +430,7 @@ function Section({
 
       <button
         onClick={onAddLine}
-        className="flex items-center gap-1 text-xs text-teal-600 hover:text-teal-700 font-medium"
+        className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-700 font-medium"
       >
         <Plus className="w-3.5 h-3.5" />
         Lägg till rad

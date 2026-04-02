@@ -35,17 +35,17 @@ export function CopyId({ value, label, className = '' }: CopyIdProps) {
   return (
     <button
       onClick={handleCopy}
-      className={`inline-flex items-center gap-1 text-gray-400 hover:text-teal-600 transition-colors ${className}`}
+      className={`inline-flex items-center gap-1 text-gray-400 hover:text-primary-700 transition-colors ${className}`}
       title={`Kopiera ${label || value}`}
     >
       <span className="font-mono text-xs">{label || value}</span>
       {copied ? (
-        <Check className="w-3 h-3 text-teal-600" />
+        <Check className="w-3 h-3 text-primary-700" />
       ) : (
         <Copy className="w-3 h-3" />
       )}
       {copied && (
-        <span className="text-[10px] text-teal-600 font-medium">Kopierat!</span>
+        <span className="text-[10px] text-primary-700 font-medium">Kopierat!</span>
       )}
     </button>
   )
