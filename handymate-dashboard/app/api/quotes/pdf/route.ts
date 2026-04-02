@@ -10,6 +10,8 @@ import {
   renderDocumentHeader,
   renderTealLine,
   renderFooterGrid,
+  renderAccentFooter,
+  renderImageGrid,
   wrapInPage,
 } from '@/lib/document-html'
 
@@ -196,9 +198,13 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       logoUrl: config?.logo_url || undefined,
       orgNumber: config?.org_number || undefined,
       fSkatt: config?.f_skatt_registered || false,
-      title: quote.title || undefined,
     }
   )
+
+  // ── Large document title (like Desorbera) ──
+  const titleHtml = quote.title
+    ? `<div class="doc-title-large">${escapeHtml(quote.title)}</div>`
+    : ''
 
   // ── Meta row ──
   const customerAddress = [
@@ -240,8 +246,12 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
   }
 
   // ── Images ──
+  const imagesCaptioned = (quote.image_captions || []) as string[]
   const imagesHtml = images.length > 0
-    ? `<div class="images">${images.slice(0, 3).map((img: string) => `<img src="${escapeHtml(img)}" alt="Projektbild" />`).join('')}</div>`
+    ? renderImageGrid(images.slice(0, 4).map((url: string, i: number) => ({
+        url,
+        caption: imagesCaptioned[i] || undefined,
+      })))
     : ''
 
   // ── Introduction text ──
@@ -350,43 +360,71 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
     }</div>
   </div>`
 
-  // ── Footer ──
+  // ── Footer — accent bar ──
   const orgNumber = config?.org_number || business?.org_number || ''
   const fSkatt = config?.f_skatt_registered ?? business?.f_skatt_registered
   const bankgiro = config?.bankgiro || ''
 
-  const footerHtml = renderFooterGrid([
+  const addressParts = [
+    business?.business_name || '',
+    config?.address || business?.address || '',
+  ].filter(Boolean)
+
+  const contactParts = [
+    config?.contact_email || business?.contact_email || '',
+    config?.phone_number || business?.phone_number || '',
+  ].filter(Boolean)
+
+  const footerHtml = renderAccentFooter([
     {
-      label: 'Betalningsvillkor',
-      value: escapeHtml(`${terms.payment_terms || 30} dagar netto`),
+      label: 'Adress',
+      value: addressParts.map(p => escapeHtml(p)).join('<br>'),
     },
     {
-      label: 'Org.nr / F-skatt',
+      label: 'Kontakt',
+      value: contactParts.map(p => escapeHtml(p)).join('<br>'),
+    },
+    {
+      label: 'Organisationsnummer',
       value: [
         escapeHtml(orgNumber),
         fSkatt ? 'Godkänd för F-skatt' : '',
+        bankgiro ? `Bankgiro: ${escapeHtml(bankgiro)}` : '',
       ].filter(Boolean).join('<br>'),
     },
-    {
-      label: 'Bankgiro',
-      value: escapeHtml(bankgiro) || '—',
-    },
   ])
+
+  // ── Author block ──
+  const authorHtml = quote.reference_person
+    ? `<div class="author-grid">
+        <div class="author-block">
+          <div class="label">Upprättad av</div>
+          <div class="name">${escapeHtml(quote.reference_person)}</div>
+          <div class="role">${escapeHtml(business?.business_name || '')}</div>
+        </div>
+        <div class="author-block">
+          <div class="label">Datum</div>
+          <div class="name">${formatDateLong(quote.created_at)}</div>
+        </div>
+      </div>`
+    : ''
 
   // ── Assemble ──
   const bodyHtml = [
     header,
     renderTealLine(),
+    titleHtml,
     metaRow,
     referencesHtml,
-    imagesHtml,
     introHtml,
+    imagesHtml,
     itemsTableHtml ? `<div class="section-title">Arbeten och material</div>` + itemsTableHtml : '',
     notIncludedHtml,
     ataHtml,
     totalsHtml,
     paymentPlanHtml,
     conclusionHtml,
+    authorHtml,
     signBoxHtml,
     footerHtml,
   ].filter(Boolean).join('\n')

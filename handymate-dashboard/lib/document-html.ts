@@ -160,10 +160,30 @@ export function getDocumentCSS(): string {
   .summary-cell .val { font-size: 20px; font-weight: 500; color: ${TEXT_PRIMARY}; }
   .summary-cell .val.teal { color: ${ACCENT}; }
 
-  /* Footer grid */
+  /* Footer grid (legacy — plain text) */
   .footer-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; padding-top: 28px; border-top: 0.5px solid ${BORDER}; }
   .footer-block .label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${LABEL_COLOR}; margin-bottom: 6px; }
   .footer-block .val { font-size: 12px; color: ${TEXT_MUTED}; line-height: 1.7; }
+
+  /* Professional accent footer bar */
+  .footer-bar { background: ${ACCENT}; border-radius: 0 0 12px 12px; margin: 0 -56px -52px; padding: 24px 56px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 28px; }
+  .footer-bar .fb-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255,255,255,0.55); margin-bottom: 5px; }
+  .footer-bar .fb-val { font-size: 12px; color: rgba(255,255,255,0.92); line-height: 1.7; }
+
+  /* Large document title (like Desorbera) */
+  .doc-title-large { font-size: 20px; font-weight: 600; color: ${ACCENT}; margin-bottom: 20px; line-height: 1.3; }
+
+  /* Author / reviewer block */
+  .author-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 28px; padding-top: 20px; border-top: 0.5px solid ${BORDER}; }
+  .author-block .label { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: ${LABEL_COLOR}; margin-bottom: 4px; }
+  .author-block .name { font-size: 13px; font-weight: 500; color: ${TEXT_PRIMARY}; }
+  .author-block .role { font-size: 11px; color: ${TEXT_SECONDARY}; margin-top: 2px; }
+
+  /* Image grid with captions */
+  .images-captioned { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  .img-card { }
+  .img-card img { width: 100%; height: 180px; object-fit: cover; border-radius: 8px; border: 0.5px solid ${BORDER}; display: block; }
+  .img-card .caption { font-size: 11px; font-style: italic; color: ${TEXT_SECONDARY}; margin-top: 6px; }
 
   /* Extra content sections (offert) */
   .intro-text, .conclusion-text { margin-bottom: 24px; font-size: 13px; color: ${TEXT_MUTED}; line-height: 1.7; white-space: pre-wrap; }
@@ -196,8 +216,9 @@ export function getDocumentCSS(): string {
 
   @media print {
     body { padding: 0; background: #fff; }
-    .page { border: none; border-radius: 0; padding: 0; max-width: none; }
+    .page { border: none; border-radius: 0; padding: 40px 48px 0; max-width: none; }
     .print-bar { display: none; }
+    .footer-bar { border-radius: 0; margin: 0 -48px 0; padding: 20px 48px; }
   }
   `
 }
@@ -283,6 +304,35 @@ ${bodyHtml}
 </div>
 </body>
 </html>`
+}
+
+/** Professional accent-colored footer bar (like Desorbera) */
+export function renderAccentFooter(
+  columns: { label: string; value: string }[],
+): string {
+  return `
+  <div class="footer-bar">
+    ${columns.map(c => `
+    <div>
+      <div class="fb-label">${escapeHtml(c.label)}</div>
+      <div class="fb-val">${c.value}</div>
+    </div>`).join('')}
+  </div>`
+}
+
+/** Render image grid with optional captions */
+export function renderImageGrid(
+  images: { url: string; caption?: string }[],
+): string {
+  if (images.length === 0) return ''
+  return `
+  <div class="images-captioned">
+    ${images.map(img => `
+    <div class="img-card">
+      <img src="${escapeHtml(img.url)}" alt="${escapeHtml(img.caption || 'Projektbild')}" onerror="this.style.display='none'" />
+      ${img.caption ? `<div class="caption">${escapeHtml(img.caption)}</div>` : ''}
+    </div>`).join('')}
+  </div>`
 }
 
 /** Build contact info line: "Namn · Tel\nemail · website" */
