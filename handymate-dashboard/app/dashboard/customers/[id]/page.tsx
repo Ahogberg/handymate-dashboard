@@ -749,6 +749,16 @@ export default function CustomerDetailPage() {
                   <MessageSquare className="w-4 h-4 text-primary-700" />
                   <span className="text-gray-900 text-sm">Skicka SMS</span>
                 </button>
+
+                {customer?.phone_number && (
+                  <Link
+                    href={`/dashboard/sms-inbox?phone=${encodeURIComponent(customer.phone_number)}`}
+                    className="w-full flex items-center gap-3 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-left"
+                  >
+                    <ExternalLink className="w-4 h-4 text-primary-500" />
+                    <span className="text-gray-900 text-sm">Öppna SMS-konversation</span>
+                  </Link>
+                )}
                 
                 <button
                   onClick={() => setShowAddNoteModal(true)}

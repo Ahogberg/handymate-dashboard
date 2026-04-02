@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   MessageSquare,
   Search,
@@ -70,6 +71,8 @@ function formatMessageTime(dateStr: string): string {
 
 export default function SmsInboxPage() {
   const business = useBusiness()
+  const searchParams = useSearchParams()
+  const phoneParam = searchParams?.get('phone') ?? null
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedPhone, setSelectedPhone] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -78,6 +81,7 @@ export default function SmsInboxPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [replyText, setReplyText] = useState('')
   const [sending, setSending] = useState(false)
+  const [didAutoOpen, setDidAutoOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -96,6 +100,14 @@ export default function SmsInboxPage() {
   useEffect(() => {
     if (business.business_id) fetchConversations()
   }, [business.business_id, fetchConversations])
+
+  // Auto-öppna tråd om ?phone= finns i URL
+  useEffect(() => {
+    if (phoneParam && !didAutoOpen && !loading) {
+      setDidAutoOpen(true)
+      loadThread(phoneParam)
+    }
+  }, [phoneParam, didAutoOpen, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll för nya meddelanden var 15:e sekund
   useEffect(() => {
