@@ -195,7 +195,7 @@ const AVATAR_BASE = AVATAR_BASE_SIGNED
 const TEAM: TeamAgent[] = [
   { id: 'matte', name: 'Matte', role: 'Chefsassistent', initials: 'M', color: 'bg-primary-700', avatar: `${AVATAR_BASE}/Matte.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTWF0dGUucG5nIiwiaWF0IjoxNzczODU1NTkyLCJleHAiOjI2Mzc4NTU1OTJ9.jNhKpwuz1VvDTszvZ7fbczsopGCNM5c0eQHR5qq-0Ak`, greeting: 'Hej! Här är läget för idag ☀️', description: 'Koordinerar teamet och pratar med dig' },
   { id: 'karin', name: 'Karin', role: 'Ekonom', initials: 'K', color: 'bg-blue-600', avatar: `${AVATAR_BASE}/Karin.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvS2FyaW4ucG5nIiwiaWF0IjoxNzczODU1NjE4LCJleHAiOjI2Mzc4NTU2MTh9.bmvCwfi8Rry-5dGsJ1Zyyco--CYT6ZG3gXBPqHRiVdA`, greeting: 'Jag har koll på ekonomin — kollar fakturorna', description: 'Håller koll på fakturor och betalningar' },
-  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE}/Emma.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRW1tYS5wbmciLCJpYXQiOjE3NzM4NTU2MzEsImV4cCI6MjYzNzg1NTYzMX0.Psi253QRXzjuTfG01NmJc07Rhwr5fwd4I_rz0gxkR5g`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
+  { id: 'hanna', name: 'Hanna', role: 'Marknadschef', initials: 'H', color: 'bg-purple-600', avatar: `${AVATAR_BASE_PUBLIC}/Hanna.png`, greeting: 'Dags att nå fler kunder!', description: 'Sköter kampanjer och nya kunder' },
   { id: 'daniel', name: 'Daniel', role: 'Säljare', initials: 'D', color: 'bg-amber-600', avatar: `${AVATAR_BASE}/Daniel.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvRGFuaWVsLnBuZyIsImlhdCI6MTc3Mzg1NTY0MiwiZXhwIjoyNjM3ODU1NjQyfQ.3NE6iIAL4gje-j0warr4k6PUFqRuf7EocaDo86LZNWE`, greeting: 'Jag följer upp offerten idag', description: 'Följer upp offerter och leads' },
   { id: 'lars', name: 'Lars', role: 'Projektledare', initials: 'L', color: 'bg-emerald-600', avatar: `${AVATAR_BASE}/Lars.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGFycy5wbmciLCJpYXQiOjE3NzM4NTU2NTUsImV4cCI6MjYzNzg1NTY1NX0.mICMOQvJxG49RDXZXsc_BfKFM-AnNOscyNTL8IxPdqY`, greeting: 'Alla projekt löper på — inga förseningar', description: 'Koordinerar projekt och bokningar' },
   { id: 'lisa', name: 'Lisa', role: 'Kundservice & Telefonist', initials: 'Li', color: 'bg-sky-500', avatar: `${AVATAR_BASE}/Lisa.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGlzYS5wbmciLCJpYXQiOjE3NzQyNTk4MTYsImV4cCI6MTA0MTQyNTk4MTZ9.ZQag6FV2my_vy7rq1tFPBYK2MuwlmhFeDtU16SLA3Ak`, greeting: 'Hej! Hur kan jag hjälpa dig idag?', description: 'Svarar i telefon och hanterar kundförfrågningar', training: true },
@@ -318,38 +318,100 @@ function formatToolResultSummary(tool: string, result: { success: boolean; data?
 // Humanize technical agent responses for display
 function humanizeResponse(text: string): string {
   if (!text) return text
-  return text
+
+  // ── Step 1: Try to extract a clean one-line summary ────────────────
+  // Many cron responses follow the pattern: "Status: Lugnt läge ✅" or similar
+  const statusMatch = text.match(/Status:\s*(.+?)(?:\n|$)/i)
+  const isCronCheck = /communication.?check|daglig.?statistik|schemalagd.?kontroll|status\s+f.r\s+\d{4}/i.test(text)
+
+  if (isCronCheck) {
+    // Parse the key numbers from the response
+    const leads = text.match(/(\d+)\s*nya?\s*leads?/i)?.[1]
+    const quotes = text.match(/(\d+)\s*(?:nya?\s*)?offert(?:er)?\s*skapad/i)?.[1]
+    const sms = text.match(/(\d+)\s*(?:utgående\s*)?SMS/i)?.[1]
+    const calls = text.match(/(\d+)\s*samtal/i)?.[1]
+    const bookings = text.match(/(\d+)\s*bokning(?:ar)?/i)?.[1]
+    const customers = text.match(/(\d+)\s*nya?\s*kund(?:er)?/i)?.[1]
+    const approvals = text.match(/(\d+)\s*(?:väntande\s*)?godkännanden?/i)?.[1]
+
+    // Build a friendly summary from the numbers
+    const highlights: string[] = []
+    if (leads && leads !== '0') highlights.push(`${leads} nya leads`)
+    if (quotes && quotes !== '0') highlights.push(`${quotes} nya offerter`)
+    if (sms && sms !== '0') highlights.push(`${sms} SMS skickade`)
+    if (calls && calls !== '0') highlights.push(`${calls} samtal`)
+    if (bookings && bookings !== '0') highlights.push(`${bookings} bokningar`)
+    if (customers && customers !== '0') highlights.push(`${customers} nya kunder`)
+    if (approvals && approvals !== '0') highlights.push(`${approvals} godkännanden väntar`)
+
+    if (highlights.length > 0) {
+      return `Kontroll klar — ${highlights.join(', ')}`
+    }
+
+    // All zeros → calm status
+    if (statusMatch && /lugnt/i.test(statusMatch[1])) {
+      return 'Kontroll klar — lugnt läge, inga åtgärder behövs'
+    }
+    return 'Kontroll klar — allt ser bra ut, inga åtgärder behövs'
+  }
+
+  // ── Step 2: For non-cron responses, do lighter cleanup ─────────────
+  let result = text
+    // Remove markdown headers and bullets
+    .replace(/^#{1,3}\s+/gm, '')
+    .replace(/^[-•·]\s*/gm, '')
+    // Remove date stamps at line starts
+    .replace(/\d{4}-\d{2}-\d{2}\s*/g, '')
+    // Technical terms → Swedish
     .replace(/Cron-trigger hanterad/gi, 'Kontroll genomförd')
+    .replace(/Communication Check/gi, 'Kontroll av samtal och meddelanden')
     .replace(/Kommunikationskontroll/gi, 'Kollade samtal och meddelanden')
     .replace(/cron[_-]?type[:\s]*\w+/gi, '')
     .replace(/schema cache/gi, 'databas')
-    .replace(/pipeline granskad \(alla statusar tomma\)/gi, 'Inga aktiva leads just nu')
-    .replace(/pipeline granskad/gi, 'Kollade dina leads')
-    .replace(/Kommunikation:\s*0 samtal,?\s*0 SMS/gi, 'Inga samtal eller meddelanden idag')
+    .replace(/pipeline granskad \(alla statusar tomma\)/gi, 'Inga aktiva förfrågningar just nu')
+    .replace(/pipeline granskad/gi, 'Kollade dina förfrågningar')
     .replace(/check_pending_approvals/gi, 'Kontrollerade godkännanden')
     .replace(/pending_approvals/gi, 'godkännanden')
     .replace(/log_automation_action/gi, 'Loggade åtgärd')
     .replace(/get_daily_stats/gi, 'Hämtade daglig statistik')
     .replace(/search_customers/gi, 'Sökte bland kunder')
-    .replace(/search_leads/gi, 'Sökte bland leads')
+    .replace(/search_leads/gi, 'Sökte bland förfrågningar')
     .replace(/get_customer/gi, 'Hämtade kundinfo')
-    .replace(/get_lead/gi, 'Hämtade lead-info')
+    .replace(/get_lead/gi, 'Hämtade förfrågningsinfo')
     .replace(/get_quotes/gi, 'Hämtade offerter')
     .replace(/create_approval_request/gi, 'Skapade godkännandeförfrågan')
     .replace(/send_sms/gi, 'Skickade SMS')
     .replace(/send_email/gi, 'Skickade e-post')
     .replace(/create_booking/gi, 'Skapade bokning')
     .replace(/check_calendar/gi, 'Kollade kalendern')
-    .replace(/qualify_lead/gi, 'Kvalificerade lead')
-    .replace(/update_lead_status/gi, 'Uppdaterade lead-status')
+    .replace(/qualify_lead/gi, 'Kvalificerade förfrågan')
+    .replace(/update_lead_status/gi, 'Uppdaterade status')
+    .replace(/\bleads?\b/gi, 'förfrågningar')
     .replace(/\btrigger\b/gi, 'händelse')
     .replace(/\bcron\b/gi, 'automatisk')
     .replace(/Could not find the table/gi, 'Kunde inte kontrollera')
     .replace(/in the schema cache/gi, '— kontakta support om det fortsätter')
     .replace(/idempotency/gi, 'dubblettskydd')
     .replace(/Error:/gi, 'Fel:')
+    // Clean up "Status sammanfattning:" headers
+    .replace(/Status\s*sammanfattning:?\s*/gi, '')
+    .replace(/Dagens?\s*översikt:?\s*/gi, '')
+    .replace(/Daglig\s*statistik:?\s*/gi, '')
+    .replace(/Genomförda\s*kontroller:?\s*/gi, '')
+    // Remove "0 st" items that add no value
+    .replace(/[·•]\s*\w[^·•\n]*:\s*0\s*(?:st|timmar?)(?:\s*[·•])?/gi, '')
+    .replace(/[·•]\s*\w[^·•\n]*:\s*Inga?\s*(?:skapade?|schemalagda?|nya?)?(?:\s*[·•])?/gi, '')
+    // Clean up multiple spaces/newlines
     .replace(/\s{2,}/g, ' ')
     .trim()
+
+  // If after cleanup it's very long, take first sentence
+  if (result.length > 200) {
+    const firstSentence = result.match(/^[^.!]+[.!]/)
+    if (firstSentence) result = firstSentence[0]
+  }
+
+  return result
 }
 
 // Simple markdown-to-HTML renderer for agent responses
