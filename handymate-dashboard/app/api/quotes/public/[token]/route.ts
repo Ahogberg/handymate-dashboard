@@ -217,6 +217,17 @@ export async function POST(
       console.error('Communication trigger error (non-blocking):', commErr)
     }
 
+    // V3 Automation Engine: fire quote_signed event för pipeline-regler
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'quote_signed', quote.business_id, {
+        quote_id: quote.quote_id,
+        customer_id: quote.customer_id,
+        quote_title: quote.title,
+        total: quote.total,
+      })
+    } catch { /* non-blocking */ }
+
     // Autopilot: förbered deal-to-delivery-paket
     try {
       const { triggerAutopilot } = await import('@/lib/autopilot/trigger')

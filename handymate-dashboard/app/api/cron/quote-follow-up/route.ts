@@ -34,6 +34,69 @@ export async function GET(request: NextRequest) {
 
     const expiredCount = expiredQuotes?.length || 0
 
+    // 1b. Skicka förfallo-nudge: SMS 3 dagar innan offert går ut
+    let expiryNudgesSent = 0
+    try {
+      const threeDaysFromNow = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const { data: expiringQuotes } = await supabase
+        .from('quotes')
+        .select(`
+          quote_id, business_id, customer_id, title, total, customer_pays, valid_until,
+          customer:customer_id (name, phone_number)
+        `)
+        .in('status', ['sent', 'opened'])
+        .eq('valid_until', threeDaysFromNow)  // Exakt 3 dagar kvar
+
+      for (const q of expiringQuotes || []) {
+        const customer = q.customer as any
+        if (!customer?.phone_number) continue
+
+        // Hämta företagsnamn
+        const { data: biz } = await supabase
+          .from('business_config')
+          .select('business_name, display_name')
+          .eq('business_id', q.business_id)
+          .single()
+
+        const businessName = biz?.display_name || biz?.business_name || ''
+        const amount = (q.customer_pays || q.total || 0).toLocaleString('sv-SE')
+        const firstName = (customer.name || '').split(' ')[0]
+
+        // Skicka SMS direkt (inte via agent — detta är tidskänsligt)
+        if (process.env.ELKS_API_USER) {
+          try {
+            const smsRes = await fetch('https://api.46elks.com/a1/sms', {
+              method: 'POST',
+              headers: {
+                'Authorization': 'Basic ' + Buffer.from(`${process.env.ELKS_API_USER}:${process.env.ELKS_API_PASSWORD}`).toString('base64'),
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+              body: new URLSearchParams({
+                from: businessName.substring(0, 11),
+                to: customer.phone_number,
+                message: `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare! //${businessName}`,
+              }).toString(),
+            })
+
+            if (smsRes.ok) {
+              expiryNudgesSent++
+              await supabase.from('sms_log').insert({
+                business_id: q.business_id,
+                customer_id: q.customer_id,
+                direction: 'outgoing',
+                phone_number: customer.phone_number,
+                message_type: 'quote_expiry_nudge',
+                related_id: q.quote_id,
+                status: 'sent',
+              })
+            }
+          } catch { /* non-blocking */ }
+        }
+      }
+    } catch (nudgeErr) {
+      console.error('Quote expiry nudge error (non-blocking):', nudgeErr)
+    }
+
     // 2. Find sent quotes needing follow-up
     const { data: sentQuotes, error } = await supabase
       .from('quotes')
@@ -142,6 +205,7 @@ export async function GET(request: NextRequest) {
       success: true,
       follow_ups_sent: followUpsSent,
       expired_count: expiredCount,
+      expiry_nudges_sent: expiryNudgesSent,
       agent_triggered: agentTriggered,
     })
   } catch (error: any) {

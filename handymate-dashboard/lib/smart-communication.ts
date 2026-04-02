@@ -355,6 +355,35 @@ export async function triggerEventCommunication(params: {
     const settingKey = eventSettingsMap[params.event]
     if (settingKey && !settings[settingKey]) return
 
+    // Respektera business_config.review_request_enabled som override
+    if (params.event === 'invoice_paid') {
+      try {
+        const { data: bizCfg } = await supabase
+          .from('business_config')
+          .select('review_request_enabled')
+          .eq('business_id', params.businessId)
+          .single()
+        if (bizCfg && bizCfg.review_request_enabled === false) return
+      } catch { /* non-blocking, fall through */ }
+    }
+
+    // Dedup: kolla om V3 automation engine redan har send_sms/send_email-regler
+    // för detta event. Om ja, hoppa över direkt-sändning (låt fireEvent hantera)
+    // men kör fortfarande nurture enrollment nedan.
+    let v3HandlesMessaging = false
+    try {
+      const { data: v3Rules } = await supabase
+        .from('v3_automation_rules')
+        .select('id')
+        .eq('trigger_type', 'event')
+        .eq('is_active', true)
+        .in('action_type', ['send_sms', 'send_email'])
+        .or(`business_id.is.null,business_id.eq.${params.businessId}`)
+        .filter('trigger_config->>event_name', 'eq', params.event)
+        .limit(1)
+      v3HandlesMessaging = (v3Rules?.length || 0) > 0
+    } catch { /* table may not exist, fall through */ }
+
     // Find matching rules (system + business-specific)
     const { data: rules } = await supabase
       .from('communication_rule')
@@ -384,60 +413,78 @@ export async function triggerEventCommunication(params: {
 
     const ruleToUse = businessOverride || matchingRule
 
-    // Get customer phone
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('phone_number, name')
-      .eq('customer_id', params.customerId)
-      .single()
+    // Skicka direkt-meddelande BARA om V3 inte redan hanterar sändning
+    if (!v3HandlesMessaging) {
+      // Get customer phone
+      const { data: customer } = await supabase
+        .from('customer')
+        .select('phone_number, name')
+        .eq('customer_id', params.customerId)
+        .single()
 
-    if (!customer?.phone_number) return
+      if (customer?.phone_number) {
+        // Check rate limits
+        const canSend = await canSendMessage(params.businessId, params.customerId)
+        if (canSend.allowed) {
+          // Resolve variables and send
+          const fullContext: CommunicationContext = {
+            businessId: params.businessId,
+            customerId: params.customerId,
+            ...params.context,
+          }
 
-    // Check rate limits
-    const canSend = await canSendMessage(params.businessId, params.customerId)
-    if (!canSend.allowed) {
-      console.log(`Communication skipped for ${params.customerId}: ${canSend.reason}`)
-      return
-    }
+          const variables = await resolveMessageVariables(fullContext)
+          const message = interpolateMessage(ruleToUse.message_template, variables)
 
-    // Resolve variables and send
-    const fullContext: CommunicationContext = {
-      businessId: params.businessId,
-      customerId: params.customerId,
-      ...params.context,
-    }
+          // Apply delay if configured
+          let delayMinutes = ruleToUse.trigger_config?.delay_minutes || 0
 
-    const variables = await resolveMessageVariables(fullContext)
-    const message = interpolateMessage(ruleToUse.message_template, variables)
-
-    // Apply delay if configured
-    const delayMinutes = ruleToUse.trigger_config?.delay_minutes || 0
-    if (delayMinutes > 0) {
-      // For now, use a simple setTimeout. In production, use a job queue.
-      setTimeout(async () => {
-        await sendSmartMessage({
-          businessId: params.businessId,
-          customerId: params.customerId,
-          ruleId: ruleToUse.id,
-          channel: ruleToUse.channel === 'email' ? 'email' : 'sms',
-          recipient: customer.phone_number,
-          message,
-          aiReason: `Automatiskt: ${ruleToUse.name}`,
-          context: fullContext,
-        })
-      }, delayMinutes * 60 * 1000)
+          // Respektera review_request_delay_days från business_config
+          if (params.event === 'invoice_paid' && delayMinutes === 0) {
+            try {
+              const { data: bizCfg } = await supabase
+                .from('business_config')
+                .select('review_request_delay_days')
+                .eq('business_id', params.businessId)
+                .single()
+              if (bizCfg?.review_request_delay_days && bizCfg.review_request_delay_days > 0) {
+                delayMinutes = bizCfg.review_request_delay_days * 24 * 60
+              }
+            } catch { /* non-blocking */ }
+          }
+          if (delayMinutes > 0) {
+            setTimeout(async () => {
+              await sendSmartMessage({
+                businessId: params.businessId,
+                customerId: params.customerId,
+                ruleId: ruleToUse.id,
+                channel: ruleToUse.channel === 'email' ? 'email' : 'sms',
+                recipient: customer.phone_number,
+                message,
+                aiReason: `Automatiskt: ${ruleToUse.name}`,
+                context: fullContext,
+              })
+            }, delayMinutes * 60 * 1000)
+          } else {
+            await sendSmartMessage({
+              businessId: params.businessId,
+              customerId: params.customerId,
+              ruleId: ruleToUse.id,
+              channel: ruleToUse.channel === 'email' ? 'email' : 'sms',
+              recipient: customer.phone_number,
+              message,
+              aiReason: `Automatiskt: ${ruleToUse.name}`,
+              context: fullContext,
+            })
+          }
+        } else {
+          console.log(`Communication skipped for ${params.customerId}: ${canSend.reason}`)
+        }
+      }
     } else {
-      await sendSmartMessage({
-        businessId: params.businessId,
-        customerId: params.customerId,
-        ruleId: ruleToUse.id,
-        channel: ruleToUse.channel === 'email' ? 'email' : 'sms',
-        recipient: customer.phone_number,
-        message,
-        aiReason: `Automatiskt: ${ruleToUse.name}`,
-        context: fullContext,
-      })
+      console.log(`[smart-communication] Skipping direct send for ${params.event} — V3 automation handles messaging`)
     }
+
     // Nurture sequence: enroll or cancel based on event
     try {
       const { enrollInSequence, cancelEnrollmentsForEvent } = await import('@/lib/nurture')

@@ -164,12 +164,97 @@ export async function PUT(
           milestoneId: body.milestone_id,
         })
       } catch { /* non-blocking */ }
+
+      // SMS till kund: milstolpe avklarad + portalänk
+      try {
+        const { data: project } = await supabase
+          .from('project')
+          .select('customer_id, name')
+          .eq('project_id', params.id)
+          .single()
+
+        if (project?.customer_id) {
+          const { data: cust } = await supabase
+            .from('customer')
+            .select('phone_number, name, portal_token, portal_enabled')
+            .eq('customer_id', project.customer_id)
+            .single()
+
+          if (cust?.phone_number) {
+            const { data: biz } = await supabase
+              .from('business_config')
+              .select('business_name, display_name')
+              .eq('business_id', business.business_id)
+              .single()
+
+            const bizName = biz?.display_name || biz?.business_name || ''
+            const firstName = (cust.name || '').split(' ')[0]
+            const milestoneName = milestone.name || 'ett moment'
+            const completedCount = allMilestones ? allMilestones.filter((m: any) => m.status === 'completed').length : 0
+            const totalCount = allMilestones?.length || 0
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+            let portalLink = ''
+            if (cust.portal_token && cust.portal_enabled) {
+              portalLink = ` Följ projektet här: ${appUrl}/portal/${cust.portal_token}?tab=projects`
+            }
+
+            await fetch(`${appUrl}/api/sms/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                business_id: business.business_id,
+                to: cust.phone_number,
+                message: `Hej${firstName ? ' ' + firstName : ''}! "${milestoneName}" i ditt projekt "${project.name}" är nu klart (${completedCount}/${totalCount}).${portalLink} // ${bizName}`,
+              }),
+            })
+          }
+        }
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({ milestone })
 
   } catch (error: any) {
     console.error('Update milestone error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
+ * PATCH - Ändra sort_order på flera milestones (drag-to-reorder)
+ * Body: { order: [{ milestone_id: string, sort_order: number }] }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getServerSupabase()
+    const body = await request.json()
+
+    if (!Array.isArray(body.order) || body.order.length === 0) {
+      return NextResponse.json({ error: 'Missing order array' }, { status: 400 })
+    }
+
+    for (const item of body.order) {
+      await supabase
+        .from('project_milestone')
+        .update({ sort_order: item.sort_order })
+        .eq('milestone_id', item.milestone_id)
+        .eq('project_id', params.id)
+        .eq('business_id', business.business_id)
+    }
+
+    return NextResponse.json({ success: true })
+
+  } catch (error: any) {
+    console.error('Reorder milestones error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

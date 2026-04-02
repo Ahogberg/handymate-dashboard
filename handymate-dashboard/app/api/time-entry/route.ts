@@ -124,15 +124,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'work_date och duration_minutes krävs' }, { status: 400 })
     }
 
+    // Hämta business_config för validering + default rate
+    const { data: bizConfig } = await supabase
+      .from('business_config')
+      .select('default_hourly_rate, time_require_description, require_gps_checkin, require_project')
+      .eq('business_id', business.business_id)
+      .single()
+
+    // Validera: kräv beskrivning
+    if (bizConfig?.time_require_description && !description?.trim()) {
+      return NextResponse.json({ error: 'Beskrivning krävs för tidrapporter' }, { status: 400 })
+    }
+
+    // Validera: kräv projekt
+    if (bizConfig?.require_project && !project_id) {
+      return NextResponse.json({ error: 'Projekt krävs för tidrapporter' }, { status: 400 })
+    }
+
+    // Validera: kräv GPS vid instämpling
+    if (bizConfig?.require_gps_checkin && body.check_in && !body.gps_lat && !body.gps_lng) {
+      return NextResponse.json({ error: 'GPS-position krävs vid instämpling' }, { status: 400 })
+    }
+
     // Get default hourly rate from business config if not provided
     let effectiveRate = hourly_rate
     if (!effectiveRate) {
-      const { data: config } = await supabase
-        .from('business_config')
-        .select('default_hourly_rate')
-        .eq('business_id', business.business_id)
-        .single()
-      effectiveRate = config?.default_hourly_rate || 500
+      effectiveRate = bizConfig?.default_hourly_rate || 500
     }
 
     // Apply work type multiplier if provided

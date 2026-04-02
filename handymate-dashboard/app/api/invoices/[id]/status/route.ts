@@ -113,20 +113,21 @@ export async function PATCH(
         })
       } catch { /* non-blocking */ }
 
-      // Golden Path: tack-SMS till kund efter betalning
+      // Golden Path: tack-SMS + recensionsförfrågan efter betalning
       try {
         const customerPhone = (invoice as any)?.customer?.phone_number
         const customerName = (invoice as any)?.customer?.name?.split(' ')[0] || ''
         if (customerPhone) {
           const { data: config } = await supabase
             .from('business_config')
-            .select('business_name')
+            .select('business_name, google_review_url, review_request_enabled, review_request_delay_days')
             .eq('business_id', business.business_id)
             .single()
 
           const bizName = config?.business_name || 'Vi'
           const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
+          // Tack-SMS (alltid)
           await fetch(`${appUrl}/api/sms/send`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -136,6 +137,33 @@ export async function PATCH(
               message: `Tack ${customerName}! Vi har mottagit din betalning. Det var ett nöje att hjälpa dig — hör av dig om du behöver mer hjälp! // ${bizName}`,
             }),
           })
+
+          // Recensionsförfrågan med Google Reviews-länk (om aktiverad)
+          if (config?.review_request_enabled !== false && config?.google_review_url) {
+            const delayDays = config.review_request_delay_days || 3
+            const delayMs = delayDays * 24 * 60 * 60 * 1000
+
+            // Schemalägg review-SMS — lagra i pending_approvals som scheduled task
+            const scheduledAt = new Date(Date.now() + delayMs).toISOString()
+            await supabase.from('pending_approvals').insert({
+              id: `review_${invoiceId}_${Date.now()}`,
+              business_id: business.business_id,
+              approval_type: 'scheduled_review_request',
+              title: `Skicka recensionsförfrågan till ${customerName || 'kund'}`,
+              description: `Schemalagd ${delayDays} dagar efter betalning`,
+              payload: {
+                customer_id: invoice.customer_id,
+                customer_phone: customerPhone,
+                customer_name: customerName,
+                google_review_url: config.google_review_url,
+                business_name: bizName,
+                invoice_id: invoiceId,
+              },
+              status: 'pending',
+              risk_level: 'low',
+              expires_at: scheduledAt,
+            })
+          }
         }
       } catch { /* non-blocking */ }
     }

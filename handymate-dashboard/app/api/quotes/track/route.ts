@@ -68,6 +68,18 @@ export async function GET(req: NextRequest) {
         status: quote.status === 'sent' ? 'opened' : quote.status,
       }).eq('quote_id', quoteId)
 
+      // V3 Automation Engine: fire quote_opened event (bara första gången)
+      if (newViewCount === 1) {
+        try {
+          const { fireEvent } = await import('@/lib/automation-engine')
+          await fireEvent(supabase, 'quote_opened', quote.business_id, {
+            quote_id: quoteId,
+            customer_id: quote.customer_id,
+            quote_title: quote.title,
+          })
+        } catch { /* non-blocking */ }
+      }
+
       // Trigga nudge vid 3+ visningar utan svar
       if (newViewCount >= 3 && ['sent', 'opened'].includes(quote.status)) {
         try {

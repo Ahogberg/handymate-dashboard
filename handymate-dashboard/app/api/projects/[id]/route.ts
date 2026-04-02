@@ -119,10 +119,28 @@ export async function GET(
       .filter((m: any) => !m.invoiced)
       .reduce((sum: number, m: any) => sum + (m.total_sell || 0), 0)
 
+    // Compute time per milestone
+    const milestoneTimeMap: Record<string, { actual_minutes: number; actual_revenue: number }> = {}
+    for (const e of entries) {
+      if (e.milestone_id) {
+        if (!milestoneTimeMap[e.milestone_id]) {
+          milestoneTimeMap[e.milestone_id] = { actual_minutes: 0, actual_revenue: 0 }
+        }
+        milestoneTimeMap[e.milestone_id].actual_minutes += (e.duration_minutes || 0)
+        milestoneTimeMap[e.milestone_id].actual_revenue += ((e.duration_minutes || 0) / 60) * (e.hourly_rate || 0)
+      }
+    }
+
+    const milestonesWithTime = (milestones || []).map((ms: any) => ({
+      ...ms,
+      actual_hours: Math.round((milestoneTimeMap[ms.milestone_id]?.actual_minutes || 0) / 60 * 100) / 100,
+      actual_revenue: Math.round(milestoneTimeMap[ms.milestone_id]?.actual_revenue || 0),
+    }))
+
     return NextResponse.json({
       project,
       quote,
-      milestones: milestones || [],
+      milestones: milestonesWithTime,
       changes: changes || [],
       time_entries: entries,
       materials: mats,

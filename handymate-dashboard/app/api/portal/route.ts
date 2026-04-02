@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
     // Verify token
     const { data: customer, error: custError } = await supabase
       .from('customer')
-      .select('customer_id, business_id, portal_enabled')
+      .select('customer_id, business_id, name, portal_enabled')
       .eq('portal_token', token)
       .single()
 
@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     if (action === 'accept_quote' && quote_id) {
       const { error } = await supabase
         .from('quotes')
-        .update({ status: 'accepted' })
+        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
@@ -144,6 +144,44 @@ export async function POST(request: NextRequest) {
         description: `Kund accepterade offert ${quote_id}`,
         created_by: 'portal',
       })
+
+      // V3 Automation Engine: fire quote_signed + quote_accepted events
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'quote_signed', customer.business_id, {
+          quote_id,
+          customer_id: customer.customer_id,
+        })
+      } catch { /* non-blocking */ }
+
+      // Smart communication: notifiera hantverkare
+      try {
+        const { triggerEventCommunication } = await import('@/lib/smart-communication')
+        await triggerEventCommunication({
+          businessId: customer.business_id,
+          event: 'quote_signed',
+          customerId: customer.customer_id,
+          context: { quoteId: quote_id },
+        })
+      } catch { /* non-blocking */ }
+
+      // Push-notis
+      try {
+        const { notifyQuoteSigned } = await import('@/lib/notifications')
+        const { data: q } = await supabase.from('quotes').select('total').eq('quote_id', quote_id).single()
+        await notifyQuoteSigned({
+          businessId: customer.business_id,
+          customerName: customer.name || 'Kund',
+          quoteId: quote_id,
+          total: q?.total || 0,
+        })
+      } catch { /* non-blocking */ }
+
+      // Autopilot
+      try {
+        const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
+        await triggerAutopilot(customer.business_id, quote_id)
+      } catch { /* non-blocking */ }
 
       return NextResponse.json({ success: true })
     }
