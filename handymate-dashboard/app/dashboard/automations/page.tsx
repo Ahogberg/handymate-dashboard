@@ -393,7 +393,7 @@ export default function AutomationsPage() {
             onClick={() => setActiveTab(tab.key)}
             className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors ${
               activeTab === tab.key
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-white text-gray-900'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -552,7 +552,7 @@ export default function AutomationsPage() {
           {loading ? (
             <div className="p-8 text-center text-gray-400">Laddar...</div>
           ) : customRules.length === 0 ? (
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
               <p className="text-gray-400 mb-3">Inga egna regler ännu</p>
               <button
                 onClick={() => { setEditRule(null); setShowBuilder(true) }}

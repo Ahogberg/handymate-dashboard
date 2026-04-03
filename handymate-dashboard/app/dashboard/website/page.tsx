@@ -151,7 +151,7 @@ function SectionCard({
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors text-left"
@@ -408,14 +408,14 @@ export default function WebsitePage() {
   // ─── Not created yet ───────────────────────────────────────
   if (!storefront) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen">
         {toast.show && (
           <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
             toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
           }`}>{toast.message}</div>
         )}
         <div className="max-w-2xl mx-auto text-center py-16">
-          <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="w-16 h-16 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-6">
             <Globe className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">Din hemsida</h1>
@@ -455,7 +455,7 @@ export default function WebsitePage() {
 
   // ─── Dashboard view (created) ──────────────────────────────
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
           toast.type === 'success' ? 'bg-emerald-100 border-emerald-200 text-emerald-600' : 'bg-red-100 border-red-200 text-red-600'
@@ -504,7 +504,7 @@ export default function WebsitePage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab.id
-                  ? 'bg-white text-gray-900 shadow-sm'
+                  ? 'bg-white text-gray-900'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -516,7 +516,7 @@ export default function WebsitePage() {
 
         {/* ═══ Preview Tab ═══ */}
         {activeTab === 'preview' && (
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
             <div className="p-3 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
               <span className="text-xs text-gray-400 font-mono">{siteUrl}</span>
               <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 flex items-center gap-1">
@@ -535,13 +535,13 @@ export default function WebsitePage() {
         {activeTab === 'edit' && (
           <div className="space-y-6">
             {/* ── Completeness indicator ── */}
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="font-semibold text-gray-900">Din hemsida är {completeness}% klar</h3>
                 <button
                   onClick={handleGenerate}
                   disabled={generating}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sky-700 border border-primary-200 rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sky-700 border border-[#E2E8F0] rounded-lg hover:bg-primary-50 transition-colors disabled:opacity-50"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
                   Regenerera med AI
@@ -592,7 +592,7 @@ export default function WebsitePage() {
                   value={editHeadline}
                   onChange={e => setEditHeadline(e.target.value)}
                   placeholder="Din slagkraftiga rubrik..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                 />
               </div>
 
@@ -604,7 +604,7 @@ export default function WebsitePage() {
                   onChange={e => setEditDescription(e.target.value)}
                   rows={3}
                   placeholder="Kort beskrivning av ditt företag..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
               </div>
 
@@ -671,7 +671,7 @@ export default function WebsitePage() {
                     value={customImageUrl}
                     onChange={e => setCustomImageUrl(e.target.value)}
                     placeholder="Eller klistra in en egen bild-URL..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   />
                   <button
                     onClick={() => {
@@ -759,7 +759,7 @@ export default function WebsitePage() {
                   onChange={e => setEditAbout(e.target.value)}
                   rows={6}
                   placeholder="Beskriv ditt företag, er erfarenhet och vad som gör er unika..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
               </div>
             </SectionCard>
@@ -777,7 +777,7 @@ export default function WebsitePage() {
                   onChange={e => setEditCertifications(e.target.value)}
                   rows={2}
                   placeholder="T.ex. Auktoriserad elektriker, F-skattsedel, Behörig elinstallatör..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">Separera med kommatecken. Visas som trust-badges på hemsidan.</p>
               </div>
@@ -801,7 +801,7 @@ export default function WebsitePage() {
                     type="text"
                     value={editSlug}
                     onChange={e => setEditSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -812,7 +812,7 @@ export default function WebsitePage() {
                   value={editMetaTitle}
                   onChange={e => setEditMetaTitle(e.target.value)}
                   maxLength={60}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                 />
                 <p className="text-xs text-gray-400 mt-1">{editMetaTitle.length}/60</p>
               </div>
@@ -823,7 +823,7 @@ export default function WebsitePage() {
                   onChange={e => setEditMetaDescription(e.target.value)}
                   maxLength={160}
                   rows={2}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-[#E2E8F0] rounded-xl focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1">{editMetaDescription.length}/160</p>
               </div>
@@ -891,19 +891,19 @@ export default function WebsitePage() {
         {activeTab === 'stats' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <p className="text-sm text-gray-500 mb-1">Sidvisningar</p>
                 <p className="text-3xl font-bold text-gray-900">{storefront.page_views}</p>
                 <p className="text-xs text-gray-400 mt-1">Totalt sedan publicering</p>
               </div>
-              <div className="bg-white rounded-2xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <p className="text-sm text-gray-500 mb-1">Kontaktförfrågningar</p>
                 <p className="text-3xl font-bold text-gray-900">{storefront.contact_form_submissions}</p>
                 <p className="text-xs text-gray-400 mt-1">Leads genererade via formuläret</p>
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h3 className="font-semibold text-gray-900 mb-2">Konverteringsgrad</h3>
               <p className="text-2xl font-bold text-gray-900">
                 {storefront.page_views > 0
@@ -925,7 +925,7 @@ export default function WebsitePage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Uppgradera din hemsida</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {lockedSections.map((section) => (
-                <div key={section.label} className="bg-white rounded-2xl border border-gray-200 p-5 opacity-75">
+                <div key={section.label} className="bg-white rounded-xl border border-[#E2E8F0] p-5 opacity-75">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
                       <section.icon className="w-5 h-5 text-gray-400" />

@@ -1445,14 +1445,14 @@ export default function PipelinePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 relative">
+    <div className="min-h-screen bg-[#F8FAFC] relative">
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
         <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary-50 rounded-full blur-[128px]" />
         <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-primary-50 rounded-full blur-[128px]" />
@@ -1479,13 +1479,13 @@ export default function PipelinePage() {
               <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => setPipelineView('kanban')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'kanban' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'kanban' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Kanban
                 </button>
                 <button
                   onClick={() => setPipelineView('timeline')}
-                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'timeline' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'timeline' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
                 >
                   Tidslinje
                 </button>
@@ -1499,20 +1499,20 @@ export default function PipelinePage() {
                   {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-700" />}
                 </button>
                 {showFilter && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-gray-200 rounded-xl p-4 shadow-xl z-50">
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl z-50">
                     <div className="space-y-3">
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Sök</label>
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input type="text" placeholder="Sök deal eller kund..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         </div>
                       </div>
                       <div>
                         <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
-                          className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                          className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                           <option value="all">Alla</option>
                           <option value="urgent">Brådskande</option>
                           <option value="high">Hög</option>
@@ -1543,7 +1543,7 @@ export default function PipelinePage() {
           <div className="mt-3 flex gap-1 overflow-x-auto pb-1 lg:hidden scrollbar-hide">
             {stages.map((stage, idx) => (
               <button key={stage.id} onClick={() => setMobileStageIndex(idx)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${mobileStageIndex === idx ? 'text-white shadow-sm' : 'bg-gray-100 text-gray-500'}`}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${mobileStageIndex === idx ? 'text-white' : 'bg-gray-100 text-gray-500'}`}
                 style={mobileStageIndex === idx ? { backgroundColor: stage.color } : undefined}>
                 {stage.name}<span className="ml-1 opacity-70">{dealsForStage(stage.id).length}</span>
               </button>
@@ -1584,15 +1584,15 @@ export default function PipelinePage() {
           </div>
           {/* Toggle hide empty */}
           <button onClick={toggleHideEmpty}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hideEmpty ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'bg-gray-50 text-gray-500 border border-gray-200'}`}>
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${hideEmpty ? 'bg-primary-50 text-primary-700 border border-[#E2E8F0]' : 'bg-gray-50 text-gray-500 border border-[#E2E8F0]'}`}>
             <Eye className="w-3.5 h-3.5" />
             {hideEmpty ? 'Visa alla steg' : 'Dölj tomma'}
           </button>
           {/* Scroll arrows */}
-          <button onClick={() => scrollPipeline('left')} className="p-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+          <button onClick={() => scrollPipeline('left')} className="p-1.5 rounded-lg bg-gray-50 border border-[#E2E8F0] text-gray-400 hover:text-gray-700 hover:bg-gray-100">
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button onClick={() => scrollPipeline('right')} className="p-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+          <button onClick={() => scrollPipeline('right')} className="p-1.5 rounded-lg bg-gray-50 border border-[#E2E8F0] text-gray-400 hover:text-gray-700 hover:bg-gray-100">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -1731,7 +1731,7 @@ export default function PipelinePage() {
                       </div>
                     </div>
                     {!act.undone_at ? (
-                      <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-xs text-gray-500 hover:text-gray-900 transition-colors">
+                      <button onClick={() => undoActivity(act.id)} className="flex-shrink-0 flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 border border-[#E2E8F0] text-xs text-gray-500 hover:text-gray-900 transition-colors">
                         <Undo2 className="w-3 h-3" /> Ångra
                       </button>
                     ) : <span className="flex-shrink-0 text-xs text-gray-400 italic">Ångrad</span>}
@@ -1760,7 +1760,7 @@ export default function PipelinePage() {
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={closeDealDetail} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="flex-shrink-0 px-6 pt-5 pb-0">
                 <div className="flex items-center justify-between mb-4">
@@ -1775,7 +1775,7 @@ export default function PipelinePage() {
                           const target = stages.find(s => s.id === e.target.value)
                           if (target) moveDealAction(selectedDeal.id, target.slug)
                         }}
-                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-gray-200 bg-white text-gray-600 hover:border-primary-300 cursor-pointer focus:outline-none focus:border-primary-400"
+                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-[#E2E8F0] bg-white text-gray-600 hover:border-primary-300 cursor-pointer focus:outline-none focus:border-primary-400"
                       >
                         {stages.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
@@ -1787,7 +1787,7 @@ export default function PipelinePage() {
                       {editingTitle ? (
                         <div className="flex items-center gap-2">
                           <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
-                            className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-primary-400" autoFocus
+                            className="flex-1 bg-gray-50 border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-primary-400" autoFocus
                             onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
                           <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-4 h-4" /></button>
                         </div>
@@ -1842,12 +1842,12 @@ export default function PipelinePage() {
                   <div className="space-y-5">
                     {/* Value + Priority row */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
+                      <div className="flex items-center justify-between rounded-lg border border-[#E2E8F0] bg-gray-50/50 px-4 py-3">
                         <span className="text-sm text-gray-400">Värde</span>
                         {editingValue ? (
                           <div className="flex items-center gap-2">
                             <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
-                              className="w-28 bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-400" autoFocus
+                              className="w-28 bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-400" autoFocus
                               onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
                             <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
                           </div>
@@ -1857,11 +1857,11 @@ export default function PipelinePage() {
                           </button>
                         )}
                       </div>
-                      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-3">
+                      <div className="flex items-center justify-between rounded-lg border border-[#E2E8F0] bg-gray-50/50 px-4 py-3">
                         <span className="text-sm text-gray-400">Prioritet</span>
                         {editingPriority ? (
                           <select value={selectedDeal.priority} onChange={e => { updateDealField(selectedDeal.id, 'priority', e.target.value); setEditingPriority(false) }} onBlur={() => setEditingPriority(false)} autoFocus
-                            className="bg-white border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                            className="bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                             <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                           </select>
                         ) : (
@@ -1874,7 +1874,7 @@ export default function PipelinePage() {
 
                     {/* Lead Score Card */}
                     {selectedDeal.lead_score != null && selectedDeal.lead_score > 0 && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 space-y-3">
+                      <div className="rounded-lg border border-[#E2E8F0] bg-gray-50/50 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Target className="w-4 h-4 text-sky-700" />
@@ -1931,7 +1931,7 @@ export default function PipelinePage() {
 
                     {/* Response time badge */}
                     {selectedDeal.response_time_seconds != null && selectedDeal.response_time_seconds > 0 && (
-                      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50/50 px-4 py-2.5">
+                      <div className="flex items-center gap-2 rounded-lg border border-[#E2E8F0] bg-gray-50/50 px-4 py-2.5">
                         <Zap className="w-4 h-4 text-amber-500" />
                         <span className="text-sm text-gray-400">Svarstid:</span>
                         <span className="text-sm font-medium text-primary-700">
@@ -1976,7 +1976,7 @@ export default function PipelinePage() {
                               value={linkCustomerSearch}
                               onChange={e => setLinkCustomerSearch(e.target.value)}
                               placeholder="Sök kund..."
-                              className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
+                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
                               autoFocus
                             />
                             <div className="max-h-40 overflow-y-auto space-y-1">
@@ -2007,7 +2007,7 @@ export default function PipelinePage() {
 
                     {/* Customer */}
                     {selectedDeal.customer && (
-                      <div className="rounded-lg border border-gray-200 bg-gray-50/50 overflow-hidden">
+                      <div className="rounded-lg border border-[#E2E8F0] bg-gray-50/50 overflow-hidden">
                         <div className="p-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
@@ -2062,11 +2062,11 @@ export default function PipelinePage() {
                           : selectedDeal.customer_id
                             ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
                             : `/dashboard/quotes/new?deal_id=${selectedDeal.id}`}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 text-sm text-primary-700 hover:bg-primary-50 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm text-primary-700 hover:bg-primary-50 transition-colors">
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}
                         </Link>
                         <button onClick={() => { setShowSiteVisit(true); setSiteVisitForm({ date: '', time: '09:00', duration: '60', notes: '', sendSms: true, invitedTeam: [], externalUe: '' }) }}
-                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-primary-200 text-sm text-primary-700 hover:bg-primary-50 transition-colors">
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm text-primary-700 hover:bg-primary-50 transition-colors">
                           <Calendar className="w-4 h-4" /> Platsbesök
                         </button>
                       </div>
@@ -2124,7 +2124,7 @@ export default function PipelinePage() {
                           value={newTaskTitle}
                           onChange={e => setNewTaskTitle(e.target.value)}
                           placeholder="Ny uppgift..."
-                          className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
+                          className="flex-1 px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
                           onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
                         />
                         <button
@@ -2141,12 +2141,12 @@ export default function PipelinePage() {
                           type="date"
                           value={newTaskDueDate}
                           onChange={e => setNewTaskDueDate(e.target.value)}
-                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-32"
+                          className="px-2 py-1.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-32"
                         />
                         <select
                           value={newTaskDueTime}
                           onChange={e => setNewTaskDueTime(e.target.value)}
-                          className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-24"
+                          className="px-2 py-1.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-24"
                         >
                           <option value="">Tid</option>
                           {Array.from({ length: 24 * 4 }, (_, i) => {
@@ -2159,7 +2159,7 @@ export default function PipelinePage() {
                           <select
                             value={newTaskAssignee}
                             onChange={e => setNewTaskAssignee(e.target.value)}
-                            className="px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 flex-1 min-w-[120px]"
+                            className="px-2 py-1.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 flex-1 min-w-[120px]"
                           >
                             <option value="">Tilldela...</option>
                             {teamMembers.map(m => (
@@ -2229,7 +2229,7 @@ export default function PipelinePage() {
                                           if (selectedDeal) fetchDealTasks(selectedDeal.id)
                                           fetchTaskActivities(task.id)
                                         }}
-                                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
+                                        className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                       >
                                         <option value="">Ej tilldelad</option>
                                         {teamMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
@@ -2242,7 +2242,7 @@ export default function PipelinePage() {
                                         if (selectedDeal) fetchDealTasks(selectedDeal.id)
                                         fetchTaskActivities(task.id)
                                       }}
-                                      className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
+                                      className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                     >
                                       <option value="low">Låg</option>
                                       <option value="medium">Medium</option>
@@ -2300,7 +2300,7 @@ export default function PipelinePage() {
                       <select
                         value={dealUploadCategory}
                         onChange={(e) => setDealUploadCategory(e.target.value)}
-                        className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm focus:outline-none focus:border-primary-400"
+                        className="px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-700 text-sm focus:outline-none focus:border-primary-400"
                       >
                         <option value="drawing">Ritning</option>
                         <option value="sketch">Skiss</option>
@@ -2309,7 +2309,7 @@ export default function PipelinePage() {
                         <option value="photo">Foto</option>
                         <option value="other">Övrigt</option>
                       </select>
-                      <label className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-sky-700 font-medium hover:bg-primary-100 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-sky-700 font-medium hover:bg-primary-100 cursor-pointer transition-colors">
                         {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                         {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
                         <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
@@ -2323,7 +2323,7 @@ export default function PipelinePage() {
 
                     {/* Document list */}
                     {dealDocuments.length > 0 ? (
-                      <div className="rounded-lg border border-gray-200 divide-y divide-gray-100">
+                      <div className="rounded-lg border border-[#E2E8F0] divide-y divide-gray-100">
                         {dealDocuments.map((doc) => (
                           <div key={doc.id} className="flex items-center gap-3 px-4 py-3">
                             <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -2370,7 +2370,7 @@ export default function PipelinePage() {
                         value={newNoteContent}
                         onChange={e => setNewNoteContent(e.target.value)}
                         placeholder="Skriv en anteckning..."
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400 resize-none"
+                        className="flex-1 px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400 resize-none"
                         rows={3}
                         onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote() }}
                       />
@@ -2387,13 +2387,13 @@ export default function PipelinePage() {
                     {dealNotes.length > 0 && (
                       <div className="space-y-3">
                         {dealNotes.map(note => (
-                          <div key={note.id} className="rounded-lg border border-gray-200 bg-gray-50/50 p-4 group">
+                          <div key={note.id} className="rounded-lg border border-[#E2E8F0] bg-gray-50/50 p-4 group">
                             {editingNoteId === note.id ? (
                               <div className="space-y-2">
                                 <textarea
                                   value={editNoteContent}
                                   onChange={e => setEditNoteContent(e.target.value)}
-                                  className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-400 resize-none"
+                                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-400 resize-none"
                                   rows={4}
                                 />
                                 <div className="flex gap-2">
@@ -2511,7 +2511,7 @@ export default function PipelinePage() {
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => setShowNewDeal(false)} />
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
                 <h2 className="text-lg font-bold text-gray-900">Ny deal</h2>
                 <button onClick={() => { setShowNewDeal(false); setNewDealFiles([]) }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
@@ -2520,7 +2520,7 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Titel *</label>
                   <input type="text" value={newDealForm.title} onChange={e => setNewDealForm(prev => ({ ...prev, title: e.target.value }))} placeholder="T.ex. Badrumsrenovering Andersson"
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Kund</label>
@@ -2535,7 +2535,7 @@ export default function PipelinePage() {
                       }}
                       onFocus={() => { if (customerSearch && !newDealForm.customer_id) setShowCustomerDropdown(true) }}
                       placeholder="Sök kund..."
-                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                      className="w-full pl-9 pr-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                   </div>
                   {newDealForm.customer_id && (
                     <div className="mt-1.5 flex items-center gap-2">
@@ -2545,7 +2545,7 @@ export default function PipelinePage() {
                     </div>
                   )}
                   {showCustomerDropdown && customerSearch && !newDealForm.customer_id && (
-                    <div className="mt-1 max-h-40 overflow-y-auto bg-white border border-gray-200 rounded-lg shadow-lg">
+                    <div className="mt-1 max-h-40 overflow-y-auto bg-white border border-[#E2E8F0] rounded-lg shadow-lg">
                       {filteredCustomers.slice(0, 8).map(c => (
                         <button key={c.customer_id} onClick={() => { setNewDealForm(prev => ({ ...prev, customer_id: c.customer_id })); setCustomerSearch(c.name || ''); setShowCustomerDropdown(false) }}
                           className="w-full text-left px-3 py-2 text-sm text-gray-900 hover:bg-gray-50 transition-colors flex items-center justify-between">
@@ -2570,22 +2570,22 @@ export default function PipelinePage() {
                     </div>
                   )}
                   {showNewCustomerForm && !newDealForm.customer_id && (
-                    <div className="mt-2 p-3 bg-primary-50/50 border border-primary-200 rounded-lg space-y-2">
+                    <div className="mt-2 p-3 bg-primary-50/50 border border-[#E2E8F0] rounded-lg space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-medium text-primary-800">Ny kund</span>
                         <button onClick={() => setShowNewCustomerForm(false)} className="text-gray-400 hover:text-gray-600"><X className="w-3.5 h-3.5" /></button>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input type="text" value={newCustomerForm.firstName} onChange={e => setNewCustomerForm(prev => ({ ...prev, firstName: e.target.value }))} placeholder="Förnamn *"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                          className="px-2.5 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         <input type="text" value={newCustomerForm.lastName} onChange={e => setNewCustomerForm(prev => ({ ...prev, lastName: e.target.value }))} placeholder="Efternamn"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                          className="px-2.5 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <input type="tel" value={newCustomerForm.phone} onChange={e => setNewCustomerForm(prev => ({ ...prev, phone: e.target.value }))} placeholder="Telefon *"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                          className="px-2.5 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         <input type="email" value={newCustomerForm.email} onChange={e => setNewCustomerForm(prev => ({ ...prev, email: e.target.value }))} placeholder="E-post (valfritt)"
-                          className="px-2.5 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                          className="px-2.5 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                       </div>
                       <button
                         onClick={async () => {
@@ -2629,12 +2629,12 @@ export default function PipelinePage() {
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Värde (kr)</label>
                     <input type="number" value={newDealForm.value} onChange={e => setNewDealForm(prev => ({ ...prev, value: e.target.value }))} placeholder="0"
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Prioritet</label>
                     <select value={newDealForm.priority} onChange={e => setNewDealForm(prev => ({ ...prev, priority: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
                       <option value="low">Låg</option><option value="medium">Medium</option><option value="high">Hög</option><option value="urgent">Brådskande</option>
                     </select>
                   </div>
@@ -2642,11 +2642,11 @@ export default function PipelinePage() {
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
                   <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={3}
-                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400 resize-y min-h-[80px] max-h-[300px]" />
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400 resize-y min-h-[80px] max-h-[300px]" />
                 </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Dokument (valfritt)</label>
-                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 border-dashed rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                  <label className="flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] border-dashed rounded-lg cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
                     <Upload className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-500">Bifoga fil</span>
                     <input type="file" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.webp" className="hidden"
@@ -2661,7 +2661,7 @@ export default function PipelinePage() {
                   {newDealFiles.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {newDealFiles.map((f, i) => (
-                        <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-200 rounded-full text-xs text-gray-700">
+                        <span key={i} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#E2E8F0] rounded-full text-xs text-gray-700">
                           <FileIcon className="w-3 h-3 text-gray-400" />
                           {f.name.length > 25 ? f.name.slice(0, 22) + '...' : f.name}
                           <button onClick={() => setNewDealFiles(prev => prev.filter((_, idx) => idx !== i))} className="text-gray-400 hover:text-gray-700"><X className="w-3 h-3" /></button>
@@ -2672,7 +2672,7 @@ export default function PipelinePage() {
                 </div>
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-                <button onClick={() => { setShowNewDeal(false); setNewDealFiles([]) }} className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
+                <button onClick={() => { setShowNewDeal(false); setNewDealFiles([]) }} className="px-4 py-2 rounded-lg bg-gray-100 border border-[#E2E8F0] text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
                 <button onClick={createDeal} disabled={newDealSubmitting || !newDealForm.title.trim()}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all disabled:opacity-50">
                   {newDealSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Skapa deal
@@ -2686,7 +2686,7 @@ export default function PipelinePage() {
       {/* Stage Settings Modal */}
       {showStageSettings && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Hantera pipeline-steg</h3>
               <button onClick={() => setShowStageSettings(false)} className="text-gray-400 hover:text-gray-900">
@@ -2707,7 +2707,7 @@ export default function PipelinePage() {
                     type="color"
                     value={stageEdits[stage.id]?.color || stage.color}
                     onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], color: e.target.value } }))}
-                    className="w-6 h-6 rounded-md border border-gray-200 cursor-pointer flex-shrink-0"
+                    className="w-6 h-6 rounded-md border border-[#E2E8F0] cursor-pointer flex-shrink-0"
                     style={{ padding: 0 }}
                   />
 
@@ -2722,7 +2722,7 @@ export default function PipelinePage() {
                       type="text"
                       value={stageEdits[stage.id]?.name || stage.name}
                       onChange={(e) => setStageEdits(prev => ({ ...prev, [stage.id]: { ...prev[stage.id], name: e.target.value } }))}
-                      className="flex-1 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="flex-1 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     />
                   )}
 
@@ -2767,7 +2767,7 @@ export default function PipelinePage() {
                 value={newStageName}
                 onChange={(e) => setNewStageName(e.target.value)}
                 placeholder="Nytt steg, t.ex. 'Platsbedömning'"
-                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 min-h-[44px]"
+                className="flex-1 px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
                 onKeyDown={(e) => e.key === 'Enter' && addNewStage()}
               />
               <button
@@ -2802,7 +2802,7 @@ export default function PipelinePage() {
         <>
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={() => setShowLossModal(false)} />
           <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl shadow-2xl w-full max-w-md">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
                 <h2 className="text-lg font-bold text-gray-900">Varför förlorades denna deal?</h2>
                 <button onClick={() => setShowLossModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors"><X className="w-5 h-5" /></button>
@@ -2819,13 +2819,13 @@ export default function PipelinePage() {
                     value={lossReasonDetail}
                     onChange={e => setLossReasonDetail(e.target.value)}
                     placeholder="Beskriv orsaken..."
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-red-400 resize-none"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-red-400 resize-none"
                     rows={2}
                   />
                 )}
               </div>
               <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200">
-                <button onClick={() => setShowLossModal(false)} className="px-4 py-2 rounded-lg bg-gray-100 border border-gray-200 text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
+                <button onClick={() => setShowLossModal(false)} className="px-4 py-2 rounded-lg bg-gray-100 border border-[#E2E8F0] text-sm text-gray-600 hover:text-gray-900 transition-colors">Avbryt</button>
                 <button
                   onClick={confirmLossReason}
                   disabled={!lossReason}
@@ -2842,7 +2842,7 @@ export default function PipelinePage() {
       {/* Quick SMS Modal */}
       {quickSmsTarget && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/40" onClick={() => setQuickSmsTarget(null)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-5" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-5" onClick={e => e.stopPropagation()}>
             <h3 className="font-semibold text-gray-900 mb-1">SMS till {quickSmsTarget.name}</h3>
             <p className="text-xs text-gray-400 mb-3">{quickSmsTarget.phone}</p>
             <textarea
@@ -2864,7 +2864,7 @@ export default function PipelinePage() {
                 {quickSmsSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageSquare className="w-4 h-4" />}
                 Skicka
               </button>
-              <button onClick={() => setQuickSmsTarget(null)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
+              <button onClick={() => setQuickSmsTarget(null)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:bg-gray-50">
                 Avbryt
               </button>
             </div>
@@ -2885,7 +2885,7 @@ export default function PipelinePage() {
       {/* Site Visit Modal */}
       {showSiteVisit && selectedDeal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={e => { if (e.target === e.currentTarget) setShowSiteVisit(false) }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-1">Boka platsbesök</h3>
             <p className="text-sm text-gray-500 mb-4">{selectedDeal.title}{selectedDeal.customer?.name ? ` · ${selectedDeal.customer.name}` : ''}</p>
             <div className="space-y-3">
@@ -2964,7 +2964,7 @@ export default function PipelinePage() {
                 className="flex-1 bg-primary-800 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50 hover:bg-primary-800 transition-colors">
                 {siteVisitSaving ? 'Bokar...' : 'Boka platsbesök'}
               </button>
-              <button onClick={() => setShowSiteVisit(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">
+              <button onClick={() => setShowSiteVisit(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-500">
                 Avbryt
               </button>
             </div>
@@ -2992,7 +2992,7 @@ interface DealCardProps {
 function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onOpenTasks }: DealCardProps) {
   return (
     <div draggable onDragStart={e => onDragStart(e, deal.id)} onDragEnd={onDragEnd} onClick={onClick}
-      className={`group relative p-3 rounded-lg border border-gray-200 bg-white shadow-sm cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
+      className={`group relative p-3 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <CopyId value={`D-${deal.deal_number || deal.id.slice(0, 6)}`} label={`Ärende #${deal.deal_number || deal.id.slice(0, 6)}`} className="text-primary-700" />

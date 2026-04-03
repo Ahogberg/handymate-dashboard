@@ -544,7 +544,7 @@ export default function DashboardPage() {
   )
 
   const SkeletonCard = ({ className = '', children }: { className?: string; children?: React.ReactNode }) => (
-    <div className={`bg-white shadow-sm rounded-xl border border-gray-200 p-4 ${className}`}>
+    <div className={`bg-white rounded-xl border border-[#E2E8F0] p-4 ${className}`}>
       {children || (
         <div className="space-y-3">
           <SkeletonPulse className="h-4 w-24" />
@@ -558,7 +558,7 @@ export default function DashboardPage() {
   const todaysBookingsCount = bookings.length
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -578,7 +578,7 @@ export default function DashboardPage() {
 
         {/* Welcome popup — visas bara en gång */}
         {showWelcome && (
-          <div className="mb-6 p-5 bg-gradient-to-r from-primary-50 to-emerald-50 border border-primary-200 rounded-2xl relative">
+          <div className="mb-6 p-5 bg-[#F0FDFA] border border-[#E2E8F0] rounded-xl relative">
             <button
               onClick={closeWelcome}
               className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-white/60 transition-colors"
@@ -608,7 +608,7 @@ export default function DashboardPage() {
 
         {/* Morning report popup */}
         {morningReport && (
-          <div className="mb-6 p-5 bg-gradient-to-r from-primary-50 to-secondary-50 border border-primary-200 rounded-2xl relative">
+          <div className="mb-6 p-5 bg-[#F0FDFA] border border-[#E2E8F0] rounded-xl relative">
             <button
               onClick={() => {
                 const today = new Date().toISOString().slice(0, 10)
@@ -635,7 +635,7 @@ export default function DashboardPage() {
 
         {/* Dagens Plan — Jobbkompisen */}
         {!loading && bookings.length > 0 && (
-          <div className="mb-6 p-5 bg-white border border-gray-200 rounded-2xl shadow-sm">
+          <div className="mb-6 p-5 bg-white border border-[#E2E8F0] rounded-xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
@@ -717,7 +717,7 @@ export default function DashboardPage() {
         {/* AI Inbox Banner — fixed: no floating "0" when pending_suggestions is 0 */}
         {(stats?.ai?.pending_suggestions ?? 0) > 0 && (
           <Link href="/dashboard/ai-inbox">
-            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-xl hover:border-primary-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary-700">
@@ -741,7 +741,7 @@ export default function DashboardPage() {
         {/* Phone setup banner — show when phone not configured and onboarding dismissed */}
         {!showOnboarding && onboardingData && !onboardingData.assigned_phone_number && (
           <Link href="/dashboard/settings/phone">
-            <div className="mb-6 p-4 bg-primary-50 border border-primary-200 rounded-xl hover:border-primary-300 transition-all cursor-pointer">
+            <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl hover:border-primary-300 transition-all cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary-700">
@@ -832,7 +832,7 @@ export default function DashboardPage() {
             </>
           ) : (
             <>
-              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bokningar</p>
                   <TrendIndicator value={stats?.bookings?.trend || 0} />
@@ -844,7 +844,7 @@ export default function DashboardPage() {
                 <MiniSparkBars data={stats?.bookings_per_day || []} />
               </div>
 
-              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nya kunder</p>
                   <TrendIndicator value={stats?.customers?.trend || 0} />
@@ -859,7 +859,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <div className="bg-white rounded-xl p-4 border border-gray-200 card-base">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Arbetad tid</p>
                 </div>
@@ -873,7 +873,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              <Link href="/dashboard/projects" className="bg-white rounded-xl p-4 border border-gray-200 card-base group cursor-pointer">
+              <Link href="/dashboard/projects" className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base group cursor-pointer">
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projekt</p>
                   <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
@@ -892,7 +892,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ═══ Att göra idag ═══ */}
-        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 mb-8">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-8">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
               <ClipboardList className="w-4 h-4 text-primary-700" />
@@ -974,7 +974,7 @@ export default function DashboardPage() {
               </div>
             </SkeletonCard>
           ) : (
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-secondary-700" />
@@ -1099,7 +1099,7 @@ export default function DashboardPage() {
           )}
 
           {/* ═══ Ekonomi ═══ */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-secondary-700" />
@@ -1144,7 +1144,7 @@ export default function DashboardPage() {
           </div>
 
           {/* ═══ Senaste aktivitet ═══ */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-primary-700" />

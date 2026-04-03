@@ -218,13 +218,13 @@ export default function InventoryPage() {
             placeholder="Sök artikel eller artikelnr..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500"
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+          className="px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         >
           {CATEGORIES.map(c => (
             <option key={c.value} value={c.value}>{c.label}</option>
@@ -233,7 +233,7 @@ export default function InventoryPage() {
         <select
           value={locationFilter}
           onChange={e => setLocationFilter(e.target.value)}
-          className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
+          className="px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20"
         >
           <option value="">Alla platser</option>
           {LOCATIONS.map(l => (
@@ -248,7 +248,7 @@ export default function InventoryPage() {
           <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
           <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500 mb-1">{items.length === 0 ? 'Inga lagerartiklar' : 'Inga träffar'}</p>
           <p className="text-sm text-gray-400">
@@ -262,7 +262,7 @@ export default function InventoryPage() {
             return (
               <div
                 key={item.id}
-                className={`bg-white shadow-sm rounded-xl border p-4 ${
+                className={`bg-white rounded-xl border p-4 ${
                   isLow ? 'border-amber-200 bg-amber-50/30' : 'border-gray-200'
                 }`}
               >
@@ -427,7 +427,7 @@ function AddItemModal({ saving, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Ny lagerartikel</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -435,16 +435,16 @@ function AddItemModal({ saving, onClose, onSave }: {
         <div className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Namn *</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Artikelnr (SKU)</label>
-              <input value={sku} onChange={e => setSku(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input value={sku} onChange={e => setSku(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="material">Material</option>
                 <option value="verktyg">Verktyg</option>
                 <option value="förbrukning">Förbrukning</option>
@@ -454,11 +454,11 @@ function AddItemModal({ saving, onClose, onSave }: {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Antal</label>
-              <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input type="number" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Enhet</label>
-              <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="st">st</option>
                 <option value="m">m</option>
                 <option value="m²">m²</option>
@@ -470,17 +470,17 @@ function AddItemModal({ saving, onClose, onSave }: {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Min. antal</label>
-              <input type="number" value={minQuantity} onChange={e => setMinQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input type="number" value={minQuantity} onChange={e => setMinQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Inköpspris (kr/{unit})</label>
-              <input type="number" value={unitCost} onChange={e => setUnitCost(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input type="number" value={unitCost} onChange={e => setUnitCost(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Plats</label>
-              <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="">Välj plats</option>
                 {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
@@ -488,7 +488,7 @@ function AddItemModal({ saving, onClose, onSave }: {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Leverantör</label>
-            <input value={supplier} onChange={e => setSupplier(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+            <input value={supplier} onChange={e => setSupplier(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
           </div>
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">
@@ -523,7 +523,7 @@ function EditItemModal({ item, saving, onClose, onSave }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">Redigera artikel</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
@@ -531,16 +531,16 @@ function EditItemModal({ item, saving, onClose, onSave }: {
         <div className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Namn</label>
-            <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+            <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Artikelnr</label>
-              <input value={sku} onChange={e => setSku(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input value={sku} onChange={e => setSku(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Kategori</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="material">Material</option>
                 <option value="verktyg">Verktyg</option>
                 <option value="förbrukning">Förbrukning</option>
@@ -550,7 +550,7 @@ function EditItemModal({ item, saving, onClose, onSave }: {
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Enhet</label>
-              <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={unit} onChange={e => setUnit(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="st">st</option>
                 <option value="m">m</option>
                 <option value="m²">m²</option>
@@ -562,24 +562,24 @@ function EditItemModal({ item, saving, onClose, onSave }: {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Min. antal</label>
-              <input type="number" value={minQuantity} onChange={e => setMinQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input type="number" value={minQuantity} onChange={e => setMinQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Inköpspris</label>
-              <input type="number" value={unitCost} onChange={e => setUnitCost(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input type="number" value={unitCost} onChange={e => setUnitCost(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Plats</label>
-              <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={location} onChange={e => setLocation(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="">Välj plats</option>
                 {LOCATIONS.map(l => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Leverantör</label>
-              <input value={supplier} onChange={e => setSupplier(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+              <input value={supplier} onChange={e => setSupplier(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
             </div>
           </div>
         </div>
@@ -625,7 +625,7 @@ function TransactionModal({ item, type, saving, onClose, onSave, businessId }: {
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-lg font-semibold text-gray-900">
             {type === 'in' ? 'Fyll på' : 'Ta ut'}: {item.name}
@@ -638,12 +638,12 @@ function TransactionModal({ item, type, saving, onClose, onSave, businessId }: {
           </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Antal ({item.unit})</label>
-            <input type="number" min="0.01" step="0.01" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+            <input type="number" min="0.01" step="0.01" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
           </div>
           {type === 'out' && projects.length > 0 && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Projekt (valfritt)</label>
-              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
+              <select value={projectId} onChange={e => setProjectId(e.target.value)} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-600/20">
                 <option value="">Inget projekt</option>
                 {projects.map(p => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}
               </select>
@@ -651,7 +651,7 @@ function TransactionModal({ item, type, saving, onClose, onSave, businessId }: {
           )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notering</label>
-            <input value={note} onChange={e => setNote(e.target.value)} placeholder={type === 'in' ? 'T.ex. inköp från Ahlsell' : 'T.ex. till badrumsrenovering'} className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
+            <input value={note} onChange={e => setNote(e.target.value)} placeholder={type === 'in' ? 'T.ex. inköp från Ahlsell' : 'T.ex. till badrumsrenovering'} className="w-full px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/20 focus:border-primary-500" />
           </div>
         </div>
         <div className="flex justify-end gap-3 p-5 border-t border-gray-100">

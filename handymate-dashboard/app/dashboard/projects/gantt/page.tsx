@@ -161,14 +161,14 @@ export default function GanttPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="relative max-w-[1400px] mx-auto">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -183,7 +183,7 @@ export default function GanttPage() {
 
         {/* Toolbar */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
             {(['week', 'month', 'quarter'] as ViewMode[]).map(mode => (
               <button
                 key={mode}
@@ -198,13 +198,13 @@ export default function GanttPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate(-1)} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+            <button onClick={() => navigate(-1)} className="p-2 bg-white border border-[#E2E8F0] rounded-lg hover:bg-gray-50">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button onClick={goToday} className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50">
+            <button onClick={goToday} className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm font-medium hover:bg-gray-50">
               Idag
             </button>
-            <button onClick={() => navigate(1)} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">
+            <button onClick={() => navigate(1)} className="p-2 bg-white border border-[#E2E8F0] rounded-lg hover:bg-gray-50">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
@@ -215,7 +215,7 @@ export default function GanttPage() {
         </div>
 
         {/* Gantt Chart */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           <div className="overflow-x-auto">
             <div className="min-w-[800px]">
               {/* Timeline header */}
@@ -307,7 +307,7 @@ export default function GanttPage() {
                               return (
                                 <div
                                   key={m.milestone_id}
-                                  className="absolute top-4 w-3 h-3 bg-amber-400 border-2 border-white shadow-sm transform rotate-45 z-10"
+                                  className="absolute top-4 w-3 h-3 bg-amber-400 border-2 border-white transform rotate-45 z-10"
                                   style={{ left: mBar.left }}
                                   title={`${m.name} - ${new Date(m.due_date).toLocaleDateString('sv-SE')}`}
                                 />

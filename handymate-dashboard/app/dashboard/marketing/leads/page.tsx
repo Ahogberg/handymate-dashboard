@@ -162,7 +162,7 @@ export default function LeadsOutboundPage() {
   const convertedCount = leads.filter(l => l.converted).length
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -195,7 +195,7 @@ export default function LeadsOutboundPage() {
 
         {/* Quota bar */}
         {usage && (
-          <div className="mb-6 bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
+          <div className="mb-6 bg-white border border-[#E2E8F0] rounded-xl p-4 flex items-center gap-4">
             <Package className="w-5 h-5 text-primary-700" />
             <div className="flex-1">
               <div className="flex justify-between text-sm mb-1">
@@ -214,13 +214,13 @@ export default function LeadsOutboundPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6">
-          <button onClick={() => setTab('outbound')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'outbound' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('outbound')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'outbound' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-[#E2E8F0]'}`}>
             <Mail className="w-4 h-4 inline mr-1.5 -mt-0.5" />Utskick
           </button>
-          <button onClick={() => setTab('neighbours')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'neighbours' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('neighbours')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'neighbours' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-[#E2E8F0]'}`}>
             <Home className="w-4 h-4 inline mr-1.5 -mt-0.5" />Grannkampanjer
           </button>
-          <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-gray-200'}`}>
+          <button onClick={() => setTab('stats')} className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === 'stats' ? 'bg-primary-700 text-white' : 'bg-white text-gray-500 border border-[#E2E8F0]'}`}>
             <BarChart3 className="w-4 h-4 inline mr-1.5 -mt-0.5" />Statistik
           </button>
         </div>
@@ -251,14 +251,14 @@ export default function LeadsOutboundPage() {
             {loading ? (
               <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
             ) : filteredLeads.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-gray-200">
+              <div className="text-center py-16 bg-white rounded-xl border border-[#E2E8F0]">
                 <Search className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400 text-sm">Inga utskick ännu — tryck "Skanna fastigheter" för att börja</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {filteredLeads.map(lead => (
-                  <div key={lead.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
+                  <div key={lead.id} className="bg-white border border-[#E2E8F0] rounded-xl p-4 flex items-center gap-4">
                     <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center shrink-0">
                       <Home className="w-5 h-5 text-primary-700" />
                     </div>
@@ -315,19 +315,19 @@ export default function LeadsOutboundPage() {
 
         {tab === 'stats' && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-1">Skickade</p>
               <p className="text-2xl font-bold text-gray-900">{sentCount}</p>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-1">Konverterade</p>
               <p className="text-2xl font-bold text-emerald-600">{convertedCount}</p>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-1">Konverteringsgrad</p>
               <p className="text-2xl font-bold text-gray-900">{sentCount > 0 ? Math.round((convertedCount / sentCount) * 100) : 0}%</p>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <p className="text-xs text-gray-400 mb-1">Väntar på godkännande</p>
               <p className="text-2xl font-bold text-blue-600">{draftCount}</p>
             </div>
@@ -338,7 +338,7 @@ export default function LeadsOutboundPage() {
       {/* Letter preview/edit modal */}
       {selectedLead && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setSelectedLead(null)}>
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <div>
                 <h3 className="font-semibold text-gray-900">Brevförhandsgranskning</h3>
@@ -444,19 +444,19 @@ function NeighbourCampaignsTab() {
     <div className="space-y-4">
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
           <p className="text-xs text-gray-400">Skickade brev</p>
           <p className="text-xl font-bold text-gray-900">{stats.totalSent}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
           <p className="text-xs text-gray-400">Konverterade</p>
           <p className="text-xl font-bold text-primary-700">{stats.totalConverted}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
           <p className="text-xs text-gray-400">Spenderat</p>
           <p className="text-xl font-bold text-gray-900">{stats.totalSpent.toLocaleString('sv-SE')} kr</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
           <p className="text-xs text-gray-400">ROI</p>
           <p className="text-xl font-bold text-emerald-600">
             {stats.totalSpent > 0 ? `${Math.round((stats.totalRevenue / stats.totalSpent) * 100)}%` : '—'}
@@ -469,7 +469,7 @@ function NeighbourCampaignsTab() {
 
       {/* Campaign list */}
       {campaigns.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center">
           <Home className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <p className="text-gray-500">Inga grannkampanjer ännu</p>
           <p className="text-sm text-gray-400 mt-1">Kampanjer skapas automatiskt när jobb avslutas</p>
@@ -477,7 +477,7 @@ function NeighbourCampaignsTab() {
       ) : (
         <div className="space-y-2">
           {campaigns.map((c: any) => (
-            <div key={c.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <div key={c.id} className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -549,11 +549,11 @@ function LeadsUpgradePage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Hero */}
         <div className="text-center mb-10 pt-8">
-          <div className="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <div className="w-16 h-16 bg-primary-100 rounded-xl flex items-center justify-center mx-auto mb-5">
             <Mail className="w-8 h-8 text-primary-700" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-3">Handymate Leads</h1>
@@ -563,7 +563,7 @@ function LeadsUpgradePage() {
         {/* Features */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
           {features.map(f => (
-            <div key={f.title} className="bg-white border border-gray-200 rounded-xl p-5 text-center">
+            <div key={f.title} className="bg-white border border-[#E2E8F0] rounded-xl p-5 text-center">
               <div className="text-3xl mb-3">{f.emoji}</div>
               <h3 className="text-sm font-semibold text-gray-900 mb-1">{f.title}</h3>
               <p className="text-xs text-gray-500">{f.desc}</p>

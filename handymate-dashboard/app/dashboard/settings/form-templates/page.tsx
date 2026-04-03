@@ -185,7 +185,7 @@ export default function FormTemplatesPage() {
     setEditFields(fields)
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   if (loading) {
     return (
@@ -198,7 +198,7 @@ export default function FormTemplatesPage() {
   // Editing view
   if (editing) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen max-w-3xl mx-auto">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen max-w-3xl mx-auto">
         <button
           onClick={() => setEditing(null)}
           className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
@@ -206,7 +206,7 @@ export default function FormTemplatesPage() {
           <ArrowLeft className="w-4 h-4" /> Tillbaka till mallar
         </button>
 
-        <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-6">
             {editing.id ? 'Redigera mall' : 'Ny formulärmall'}
           </h2>
@@ -243,7 +243,7 @@ export default function FormTemplatesPage() {
                 const typeInfo = FIELD_TYPES.find(t => t.type === field.type)
                 const Icon = typeInfo?.icon || CheckSquare
                 return (
-                  <div key={field.id} className="flex items-start gap-2 p-3 bg-gray-50 border border-gray-200 rounded-lg group">
+                  <div key={field.id} className="flex items-start gap-2 p-3 bg-gray-50 border border-[#E2E8F0] rounded-lg group">
                     <div className="flex flex-col gap-0.5 mt-1">
                       <button onClick={() => moveField(idx, -1)} disabled={idx === 0} className="text-gray-300 hover:text-gray-500 disabled:opacity-30">
                         <ChevronDown className="w-3.5 h-3.5 rotate-180" />
@@ -264,7 +264,7 @@ export default function FormTemplatesPage() {
                         value={field.label}
                         onChange={e => updateField(idx, { label: e.target.value })}
                         placeholder={field.type === 'header' ? 'Rubriktext...' : 'Fältnamn...'}
-                        className="w-full px-2 py-1.5 bg-white border border-gray-200 rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
+                        className="w-full px-2 py-1.5 bg-white border border-[#E2E8F0] rounded text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
                       />
                       {field.type !== 'header' && (
                         <div className="flex items-center gap-4">
@@ -282,7 +282,7 @@ export default function FormTemplatesPage() {
                             value={field.description || ''}
                             onChange={e => updateField(idx, { description: e.target.value })}
                             placeholder="Beskrivning (valfri)"
-                            className="flex-1 px-2 py-1 bg-white border border-gray-200 rounded text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-primary-500"
+                            className="flex-1 px-2 py-1 bg-white border border-[#E2E8F0] rounded text-xs text-gray-700 placeholder-gray-400 focus:outline-none focus:border-primary-500"
                           />
                         </div>
                       )}
@@ -309,7 +309,7 @@ export default function FormTemplatesPage() {
               </button>
 
               {showAddField && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 p-2">
+                <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-[#E2E8F0] rounded-lg shadow-lg z-10 p-2">
                   {FIELD_TYPES.map(ft => {
                     const Icon = ft.icon
                     return (
@@ -332,7 +332,7 @@ export default function FormTemplatesPage() {
           <div className="flex gap-3 pt-4 border-t border-gray-200">
             <button
               onClick={() => setEditing(null)}
-              className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900"
+              className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900"
             >
               Avbryt
             </button>
@@ -352,7 +352,7 @@ export default function FormTemplatesPage() {
 
   // List view
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen max-w-3xl mx-auto">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen max-w-3xl mx-auto">
       <button
         onClick={() => router.push('/dashboard/settings')}
         className="flex items-center gap-1 text-sm text-sky-700 hover:text-primary-700 mb-6"
@@ -374,7 +374,7 @@ export default function FormTemplatesPage() {
         {templates.map(t => (
           <div
             key={t.id}
-            className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 flex items-center gap-4"
+            className="bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center gap-4"
           >
             <div className="flex-1">
               <div className="flex items-center gap-2">
@@ -420,7 +420,7 @@ export default function FormTemplatesPage() {
         ))}
 
         {templates.length === 0 && (
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <p className="text-gray-400">Inga formulärmallar hittades</p>
           </div>
         )}

@@ -312,7 +312,7 @@ export default function QuoteTemplateEditorPage() {
               key={item.id || index}
               className={`flex items-center gap-2 p-2.5 rounded-lg border transition-colors ${
                 item.item_type === 'heading'
-                  ? 'bg-slate-50 border-slate-200'
+                  ? 'bg-[#F8FAFC] border-slate-200'
                   : item.item_type === 'subtotal'
                   ? 'bg-teal-50/30 border-teal-100'
                   : 'bg-white border-[#E2E8F0]'
@@ -428,7 +428,7 @@ export default function QuoteTemplateEditorPage() {
             <button
               key={btn.type}
               onClick={() => addItem(btn.type)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 text-slate-600 text-xs font-medium rounded-lg transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-[#F8FAFC] hover:border-slate-300 text-slate-600 text-xs font-medium rounded-lg transition-colors"
             >
               <Plus className="w-3 h-3" /> {btn.label}
             </button>
@@ -478,7 +478,7 @@ export default function QuoteTemplateEditorPage() {
 
         <button
           onClick={addPaymentEntry}
-          className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-lg mt-3 transition-colors"
+          className="flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:bg-[#F8FAFC] text-slate-600 text-xs font-medium rounded-lg mt-3 transition-colors"
         >
           <Plus className="w-3 h-3" /> Lägg till delfaktura
         </button>
@@ -569,7 +569,7 @@ function Section({
     <div className="bg-white border-thin border-[#E2E8F0] rounded-xl mb-4 overflow-hidden">
       <button
         onClick={() => onToggle(sectionKey)}
-        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-[#F8FAFC] transition-colors"
       >
         <span className="text-sm font-semibold text-slate-900">{title}</span>
         {expanded ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}

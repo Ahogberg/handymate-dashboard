@@ -180,14 +180,14 @@ export default function EditInvoicePage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -225,7 +225,7 @@ export default function EditInvoicePage() {
           {/* Left: Main editor */}
           <div className="flex-1 min-w-0 space-y-6">
             {/* Dates & references */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Fakturadatum</label>
@@ -233,7 +233,7 @@ export default function EditInvoicePage() {
                     type="date"
                     value={invoiceDate}
                     onChange={(e) => { setInvoiceDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -242,7 +242,7 @@ export default function EditInvoicePage() {
                     type="date"
                     value={dueDate}
                     onChange={(e) => { setDueDate(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -251,7 +251,7 @@ export default function EditInvoicePage() {
                     type="text"
                     value={ourReference}
                     onChange={(e) => { setOurReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -260,21 +260,21 @@ export default function EditInvoicePage() {
                     type="text"
                     value={yourReference}
                     onChange={(e) => { setYourReference(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
             </div>
 
             {/* VAT & ROT/RUT */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs text-gray-400 mb-1">Momssats</label>
                   <select
                     value={vatRate}
                     onChange={(e) => { setVatRate(Number(e.target.value)); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value={25}>25%</option>
                     <option value={12}>12%</option>
@@ -287,7 +287,7 @@ export default function EditInvoicePage() {
                   <select
                     value={rotRutType}
                     onChange={(e) => { setRotRutType(e.target.value); setHasUnsavedChanges(true) }}
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="">Inget avdrag</option>
                     <option value="rot">ROT-avdrag (30%)</option>
@@ -298,7 +298,7 @@ export default function EditInvoicePage() {
             </div>
 
             {/* Line items */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-6">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
               <LineItemEditor
                 items={items}
                 onChange={handleItemsChange}

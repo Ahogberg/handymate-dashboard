@@ -151,7 +151,7 @@ export default function BookingDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
@@ -159,14 +159,14 @@ export default function BookingDetailPage() {
 
   if (!booking) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Bokningen hittades inte</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -194,7 +194,7 @@ export default function BookingDetailPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Bokningsinformation</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex items-start gap-3">
@@ -245,26 +245,26 @@ export default function BookingDetailPage() {
               )}
             </div>
 
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Jobbanteckningar</h2>
               <textarea
                 value={jobNotes}
                 onChange={(e) => setJobNotes(e.target.value)}
                 placeholder="Skriv anteckningar om jobbet här..."
                 rows={4}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
               />
               <button
                 onClick={() => updateJobStatus(booking.job_status || 'scheduled')}
                 disabled={updating || jobNotes === (booking.job_notes || '')}
-                className="mt-3 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm hover:bg-gray-200 disabled:opacity-50"
+                className="mt-3 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm hover:bg-gray-200 disabled:opacity-50"
               >
                 Spara anteckningar
               </button>
             </div>
 
             {booking.customer_rating && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Kundbetyg</h2>
                 <div className="flex items-center gap-2 mb-2">
                   {[1, 2, 3, 4, 5].map((star) => (
@@ -278,7 +278,7 @@ export default function BookingDetailPage() {
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Uppdatera status</h2>
               <div className="space-y-3">
                 {booking.job_status !== 'in_progress' && booking.job_status !== 'completed' && (
@@ -299,14 +299,14 @@ export default function BookingDetailPage() {
                   </div>
                 )}
                 {booking.job_status !== 'cancelled' && booking.job_status !== 'completed' && (
-                  <button onClick={() => updateJobStatus('cancelled')} disabled={updating} className="w-full flex items-center justify-center gap-2 p-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-red-600 hover:border-red-500/30 transition-all">
+                  <button onClick={() => updateJobStatus('cancelled')} disabled={updating} className="w-full flex items-center justify-center gap-2 p-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-red-600 hover:border-red-500/30 transition-all">
                     <XCircle className="w-4 h-4" /> Avboka
                   </button>
                 )}
               </div>
             </div>
 
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Snabbåtgärder</h2>
               <div className="space-y-2">
                 {booking.customer?.phone_number && (
@@ -329,7 +329,7 @@ export default function BookingDetailPage() {
 
       {showCompleteModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <CheckCircle className="w-8 h-8 text-emerald-600" />
@@ -341,7 +341,7 @@ export default function BookingDetailPage() {
               <button onClick={() => updateJobStatus('completed', true)} disabled={updating} className="w-full flex items-center justify-center gap-2 p-4 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50">
                 {updating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Send className="w-5 h-5" /> Ja, skicka SMS</>}
               </button>
-              <button onClick={() => updateJobStatus('completed', false)} disabled={updating} className="w-full p-4 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50">
+              <button onClick={() => updateJobStatus('completed', false)} disabled={updating} className="w-full p-4 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50">
                 Nej, bara markera klart
               </button>
               <button onClick={() => setShowCompleteModal(false)} disabled={updating} className="w-full p-3 text-gray-400 hover:text-gray-900">

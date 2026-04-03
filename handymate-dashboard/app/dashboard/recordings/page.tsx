@@ -292,14 +292,14 @@ export default function RecordingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -330,7 +330,7 @@ export default function RecordingsPage() {
         </div>
 
         {/* Info box */}
-        <div className="mb-6 p-4 bg-primary-50 border border-primary-300 rounded-xl">
+        <div className="mb-6 p-4 bg-primary-50 border border-[#E2E8F0] rounded-xl">
           <div className="flex items-start gap-3">
             <Sparkles className="w-5 h-5 text-sky-700 mt-0.5" />
             <div>
@@ -344,7 +344,7 @@ export default function RecordingsPage() {
         </div>
 
         {/* Recordings list */}
-        <div className="bg-white shadow-sm rounded-xl sm:rounded-2xl border border-gray-200">
+        <div className="bg-white rounded-xl sm:rounded-xl border border-[#E2E8F0]">
           <div className="p-4 sm:p-6 border-b border-gray-200">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900">Inspelningar</h2>
           </div>
@@ -400,7 +400,7 @@ export default function RecordingsPage() {
                               {recording.direction === 'inbound' ? 'Inkommande' : 'Utgående'}
                             </span>
                             {recording.transcript && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-sky-700 border border-primary-300">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-sky-700 border border-[#E2E8F0]">
                                 Transkriberad
                               </span>
                             )}
@@ -475,7 +475,7 @@ export default function RecordingsPage() {
                               onChange={(e) => setTranscriptDraft(e.target.value)}
                               placeholder="Skriv transkriptet här..."
                               rows={6}
-                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                              className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
                             />
                             <div className="flex justify-end gap-2">
                               <button

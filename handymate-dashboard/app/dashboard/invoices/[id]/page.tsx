@@ -347,7 +347,7 @@ export default function InvoiceDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
@@ -355,7 +355,7 @@ export default function InvoiceDetailPage() {
 
   if (!invoice) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Faktura hittades inte</div>
       </div>
     )
@@ -399,7 +399,7 @@ export default function InvoiceDetailPage() {
   timelineEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -418,7 +418,7 @@ export default function InvoiceDetailPage() {
       {/* Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Markera som betald</h3>
               <button
@@ -436,7 +436,7 @@ export default function InvoiceDetailPage() {
                   type="date"
                   value={paymentData.paid_at}
                   onChange={(e) => setPaymentData({ ...paymentData, paid_at: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -467,7 +467,7 @@ export default function InvoiceDetailPage() {
                     type="number"
                     value={paymentData.paid_amount}
                     onChange={(e) => setPaymentData({ ...paymentData, paid_amount: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 pr-12"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E] pr-12"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
                 </div>
@@ -480,7 +480,7 @@ export default function InvoiceDetailPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowPaymentModal(false)}
-                className="flex-1 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                className="flex-1 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
@@ -506,7 +506,7 @@ export default function InvoiceDetailPage() {
       {/* Credit Note Modal */}
       {showCreditModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Skapa kreditfaktura</h3>
               <button
@@ -522,7 +522,7 @@ export default function InvoiceDetailPage() {
               <button
                 onClick={() => setCreditType('full')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                  creditType === 'full' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                  creditType === 'full' ? 'bg-white text-gray-900' : 'text-gray-500'
                 }`}
               >
                 Hel kreditering
@@ -530,7 +530,7 @@ export default function InvoiceDetailPage() {
               <button
                 onClick={() => setCreditType('partial')}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
-                  creditType === 'partial' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+                  creditType === 'partial' ? 'bg-white text-gray-900' : 'text-gray-500'
                 }`}
               >
                 Delkreditering
@@ -586,7 +586,7 @@ export default function InvoiceDetailPage() {
                             ...creditItemQuantity,
                             [index]: Math.min(Number(e.target.value), item.quantity)
                           })}
-                          className="w-16 px-2 py-1 bg-white border border-gray-200 rounded-lg text-sm text-center"
+                          className="w-16 px-2 py-1 bg-white border border-[#E2E8F0] rounded-lg text-sm text-center"
                         />
                       )}
                       <span className="text-sm font-medium text-gray-700 w-20 text-right">
@@ -604,7 +604,7 @@ export default function InvoiceDetailPage() {
                 <select
                   value={creditReason}
                   onChange={(e) => setCreditReason(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj anledning...</option>
                   <option value="Felaktig faktura">Felaktig faktura</option>
@@ -620,7 +620,7 @@ export default function InvoiceDetailPage() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setShowCreditModal(false)}
-                className="flex-1 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                className="flex-1 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
@@ -671,7 +671,7 @@ export default function InvoiceDetailPage() {
               href={`/api/invoices/pdf?invoiceId=${invoiceId}&format=pdf`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
             >
               <Download className="w-4 h-4" />
               PDF
@@ -680,7 +680,7 @@ export default function InvoiceDetailPage() {
               href={`/api/invoices/pdf?invoiceId=${invoiceId}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:bg-gray-200 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:bg-gray-200 text-sm"
             >
               <Eye className="w-4 h-4" />
               Förhandsgranska
@@ -689,7 +689,7 @@ export default function InvoiceDetailPage() {
             {invoice.status === 'draft' && (
               <Link
                 href={`/dashboard/invoices/${invoiceId}/edit`}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-600 hover:bg-gray-200"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-600 hover:bg-gray-200"
               >
                 <Pencil className="w-4 h-4" />
                 Redigera
@@ -706,7 +706,7 @@ export default function InvoiceDetailPage() {
                   Skicka
                 </button>
                 <div className="absolute right-0 top-full mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                  <div className="bg-gray-100 border border-gray-300 rounded-xl p-2 shadow-xl min-w-[160px]">
+                  <div className="bg-white border border-[#E2E8F0] rounded-lg p-2 shadow-xl min-w-[160px]">
                     <button
                       onClick={() => handleSend('email')}
                       disabled={!invoice.customer?.email || sending}
@@ -777,7 +777,7 @@ export default function InvoiceDetailPage() {
         </div>
 
         {/* Status Timeline */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 mb-6">
           <h3 className="text-sm font-medium text-gray-500 mb-4">Historik</h3>
           <div className="flex flex-wrap gap-4">
             {timelineEvents.map((event, index) => {
@@ -809,7 +809,7 @@ export default function InvoiceDetailPage() {
 
         {/* Credit Note Banner */}
         {invoice.is_credit_note && (
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
             <div className="flex items-center gap-3">
               <RotateCcw className="w-5 h-5 text-red-500" />
               <div>
@@ -828,7 +828,7 @@ export default function InvoiceDetailPage() {
         )}
 
         {invoice.status === 'credited' && (
-          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-6">
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-orange-500" />
               <div>
@@ -840,7 +840,7 @@ export default function InvoiceDetailPage() {
         )}
 
         {/* Invoice Content */}
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
           {/* Customer & Dates */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 border-b border-gray-200">
             <div>
@@ -958,7 +958,7 @@ export default function InvoiceDetailPage() {
 
         {/* Reminder History */}
         {reminders.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mt-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden mt-6">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-900 flex items-center gap-2">
@@ -1025,7 +1025,7 @@ export default function InvoiceDetailPage() {
 
         {/* Max Reminders Warning */}
         {invoice.reminder_count >= 3 && (invoice.status === 'overdue' || invoice.status === 'sent') && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mt-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mt-6">
             <div className="flex items-center gap-3">
               <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
               <div>

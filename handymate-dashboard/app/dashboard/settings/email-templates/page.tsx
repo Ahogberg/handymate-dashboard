@@ -179,14 +179,14 @@ export default function EmailTemplatesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[9999] px-6 py-3 rounded-xl text-white font-medium shadow-lg ${
@@ -204,7 +204,7 @@ export default function EmailTemplatesPage() {
 
         {/* Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
             <button
               onClick={() => setFilterCategory('')}
               className={`px-3 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
@@ -239,7 +239,7 @@ export default function EmailTemplatesPage() {
         </div>
 
         {/* Template list */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200">
+        <div className="bg-white rounded-xl border border-[#E2E8F0]">
           {filteredTemplates.length === 0 ? (
             <div className="p-12 text-center">
               <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -257,7 +257,7 @@ export default function EmailTemplatesPage() {
                       <div className="flex items-center gap-2 mb-1">
                         <FileText className="w-4 h-4 text-gray-400" />
                         <h3 className="font-semibold text-gray-900">{t.name}</h3>
-                        <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700 border border-primary-300">
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-primary-700 border border-[#E2E8F0]">
                           {getCategoryLabel(t.category)}
                         </span>
                       </div>
@@ -289,7 +289,7 @@ export default function EmailTemplatesPage() {
       {/* Editor Modal */}
       {showEditor && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-gray-900">{editingTemplate ? 'Redigera mall' : 'Ny e-postmall'}</h3>
               <div className="flex items-center gap-2">
@@ -307,7 +307,7 @@ export default function EmailTemplatesPage() {
             </div>
 
             {showPreview ? (
-              <div className="border border-gray-200 rounded-xl p-6 bg-gray-50 min-h-[200px]">
+              <div className="border border-[#E2E8F0] rounded-xl p-6 bg-gray-50 min-h-[200px]">
                 <p className="text-sm text-gray-400 mb-2">Ämne: <strong className="text-gray-900">{form.subject}</strong></p>
                 <div className="prose prose-sm max-w-none text-gray-700" dangerouslySetInnerHTML={{ __html: getPreviewHtml().replace(/\n/g, '<br>') }} />
               </div>
@@ -321,7 +321,7 @@ export default function EmailTemplatesPage() {
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
                       placeholder="T.ex. Faktura-påminnelse"
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     />
                   </div>
                   <div>
@@ -329,7 +329,7 @@ export default function EmailTemplatesPage() {
                     <select
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     >
                       {CATEGORIES.map(c => (
                         <option key={c.id} value={c.id}>{c.label}</option>
@@ -344,7 +344,7 @@ export default function EmailTemplatesPage() {
                     value={form.subject}
                     onChange={(e) => setForm({ ...form, subject: e.target.value })}
                     placeholder="E-postens ämnesrad"
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -354,7 +354,7 @@ export default function EmailTemplatesPage() {
                     onChange={(e) => setForm({ ...form, body: e.target.value })}
                     placeholder="Skriv ditt e-postmeddelande här..."
                     rows={10}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none font-mono text-sm"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E] resize-none font-mono text-sm"
                   />
                 </div>
                 <div>
@@ -364,7 +364,7 @@ export default function EmailTemplatesPage() {
                       <button
                         key={v.key}
                         onClick={() => insertVariable(v.key)}
-                        className="px-2.5 py-1 text-xs bg-primary-50 text-primary-700 border border-primary-300 rounded-lg hover:bg-primary-100"
+                        className="px-2.5 py-1 text-xs bg-primary-50 text-primary-700 border border-[#E2E8F0] rounded-lg hover:bg-primary-100"
                       >
                         {v.label}
                       </button>

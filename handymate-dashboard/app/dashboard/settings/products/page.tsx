@@ -136,14 +136,14 @@ export default function ProductsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -171,13 +171,13 @@ export default function ProductsPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Sök produkter..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-500"
             />
           </div>
           <select
             value={categoryFilter}
             onChange={e => setCategoryFilter(e.target.value)}
-            className="px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
+            className="px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
           >
             <option value="">Alla kategorier</option>
             {CATEGORY_OPTIONS.map(c => (
@@ -187,7 +187,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Products list */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
           {/* Table header */}
           <div className="hidden sm:grid grid-cols-[auto_1fr_100px_100px_80px_80px_60px] gap-3 px-5 py-3 bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wider">
             <div className="w-6" />
@@ -299,7 +299,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Info box */}
-        <div className="mt-4 bg-primary-50 border border-primary-300 rounded-xl p-5 text-sm text-primary-700">
+        <div className="mt-4 bg-primary-50 border border-[#E2E8F0] rounded-xl p-5 text-sm text-primary-700">
           <p className="font-medium mb-1">Tips</p>
           <p>Produkter du lägger till här kan snabbsökas i offertformuläret. Markera favoriter med stjärnan för snabbåtkomst.</p>
         </div>
@@ -341,7 +341,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
   const sales = parseFloat(salesPrice) || 0
   const markup = purchase > 0 ? Math.round(((sales - purchase) / purchase) * 100) : null
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   const handleSubmit = () => {
     if (!name.trim() || !salesPrice) return
@@ -362,7 +362,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">
             {product ? 'Redigera produkt' : 'Ny produkt'}
@@ -452,7 +452,7 @@ function ProductModal({ product, saving, onSave, onClose }: {
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             Avbryt
           </button>

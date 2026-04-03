@@ -356,14 +356,14 @@ export default function AIInboxPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -450,7 +450,7 @@ export default function AIInboxPage() {
         {/* Grouped suggestions */}
         <div className="space-y-4">
           {groups.length === 0 ? (
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
               <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500">
                 {statusFilter === 'pending' ? 'Inga väntande förslag' : 'Inga förslag att visa'}
@@ -468,7 +468,7 @@ export default function AIInboxPage() {
               return (
                 <div
                   key={groupId}
-                  className={`bg-white shadow-sm rounded-2xl border transition-all ${
+                  className={`bg-white rounded-xl border transition-all ${
                     hasPending ? 'border-amber-200' : 'border-gray-200'
                   }`}
                 >
@@ -674,21 +674,21 @@ export default function AIInboxPage() {
                                               value={editForm.service || ''}
                                               onChange={(e) => setEditForm({ ...editForm, service: e.target.value })}
                                               placeholder="Tjänst"
-                                              className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                             <input
                                               type="text"
                                               value={editForm.date || ''}
                                               onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                                               placeholder="Datum (t.ex. 2024-02-15)"
-                                              className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                             <input
                                               type="text"
                                               value={editForm.time || ''}
                                               onChange={(e) => setEditForm({ ...editForm, time: e.target.value })}
                                               placeholder="Tid (t.ex. 10:00)"
-                                              className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                           </>
                                         )}
@@ -700,14 +700,14 @@ export default function AIInboxPage() {
                                               value={editForm.service || ''}
                                               onChange={(e) => setEditForm({ ...editForm, service: e.target.value })}
                                               placeholder="Tjänst"
-                                              className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                             <input
                                               type="number"
                                               value={editForm.estimated_price || ''}
                                               onChange={(e) => setEditForm({ ...editForm, estimated_price: e.target.value })}
                                               placeholder="Uppskattat pris (kr)"
-                                              className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                              className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                             />
                                           </>
                                         )}
@@ -718,7 +718,7 @@ export default function AIInboxPage() {
                                             onChange={(e) => setEditForm({ ...editForm, message_template: e.target.value })}
                                             placeholder="SMS-meddelande"
                                             rows={3}
-                                            className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none"
+                                            className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm resize-none"
                                           />
                                         )}
 

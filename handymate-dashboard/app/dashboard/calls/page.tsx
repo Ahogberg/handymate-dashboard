@@ -39,17 +39,17 @@ export default function CallsPage() {
   )
 
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-[#F8FAFC] min-h-screen">
       {/* Sticky tab bar */}
-      <div className="sticky top-0 z-30 bg-slate-50/95 backdrop-blur-xl border-b border-gray-200 px-4 sm:px-8 pt-4 sm:pt-6 pb-0">
-        <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-200 mb-4 overflow-x-auto">
+      <div className="sticky top-0 z-30 bg-[#F8FAFC]/95 backdrop-blur-xl border-b border-gray-200 px-4 sm:px-8 pt-4 sm:pt-6 pb-0">
+        <div className="flex gap-1 p-1 bg-white rounded-xl border border-[#E2E8F0] mb-4 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === tab.key
-                  ? 'bg-gradient-to-r from-primary-700/20 to-primary-600/20 text-white border border-primary-300'
+                  ? 'bg-[#F0FDFA] text-white border border-[#E2E8F0]'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >

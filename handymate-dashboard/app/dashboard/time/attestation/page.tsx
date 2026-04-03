@@ -148,7 +148,7 @@ export default function AttestationPage() {
       </div>
 
       {/* Week nav */}
-      <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3 mb-6">
+      <div className="flex items-center justify-between bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 mb-6">
         <button onClick={() => setWeekOffset(w => w - 1)} className="p-1 text-gray-400 hover:text-gray-900">
           <ChevronLeft className="w-5 h-5" />
         </button>

@@ -240,7 +240,7 @@ export default function BillingPage() {
   const status = getStatusLabel(billing?.plan?.status || 'active')
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background decoration */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
@@ -252,7 +252,7 @@ export default function BillingPage() {
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/dashboard/settings"
-            className="flex items-center justify-center w-10 h-10 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+            className="flex items-center justify-center w-10 h-10 bg-white border border-[#E2E8F0] rounded-xl hover:bg-gray-50 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </Link>
@@ -267,7 +267,7 @@ export default function BillingPage() {
         ) : (
           <div className="space-y-8">
             {/* ===== CURRENT PLAN CARD ===== */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
               {/* Past due warning banner */}
               {billing?.plan?.status === 'past_due' && (
                 <div className="bg-red-50 border-b border-red-200 px-6 py-4 flex items-center gap-3">
@@ -341,7 +341,7 @@ export default function BillingPage() {
             </div>
 
             {/* ===== USAGE OVERVIEW ===== */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <BarChart3 className="w-5 h-5 text-gray-700" />
@@ -408,7 +408,7 @@ export default function BillingPage() {
                   return (
                     <div
                       key={plan.id}
-                      className={`relative bg-white rounded-2xl border-2 p-6 transition-all ${
+                      className={`relative bg-white rounded-xl border-2 p-6 transition-all ${
                         isCurrent
                           ? 'border-primary-500 shadow-md shadow-cyan-100'
                           : 'border-gray-200 hover:border-gray-300'
@@ -480,7 +480,7 @@ export default function BillingPage() {
             </div>
 
             {/* ===== BILLING HISTORY ===== */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center gap-3 mb-6">
                 <Receipt className="w-5 h-5 text-gray-700" />
                 <h2 className="text-lg font-semibold text-gray-900">Betalningshistorik</h2>
@@ -624,7 +624,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-8">
       {/* Current plan skeleton */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <SkeletonBlock className="w-12 h-12" />
@@ -641,7 +641,7 @@ function LoadingSkeleton() {
       </div>
 
       {/* Usage skeleton */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
         <SkeletonBlock className="w-32 h-6 mb-6" />
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {[1, 2, 3, 4].map((i) => (
@@ -661,7 +661,7 @@ function LoadingSkeleton() {
         <SkeletonBlock className="w-28 h-6 mb-4" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-200 p-6 space-y-3">
+            <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-6 space-y-3">
               <SkeletonBlock className="w-24 h-6" />
               <SkeletonBlock className="w-32 h-8" />
               <div className="space-y-2 pt-2">
@@ -676,7 +676,7 @@ function LoadingSkeleton() {
       </div>
 
       {/* History skeleton */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
         <SkeletonBlock className="w-40 h-6 mb-6" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (

@@ -573,7 +573,7 @@ export default function CustomerDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
@@ -581,14 +581,14 @@ export default function CustomerDetailPage() {
 
   if (!customer) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Kunden hittades inte</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -622,7 +622,7 @@ export default function CustomerDetailPage() {
           </div>
           <button
             onClick={startEditing}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all min-h-[44px]"
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition-all min-h-[44px]"
           >
             <Edit className="w-4 h-4" />
             <span className="hidden sm:inline">Redigera</span>
@@ -634,7 +634,7 @@ export default function CustomerDetailPage() {
           <div className="space-y-6">
             {/* Livstidsvärde */}
             {(customer.lifetime_value || 0) > 0 && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-5">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-5">
                 <div className="flex items-center gap-2 mb-3">
                   {(customer.lifetime_value || 0) >= 50000 && <span className="text-lg">👑</span>}
                   <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Livstidsvärde</h2>
@@ -662,7 +662,7 @@ export default function CustomerDetailPage() {
             )}
 
             {/* Kundinfo */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Kontaktinfo</h2>
 
               <div className="space-y-3">
@@ -730,7 +730,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Snabbåtgärder */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Åtgärder</h2>
               
               <div className="space-y-2">
@@ -779,7 +779,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Kundportal */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Kundportal</h2>
 
               {portalToken && portalEnabled ? (
@@ -863,7 +863,7 @@ export default function CustomerDetailPage() {
             </div>
 
             {/* Statistik */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Statistik</h2>
               
               <div className="grid grid-cols-2 gap-3">
@@ -960,7 +960,7 @@ export default function CustomerDetailPage() {
 
             {/* Bookings */}
             {activeTab === 'bookings' && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0]">
                 {bookings.length === 0 ? (
                   <div className="p-8 text-center">
                     <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -1022,12 +1022,12 @@ export default function CustomerDetailPage() {
             {activeTab === 'documents' && (
               <div className="space-y-4">
                 {/* Upload area */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                     <select
                       value={uploadCategory}
                       onChange={(e) => setUploadCategory(e.target.value)}
-                      className="px-3 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 min-h-[44px]"
+                      className="px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] min-h-[44px]"
                     >
                       <option value="drawing">Ritning</option>
                       <option value="sketch">Skiss</option>
@@ -1059,7 +1059,7 @@ export default function CustomerDetailPage() {
                 </div>
 
                 {/* Document list */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="bg-white rounded-xl border border-[#E2E8F0]">
                   {documents.length === 0 ? (
                     <div className="p-8 text-center">
                       <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -1119,7 +1119,7 @@ export default function CustomerDetailPage() {
             {activeTab === 'projects' && (
               <div className="space-y-6">
                 {/* Deals / Pipeline */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="bg-white rounded-xl border border-[#E2E8F0]">
                   <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Ärenden i säljtratten</h3>
                     <a
@@ -1158,7 +1158,7 @@ export default function CustomerDetailPage() {
                 </div>
 
                 {/* Projekt */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="bg-white rounded-xl border border-[#E2E8F0]">
                   <div className="p-4 border-b border-gray-100">
                     <h3 className="text-sm font-semibold text-gray-900">Projekt ({projects.length})</h3>
                   </div>
@@ -1196,7 +1196,7 @@ export default function CustomerDetailPage() {
                 </div>
 
                 {/* Offerter */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="bg-white rounded-xl border border-[#E2E8F0]">
                   <div className="p-4 border-b border-gray-100">
                     <h3 className="text-sm font-semibold text-gray-900">Offerter ({quotes.length})</h3>
                   </div>
@@ -1237,7 +1237,7 @@ export default function CustomerDetailPage() {
                 </div>
 
                 {/* Fakturor */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+                <div className="bg-white rounded-xl border border-[#E2E8F0]">
                   <div className="p-4 border-b border-gray-100">
                     <h3 className="text-sm font-semibold text-gray-900">Fakturor ({invoices.length})</h3>
                   </div>
@@ -1281,7 +1281,7 @@ export default function CustomerDetailPage() {
 
             {/* Tasks */}
             {activeTab === 'tasks' && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0]">
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex items-center gap-2">
                     <input
@@ -1289,14 +1289,14 @@ export default function CustomerDetailPage() {
                       value={newTaskTitle}
                       onChange={e => setNewTaskTitle(e.target.value)}
                       placeholder="Ny uppgift..."
-                      className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-500 min-h-[44px]"
+                      className="flex-1 px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-500 min-h-[44px]"
                       onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
                     />
                     <input
                       type="date"
                       value={newTaskDueDate}
                       onChange={e => setNewTaskDueDate(e.target.value)}
-                      className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:border-primary-500 min-h-[44px]"
+                      className="px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-xl text-sm text-gray-500 focus:outline-none focus:border-primary-500 min-h-[44px]"
                     />
                     <button
                       onClick={handleAddTask}
@@ -1347,7 +1347,7 @@ export default function CustomerDetailPage() {
       {/* Edit Customer Modal */}
       {isEditing && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Redigera kund</h3>
               <button onClick={() => setIsEditing(false)} className="text-gray-400 hover:text-gray-900">
@@ -1390,7 +1390,7 @@ export default function CustomerDetailPage() {
                   type="text"
                   value={editForm.name || ''}
                   onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -1399,12 +1399,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Organisationsnummer</label>
                     <input type="text" value={editForm.org_number || ''} onChange={(e) => setEditForm({ ...editForm, org_number: e.target.value })} placeholder="XXXXXX-XXXX"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Kontaktperson</label>
                     <input type="text" value={editForm.contact_person || ''} onChange={(e) => setEditForm({ ...editForm, contact_person: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
                   </div>
                 </>
               )}
@@ -1412,19 +1412,19 @@ export default function CustomerDetailPage() {
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Telefon *</label>
                 <input type="tel" value={editForm.phone_number || ''} onChange={(e) => setEditForm({ ...editForm, phone_number: e.target.value })} placeholder="+46..."
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">E-post</label>
                 <input type="email" value={editForm.email || ''} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Adress</label>
                 <input type="text" value={editForm.address_line || ''} onChange={(e) => setEditForm({ ...editForm, address_line: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
               </div>
 
               {(editForm.customer_type === 'company' || editForm.customer_type === 'brf') && (
@@ -1432,12 +1432,12 @@ export default function CustomerDetailPage() {
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Referens / Er märkning</label>
                     <input type="text" value={editForm.reference || ''} onChange={(e) => setEditForm({ ...editForm, reference: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
                   </div>
                   <div>
                     <label className="block text-sm text-gray-500 mb-1">Fakturaadress</label>
                     <input type="text" value={editForm.invoice_address || ''} onChange={(e) => setEditForm({ ...editForm, invoice_address: e.target.value })} placeholder="Om annan än besöksadress"
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]" />
                   </div>
                 </>
               )}
@@ -1446,7 +1446,7 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Antal lägenheter</label>
                   <input type="number" value={editForm.apartment_count || ''} onChange={(e) => setEditForm({ ...editForm, apartment_count: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]" />
                 </div>
               )}
 
@@ -1454,14 +1454,14 @@ export default function CustomerDetailPage() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">Personnummer</label>
                   <input type="text" value={editForm.personal_number || ''} onChange={(e) => setEditForm({ ...editForm, personal_number: e.target.value })} placeholder="YYYYMMDD-XXXX"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]" />
                 </div>
               )}
 
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Fastighetsbeteckning</label>
                 <input type="text" value={editForm.property_designation || ''} onChange={(e) => setEditForm({ ...editForm, property_designation: e.target.value })} placeholder="T.ex. Stockholm Söder 1:23"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50" />
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]" />
               </div>
             </div>
 
@@ -1560,7 +1560,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Logga samtal</h2>
         
         <div className="space-y-4">
@@ -1571,7 +1571,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('outbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'outbound'
-                    ? 'bg-primary-100 border border-primary-300 text-gray-900'
+                    ? 'bg-primary-100 border border-[#E2E8F0] text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1582,7 +1582,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
                 onClick={() => setDirection('inbound')}
                 className={`flex-1 p-3 rounded-xl text-sm font-medium transition-all ${
                   direction === 'inbound'
-                    ? 'bg-primary-100 border border-primary-300 text-gray-900'
+                    ? 'bg-primary-100 border border-[#E2E8F0] text-gray-900'
                     : 'bg-gray-100 border border-gray-300 text-gray-500'
                 }`}
               >
@@ -1599,7 +1599,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               value={duration}
               onChange={(e) => setDuration(e.target.value)}
               placeholder="5"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -1610,7 +1610,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               placeholder="Vad pratade ni om?"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
             />
           </div>
         </div>
@@ -1618,7 +1618,7 @@ function LogCallModal({ customerId, businessId, onClose, onSaved }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -1667,7 +1667,7 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Lägg till anteckning</h2>
         
         <textarea
@@ -1676,13 +1676,13 @@ function AddNoteModal({ customerId, businessId, onClose, onSaved }: {
           rows={4}
           placeholder="Skriv din anteckning..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+          className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
         />
 
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -1755,7 +1755,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Skicka SMS</h2>
         
         <p className="text-sm text-gray-500 mb-4">
@@ -1768,7 +1768,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
           rows={4}
           placeholder="Skriv ditt meddelande..."
           autoFocus
-          className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+          className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
         />
         
         <p className="text-xs text-gray-400 mt-2">{message.length} tecken</p>
@@ -1776,7 +1776,7 @@ function SendSMSModal({ customer, businessId, businessName, onClose, onSaved }: 
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>

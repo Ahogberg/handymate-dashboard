@@ -159,7 +159,7 @@ export default function AnalyticsPage() {
           <select
             value={period}
             onChange={e => setPeriod(e.target.value)}
-            className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
+            className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-500"
           >
             <option value="30d">Senaste 30 dagar</option>
             <option value="90d">Senaste 90 dagar</option>
@@ -183,15 +183,15 @@ export default function AnalyticsPage() {
 
                 {/* Topprad: 3 metrikkort */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <span className="text-xs text-gray-400 uppercase tracking-wider">Fakturerat denna månad</span>
                     <p className="text-2xl font-bold text-gray-900 mt-1">~{econ.invoiced.toLocaleString('sv-SE')} kr</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad vinst</span>
                     <p className="text-2xl font-bold text-gray-900 mt-1">~{Math.max(0, econ.invoiced - econ.materialCost - econ.laborCost - econ.overhead).toLocaleString('sv-SE')} kr</p>
                   </div>
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <span className="text-xs text-gray-400 uppercase tracking-wider">Uppskattad marginal</span>
                     <p className={`text-2xl font-bold mt-1 ${(econ.estimatedMargin ?? 0) >= 50 ? 'text-emerald-600' : (econ.estimatedMargin ?? 0) >= 30 ? 'text-amber-600' : 'text-red-600'}`}>
                       {econ.estimatedMargin !== null ? `~${econ.estimatedMargin}%` : '—'}
@@ -201,7 +201,7 @@ export default function AnalyticsPage() {
 
                 {/* Kostnadsfördelning */}
                 {econ.invoiced > 0 && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Kostnadsfördelning</h3>
                     <div className="space-y-2.5">
                       {[
@@ -229,7 +229,7 @@ export default function AnalyticsPage() {
 
                 {/* Månadsöversikt */}
                 {econ.monthlyTrend.length > 1 && (
-                  <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Fakturerat per månad</h3>
                     <div className="h-48">
                       <ResponsiveContainer width="100%" height="100%">
@@ -261,7 +261,7 @@ export default function AnalyticsPage() {
 
             {/* Overview KPIs */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-green-100"><Trophy className="w-4 h-4 text-green-600" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Win-rate</span>
@@ -269,7 +269,7 @@ export default function AnalyticsPage() {
                 <p className="text-2xl font-bold text-gray-900">{winLossData?.win_rate || 0}%</p>
                 <p className="text-xs text-gray-400 mt-1">{winLossData?.won || 0} vunna / {(winLossData?.won || 0) + (winLossData?.lost || 0)} avslutade</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-primary-100"><TrendingUp className="w-4 h-4 text-sky-700" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Vunnet totalt</span>
@@ -277,7 +277,7 @@ export default function AnalyticsPage() {
                 <p className="text-2xl font-bold text-gray-900">{formatValue(winLossData?.won_value || 0)}</p>
                 <p className="text-xs text-gray-400 mt-1">Snitt: {formatValue(winLossData?.avg_deal_size_won || 0)}/deal</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-amber-100"><Clock className="w-4 h-4 text-amber-600" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Tid till vinst</span>
@@ -285,7 +285,7 @@ export default function AnalyticsPage() {
                 <p className="text-2xl font-bold text-gray-900">{winLossData?.avg_days_to_win || 0} dagar</p>
                 <p className="text-xs text-gray-400 mt-1">Snitt från lead till avslut</p>
               </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="p-1.5 rounded-lg bg-purple-100"><Zap className="w-4 h-4 text-purple-600" /></div>
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Svarstid</span>
@@ -302,7 +302,7 @@ export default function AnalyticsPage() {
 
             {/* AI Insights */}
             {insights.length > 0 && (
-              <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-xl border border-primary-200 p-5">
+              <div className="bg-gradient-to-r from-primary-50 to-primary-50 rounded-xl border border-[#E2E8F0] p-5">
                 <h3 className="text-sm font-semibold text-primary-900 flex items-center gap-2 mb-3">
                   <Lightbulb className="w-4 h-4 text-sky-700" />
                   AI-insikter
@@ -322,7 +322,7 @@ export default function AnalyticsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
               {/* Speed-to-Lead */}
-              <div className="bg-white rounded-xl border border-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0]">
                 <div className="p-5 border-b border-gray-100">
                   <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                     <Zap className="w-4 h-4 text-amber-500" />
@@ -390,7 +390,7 @@ export default function AnalyticsPage() {
               </div>
 
               {/* Win/Loss Analysis */}
-              <div className="bg-white rounded-xl border border-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0]">
                 <div className="p-5 border-b border-gray-100">
                   <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
                     <Target className="w-4 h-4 text-sky-700" />
@@ -426,7 +426,7 @@ export default function AnalyticsPage() {
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-3">Win-rate per källa</p>
                     {(winLossData?.win_rate_by_source || []).length > 0 ? (
-                      <div className="rounded-lg border border-gray-200 overflow-hidden">
+                      <div className="rounded-lg border border-[#E2E8F0] overflow-hidden">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="bg-gray-50 text-gray-400">

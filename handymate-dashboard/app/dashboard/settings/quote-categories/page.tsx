@@ -122,14 +122,14 @@ export default function QuoteCategoriesPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -143,7 +143,7 @@ export default function QuoteCategoriesPage() {
         </div>
 
         {/* System categories */}
-        <div className="bg-white border border-gray-200 rounded-xl mb-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl mb-4">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900 text-sm">Systemkategorier</h2>
             <p className="text-xs text-gray-400 mt-0.5">Dessa kategorier ingår som standard och kan inte tas bort.</p>
@@ -164,7 +164,7 @@ export default function QuoteCategoriesPage() {
         </div>
 
         {/* Custom categories */}
-        <div className="bg-white border border-gray-200 rounded-xl mb-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl mb-4">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="font-semibold text-gray-900 text-sm">Egna kategorier</h2>
             <p className="text-xs text-gray-400 mt-0.5">Skapa kategorier specifika för ditt företag.</p>
@@ -183,7 +183,7 @@ export default function QuoteCategoriesPage() {
                       type="text"
                       value={editLabel}
                       onChange={e => setEditLabel(e.target.value)}
-                      className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-600"
+                      className="flex-1 min-w-0 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 text-sm focus:outline-none focus:border-primary-600"
                     />
                     <label className="flex items-center gap-1 text-xs text-gray-500">
                       <input type="checkbox" checked={editRot} onChange={e => { setEditRot(e.target.checked); if (e.target.checked) setEditRut(false) }} className="w-3.5 h-3.5 rounded" />
@@ -229,7 +229,7 @@ export default function QuoteCategoriesPage() {
                 onChange={e => setNewLabel(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addCategory() }}
                 placeholder="Ny kategori, t.ex. Snickeri"
-                className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
+                className="flex-1 min-w-0 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
               />
               <label className="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap">
                 <input type="checkbox" checked={newRot} onChange={e => { setNewRot(e.target.checked); if (e.target.checked) setNewRut(false) }} className="w-3.5 h-3.5 rounded" />
@@ -252,7 +252,7 @@ export default function QuoteCategoriesPage() {
         </div>
 
         {/* Info box */}
-        <div className="bg-primary-50 border border-primary-300 rounded-xl p-5 text-sm text-primary-700">
+        <div className="bg-primary-50 border border-[#E2E8F0] rounded-xl p-5 text-sm text-primary-700">
           <p className="font-medium mb-1">Tips</p>
           <p>Kategorier hjälper dig att gruppera offertrader. Aktivera &quot;Visa delsummor per kategori&quot; i offertens visningsinställningar för att visa delsummor per kategorigrupp i offerten.</p>
         </div>

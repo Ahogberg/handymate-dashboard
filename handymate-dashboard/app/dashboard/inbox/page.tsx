@@ -411,7 +411,7 @@ export default function InboxPage() {
   const pendingRecordings = recordings.filter(r => !r.transcript).length
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -446,7 +446,7 @@ export default function InboxPage() {
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'suggestions'
                 ? 'bg-primary-700 text-white'
-                : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
+                : 'bg-white border border-[#E2E8F0] text-gray-500 hover:text-white'
             }`}
           >
             <Sparkles className="w-4 h-4" />
@@ -463,7 +463,7 @@ export default function InboxPage() {
             className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === 'recordings'
                 ? 'bg-primary-700 text-white'
-                : 'bg-white border border-gray-200 text-gray-500 hover:text-white'
+                : 'bg-white border border-[#E2E8F0] text-gray-500 hover:text-white'
             }`}
           >
             <Mic className="w-4 h-4" />
@@ -537,7 +537,7 @@ export default function InboxPage() {
             {suggestionsLoading ? (
               <div className="text-center py-12 text-gray-500">Laddar...</div>
             ) : groups.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">
                   {statusFilter === 'pending' ? 'Inga väntande förslag' : 'Inga förslag att visa'}
@@ -556,7 +556,7 @@ export default function InboxPage() {
                   return (
                     <div
                       key={groupId}
-                      className={`bg-white shadow-sm rounded-2xl border transition-all ${
+                      className={`bg-white rounded-xl border transition-all ${
                         hasPending ? 'border-amber-200' : 'border-gray-200'
                       }`}
                     >
@@ -744,14 +744,14 @@ export default function InboxPage() {
                                                   value={editForm.service || ''}
                                                   onChange={(e) => setEditForm({ ...editForm, service: e.target.value })}
                                                   placeholder="Tjänst"
-                                                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                                 />
                                                 <input
                                                   type="text"
                                                   value={editForm.date || ''}
                                                   onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                                                   placeholder="Datum (YYYY-MM-DD)"
-                                                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm"
+                                                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm"
                                                 />
                                               </>
                                             )}
@@ -761,7 +761,7 @@ export default function InboxPage() {
                                                 onChange={(e) => setEditForm({ ...editForm, message_template: e.target.value })}
                                                 placeholder="SMS-meddelande"
                                                 rows={3}
-                                                className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none"
+                                                className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm resize-none"
                                               />
                                             )}
                                             <div className="flex gap-2">
@@ -843,7 +843,7 @@ export default function InboxPage() {
             {recordingsLoading ? (
               <div className="text-center py-12 text-gray-500">Laddar...</div>
             ) : recordings.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Mic className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-500">Inga inspelningar ännu</p>
                 <p className="text-gray-400 text-sm mt-2">
@@ -855,7 +855,7 @@ export default function InboxPage() {
                 {recordings.map((recording) => (
                   <div
                     key={recording.recording_id}
-                    className={`bg-white shadow-sm rounded-xl border p-4 ${
+                    className={`bg-white rounded-xl border p-4 ${
                       !recording.transcript ? 'border-amber-200' : 'border-gray-200'
                     }`}
                   >
@@ -910,7 +910,7 @@ export default function InboxPage() {
                           <button
                             onClick={() => handleTranscribe(recording.recording_id)}
                             disabled={actionLoading === recording.recording_id}
-                            className="flex items-center gap-2 px-3 py-2.5 bg-primary-100 border border-primary-300 rounded-lg text-sky-700 text-sm hover:bg-primary-700/30 disabled:opacity-50 min-h-[44px]"
+                            className="flex items-center gap-2 px-3 py-2.5 bg-primary-100 border border-[#E2E8F0] rounded-lg text-sky-700 text-sm hover:bg-primary-700/30 disabled:opacity-50 min-h-[44px]"
                           >
                             {actionLoading === recording.recording_id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />

@@ -195,14 +195,14 @@ export default function KnowledgeBasePage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -238,7 +238,7 @@ export default function KnowledgeBasePage() {
 
         <div className="space-y-6">
           {/* Bransch */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <Zap className="w-5 h-5 text-sky-700" />
               Bransch
@@ -246,7 +246,7 @@ export default function KnowledgeBasePage() {
             <select
               value={kb.industry}
               onChange={(e) => handleIndustryChange(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
             >
               <option value="">Välj bransch...</option>
               {INDUSTRIES.map(ind => (
@@ -257,7 +257,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Tjänster & Priser */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary-700" />
@@ -265,7 +265,7 @@ export default function KnowledgeBasePage() {
               </h2>
               <button
                 onClick={addService}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
@@ -289,28 +289,28 @@ export default function KnowledgeBasePage() {
                         value={service.name}
                         onChange={(e) => updateService(index, 'name', e.target.value)}
                         placeholder="Tjänstens namn"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                       <input
                         type="text"
                         value={service.price_indication}
                         onChange={(e) => updateService(index, 'price_indication', e.target.value)}
                         placeholder="Prisindikation (t.ex. 'Från 995 kr')"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                       <input
                         type="text"
                         value={service.typical_duration}
                         onChange={(e) => updateService(index, 'typical_duration', e.target.value)}
                         placeholder="Tidsåtgång (t.ex. '1-2 timmar')"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                       <input
                         type="text"
                         value={service.description}
                         onChange={(e) => updateService(index, 'description', e.target.value)}
                         placeholder="Kort beskrivning"
-                        className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Vanliga frågor */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <HelpCircle className="w-5 h-5 text-amber-600" />
@@ -328,7 +328,7 @@ export default function KnowledgeBasePage() {
               </h2>
               <button
                 onClick={addFAQ}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
@@ -351,14 +351,14 @@ export default function KnowledgeBasePage() {
                       value={faq.question}
                       onChange={(e) => updateFAQ(index, 'question', e.target.value)}
                       placeholder="Frågan kunden ställer"
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm mb-2 focus:outline-none focus:border-[#0F766E]"
                     />
                     <textarea
                       value={faq.answer}
                       onChange={(e) => updateFAQ(index, 'answer', e.target.value)}
                       placeholder="Svaret AI:n ska ge"
                       rows={2}
-                      className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm resize-none focus:outline-none focus:border-[#0F766E]"
                     />
                   </div>
                 ))}
@@ -367,7 +367,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Akuta situationer */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
@@ -375,7 +375,7 @@ export default function KnowledgeBasePage() {
               </h2>
               <button
                 onClick={addEmergency}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-lg text-sm text-gray-900 hover:bg-gray-200"
+                className="flex items-center gap-1 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-900 hover:bg-gray-200"
               >
                 <Plus className="w-4 h-4" /> Lägg till
               </button>
@@ -393,7 +393,7 @@ export default function KnowledgeBasePage() {
                       value={emergency}
                       onChange={(e) => updateEmergency(index, e.target.value)}
                       placeholder="Beskrivning av akut situation"
-                      className="flex-1 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="flex-1 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                     />
                     <button onClick={() => removeEmergency(index)} className="p-2 text-gray-400 hover:text-red-600">
                       <X className="w-4 h-4" />
@@ -405,7 +405,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Jobbstil — AI-preferenser */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary-700" />
               Jobbstil
@@ -540,7 +540,7 @@ export default function KnowledgeBasePage() {
           </div>
 
           {/* Policyer */}
-          <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
               <FileText className="w-5 h-5 text-emerald-600" />
               Policyer
@@ -553,7 +553,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.quote}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, quote: e.target.value } })}
                   placeholder="T.ex. 'Vi ger alltid prisuppskattning innan'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -563,7 +563,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.payment}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, payment: e.target.value } })}
                   placeholder="T.ex. 'Faktura 30 dagar eller Swish'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -573,7 +573,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.warranty}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, warranty: e.target.value } })}
                   placeholder="T.ex. '2 års garanti på arbete'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -583,7 +583,7 @@ export default function KnowledgeBasePage() {
                   value={kb.policies.cancellation}
                   onChange={(e) => setKb({ ...kb, policies: { ...kb.policies, cancellation: e.target.value } })}
                   placeholder="T.ex. 'Avboka senast 24h innan'"
-                  className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
             </div>

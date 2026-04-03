@@ -151,7 +151,7 @@ export default function EmailInboxPage() {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 filter === f.key
                   ? 'bg-primary-700 text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+                  : 'bg-white text-gray-600 border border-[#E2E8F0] hover:border-gray-300'
               }`}
             >
               {f.label}
@@ -168,7 +168,7 @@ export default function EmailInboxPage() {
 
         {/* Email list */}
         {filteredEmails.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Mail className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">Inga e-postmeddelanden</h3>
             <p className="text-gray-500 text-sm">
@@ -186,7 +186,7 @@ export default function EmailInboxPage() {
                   key={email.id}
                   className={`bg-white rounded-xl border transition-all ${
                     email.status === 'new'
-                      ? 'border-primary-300 shadow-sm'
+                      ? 'border-primary-300'
                       : 'border-gray-200'
                   }`}
                 >

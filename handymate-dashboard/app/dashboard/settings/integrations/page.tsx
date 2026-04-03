@@ -19,7 +19,7 @@ export default function IntegrationsPage() {
 
   if (!business.business_id) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
@@ -53,7 +53,7 @@ export default function IntegrationsPage() {
   ]
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -72,7 +72,7 @@ export default function IntegrationsPage() {
             <Link
               key={item.title}
               href={item.href}
-              className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all"
+              className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
             >
               <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}>
                 <item.icon className="w-5 h-5" />
@@ -92,7 +92,7 @@ export default function IntegrationsPage() {
         </div>
 
         {/* Embed code section */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
           <div className="flex items-center gap-2 mb-1">
             <Code className="w-5 h-5 text-gray-700" />
             <h2 className="text-lg font-semibold text-gray-900">Snabbinstallation</h2>

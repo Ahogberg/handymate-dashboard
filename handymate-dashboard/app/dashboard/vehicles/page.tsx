@@ -221,7 +221,7 @@ export default function VehiclesPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowManageVehicles(true)}
-            className="px-3 py-2 text-sm border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50"
+            className="px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg text-gray-700 hover:bg-gray-50"
           >
             Hantera fordon
           </button>
@@ -245,7 +245,7 @@ export default function VehiclesPage() {
           <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-gray-100">
             <ChevronRight className="w-4 h-4" />
           </button>
-          <button onClick={goToday} className="px-2.5 py-1 text-xs border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 ml-1">
+          <button onClick={goToday} className="px-2.5 py-1 text-xs border border-[#E2E8F0] rounded-md text-gray-600 hover:bg-gray-50 ml-1">
             Idag
           </button>
         </div>
@@ -253,7 +253,7 @@ export default function VehiclesPage() {
         <select
           value={selectedVehicle}
           onChange={e => setSelectedVehicle(e.target.value)}
-          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-700"
+          className="px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg bg-white text-gray-700"
         >
           <option value="all">Alla fordon</option>
           {activeVehicles.map(v => (
@@ -264,15 +264,15 @@ export default function VehiclesPage() {
 
       {/* Summary bar */}
       <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
           <p className="text-xs text-gray-500">Sträcka</p>
           <p className="text-lg font-bold text-gray-900">{weekTotalKm.toLocaleString('sv-SE')} km</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
           <p className="text-xs text-gray-500">Totalt</p>
           <p className="text-lg font-bold text-gray-900">{weekTotalAmount.toLocaleString('sv-SE', { minimumFractionDigits: 0 })} kr</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
           <p className="text-xs text-gray-500">Fakturerbart</p>
           <p className="text-lg font-bold text-primary-700">{weekBillableAmount.toLocaleString('sv-SE', { minimumFractionDigits: 0 })} kr</p>
         </div>
@@ -301,7 +301,7 @@ export default function VehiclesPage() {
             ) : (
               <div className="space-y-2">
                 {dayReports.map(r => (
-                  <div key={r.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                  <div key={r.id} className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -382,7 +382,7 @@ export default function VehiclesPage() {
 
       {/* Empty state when no vehicles */}
       {activeVehicles.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center mt-6">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center mt-6">
           <Car className="w-10 h-10 text-gray-300 mx-auto mb-3" />
           <h3 className="font-medium text-gray-900 mb-1">Inga fordon tillagda</h3>
           <p className="text-sm text-gray-500 mb-4">Lägg till ditt första fordon för att börja spåra körrapporter</p>
@@ -564,11 +564,11 @@ function ReportModal({
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h3 className="font-semibold text-gray-900">{editing ? 'Redigera rapport' : 'Ny körrapport'}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>
@@ -649,7 +649,7 @@ function ReportModal({
               <button
                 onClick={calculateDistance}
                 disabled={calculating || !startAddress.trim() || !endAddress.trim()}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-3 py-2 text-sm border border-[#E2E8F0] rounded-lg text-primary-700 hover:bg-primary-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                 Beräkna med Google Maps
@@ -712,7 +712,7 @@ function ReportModal({
 
           {/* Amount preview */}
           {amount > 0 && (
-            <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 flex items-center justify-between">
+            <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-3 flex items-center justify-between">
               <span className="text-sm text-primary-700">Beräknat belopp</span>
               <span className="text-lg font-bold text-primary-800">{amount.toLocaleString('sv-SE', { minimumFractionDigits: 2 })} kr</span>
             </div>
@@ -755,7 +755,7 @@ function ManageVehiclesModal({
 }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md max-h-[80vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h3 className="font-semibold text-gray-900">Hantera fordon</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>
@@ -835,11 +835,11 @@ function VehicleModal({
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-500'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-sm">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h3 className="font-semibold text-gray-900">{editing ? 'Redigera fordon' : 'Nytt fordon'}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100"><X className="w-4 h-4" /></button>

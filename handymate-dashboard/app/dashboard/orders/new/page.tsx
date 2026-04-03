@@ -206,14 +206,14 @@ export default function NewOrderPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -235,14 +235,14 @@ export default function NewOrderPage() {
         {/* Form */}
         <div className="space-y-6">
           {/* Supplier & Delivery */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm text-gray-500 mb-2">Leverantör</label>
                 <select
                   value={supplierId}
                   onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj leverantör...</option>
                   {suppliers.map(s => (
@@ -263,7 +263,7 @@ export default function NewOrderPage() {
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                   placeholder="Adress för leverans"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
             </div>
@@ -275,27 +275,27 @@ export default function NewOrderPage() {
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Ev. önskemål om leverans, brådskande etc."
                 rows={2}
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E] resize-none"
               />
             </div>
           </div>
 
           {/* Products */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Produkter</h2>
               <div className="flex gap-2">
                 <div className="relative">
                   <button
                     onClick={() => setShowProductSearch(!showProductSearch)}
-                    className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                    className="flex items-center gap-2 px-3 py-2 text-sm bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
                   >
                     <Search className="w-4 h-4" />
                     Sök produkt
                   </button>
 
                   {showProductSearch && (
-                    <div className="absolute right-0 top-full mt-2 w-80 bg-gray-100 border border-gray-300 rounded-xl shadow-xl z-10">
+                    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-[#E2E8F0] rounded-lg shadow-xl z-10">
                       <div className="p-2">
                         <input
                           type="text"
@@ -337,7 +337,7 @@ export default function NewOrderPage() {
                 </div>
                 <button
                   onClick={addEmptyItem}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-primary-100 border border-primary-300 rounded-xl text-sky-700 hover:bg-primary-700/30"
+                  className="flex items-center gap-2 px-3 py-2 text-sm bg-primary-100 border border-[#E2E8F0] rounded-xl text-sky-700 hover:bg-primary-700/30"
                 >
                   <Plus className="w-4 h-4" />
                   Lägg till rad
@@ -367,7 +367,7 @@ export default function NewOrderPage() {
                         type="text"
                         value={item.name}
                         onChange={(e) => updateItem(index, 'name', e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                     <div className="w-20">
@@ -377,7 +377,7 @@ export default function NewOrderPage() {
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateItem(index, 'quantity', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                     <div className="w-20">
@@ -385,7 +385,7 @@ export default function NewOrderPage() {
                       <select
                         value={item.unit}
                         onChange={(e) => updateItem(index, 'unit', e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       >
                         <option value="st">st</option>
                         <option value="m">m</option>
@@ -400,7 +400,7 @@ export default function NewOrderPage() {
                         type="number"
                         value={item.unit_price}
                         onChange={(e) => updateItem(index, 'unit_price', Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-gray-200 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                     <div className="w-24 text-right">
@@ -420,7 +420,7 @@ export default function NewOrderPage() {
           </div>
 
           {/* Total */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <div className="max-w-sm ml-auto">
               <div className="flex justify-between text-xl font-bold text-gray-900">
                 <span>Totalt inköpsvärde</span>

@@ -257,7 +257,7 @@ export default function InvoicesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
@@ -265,7 +265,7 @@ export default function InvoicesPage() {
 
   return (
     <PermissionGate permission="see_financials">
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -299,7 +299,7 @@ export default function InvoicesPage() {
 
         {/* Stats Bar */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Clock className="w-5 h-5 text-primary-700" />
@@ -325,7 +325,7 @@ export default function InvoicesPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-emerald-500" />
@@ -337,7 +337,7 @@ export default function InvoicesPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:shadow-md transition-shadow">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <TrendingUp className="w-5 h-5 text-emerald-500" />
@@ -353,14 +353,14 @@ export default function InvoicesPage() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
             {filterTabs.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   filter === f.id
-                    ? 'bg-primary-700 text-white shadow-sm'
+                    ? 'bg-primary-700 text-white'
                     : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
@@ -387,13 +387,13 @@ export default function InvoicesPage() {
               placeholder="Sök fakturanr eller kund..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
         </div>
 
         {/* Invoice List */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {filteredInvoices.length === 0 ? (
             <div className="p-12 text-center">
               <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -587,7 +587,7 @@ export default function InvoicesPage() {
                               <button
                                 onClick={() => handleSyncToFortnox(invoice.invoice_id)}
                                 disabled={syncingId === invoice.invoice_id}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-gray-50 text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-gray-200 hover:border-primary-300 transition-colors disabled:opacity-50"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-full bg-gray-50 text-gray-500 hover:text-primary-700 hover:bg-primary-50 border border-[#E2E8F0] hover:border-primary-300 transition-colors disabled:opacity-50"
                               >
                                 {syncingId === invoice.invoice_id ? (
                                   <Loader2 className="w-3 h-3 animate-spin" />

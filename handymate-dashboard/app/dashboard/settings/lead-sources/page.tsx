@@ -121,14 +121,14 @@ export default function LeadSourcesPage() {
 
   if (!business.business_id) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 md:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -154,7 +154,7 @@ export default function LeadSourcesPage() {
             <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
           </div>
         ) : sources.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Link2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Inga lead-källor ännu</h3>
             <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
@@ -291,7 +291,7 @@ export default function LeadSourcesPage() {
       {/* Modal: Lägg till källa */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Lägg till lead-källa</h2>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">

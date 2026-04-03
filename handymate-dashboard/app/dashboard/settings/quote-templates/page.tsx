@@ -63,7 +63,7 @@ function TemplatePreview({ items, rotEnabled }: { items: any[]; rotEnabled: bool
   const total = lineItems.reduce((sum: number, i: any) => sum + (i.total || 0), 0)
 
   return (
-    <div className="mt-3 bg-slate-50 rounded-lg p-3 border border-slate-100">
+    <div className="mt-3 bg-[#F8FAFC] rounded-lg p-3 border border-slate-100">
       {/* Mini header bar */}
       <div className="flex items-center gap-2 mb-2.5">
         <div className="w-5 h-5 rounded bg-[#0F766E]/10 flex items-center justify-center">
@@ -304,7 +304,7 @@ export default function QuoteTemplatesPage() {
             <button
               onClick={seedTemplates}
               disabled={seeding}
-              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-[#F8FAFC] transition-colors"
             >
               {seeding ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-amber-500" />}
               Skapa exempelmallar
@@ -333,7 +333,7 @@ export default function QuoteTemplatesPage() {
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
               branchFilter === 'all'
                 ? 'bg-[#0F766E] text-white'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-[#F8FAFC]'
             }`}
           >
             Alla
@@ -348,7 +348,7 @@ export default function QuoteTemplatesPage() {
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
                   branchFilter === b
                     ? 'bg-[#0F766E] text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-[#F8FAFC]'
                 }`}
               >
                 <Icon className="w-3 h-3" />
@@ -371,7 +371,7 @@ export default function QuoteTemplatesPage() {
         <div className="mt-2">
           {/* Hero empty state */}
           <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-10 text-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 flex items-center justify-center mx-auto mb-5">
+            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-100 flex items-center justify-center mx-auto mb-5">
               <LayoutTemplate className="w-7 h-7 text-[#0F766E]" />
             </div>
             <h2 className="text-lg font-bold text-slate-900 mb-2">Kom igång med offertmallar</h2>
@@ -391,7 +391,7 @@ export default function QuoteTemplatesPage() {
               </button>
               <button
                 onClick={createNew}
-                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 text-sm font-medium border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-slate-700 text-sm font-medium border border-slate-200 rounded-lg hover:bg-[#F8FAFC] transition-colors"
               >
                 <Plus className="w-4 h-4" />
                 Skapa från grunden

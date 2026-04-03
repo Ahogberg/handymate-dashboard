@@ -650,14 +650,14 @@ export default function DocumentsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-sky-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-gray-900">
+    <div className="min-h-screen bg-[#F8FAFC] text-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 md:ml-64">
 
         {/* Header */}
@@ -676,7 +676,7 @@ export default function DocumentsPage() {
 
         {/* Tabs + Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-white rounded-xl p-1 border border-gray-200">
+          <div className="flex bg-white rounded-xl p-1 border border-[#E2E8F0]">
             <button
               onClick={() => { setView('documents'); setSelectedCategory(null) }}
               className={`px-4 py-2 text-sm rounded-lg transition-all ${view === 'documents' ? 'bg-primary-800 text-gray-900' : 'text-gray-500 hover:text-gray-900'}`}
@@ -705,14 +705,14 @@ export default function DocumentsPage() {
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Sök dokument..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-600"
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-600"
               />
             </div>
             {view === 'documents' && (
               <select
                 value={statusFilter}
                 onChange={e => setStatusFilter(e.target.value)}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
+                className="px-3 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-900 focus:outline-none focus:border-primary-600"
               >
                 <option value="">Alla status</option>
                 <option value="draft">Utkast</option>
@@ -727,7 +727,7 @@ export default function DocumentsPage() {
         <div className="flex gap-6">
           {/* Category sidebar */}
           <div className="hidden lg:block w-56 flex-shrink-0">
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-3">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
               <button
                 onClick={() => setSelectedCategory(null)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
@@ -798,7 +798,7 @@ export default function DocumentsPage() {
                   {filteredDocuments.map(doc => (
                     <div
                       key={doc.id}
-                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all group"
+                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group"
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -884,7 +884,7 @@ export default function DocumentsPage() {
                   {filteredUploads.map(file => (
                     <div
                       key={`${file.source}-${file.id}`}
-                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-all group"
+                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group"
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -954,7 +954,7 @@ export default function DocumentsPage() {
                   {filteredTemplates.map(tpl => (
                     <div
                       key={tpl.id}
-                      className="bg-white shadow-sm border border-gray-200 rounded-xl p-5 hover:border-primary-300 transition-all group cursor-pointer"
+                      className="bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-primary-300 transition-all group cursor-pointer"
                       onClick={() => { selectTemplate(tpl); setShowCreate(true) }}
                     >
                       <div className="flex items-start gap-3 mb-3">
@@ -1009,7 +1009,7 @@ export default function DocumentsPage() {
           ========================================== */}
       {showCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             {/* Wizard header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
@@ -1044,7 +1044,7 @@ export default function DocumentsPage() {
                             <button
                               key={tpl.id}
                               onClick={() => selectTemplate(tpl)}
-                              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-primary-300 rounded-xl text-left transition-all"
+                              className="w-full flex items-center gap-3 p-3 bg-gray-50 hover:bg-gray-100 border border-[#E2E8F0] hover:border-primary-300 rounded-xl text-left transition-all"
                             >
                               {getCategoryIcon(cat.icon, 'w-5 h-5 text-sky-700')}
                               <div className="flex-1 min-w-0">
@@ -1198,7 +1198,7 @@ export default function DocumentsPage() {
           ========================================== */}
       {viewDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-200">
               <h2 className="text-lg font-semibold">{viewDoc.title}</h2>
               <div className="flex items-center gap-2">
@@ -1264,7 +1264,7 @@ export default function DocumentsPage() {
           ========================================== */}
       {editDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Redigera: {editDoc.title}</h2>
               <button onClick={() => setEditDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
@@ -1350,7 +1350,7 @@ export default function DocumentsPage() {
           ========================================== */}
       {signDoc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-lg">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-lg">
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <h2 className="text-lg font-semibold">Signera dokument</h2>
               <button onClick={() => setSignDoc(null)} className="p-2 text-gray-500 hover:text-gray-900 rounded-lg">
@@ -1415,7 +1415,7 @@ export default function DocumentsPage() {
       {/* Context menu */}
       {contextMenu && (
         <div
-          className="fixed z-[60] bg-white border border-gray-200 rounded-xl shadow-xl py-1 min-w-[160px]"
+          className="fixed z-[60] bg-white border border-[#E2E8F0] rounded-xl shadow-xl py-1 min-w-[160px]"
           style={{ top: contextMenu.y, left: contextMenu.x }}
         >
           <button

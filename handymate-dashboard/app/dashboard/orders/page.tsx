@@ -179,14 +179,14 @@ export default function OrdersPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -220,7 +220,7 @@ export default function OrdersPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Package className="w-5 h-5 text-sky-700" />
@@ -231,7 +231,7 @@ export default function OrdersPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Send className="w-5 h-5 text-primary-600" />
@@ -242,7 +242,7 @@ export default function OrdersPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <Truck className="w-5 h-5 text-emerald-600" />
@@ -253,7 +253,7 @@ export default function OrdersPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
                 <Package className="w-5 h-5 text-amber-600" />
@@ -268,7 +268,7 @@ export default function OrdersPage() {
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
             {[
               { id: 'all', label: 'Alla' },
               { id: 'draft', label: 'Utkast' },
@@ -294,13 +294,13 @@ export default function OrdersPage() {
               placeholder="Sök beställning..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
         </div>
 
         {/* Orders List */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {filteredOrders.length === 0 ? (
             <div className="p-12 text-center">
               <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -318,7 +318,7 @@ export default function OrdersPage() {
                 <div key={order.order_id} className="p-4 hover:bg-gray-100/30 transition-all">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300">
+                      <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
                         <Package className="w-5 h-5 text-sky-700" />
                       </div>
                       <div>

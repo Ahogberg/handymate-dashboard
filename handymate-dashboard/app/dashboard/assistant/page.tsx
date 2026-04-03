@@ -180,7 +180,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen pt-16 sm:pt-8">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen pt-16 sm:pt-8">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-primary-100 rounded-full blur-[128px]"></div>
@@ -235,7 +235,7 @@ export default function AssistantPage() {
 
         {/* Transcript */}
         {(transcript || isListening) && (
-          <div className="mb-6 p-4 bg-white border border-gray-200 rounded-xl">
+          <div className="mb-6 p-4 bg-white border border-[#E2E8F0] rounded-xl">
             <p className="text-sm text-gray-400 mb-1">Du sa:</p>
             <p className="text-gray-900 text-lg">{transcript || '...'}</p>
           </div>
@@ -250,7 +250,7 @@ export default function AssistantPage() {
 
         {/* Response */}
         {currentResponse && (
-          <div className="mb-8 p-6 bg-white border border-gray-200 rounded-2xl">
+          <div className="mb-8 p-6 bg-white border border-[#E2E8F0] rounded-xl">
             <div className="flex items-start gap-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
                 currentResponse.action !== 'unknown'
@@ -296,7 +296,7 @@ export default function AssistantPage() {
                     </button>
                     <button
                       onClick={handleCancel}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                      className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
                     >
                       <XCircle className="w-4 h-4" />
                       Avbryt
@@ -325,7 +325,7 @@ export default function AssistantPage() {
               <button
                 key={idx}
                 onClick={() => handleQuickCommand(cmd.example)}
-                className="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-all text-left"
+                className="flex items-center gap-3 p-4 bg-white border border-[#E2E8F0] rounded-xl hover:bg-gray-50 transition-all text-left"
               >
                 <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                   <cmd.icon className="w-5 h-5 text-sky-700" />
@@ -350,7 +350,7 @@ export default function AssistantPage() {
               {history.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-start gap-3 p-3 bg-white border border-gray-200 rounded-xl"
+                  className="flex items-start gap-3 p-3 bg-white border border-[#E2E8F0] rounded-xl"
                 >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
                     item.success ? 'bg-emerald-100' : 'bg-gray-100'

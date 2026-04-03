@@ -300,7 +300,7 @@ export default function WebsiteWidgetPage() {
             onClick={() => setActiveTab(tab.key)}
             className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.key
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-white text-gray-900'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -327,7 +327,7 @@ export default function WebsiteWidgetPage() {
                   { label: 'Konverteringsgrad', value: `${analytics.conversion_rate}%`, icon: Target, color: 'text-primary-700 bg-primary-50' },
                   { label: 'Snitt meddelanden', value: analytics.avg_messages_per_conversation, icon: TrendingUp, color: 'text-amber-600 bg-amber-50' },
                 ].map((kpi, i) => (
-                  <div key={i} className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div key={i} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${kpi.color}`}>
                         <kpi.icon className="w-4 h-4" />
@@ -342,7 +342,7 @@ export default function WebsiteWidgetPage() {
               {/* Two columns */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Common questions */}
-                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Vanligaste frågorna</h3>
                   {analytics.common_questions.length > 0 ? (
                     <div className="space-y-2">
@@ -359,7 +359,7 @@ export default function WebsiteWidgetPage() {
                 </div>
 
                 {/* Recent conversations */}
-                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Senaste konversationer</h3>
                   {analytics.recent_conversations.length > 0 ? (
                     <div className="space-y-3">
@@ -405,7 +405,7 @@ export default function WebsiteWidgetPage() {
       )}
 
       {activeTab === 'appearance' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 space-y-6">
           {/* Bot Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -416,7 +416,7 @@ export default function WebsiteWidgetPage() {
               value={config.widget_bot_name}
               onChange={e => setConfig(prev => ({ ...prev, widget_bot_name: e.target.value }))}
               placeholder={`${business.business_name}s assistent`}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             />
             <p className="text-xs text-gray-400 mt-1">Lämna tomt för standardnamn</p>
           </div>
@@ -430,7 +430,7 @@ export default function WebsiteWidgetPage() {
               value={config.widget_welcome_message}
               onChange={e => setConfig(prev => ({ ...prev, widget_welcome_message: e.target.value }))}
               rows={2}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent resize-none"
             />
           </div>
 
@@ -458,7 +458,7 @@ export default function WebsiteWidgetPage() {
                   type="color"
                   value={config.widget_color}
                   onChange={e => setConfig(prev => ({ ...prev, widget_color: e.target.value }))}
-                  className="w-10 h-10 rounded-lg cursor-pointer border border-gray-200"
+                  className="w-10 h-10 rounded-lg cursor-pointer border border-[#E2E8F0]"
                 />
                 <span className="text-xs text-gray-400 font-mono">{config.widget_color}</span>
               </div>
@@ -512,7 +512,7 @@ export default function WebsiteWidgetPage() {
                     onChange={e => setNewQuestion(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && addQuickQuestion()}
                     placeholder="Ny snabbfråga..."
-                    className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+                    className="flex-1 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
                   />
                   <button
                     onClick={addQuickQuestion}
@@ -529,7 +529,7 @@ export default function WebsiteWidgetPage() {
       )}
 
       {activeTab === 'behavior' && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 space-y-6">
           {/* Toggle options */}
           {[
             {
@@ -587,7 +587,7 @@ export default function WebsiteWidgetPage() {
               type="number"
               value={config.widget_max_estimate}
               onChange={e => setConfig(prev => ({ ...prev, widget_max_estimate: parseInt(e.target.value) || 0 }))}
-              className="w-48 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              className="w-48 px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             />
             <span className="text-sm text-gray-400 ml-2">kr</span>
           </div>
@@ -597,7 +597,7 @@ export default function WebsiteWidgetPage() {
       {activeTab === 'install' && (
         <div className="space-y-6">
           {/* Embed code */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
               <Code className="w-4 h-4 text-sky-700" />
               Installationskod
@@ -620,7 +620,7 @@ export default function WebsiteWidgetPage() {
           </div>
 
           {/* Platform guides */}
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-4">Plattformsguider</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {[
@@ -677,7 +677,7 @@ export default function WebsiteWidgetPage() {
               style={{ width: '360px' }}
             >
               {/* Chat window */}
-              <div className="bg-white rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
+              <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-[#E2E8F0]">
                 {/* Header */}
                 <div
                   className="px-4 py-3 text-white flex items-center gap-3"
@@ -702,7 +702,7 @@ export default function WebsiteWidgetPage() {
                     >
                       <MessageSquare className="w-3 h-3 text-white" />
                     </div>
-                    <div className="bg-white rounded-xl rounded-tl-sm px-3 py-2 shadow-sm max-w-[80%]">
+                    <div className="bg-white rounded-xl rounded-tl-sm px-3 py-2 max-w-[80%]">
                       <p className="text-sm text-gray-800">{config.widget_welcome_message}</p>
                     </div>
                   </div>
@@ -714,7 +714,7 @@ export default function WebsiteWidgetPage() {
                     {config.widget_quick_questions.map((q, i) => (
                       <button
                         key={i}
-                        className="px-3 py-1.5 text-xs rounded-full border border-gray-200 text-gray-600 bg-white hover:bg-gray-50"
+                        className="px-3 py-1.5 text-xs rounded-full border border-[#E2E8F0] text-gray-600 bg-white hover:bg-gray-50"
                       >
                         {q}
                       </button>

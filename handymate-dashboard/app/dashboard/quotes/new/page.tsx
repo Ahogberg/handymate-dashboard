@@ -186,7 +186,7 @@ function StandardTextPicker({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
+          <div className="absolute right-0 top-6 z-20 bg-white border border-[#E2E8F0] rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
             {texts.map((t) => (
               <button
                 key={t.id}
@@ -1400,7 +1400,7 @@ export default function NewQuotePage() {
                   {/* Text description */}
                   <div>
                     <p className="text-[12px] text-[#64748B] mb-1">Beskriv jobbet — AI genererar offertrader</p>
-                    <div className="bg-primary-50 border border-primary-300 rounded-lg px-3 py-2 mb-2">
+                    <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-3 py-2 mb-2">
                       <p className="text-[11px] text-primary-700 font-medium mb-1">Tips för bästa resultat:</p>
                       <ul className="text-[11px] text-primary-700 space-y-0.5 list-disc list-inside">
                         <li>Ange rum/plats (kök, badrum, fasad)</li>
@@ -1449,7 +1449,7 @@ export default function NewQuotePage() {
                     ))}
                   </select>
                   {customerPriceListInfo && (
-                    <div className="mt-2 bg-primary-50 border border-primary-300 rounded-lg p-2.5 space-y-1.5">
+                    <div className="mt-2 bg-primary-50 border border-[#E2E8F0] rounded-lg p-2.5 space-y-1.5">
                       <div className="flex items-center gap-2 text-xs">
                         <span className="text-primary-700">📋</span>
                         <span className="text-primary-800">
@@ -1990,7 +1990,7 @@ export default function NewQuotePage() {
                 </div>
               )}
               {priceAlts.length > 0 && (
-                <div className="bg-primary-50 border border-primary-300 rounded-lg p-3 mb-4 space-y-1.5">
+                <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg p-3 mb-4 space-y-1.5">
                   {priceAlts.map((a, i) => (
                     <p key={i} className="text-xs text-primary-800">
                       💡 {a.cheaper_supplier} har {a.product_name} {a.savings_pct}% billigare ({a.cheaper_price} kr)
@@ -2160,7 +2160,7 @@ export default function NewQuotePage() {
       {/* Product search */}
       {showProductSearch && (
         <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={() => setShowProductSearch(false)}>
-          <div className="bg-white rounded-2xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 px-5 py-4 border-b border-[#E2E8F0]">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
               <input

@@ -357,7 +357,7 @@ export default function CommunicationPage() {
         </div>
         <button
           onClick={() => setShowSettings(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-50 shadow-sm"
+          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-700 hover:bg-gray-50"
         >
           <Settings className="w-4 h-4" />
           Inställningar
@@ -365,7 +365,7 @@ export default function CommunicationPage() {
       </div>
 
       {/* Status card */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -423,7 +423,7 @@ export default function CommunicationPage() {
         </div>
 
         {logs.length === 0 ? (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-8 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
             <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 font-medium">Inga meddelanden ännu</p>
             <p className="text-sm text-gray-400 mt-1">
@@ -435,7 +435,7 @@ export default function CommunicationPage() {
             {(showAllLogs ? logs : logs.slice(0, 5)).map(log => {
               const ChannelIcon = channelIcons[log.channel] || MessageSquare
               return (
-                <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                <div key={log.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`p-1.5 rounded-lg ${log.channel === 'sms' ? 'bg-primary-50' : 'bg-purple-50'}`}>
@@ -488,7 +488,7 @@ export default function CommunicationPage() {
       </div>
 
       {/* Advanced: Rules */}
-      <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
@@ -522,7 +522,7 @@ export default function CommunicationPage() {
                       <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
                         rule.is_enabled
                           ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                          : 'bg-gray-100 text-gray-500 border border-gray-200'
+                          : 'bg-gray-100 text-gray-500 border border-[#E2E8F0]'
                       }`}>
                         {rule.is_enabled ? 'Aktiv' : 'Inaktiv'}
                       </span>
@@ -578,7 +578,7 @@ export default function CommunicationPage() {
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
+          <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-xl">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Settings className="w-5 h-5" />
@@ -618,7 +618,7 @@ export default function CommunicationPage() {
                 <select
                   value={settings.max_sms_per_customer_per_week}
                   onChange={e => setSettings({ ...settings, max_sms_per_customer_per_week: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   {[1, 2, 3, 4, 5, 7, 10].map(n => (
                     <option key={n} value={n}>{n}</option>
@@ -636,14 +636,14 @@ export default function CommunicationPage() {
                     type="time"
                     value={settings.quiet_hours_start}
                     onChange={e => setSettings({ ...settings, quiet_hours_start: e.target.value })}
-                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                   <span className="text-gray-400">–</span>
                   <input
                     type="time"
                     value={settings.quiet_hours_end}
                     onChange={e => setSettings({ ...settings, quiet_hours_end: e.target.value })}
-                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="flex-1 px-4 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -696,7 +696,7 @@ export default function CommunicationPage() {
       {/* Edit Rule Modal */}
       {editingRule && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl">
+          <div className="bg-white rounded-xl w-full max-w-lg shadow-xl">
             <div className="flex items-center justify-between p-5 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Pencil className="w-5 h-5" />
@@ -714,7 +714,7 @@ export default function CommunicationPage() {
                   value={editTemplate}
                   onChange={e => setEditTemplate(e.target.value)}
                   rows={4}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                  className="w-full px-4 py-3 bg-gray-50 border border-[#E2E8F0] rounded-xl text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] resize-none"
                 />
                 <p className="text-xs text-gray-400 mt-1 text-right">
                   {smsInfo(editTemplate)}
@@ -738,7 +738,7 @@ export default function CommunicationPage() {
 
               <div>
                 <label className="text-xs text-gray-500 block mb-2">Förhandsgranskning:</label>
-                <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700">
+                <div className="px-4 py-3 bg-gray-50 border border-[#E2E8F0] rounded-xl text-sm text-gray-700">
                   {getPreview(editTemplate)}
                 </div>
               </div>

@@ -259,7 +259,7 @@ export default function QuoteStandardTextsPage() {
 
       {/* Empty state */}
       {!loading && filteredTexts.length === 0 && !showNew && (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-12 text-center">
           <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-900 mb-2">
             Inga {activeTypeInfo?.label.toLowerCase() || 'texter'} sparade
@@ -289,7 +289,7 @@ export default function QuoteStandardTextsPage() {
 
       {/* New text form */}
       {showNew && (
-        <div className="bg-white border border-primary-300 rounded-xl p-5 mb-4 shadow-sm">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-5 mb-4">
           <h3 className="text-sm font-semibold text-gray-900 mb-3">
             Ny {activeTypeInfo?.label.toLowerCase() || 'text'}
           </h3>
@@ -302,7 +302,7 @@ export default function QuoteStandardTextsPage() {
                 onChange={e => setNewName(e.target.value)}
                 placeholder="T.ex. Standard inledning"
                 autoFocus
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
               />
             </div>
             <div>
@@ -312,7 +312,7 @@ export default function QuoteStandardTextsPage() {
                 onChange={e => setNewContent(e.target.value)}
                 rows={5}
                 placeholder="Skriv din text här..."
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] resize-y"
               />
             </div>
             <div className="flex gap-2 justify-end">
@@ -341,7 +341,7 @@ export default function QuoteStandardTextsPage() {
           {filteredTexts.map(text => (
             <div
               key={text.id}
-              className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 transition-colors"
+              className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-colors"
             >
               {editingId === text.id ? (
                 // Edit mode
@@ -353,7 +353,7 @@ export default function QuoteStandardTextsPage() {
                       value={editName}
                       onChange={e => setEditName(e.target.value)}
                       autoFocus
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                     />
                   </div>
                   <div>
@@ -362,7 +362,7 @@ export default function QuoteStandardTextsPage() {
                       value={editContent}
                       onChange={e => setEditContent(e.target.value)}
                       rows={6}
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-y"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E] resize-y"
                     />
                   </div>
                   <div className="flex gap-2 justify-end">

@@ -202,14 +202,14 @@ export default function WarrantiesPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-emerald-50 rounded-full blur-[128px]" />
       </div>
@@ -232,7 +232,7 @@ export default function WarrantiesPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <Shield className="w-5 h-5 text-emerald-600" />
@@ -243,7 +243,7 @@ export default function WarrantiesPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
@@ -254,7 +254,7 @@ export default function WarrantiesPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center">
                 <Clock className="w-5 h-5 text-gray-500" />
@@ -265,7 +265,7 @@ export default function WarrantiesPage() {
               </div>
             </div>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Calendar className="w-5 h-5 text-sky-700" />
@@ -287,10 +287,10 @@ export default function WarrantiesPage() {
               placeholder="Sök garanti eller kund..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 min-h-[44px]"
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 min-h-[44px]"
             />
           </div>
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
             {[
               { id: '', label: 'Alla' },
               { id: 'active', label: 'Aktiva' },
@@ -329,7 +329,7 @@ export default function WarrantiesPage() {
         )}
 
         {/* Warranty list */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200">
+        <div className="bg-white rounded-xl border border-[#E2E8F0]">
           {filtered.length === 0 ? (
             <div className="p-12 text-center">
               <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -354,7 +354,7 @@ export default function WarrantiesPage() {
                           <span className={`px-2 py-0.5 text-xs rounded-full border font-medium ${getStatusStyle(w.status)}`}>
                             {getStatusText(w.status)}
                           </span>
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-sky-700 border border-primary-200">
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-primary-50 text-sky-700 border border-[#E2E8F0]">
                             {getTypeText(w.warranty_type)}
                           </span>
                           {isExpiringSoon && (
@@ -390,7 +390,7 @@ export default function WarrantiesPage() {
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-gray-900">{editingWarranty ? 'Redigera garanti' : 'Ny garanti'}</h3>
               <button onClick={() => setModalOpen(false)} className="p-2 text-gray-400 hover:text-gray-900">
@@ -403,7 +403,7 @@ export default function WarrantiesPage() {
                 <select
                   value={form.customer_id}
                   onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -418,7 +418,7 @@ export default function WarrantiesPage() {
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder="T.ex. Badrumsrenovering - Tätskikt"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -428,7 +428,7 @@ export default function WarrantiesPage() {
                     type="date"
                     value={form.start_date}
                     onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   />
                 </div>
                 <div>
@@ -437,7 +437,7 @@ export default function WarrantiesPage() {
                     type="date"
                     value={form.end_date}
                     onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   />
                 </div>
               </div>
@@ -446,7 +446,7 @@ export default function WarrantiesPage() {
                 <select
                   value={form.warranty_type}
                   onChange={(e) => setForm({ ...form, warranty_type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 >
                   <option value="standard">Standard (2 år)</option>
                   <option value="extended">Utökad</option>
@@ -461,7 +461,7 @@ export default function WarrantiesPage() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="Vad omfattar garantin?"
                   rows={2}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
                 />
               </div>
               <div>
@@ -471,7 +471,7 @@ export default function WarrantiesPage() {
                   onChange={(e) => setForm({ ...form, terms: e.target.value })}
                   placeholder="Specifika garantivillkor..."
                   rows={2}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
                 />
               </div>
             </div>

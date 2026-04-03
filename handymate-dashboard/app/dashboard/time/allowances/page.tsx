@@ -166,7 +166,7 @@ export default function AllowancesPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -187,7 +187,7 @@ export default function AllowancesPage() {
         </div>
 
         {/* Week navigator */}
-        <div className="flex items-center justify-between mb-4 bg-white border border-gray-200 rounded-xl px-4 py-3">
+        <div className="flex items-center justify-between mb-4 bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
           <button onClick={() => setWeekDate(subWeeks(weekDate, 1))} className="p-1 text-gray-400 hover:text-gray-900 rounded-lg transition-all">
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -204,15 +204,15 @@ export default function AllowancesPage() {
 
         {/* Summary cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
-          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Vecka totalt</p>
             <p className="text-lg font-semibold text-gray-900">{fmtKr(weekTotal)}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Debiterbart</p>
             <p className="text-lg font-semibold text-primary-700">{fmtKr(weekBillable)}</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
             <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Löneunderlag</p>
             <p className="text-lg font-semibold text-gray-900">{fmtKr(weekTotal)}</p>
           </div>
@@ -224,7 +224,7 @@ export default function AllowancesPage() {
             <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
           </div>
         ) : reports.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-12 text-center">
             <Car className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Inga ersättningar denna vecka</p>
             <p className="text-xs text-gray-400 mt-1">Klicka "Ny ersättning" för att rapportera</p>
@@ -234,7 +234,7 @@ export default function AllowancesPage() {
             {sortedDates.map(date => (
               <div key={date}>
                 <h3 className="text-sm font-medium text-gray-500 mb-2 capitalize">{fmtDate(date)}</h3>
-                <div className="bg-white border border-gray-200 rounded-xl divide-y divide-gray-100">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl divide-y divide-gray-100">
                   {reportsByDate[date].map(report => (
                     <div key={report.id} className="flex items-start gap-3 p-4">
                       <div className={`mt-0.5 p-2 rounded-lg flex-shrink-0 ${
@@ -249,7 +249,7 @@ export default function AllowancesPage() {
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-gray-900">{report.allowance_type?.name || 'Okänd typ'}</p>
                           {report.billable && (
-                            <span className="text-[10px] px-1.5 py-0.5 bg-primary-50 text-primary-700 border border-primary-300 rounded-full">Debiterbar</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-primary-50 text-primary-700 border border-[#E2E8F0] rounded-full">Debiterbar</span>
                           )}
                         </div>
                         {report.project && (
@@ -385,7 +385,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Ny ersättning</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -400,7 +400,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             <select
               value={typeId}
               onChange={e => setTypeId(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
             >
               <option value="">Välj ersättningstyp...</option>
               {systemTypes.length > 0 && (
@@ -436,7 +436,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
             <select
               value={projectId}
               onChange={e => setProjectId(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
             >
               <option value="">Inget projekt</option>
               {projects.map(p => (
@@ -452,7 +452,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -468,7 +468,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               placeholder="0"
               min="0"
               step="0.5"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
             {selectedType && quantity && (
               <p className="text-xs text-gray-500 mt-1">
@@ -487,7 +487,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
                   value={fromAddress}
                   onChange={e => setFromAddress(e.target.value)}
                   placeholder="Startadress"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -497,7 +497,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
                   value={toAddress}
                   onChange={e => setToAddress(e.target.value)}
                   placeholder="Slutadress"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
             </div>
@@ -511,7 +511,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Valfri kommentar..."
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -529,7 +529,7 @@ function NewAllowanceModal({ types, projects, currentUserId, onClose, onSaved, o
         </div>
 
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200">
+          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200">
             Avbryt
           </button>
           <button
@@ -589,7 +589,7 @@ function NewTypeModal({ onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Ny ersättningstyp</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -606,7 +606,7 @@ function NewTypeModal({ onClose, onSaved }: {
               onChange={e => setName(e.target.value)}
               placeholder="T.ex. Reseersättning"
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -622,7 +622,7 @@ function NewTypeModal({ onClose, onSaved }: {
                   else if (e.target.value === 'hourly') setUnit('tim')
                   else setUnit('st')
                 }}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
               >
                 <option value="mileage">Milersättning</option>
                 <option value="daily">Dagersättning</option>
@@ -635,7 +635,7 @@ function NewTypeModal({ onClose, onSaved }: {
               <select
                 value={unit}
                 onChange={e => setUnit(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
               >
                 <option value="km">km</option>
                 <option value="dag">dag</option>
@@ -653,7 +653,7 @@ function NewTypeModal({ onClose, onSaved }: {
               onChange={e => setRate(e.target.value)}
               placeholder="0"
               min="0"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -674,7 +674,7 @@ function NewTypeModal({ onClose, onSaved }: {
         </div>
 
         <div className="flex gap-3 mt-6">
-          <button onClick={onClose} className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200">
+          <button onClick={onClose} className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200">
             Avbryt
           </button>
           <button

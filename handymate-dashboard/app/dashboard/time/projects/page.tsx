@@ -70,7 +70,7 @@ export default function ProjectComparisonPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
@@ -79,7 +79,7 @@ export default function ProjectComparisonPage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/dashboard/time"
-            className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-500 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
@@ -105,8 +105,8 @@ export default function ProjectComparisonPage() {
               onClick={() => setStatusFilter(opt.value)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
                 statusFilter === opt.value
-                  ? 'bg-primary-100 text-primary-700 border border-primary-300'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+                  ? 'bg-primary-100 text-primary-700 border border-[#E2E8F0]'
+                  : 'bg-white text-gray-600 border border-[#E2E8F0] hover:border-gray-300'
               }`}>
               {opt.label}
             </button>
@@ -118,14 +118,14 @@ export default function ProjectComparisonPage() {
             <Loader2 className="w-8 h-8 animate-spin text-primary-600" />
           </div>
         ) : projects.length === 0 ? (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Inga projekt att visa</p>
           </div>
         ) : (
           <div className="space-y-4">
             {projects.map(proj => (
-              <div key={proj.project_id} className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <div key={proj.project_id} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                 {/* Project header */}
                 <div className="p-4 border-b border-gray-100">
                   <div className="flex items-center justify-between">

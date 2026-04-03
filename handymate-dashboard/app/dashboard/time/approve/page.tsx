@@ -103,7 +103,7 @@ export default function ApprovePage() {
 
   return (
     <PermissionGate permission="approve_time">
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Toast */}
       {toast.show && (
         <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
@@ -117,7 +117,7 @@ export default function ApprovePage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/dashboard/time"
-            className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-500 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
@@ -136,7 +136,7 @@ export default function ApprovePage() {
             <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
           </div>
         ) : weeks.length === 0 ? (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Check className="w-12 h-12 text-emerald-300 mx-auto mb-3" />
             <p className="text-gray-900 font-medium">Allt godkänt!</p>
             <p className="text-gray-500 text-sm mt-1">Inga veckorapporter väntar på godkännande</p>
@@ -148,7 +148,7 @@ export default function ApprovePage() {
               const isLoading = actionLoading === week.weekKey
 
               return (
-                <div key={week.weekKey} className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+                <div key={week.weekKey} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                   {/* Week header */}
                   <button
                     onClick={() => setExpanded(isExpanded ? null : week.weekKey)}

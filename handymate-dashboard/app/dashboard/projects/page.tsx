@@ -297,7 +297,7 @@ export default function ProjectsPage() {
   }, 0)
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -329,28 +329,28 @@ export default function ProjectsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <FolderKanban className="w-4 h-4 text-primary-600" />
               <span className="text-xs text-gray-400">Aktiva</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{activeCount}</p>
           </div>
-          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="w-4 h-4 text-red-600" />
               <span className="text-xs text-gray-400">Över budget</span>
             </div>
             <p className={`text-2xl font-bold ${overBudget > 0 ? 'text-red-600' : 'text-gray-900'}`}>{overBudget}</p>
           </div>
-          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-amber-600" />
               <span className="text-xs text-gray-400">Ofakturerat</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr</p>
           </div>
-          <div className="bg-white shadow-sm border border-gray-200 rounded-2xl p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle className="w-4 h-4 text-emerald-600" />
               <span className="text-xs text-gray-400">Totalt</span>
@@ -373,7 +373,7 @@ export default function ProjectsPage() {
                 className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
                   filter === f.key
                     ? 'bg-primary-700 text-white'
-                    : 'bg-white text-gray-500 hover:text-white border border-gray-200'
+                    : 'bg-white text-gray-500 hover:text-white border border-[#E2E8F0]'
                 }`}
               >
                 {f.label}
@@ -387,13 +387,13 @@ export default function ProjectsPage() {
               placeholder="Sök projekt..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+              className="w-full pl-11 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
         </div>
 
         {/* Project List */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
@@ -546,7 +546,7 @@ export default function ProjectsPage() {
       {/* Create Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Nytt projekt</h3>
               <button onClick={() => { setShowCreateModal(false); setPendingFiles([]) }} className="text-gray-400 hover:text-gray-900">
@@ -562,7 +562,7 @@ export default function ProjectsPage() {
                   value={newProject.name}
                   onChange={e => setNewProject({ ...newProject, name: e.target.value })}
                   placeholder="T.ex. Badrumsrenovering Svensson"
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -571,7 +571,7 @@ export default function ProjectsPage() {
                 <select
                   value={newProject.customer_id}
                   onChange={e => setNewProject({ ...newProject, customer_id: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name}</option>)}
@@ -583,7 +583,7 @@ export default function ProjectsPage() {
                 <select
                   value={newProject.project_type}
                   onChange={e => setNewProject({ ...newProject, project_type: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                  className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="hourly">Löpande räkning</option>
                   <option value="fixed_price">Fast pris</option>
@@ -599,7 +599,7 @@ export default function ProjectsPage() {
                     value={newProject.budget_hours}
                     onChange={e => setNewProject({ ...newProject, budget_hours: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -609,7 +609,7 @@ export default function ProjectsPage() {
                     value={newProject.budget_amount}
                     onChange={e => setNewProject({ ...newProject, budget_amount: e.target.value })}
                     placeholder="0"
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -621,7 +621,7 @@ export default function ProjectsPage() {
                     type="date"
                     value={newProject.start_date}
                     onChange={e => setNewProject({ ...newProject, start_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -630,7 +630,7 @@ export default function ProjectsPage() {
                     type="date"
                     value={newProject.end_date}
                     onChange={e => setNewProject({ ...newProject, end_date: e.target.value })}
-                    className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30"
+                    className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function ProjectsPage() {
                   <label className="block text-sm text-gray-500 mb-2">Utförare</label>
                   <div className="space-y-1.5 max-h-32 overflow-y-auto">
                     {teamMembers.map(member => (
-                      <label key={member.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-gray-100 transition">
+                      <label key={member.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-[#E2E8F0] cursor-pointer hover:bg-gray-100 transition">
                         <input
                           type="checkbox"
                           checked={selectedTeam.includes(member.id)}
@@ -680,7 +680,7 @@ export default function ProjectsPage() {
                 {pendingFiles.length > 0 && (
                   <div className="mt-2 space-y-1.5">
                     {pendingFiles.map((file, idx) => (
-                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-[#E2E8F0]">
                         <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
                         <span className="text-sm text-gray-700 truncate flex-1">{file.name}</span>
                         <span className="text-xs text-gray-400 flex-shrink-0">{(file.size / 1024).toFixed(0)} KB</span>
@@ -708,7 +708,7 @@ export default function ProjectsPage() {
                 </button>
                 <button
                   onClick={() => { setShowCreateModal(false); setPendingFiles([]) }}
-                  className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-500 hover:text-gray-900"
+                  className="px-6 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900"
                 >
                   Avbryt
                 </button>

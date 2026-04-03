@@ -412,7 +412,7 @@ function StatCard({ label, value, suffix, icon: Icon, color }: {
   label: string; value: number | string; suffix?: string; icon: typeof Bot; color: string
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-all group">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 hover:shadow-md transition-all group">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
@@ -495,7 +495,7 @@ function ToolStep({ call, index, total, count = 1 }: {
     <div className="flex gap-3">
       {/* Timeline */}
       <div className="flex flex-col items-center w-8 flex-shrink-0">
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center z-10 shadow-sm ${
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center z-10 ${
           call.result.success
             ? 'bg-primary-100 text-primary-700 shadow-primary-600/20'
             : 'bg-red-100 text-red-500 shadow-red-500/20'
@@ -551,7 +551,7 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   }, [])
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden animate-in fade-in">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden animate-in fade-in">
       {/* Header */}
       <div className="p-5 bg-gradient-to-br from-gray-50 to-slate-50 border-b border-gray-200">
         <div className="flex items-start justify-between">
@@ -570,14 +570,14 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all"
+            className="w-8 h-8 rounded-lg border border-[#E2E8F0] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 hover:border-red-200 transition-all"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Summary — rendered as proper markdown */}
-        <div className="mt-3 p-3 bg-white rounded-lg border border-gray-200 text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-700">
+        <div className="mt-3 p-3 bg-white rounded-lg border border-[#E2E8F0] text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-700">
           {run.final_response ? (
             <ReactMarkdown>{humanizeResponse(run.final_response)}</ReactMarkdown>
           ) : (
@@ -627,15 +627,15 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
         {showTech && (
           <div className="px-5 pb-5 space-y-3">
             <div className="grid grid-cols-3 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="bg-gray-50 rounded-lg p-3 border border-[#E2E8F0]">
                 <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Tokens</p>
                 <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">{run.tokens_used.toLocaleString()}</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="bg-gray-50 rounded-lg p-3 border border-[#E2E8F0]">
                 <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Kostnad</p>
                 <p className="text-sm font-mono font-semibold text-gray-900 mt-0.5">{formatCost(run.estimated_cost)}</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="bg-gray-50 rounded-lg p-3 border border-[#E2E8F0]">
                 <p className="text-[10px] text-gray-400 uppercase font-semibold tracking-wider">Run ID</p>
                 <p className="text-xs font-mono text-gray-500 mt-0.5 truncate">{run.run_id}</p>
               </div>
@@ -644,12 +644,12 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
               <div>
                 <p className="text-xs font-semibold text-gray-500 mb-2">Rå verktygsdata</p>
                 {allToolCalls.map((call, i) => (
-                  <div key={i} className="mb-2 bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div key={i} className="mb-2 bg-gray-50 rounded-lg p-3 border border-[#E2E8F0]">
                     <p className="text-xs font-mono font-semibold text-gray-700 mb-1">{call.tool}</p>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <p className="text-[10px] text-gray-400 uppercase mb-0.5">Input</p>
-                        <pre className="text-[11px] text-gray-600 bg-white p-2 rounded border border-gray-200 overflow-auto max-h-32 font-mono leading-relaxed">
+                        <pre className="text-[11px] text-gray-600 bg-white p-2 rounded border border-[#E2E8F0] overflow-auto max-h-32 font-mono leading-relaxed">
                           {JSON.stringify(call.input, null, 2)}
                         </pre>
                       </div>
@@ -752,7 +752,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-primary-600" />
@@ -810,7 +810,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
               type="number"
               value={settings.require_approval_above}
               onChange={e => onUpdate('require_approval_above', Number(e.target.value))}
-              className="w-32 px-3 py-1.5 rounded-lg border border-gray-200 text-sm font-mono text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
+              className="w-32 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-sm font-mono text-gray-900 focus:outline-none focus:border-[#0F766E] focus:border-primary-600"
             />
             <span className="text-sm text-gray-500">kr</span>
             <span className="text-xs text-gray-400 ml-2">
@@ -900,7 +900,7 @@ function ManualTrigger({ businessId, onTriggered }: {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
       <div className="flex items-center gap-2 mb-3">
         {TEAM[0].avatar ? (
           <img src={TEAM[0].avatar} alt="Matte" className="w-7 h-7 rounded-full object-cover" />
@@ -915,7 +915,7 @@ function ManualTrigger({ businessId, onTriggered }: {
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {history.map(q => (
             <button key={q} onClick={() => { setInstruction(q); inputRef.current?.focus() }}
-              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-gray-200 text-[11px] text-gray-500 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
+              className="group flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-50 border border-[#E2E8F0] text-[11px] text-gray-500 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
               <span className="truncate max-w-[180px]">{q}</span>
               <span onClick={(e) => { e.stopPropagation(); removeFromHistory(q) }}
                 className="text-gray-300 hover:text-red-400 ml-0.5">×</span>
@@ -930,10 +930,10 @@ function ManualTrigger({ businessId, onTriggered }: {
           onChange={e => setInstruction(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
           placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
-          className="flex-1 px-4 py-2.5 rounded-lg border border-gray-200 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
+          className="flex-1 px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#0F766E] focus:border-primary-600"
           disabled={loading} />
         <button onClick={handleTrigger} disabled={loading || !instruction.trim()}
-          className="px-4 py-2.5 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all flex items-center gap-2 shadow-sm shadow-primary-600/20">
+          className="px-4 py-2.5 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all flex items-center gap-2 shadow-primary-600/20">
           {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {loading ? `${elapsed}s…` : 'Kör'}
         </button>
@@ -945,7 +945,7 @@ function ManualTrigger({ businessId, onTriggered }: {
           <button key={btn.label} type="button"
             onClick={() => { setInstruction(btn.text); inputRef.current?.focus() }}
             disabled={loading}
-            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors disabled:opacity-50">
+            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-[#E2E8F0] text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors disabled:opacity-50">
             {btn.emoji} {btn.label}
           </button>
         ))}
@@ -1126,7 +1126,7 @@ export default function AgentDashboardPage() {
     return (
       <div className="p-4 sm:p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center shadow-sm shadow-primary-600/20">
+          <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center shadow-primary-600/20">
             <Bot className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -1136,7 +1136,7 @@ export default function AgentDashboardPage() {
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 h-24 animate-pulse" />
+            <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] p-5 h-24 animate-pulse" />
           ))}
         </div>
       </div>
@@ -1172,7 +1172,7 @@ export default function AgentDashboardPage() {
               }
               setFilterType(agent.id)
             }}
-            className={`flex flex-col items-center gap-2 px-4 py-4 rounded-2xl border transition-all min-w-[110px] ${
+            className={`flex flex-col items-center gap-2 px-4 py-4 rounded-xl border transition-all min-w-[110px] ${
               isDisabled
                 ? 'bg-gray-50 border-gray-100 opacity-60 cursor-default'
                 : filterType === agent.id
@@ -1184,7 +1184,7 @@ export default function AgentDashboardPage() {
           >
             <div className="relative">
               {agent.avatar ? (
-                <img src={agent.avatar} alt={agent.name} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-sm ${isDisabled ? 'grayscale opacity-60' : ''}`} />
+                <img src={agent.avatar} alt={agent.name} className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover ${isDisabled ? 'grayscale opacity-60' : ''}`} />
               ) : (
                 <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${agent.color} flex items-center justify-center text-white font-bold text-xl ${isDisabled ? 'grayscale opacity-60' : ''}`}>
                   {agent.initials}
@@ -1248,7 +1248,7 @@ export default function AgentDashboardPage() {
           <AutomationValueWidget />
 
           {/* Chart */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
             <p className="text-sm font-bold text-gray-900 mb-4">Aktivitet senaste 7 dagarna</p>
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={chartData}>
@@ -1280,7 +1280,7 @@ export default function AgentDashboardPage() {
 
           {/* Team Communication */}
           {teamMessages.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-5">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-5">
               <h3 className="text-sm font-bold text-gray-900 mb-3">Teamkommunikation</h3>
               <div className="space-y-2">
                 {teamMessages.slice(0, 5).map((msg, i) => {
@@ -1315,7 +1315,7 @@ export default function AgentDashboardPage() {
           {/* Feed + Detail */}
           <div className={`grid gap-5 ${selectedRun ? 'grid-cols-1 lg:grid-cols-[400px_1fr]' : 'grid-cols-1'}`}>
             {/* Activity Feed */}
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <span className="text-sm font-bold text-gray-900">Teamaktivitet</span>
                 <span className="text-xs text-gray-400">
@@ -1351,7 +1351,7 @@ export default function AgentDashboardPage() {
           </div>
       {showTeamUpgrade && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setShowTeamUpgrade(false)}>
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 text-center" onClick={e => e.stopPropagation()}>
             <div className="text-4xl mb-4">⚡</div>
             <h2 className="text-xl font-semibold mb-2">Uppgradera till Professional</h2>
             <p className="text-gray-500 mb-6">
@@ -1399,7 +1399,7 @@ function AutomationValueWidget() {
   const confirmedItems = data.items.filter(i => i.status === 'confirmed')
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 shadow-sm">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
       {hasValue ? (
         <>
           <button onClick={() => setExpanded(!expanded)} className="w-full text-left">

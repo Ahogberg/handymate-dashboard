@@ -190,14 +190,14 @@ export default function BookingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -213,7 +213,7 @@ export default function BookingsPage() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-md mx-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl p-6 w-full max-w-md mx-4">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">{editingBooking ? 'Redigera bokning' : 'Ny bokning'}</h3>
               <button onClick={() => setModalOpen(false)} className="text-gray-400 hover:text-gray-900"><X className="w-5 h-5" /></button>
@@ -225,7 +225,7 @@ export default function BookingsPage() {
                 <select
                   value={form.customer_id}
                   onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Välj kund...</option>
                   {customers.map(c => (
@@ -242,7 +242,7 @@ export default function BookingsPage() {
                   type="date"
                   value={form.date}
                   onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -252,7 +252,7 @@ export default function BookingsPage() {
                     type="time"
                     value={form.start_time}
                     onChange={(e) => setForm({ ...form, start_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -261,7 +261,7 @@ export default function BookingsPage() {
                     type="time"
                     value={form.end_time}
                     onChange={(e) => setForm({ ...form, end_time: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function BookingsPage() {
                   <select
                     value={form.status}
                     onChange={(e) => setForm({ ...form, status: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="confirmed">Bekräftad</option>
                     <option value="completed">Slutförd</option>
@@ -287,7 +287,7 @@ export default function BookingsPage() {
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   placeholder="T.ex. Elinstallation - 3 nya uttag"
                   rows={3}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E] resize-none"
                 />
               </div>
             </div>
@@ -314,7 +314,7 @@ export default function BookingsPage() {
             <p className="text-gray-500">{filteredBookings.length} bokningar</p>
           </div>
           <div className="flex space-x-4">
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+            <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
               {(['all', 'today', 'upcoming'] as const).map((f) => (
                 <button
                   key={f}
@@ -334,7 +334,7 @@ export default function BookingsPage() {
           </div>
         </div>
 
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {filteredBookings.length === 0 ? (
             <div className="text-center py-12">
               <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -365,7 +365,7 @@ export default function BookingsPage() {
                   <tr key={booking.booking_id} className="hover:bg-gray-100/30 transition-all">
                     <td className="px-6 py-4">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300">
+                        <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
                           <User className="w-5 h-5 text-sky-700" />
                         </div>
                         <div className="ml-4">

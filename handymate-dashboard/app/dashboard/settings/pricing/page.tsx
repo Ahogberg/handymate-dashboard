@@ -316,7 +316,7 @@ export default function PricingSettingsPage() {
             onClick={() => setTab(t.key)}
             className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               tab === t.key
-                ? 'bg-white text-gray-900 shadow-sm'
+                ? 'bg-white text-gray-900'
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
@@ -348,7 +348,7 @@ export default function PricingSettingsPage() {
           </div>
 
           {segments.map(seg => (
-            <div key={seg.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <div key={seg.id} className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
               <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: seg.color }} />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{seg.name}</p>
@@ -406,7 +406,7 @@ export default function PricingSettingsPage() {
           </div>
 
           {contractTypes.map(ct => (
-            <div key={ct.id} className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3">
+            <div key={ct.id} className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{ct.name}</p>
                 <p className="text-xs text-gray-400">
@@ -447,7 +447,7 @@ export default function PricingSettingsPage() {
           </div>
 
           {priceLists.map(pl => (
-            <div key={pl.id} className="bg-white border border-gray-200 rounded-xl p-4">
+            <div key={pl.id} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -739,12 +739,12 @@ export default function PricingSettingsPage() {
                         value={item.name}
                         onChange={e => updatePriceListItem(i, { name: e.target.value })}
                         placeholder="Namn"
-                        className="flex-1 min-w-0 px-2 py-1 border border-gray-200 rounded text-sm bg-white"
+                        className="flex-1 min-w-0 px-2 py-1 border border-[#E2E8F0] rounded text-sm bg-white"
                       />
                       <select
                         value={item.unit}
                         onChange={e => updatePriceListItem(i, { unit: e.target.value })}
-                        className="w-16 px-1 py-1 border border-gray-200 rounded text-sm bg-white"
+                        className="w-16 px-1 py-1 border border-[#E2E8F0] rounded text-sm bg-white"
                       >
                         <option value="tim">tim</option>
                         <option value="st">st</option>
@@ -757,7 +757,7 @@ export default function PricingSettingsPage() {
                         value={item.price || ''}
                         onChange={e => updatePriceListItem(i, { price: Number(e.target.value) })}
                         placeholder="Pris"
-                        className="w-20 px-2 py-1 border border-gray-200 rounded text-sm bg-white text-right"
+                        className="w-20 px-2 py-1 border border-[#E2E8F0] rounded text-sm bg-white text-right"
                       />
                       <span className="text-xs text-gray-400 shrink-0">kr</span>
                       <label className="flex items-center gap-1 shrink-0" title="ROT-berättigad">
@@ -805,7 +805,7 @@ function Modal({ children, onClose, wide }: { children: React.ReactNode; onClose
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className={`bg-white rounded-2xl shadow-xl p-6 w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>
+      <div className={`bg-white rounded-xl shadow-xl p-6 w-full ${wide ? 'max-w-2xl' : 'max-w-md'}`}>
         {children}
       </div>
     </div>

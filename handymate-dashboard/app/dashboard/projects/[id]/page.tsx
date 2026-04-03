@@ -1424,7 +1424,7 @@ export default function ProjectDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
       </div>
     )
@@ -1432,7 +1432,7 @@ export default function ProjectDetailPage() {
 
   if (!project) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Projektet hittades inte</div>
       </div>
     )
@@ -1482,7 +1482,7 @@ export default function ProjectDetailPage() {
   // --- Render ---
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -1530,7 +1530,7 @@ export default function ProjectDetailPage() {
             </button>
 
             {statusDropdownOpen && (
-              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-20 w-44 overflow-hidden">
+              <div className="absolute top-full right-0 mt-2 bg-white border border-[#E2E8F0] rounded-xl shadow-xl z-20 w-44 overflow-hidden">
                 {Object.entries(STATUS_MAP).map(([key, label]) => (
                   <button
                     key={key}
@@ -1605,22 +1605,22 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {/* Snabbnavigering */}
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setActiveTab('material')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
+              <button onClick={() => setActiveTab('material')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 📦 Material
               </button>
-              <button onClick={() => setActiveTab('economy')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
+              <button onClick={() => setActiveTab('economy')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 💰 Ekonomi
               </button>
-              <button onClick={() => setActiveTab('documents')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
+              <button onClick={() => setActiveTab('documents')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 📄 Dokument
               </button>
-              <button onClick={() => setActiveTab('time')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
+              <button onClick={() => setActiveTab('time')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
                 🕐 Tidrapporter
               </button>
             </div>
 
             {/* Project info card */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-secondary-700" />
                 Projektinfo
@@ -1675,7 +1675,7 @@ export default function ProjectDetailPage() {
               const statusLabel = costPct > 95 ? '🔴 Över budget' : costPct > 75 ? '⚠️ Håll koll' : '✅ Inom budget'
               const projectedCost = hoursPct > 10 ? Math.round(costTotal / (hoursPct / 100)) : costTotal
               return (
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-secondary-700" />
                     Lönsamhet
@@ -1717,7 +1717,7 @@ export default function ProjectDetailPage() {
             })()}
 
             {/* Progress bar */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Target className="w-5 h-5 text-primary-700" />
@@ -1778,7 +1778,7 @@ export default function ProjectDetailPage() {
 
             {/* Budget vs Actual */}
             {(project.budget_hours || project.budget_amount) && summary && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <BarChart3 className="w-5 h-5 text-primary-500" />
                   Budget vs Utfall
@@ -1819,7 +1819,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Personal (team allocation) */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                   <Users className="w-5 h-5 text-secondary-700" />
@@ -1847,7 +1847,7 @@ export default function ProjectDetailPage() {
               ) : (
                 <div className="flex flex-wrap gap-3">
                   {projectTeam.map(assignment => (
-                    <div key={assignment.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200">
+                    <div key={assignment.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-[#E2E8F0]">
                       <div
                         className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                         style={{ backgroundColor: assignment.business_user.color }}
@@ -1870,28 +1870,28 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <button
                 onClick={() => openTimeModal()}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
               >
                 <Timer className="w-5 h-5 text-secondary-700" />
                 <span className="text-sm text-gray-700">Lägg till tid</span>
               </button>
               <button
                 onClick={() => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
               >
                 <Layers className="w-5 h-5 text-primary-500" />
                 <span className="text-sm text-gray-700">Nytt delmoment</span>
               </button>
               <button
                 onClick={() => { setActiveTab('changes'); setChangeModal({ open: true, editing: null }) }}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
               >
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
                 <span className="text-sm text-gray-700">Ny ATA</span>
               </button>
               <button
                 onClick={() => setActiveTab('economy')}
-                className="flex flex-col items-center gap-2 p-4 bg-white shadow-sm rounded-xl border border-gray-200 hover:border-primary-300 transition-all text-center"
+                className="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 transition-all text-center"
               >
                 <Receipt className="w-5 h-5 text-emerald-600" />
                 <span className="text-sm text-gray-700">Fakturera</span>
@@ -1918,7 +1918,7 @@ export default function ProjectDetailPage() {
             </div>
 
             {projectSchedule.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 mb-2">Inga schemalagda tillfällen ännu</p>
                 <p className="text-gray-400 text-sm">Planera arbete via resursplaneringen</p>
@@ -1937,7 +1937,7 @@ export default function ProjectDetailPage() {
                   return (
                     <div
                       key={entry.id}
-                      className={`bg-white shadow-sm rounded-xl border border-gray-200 p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
+                      className={`bg-white rounded-xl border border-[#E2E8F0] p-4 flex items-center gap-4 ${isPast ? 'opacity-60' : ''}`}
                     >
                       <div className="w-1 h-12 rounded-full shrink-0" style={{ backgroundColor: entry.color || entry.business_user?.color || '#8B5CF6' }} />
                       <div className="flex-1 min-w-0">
@@ -1988,13 +1988,13 @@ export default function ProjectDetailPage() {
             </div>
 
             {milestones.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Layers className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga delmoment annu</p>
                 <p className="text-xs text-gray-400 mt-1">Lagg till delmoment for att spara framsteg</p>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
                 <DndContext sensors={milestoneDndSensors} collisionDetection={closestCenter} onDragEnd={handleMilestoneDragEnd}>
                   <SortableContext items={milestones.map(m => m.milestone_id)} strategy={verticalListSortingStrategy}>
                     {milestones.map(ms => (
@@ -2041,7 +2041,7 @@ export default function ProjectDetailPage() {
                   <p className="text-xs text-red-600 mb-1">Avgående</p>
                   <p className="text-lg font-bold text-red-600">-{formatCurrency(summary.ata_removals)}</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-500 mb-1">Netto</p>
                   <p className={`text-lg font-bold ${summary.ata_net >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
                     {summary.ata_net >= 0 ? '+' : ''}{formatCurrency(summary.ata_net)}
@@ -2051,7 +2051,7 @@ export default function ProjectDetailPage() {
             )}
 
             {changes.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <AlertTriangle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga ÄTA ännu</p>
                 <p className="text-xs text-gray-400 mt-1">Registrera tillägg, ändringar eller avgående arbeten</p>
@@ -2073,7 +2073,7 @@ export default function ProjectDetailPage() {
                   const sc = statusConfig[change.status] || statusConfig.draft
 
                   return (
-                    <div key={change.change_id} className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+                    <div key={change.change_id} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                       {/* Header row */}
                       <button
                         onClick={() => setExpandedAtaId(isExpanded ? null : change.change_id)}
@@ -2206,7 +2206,7 @@ export default function ProjectDetailPage() {
                             {(change.status === 'draft' || change.status === 'pending') && (
                               <button
                                 onClick={() => setChangeModal({ open: true, editing: change })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-[#E2E8F0] rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
                               >
                                 <Edit className="w-3.5 h-3.5" />
                                 Redigera
@@ -2221,7 +2221,7 @@ export default function ProjectDetailPage() {
                                   navigator.clipboard.writeText(url)
                                   showToast('Signeringslänk kopierad', 'success')
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-[#E2E8F0] rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
                               >
                                 <Copy className="w-3.5 h-3.5" />
                                 Kopiera länk
@@ -2266,15 +2266,15 @@ export default function ProjectDetailPage() {
             {/* Time summary */}
             {summary && (
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Totalt</p>
                   <p className="text-lg font-bold text-gray-900">{formatHours(summary.total_hours)}</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Debiterbart</p>
                   <p className="text-lg font-bold text-gray-900">{formatHours(summary.billable_hours)}</p>
                 </div>
-                <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
+                <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 text-center">
                   <p className="text-xs text-gray-400 mb-1">Ofakturerat</p>
                   <p className="text-lg font-bold text-amber-400">{formatHours(summary.uninvoiced_hours)}</p>
                 </div>
@@ -2282,7 +2282,7 @@ export default function ProjectDetailPage() {
             )}
 
             {timeEntries.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga tidrapporter annu</p>
                 <button onClick={() => openTimeModal()} className="text-sm text-secondary-700 hover:text-primary-700 mt-2 inline-block">
@@ -2290,7 +2290,7 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
                 {/* Table header */}
                 <div className="hidden sm:grid grid-cols-12 gap-4 px-4 py-3 text-xs text-gray-400 font-medium">
                   <div className="col-span-2">Datum</div>
@@ -2312,7 +2312,7 @@ export default function ProjectDetailPage() {
                           <span className="text-sm text-gray-900">{formatDate(entry.work_date)}</span>
                           <div className="flex items-center gap-2">
                             {entry.work_type?.name && (
-                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-primary-300">
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-[#E2E8F0]">
                                 {entry.work_type.name}
                               </span>
                             )}
@@ -2341,7 +2341,7 @@ export default function ProjectDetailPage() {
                         <div className="col-span-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(Math.round(total))}</div>
                         <div className="col-span-2 flex items-center justify-end gap-2">
                           {entry.work_type?.name && (
-                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-primary-300">
+                            <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-secondary-700 border border-[#E2E8F0]">
                               {entry.work_type.name}
                             </span>
                           )}
@@ -2367,22 +2367,22 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
                 <p className="text-xs text-gray-400 mb-1">Inköpskostnad</p>
                 <p className="text-xl font-bold text-gray-900">{formatCurrency(materialSummary?.total_purchase || 0)}</p>
               </div>
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
                 <p className="text-xs text-gray-400 mb-1">Kundpris</p>
                 <p className="text-xl font-bold text-gray-900">{formatCurrency(materialSummary?.total_sell || 0)}</p>
               </div>
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
                 <p className="text-xs text-gray-400 mb-1">Marginal</p>
                 <p className="text-xl font-bold text-emerald-600">
                   {formatCurrency(materialSummary?.margin_amount || 0)}
                   <span className="text-sm ml-1">({Math.round(materialSummary?.margin_percent || 0)}%)</span>
                 </p>
               </div>
-              <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
                 <p className="text-xs text-gray-400 mb-1">Ofakturerat</p>
                 <p className="text-xl font-bold text-amber-400">{formatCurrency(materialSummary?.uninvoiced_sell || 0)}</p>
               </div>
@@ -2411,7 +2411,7 @@ export default function ProjectDetailPage() {
 
             {/* Snabbval från prislista */}
             {projectPriceList.length > 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <p className="text-sm text-gray-400 mb-2">Snabbval från prislista:</p>
                 <div className="flex flex-wrap gap-2">
                   {projectPriceList.slice(0, 10).map((item) => (
@@ -2437,7 +2437,7 @@ export default function ProjectDetailPage() {
                           setToast({ show: true, message: 'Kunde inte lägga till', type: 'error' })
                         }
                       }}
-                      className="px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-700 text-sm hover:border-primary-400 hover:text-primary-700 transition-colors"
+                      className="px-3 py-1.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-700 text-sm hover:border-primary-400 hover:text-primary-700 transition-colors"
                     >
                       {item.name}
                     </button>
@@ -2445,7 +2445,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                 <p className="text-sm text-gray-400">Du har inga sparade artiklar än.</p>
                 <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
                   className="text-sm text-primary-700 hover:underline mt-1 inline-block">
@@ -2456,13 +2456,13 @@ export default function ProjectDetailPage() {
 
             {/* Material list */}
             {materials.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Package className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 mb-1">Inga material tillagda</p>
                 <p className="text-sm text-gray-400">Sök och lägg till material från grossister</p>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                 {/* Table header */}
                 <div className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-gray-200 text-xs text-gray-400 font-medium">
                   <div className="col-span-3">Produkt</div>
@@ -2589,7 +2589,7 @@ export default function ProjectDetailPage() {
                     Lagg till
                   </button>
                   {showAddMember && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl z-30 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#E2E8F0] rounded-xl shadow-xl z-30 overflow-hidden">
                       {allTeamMembers
                         .filter(m => !projectTeam.some(a => a.business_user_id === m.id))
                         .map(member => (
@@ -2623,13 +2623,13 @@ export default function ProjectDetailPage() {
             </div>
 
             {projectTeam.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <Users className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-500 font-medium">Ingen tilldelad annu</p>
                 <p className="text-gray-400 text-sm mt-1">Lagg till teammedlemmar for att tilldela dem detta projekt</p>
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 divide-y divide-gray-200">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
                 {projectTeam.map(assignment => (
                   <div key={assignment.id} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -2679,7 +2679,7 @@ export default function ProjectDetailPage() {
                     <a
                       key={gd.id}
                       href="/dashboard/documents"
-                      className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-primary-300 transition block"
+                      className="bg-white rounded-xl border border-[#E2E8F0] p-4 hover:border-primary-300 transition block"
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <div className="w-8 h-8 bg-primary-50 rounded-lg flex items-center justify-center">
@@ -2735,7 +2735,7 @@ export default function ProjectDetailPage() {
                 {documents.map((doc: any) => {
                   const isImage = doc.mime_type?.startsWith('image/')
                   return (
-                    <div key={doc.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 hover:border-gray-300 transition">
+                    <div key={doc.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 hover:border-gray-300 transition">
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${isImage ? 'bg-primary-600/20' : 'bg-primary-100'}`}>
                           {isImage ? <Image className="w-5 h-5 text-primary-500" /> : <FileText className="w-5 h-5 text-secondary-700" />}
@@ -2766,7 +2766,7 @@ export default function ProjectDetailPage() {
                 })}
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga dokument uppladdade</p>
                 <p className="text-xs text-gray-400 mt-1">Ladda upp foton, ritningar eller kontrakt</p>
@@ -2801,7 +2801,7 @@ export default function ProjectDetailPage() {
                         showToast('Kunde inte exportera PDF', 'error')
                       }
                     }}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors"
                   >
                     <Download className="w-4 h-4" /> Exportera PDF
                   </button>
@@ -2821,7 +2821,7 @@ export default function ProjectDetailPage() {
                   const weatherMap: Record<string, string> = { sunny: '\u2600\uFE0F Sol', cloudy: '\u26C5 Mulet', rainy: '\uD83C\uDF27\uFE0F Regn', snowy: '\u2744\uFE0F Snö', windy: '\uD83C\uDF2C\uFE0F Blåsigt' }
                   const weatherLabel = log.weather ? weatherMap[log.weather] || log.weather : null
                   return (
-                    <div key={log.id} className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                    <div key={log.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <p className="text-gray-900 font-semibold">
@@ -2869,7 +2869,7 @@ export default function ProjectDetailPage() {
                         <div className="flex gap-2 mt-2 overflow-x-auto">
                           {log.photos.map((photo: any, i: number) => (
                             <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                              <img src={photo.url} alt={photo.caption || `Foto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-gray-200" />
+                              <img src={photo.url} alt={photo.caption || `Foto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-[#E2E8F0]" />
                             </a>
                           ))}
                         </div>
@@ -2894,7 +2894,7 @@ export default function ProjectDetailPage() {
                 })}
               </div>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Inga dagboksanteckningar ännu</p>
                 <p className="text-xs text-gray-400 mt-1">Dokumentera arbetet dag för dag</p>
@@ -2940,7 +2940,7 @@ export default function ProjectDetailPage() {
                 >
                   <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
                 </button>
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-gray-900 font-semibold">{activeChecklist.name}</h3>
                     <span className={`px-2 py-0.5 text-xs rounded-full ${
@@ -3024,7 +3024,7 @@ export default function ProjectDetailPage() {
                       <button
                         key={cl.id}
                         onClick={() => setActiveChecklist(cl)}
-                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-primary-300 transition"
+                        className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-primary-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-900">{cl.name}</h3>
@@ -3049,7 +3049,7 @@ export default function ProjectDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-8 text-center">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
                     <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-gray-400 text-sm">Inga checklistor skapade</p>
                   </div>
@@ -3075,7 +3075,7 @@ export default function ProjectDetailPage() {
                       <button
                         key={fs.id}
                         onClick={() => { setActiveForm(fs); setFormAnswers(fs.answers || {}) }}
-                        className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 text-left hover:border-sky-300 transition"
+                        className="bg-white rounded-xl border border-[#E2E8F0] p-4 text-left hover:border-sky-300 transition"
                       >
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-sm font-medium text-gray-900">{fs.name}</h3>
@@ -3107,7 +3107,7 @@ export default function ProjectDetailPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-8 text-center">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
                     <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
                     <p className="text-gray-400 text-sm">Inga formulär skapade</p>
                     <p className="text-xs text-gray-400 mt-1">Skapa egenkontroll, säkerhetschecklist eller eget formulär</p>
@@ -3153,7 +3153,7 @@ export default function ProjectDetailPage() {
                 {/* Revenue / Costs / Result / Invoicing cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Intakter */}
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <DollarSign className="w-4 h-4 text-emerald-600" />
                       <p className="text-sm font-medium text-gray-500">Intakter</p>
@@ -3186,7 +3186,7 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Kostnader */}
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Clock className="w-4 h-4 text-amber-400" />
                       <p className="text-sm font-medium text-gray-500">Kostnader</p>
@@ -3228,7 +3228,7 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Resultat */}
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <TrendingUp className="w-4 h-4 text-secondary-700" />
                       <p className="text-sm font-medium text-gray-500">Resultat</p>
@@ -3242,7 +3242,7 @@ export default function ProjectDetailPage() {
                   </div>
 
                   {/* Fakturering */}
-                  <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4">
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Receipt className="w-4 h-4 text-primary-500" />
                       <p className="text-sm font-medium text-gray-500">Fakturering</p>
@@ -3262,7 +3262,7 @@ export default function ProjectDetailPage() {
                 </div>
 
                 {/* Budget usage bars */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                     <BarChart3 className="w-5 h-5 text-primary-500" />
                     Budgetforbrukning
@@ -3302,7 +3302,7 @@ export default function ProjectDetailPage() {
                 </div>
 
                 {/* Extra costs section */}
-                <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="font-semibold text-gray-900 flex items-center gap-2">
                       <Briefcase className="w-5 h-5 text-amber-500" />
@@ -3392,7 +3392,7 @@ export default function ProjectDetailPage() {
                 )}
               </>
             ) : (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                 <p className="text-gray-400">Kunde inte ladda ekonomidata</p>
               </div>
@@ -3449,7 +3449,7 @@ export default function ProjectDetailPage() {
             )}
 
             {/* Log entries */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
               <div className="p-4 border-b border-gray-100">
                 <h3 className="font-medium text-gray-900">Händelselogg</h3>
               </div>
@@ -3517,14 +3517,14 @@ export default function ProjectDetailPage() {
             </div>
 
             {workOrders.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center">
                 <ClipboardList className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <h3 className="font-medium text-gray-900 mb-1">Inga arbetsorder</h3>
                 <p className="text-sm text-gray-500">Skapa en arbetsorder för att skicka instruktioner till din personal</p>
               </div>
             ) : woDetail ? (
               /* ── Detail view ── */
-              <div className="bg-white border border-gray-200 rounded-2xl p-6">
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <button onClick={() => setWoDetail(null)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700">
                     <ArrowLeft className="w-4 h-4" /> Tillbaka
@@ -3534,14 +3534,14 @@ export default function ProjectDetailPage() {
                       href={`/api/work-orders/${woDetail.id}/pdf`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs text-gray-600 hover:bg-gray-50"
                     >
                       <Printer className="w-3.5 h-3.5" />
                       Skriv ut
                     </a>
                     <button
                       onClick={() => { setWoModal({ open: true, editing: woDetail }); setWoDetail(null) }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs text-gray-600 hover:bg-gray-50"
                     >
                       <Edit className="w-3.5 h-3.5" />
                       Redigera
@@ -3687,7 +3687,7 @@ export default function ProjectDetailPage() {
               /* ── List view ── */
               <div className="space-y-3">
                 {workOrders.map(wo => (
-                  <div key={wo.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+                  <div key={wo.id} className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setWoDetail(wo)}>
                         <div className="flex items-center gap-2 mb-1">
@@ -3727,7 +3727,7 @@ export default function ProjectDetailPage() {
                       <div className="flex items-center gap-1 ml-2 flex-shrink-0">
                         <button
                           onClick={() => setWoDetail(wo)}
-                          className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50"
+                          className="px-2.5 py-1 text-xs border border-[#E2E8F0] rounded-lg text-gray-600 hover:bg-gray-50"
                         >
                           Visa
                         </button>
@@ -3750,7 +3750,7 @@ export default function ProjectDetailPage() {
                               }
                               setWoSending(null)
                             }}
-                            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 border border-primary-200 rounded-lg text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+                            className="flex items-center gap-1 px-2.5 py-1 text-xs bg-primary-50 border border-[#E2E8F0] rounded-lg text-primary-700 hover:bg-primary-100 disabled:opacity-50"
                           >
                             {woSending === wo.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
                             {wo.status === 'sent' ? 'Påminn' : 'Skicka SMS'}
@@ -3799,19 +3799,19 @@ export default function ProjectDetailPage() {
 
               return (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Totalt inköp</p>
                     <p className="text-lg font-bold text-gray-900">{formatCurrency(totalPurchase)}</p>
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Påslag ({Math.round(avgMarkup)}%)</p>
                     <p className="text-lg font-bold text-gray-900">{formatCurrency(totalMarkup)}</p>
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Debiterbart</p>
                     <p className="text-lg font-bold text-primary-700">{formatCurrency(totalBillable)}</p>
                   </div>
-                  <div className="bg-white border border-gray-200 rounded-xl p-3">
+                  <div className="bg-white border border-[#E2E8F0] rounded-xl p-3">
                     <p className="text-xs text-gray-400 mb-1">Ej betalt</p>
                     <p className="text-lg font-bold text-amber-500">{formatCurrency(unpaid)}</p>
                   </div>
@@ -3820,7 +3820,7 @@ export default function ProjectDetailPage() {
             })()}
 
             {supplierInvoices.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center">
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center">
                 <Receipt className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <h3 className="font-medium text-gray-900 mb-1">Inga leverantörsfakturor</h3>
                 <p className="text-sm text-gray-500">Lägg till fakturor från leverantörer för att spåra inköpskostnader</p>
@@ -3833,7 +3833,7 @@ export default function ProjectDetailPage() {
                   const customerPrice = totalAmt + totalAmt * markup / 100
 
                   return (
-                    <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div key={inv.id} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
@@ -3886,7 +3886,7 @@ export default function ProjectDetailPage() {
                         )}
                         <button
                           onClick={() => setSiModal({ open: true, editing: inv })}
-                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-50 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100"
+                          className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-600 hover:bg-gray-100"
                         >
                           <Edit className="w-3 h-3" />
                           Redigera
@@ -4133,11 +4133,11 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
     }
   }
 
-  const inputCls = 'w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50'
+  const inputCls = 'w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]'
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera delmoment' : 'Lägg till delmoment'}
@@ -4179,8 +4179,8 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
                               alreadyExists
                                 ? 'bg-gray-100 text-gray-300 cursor-not-allowed line-through'
                                 : isSelected
-                                  ? 'bg-primary-100 border border-primary-300 text-primary-700'
-                                  : 'bg-gray-50 border border-gray-200 text-gray-600 hover:border-primary-300 hover:text-primary-700'
+                                  ? 'bg-primary-100 border border-[#E2E8F0] text-primary-700'
+                                  : 'bg-gray-50 border border-[#E2E8F0] text-gray-600 hover:border-primary-300 hover:text-primary-700'
                             }`}
                           >
                             {isSelected && <span className="mr-1">✓</span>}
@@ -4198,7 +4198,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
               <div className="flex gap-3 mt-4">
                 <button
                   onClick={onClose}
-                  className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                  className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
                 >
                   Avbryt
                 </button>
@@ -4295,7 +4295,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
             <div className="flex gap-3 mt-6">
               <button
                 onClick={onClose}
-                className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>
@@ -4419,7 +4419,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">{editing ? 'Redigera ÄTA' : 'Ny ÄTA'}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -4462,7 +4462,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
               rows={2}
               placeholder="Beskriv ändringar/tillägg..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
             />
           </div>
 
@@ -4477,7 +4477,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     value={item.name}
                     onChange={e => updateItemField(item.id, 'name', e.target.value)}
                     placeholder="Namn"
-                    className="flex-1 min-w-0 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="flex-1 min-w-0 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                   <input
                     type="number"
@@ -4486,12 +4486,12 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     placeholder="Antal"
                     min="0"
                     step="0.5"
-                    className="w-16 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-16 px-2 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:border-[#0F766E]"
                   />
                   <select
                     value={item.unit}
                     onChange={e => updateItemField(item.id, 'unit', e.target.value)}
-                    className="w-16 px-1 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-16 px-1 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-600 text-sm focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="st">st</option>
                     <option value="timme">tim</option>
@@ -4507,7 +4507,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                     onChange={e => updateItemField(item.id, 'unit_price', Number(e.target.value) || 0)}
                     placeholder="à-pris"
                     min="0"
-                    className="w-24 px-2 py-2 bg-gray-100 border border-gray-300 rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-24 px-2 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:border-[#0F766E]"
                   />
                   <button
                     onClick={() => removeItem(item.id)}
@@ -4543,7 +4543,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                 placeholder="0"
                 min="0"
                 step="0.5"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
               />
             </div>
             <div>
@@ -4553,7 +4553,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
                 value={notes}
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Intern notering..."
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
               />
             </div>
           </div>
@@ -4562,7 +4562,7 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -4624,7 +4624,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-md p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Lagg till kostnad</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -4666,7 +4666,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
               onChange={e => setDescription(e.target.value)}
               placeholder="T.ex. Elektriker AB, hyra stegar..."
               autoFocus
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -4678,7 +4678,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 onChange={e => setAmount(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
               />
             </div>
             <div>
@@ -4687,7 +4687,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
                 type="date"
                 value={date}
                 onChange={e => setDate(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
               />
             </div>
           </div>
@@ -4696,7 +4696,7 @@ function CostModal({ projectId, onClose, onSaved, onError }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -4755,11 +4755,11 @@ function LogModal({ editing, onClose, onSave }: {
     })
   }
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera dagbokspost' : 'Ny dagbokspost'}
@@ -4863,7 +4863,7 @@ function LogModal({ editing, onClose, onSave }: {
         <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             Avbryt
           </button>
@@ -4935,7 +4935,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
     }
   }, [business.business_id])
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   const handleSave = async (andSend: boolean) => {
     if (!title.trim()) return
@@ -4988,7 +4988,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera arbetsorder' : 'Ny arbetsorder'}
@@ -5155,7 +5155,7 @@ function WorkOrderModal({ projectId, editing, projectData, onClose, onSaved, onS
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             Avbryt
           </button>
@@ -5209,7 +5209,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
   const markup = parseFloat(markupPercent) || 0
   const customerPrice = total + total * markup / 100
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
 
   const handleSave = async () => {
     if (!supplierName.trim()) return
@@ -5246,7 +5246,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">
             {editing ? 'Redigera leverantörsfaktura' : 'Ny leverantörsfaktura'}
@@ -5299,7 +5299,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
             </div>
             <div>
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Totalt</label>
-              <div className="px-3 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-900">
+              <div className="px-3 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm font-medium text-gray-900">
                 {total.toLocaleString('sv-SE')} kr
               </div>
             </div>
@@ -5343,7 +5343,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
         <div className="px-6 pb-6 flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
           >
             Avbryt
           </button>
@@ -5388,7 +5388,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Ny checklista</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -5434,7 +5434,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               value={customName}
               onChange={e => { setCustomName(e.target.value); setSelectedTemplate(null) }}
               placeholder="T.ex. Slutbesiktning badrum"
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
             />
           </div>
 
@@ -5445,7 +5445,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
               onChange={e => { setCustomItems(e.target.value); setSelectedTemplate(null) }}
               rows={5}
               placeholder={"Kontrollera tätskikt\nTesta golvvärme\nKontrollera fall mot brunn"}
-              className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
             />
           </div>
         </div>
@@ -5453,7 +5453,7 @@ function ChecklistCreateModal({ templates, onClose, onCreate }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -5481,7 +5481,7 @@ function FormCreateModal({ templates, onClose, onCreate }: {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900">Nytt formulär</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
@@ -5521,7 +5521,7 @@ function FormCreateModal({ templates, onClose, onCreate }: {
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             Avbryt
           </button>
@@ -5654,7 +5654,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
     ? Math.round((answeredRequired.length / requiredFields.length) * 100)
     : 100
 
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-sky-400'
+  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-sky-400'
 
   return (
     <div className="space-y-4">
@@ -5665,7 +5665,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
         <ArrowLeft className="w-4 h-4" /> Tillbaka till lista
       </button>
 
-      <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-gray-900 font-semibold text-lg">{submission.name}</h3>
@@ -5768,7 +5768,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                   </label>
                   {answer.photo_url ? (
                     <div className="relative inline-block">
-                      <img src={answer.photo_url} alt={field.label} className="w-32 h-32 object-cover rounded-lg border border-gray-200" />
+                      <img src={answer.photo_url} alt={field.label} className="w-32 h-32 object-cover rounded-lg border border-[#E2E8F0]" />
                       {!isSigned && (
                         <button
                           onClick={() => updateAnswer(field.id, 'photo_url', null)}
@@ -5815,7 +5815,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                   </label>
                   {answer.signature_data ? (
                     <div className="relative inline-block">
-                      <img src={answer.signature_data} alt="Signatur" className="h-20 border border-gray-200 rounded-lg bg-white" />
+                      <img src={answer.signature_data} alt="Signatur" className="h-20 border border-[#E2E8F0] rounded-lg bg-white" />
                       {!isSigned && (
                         <button
                           onClick={() => updateAnswer(field.id, 'signature_data', null)}
@@ -5826,7 +5826,7 @@ function FormFillView({ submission, answers, setAnswers, saving, signName, setSi
                       )}
                     </div>
                   ) : !isSigned ? (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                    <div className="border border-[#E2E8F0] rounded-lg overflow-hidden bg-white">
                       <canvas
                         ref={canvasRef}
                         onPointerDown={onPointerDown}
@@ -6035,14 +6035,14 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
       {loading ? (
         <div className="py-12 text-center text-gray-400">Laddar...</div>
       ) : reports.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center">
           <p className="text-gray-400 mb-2">Inga fältrapporter ännu</p>
           <p className="text-sm text-gray-400">Skapa en rapport som kunden kan signera digitalt</p>
         </div>
       ) : (
         <div className="space-y-2">
           {reports.map((r: any) => (
-            <div key={r.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+            <div key={r.id} className="bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium text-gray-900 truncate">{r.title}</p>
@@ -6071,7 +6071,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Ny fältrapport</h3>
             <div className="space-y-3">
               <div>
@@ -6091,7 +6091,7 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
               <button onClick={createReport} disabled={saving || !form.title.trim()} className="flex-1 bg-primary-800 text-white py-2.5 rounded-xl font-medium text-sm disabled:opacity-50">
                 {saving ? 'Skapar...' : 'Skapa och skicka'}
               </button>
-              <button onClick={() => setShowModal(false)} className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-500">Avbryt</button>
+              <button onClick={() => setShowModal(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-500">Avbryt</button>
             </div>
           </div>
         </div>

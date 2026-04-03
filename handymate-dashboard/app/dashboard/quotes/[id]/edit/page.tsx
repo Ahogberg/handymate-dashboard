@@ -180,7 +180,7 @@ function StandardTextPicker({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
+          <div className="absolute right-0 top-6 z-20 bg-white border border-[#E2E8F0] rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
             {texts.map((t) => (
               <button
                 key={t.id}

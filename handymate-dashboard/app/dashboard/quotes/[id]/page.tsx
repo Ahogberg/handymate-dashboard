@@ -521,7 +521,7 @@ export default function QuoteDetailPage() {
           switch (item.item_type) {
             case 'heading':
               return (
-                <div key={item.id} className="bg-primary-50 border border-primary-300 rounded-lg px-4 py-2.5 mt-3 first:mt-0">
+                <div key={item.id} className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-2.5 mt-3 first:mt-0">
                   <p className="font-semibold text-primary-800 text-sm">{item.description}</p>
                 </div>
               )
@@ -647,7 +647,7 @@ export default function QuoteDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
@@ -655,14 +655,14 @@ export default function QuoteDetailPage() {
 
   if (!quote) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Offerten hittades inte</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -700,13 +700,13 @@ export default function QuoteDetailPage() {
 
         {/* Version selector */}
         {versions.length > 1 && (
-          <div className="flex items-center gap-3 mb-4 bg-white border border-gray-200 rounded-xl p-3">
+          <div className="flex items-center gap-3 mb-4 bg-white border border-[#E2E8F0] rounded-xl p-3">
             <GitBranch className="w-4 h-4 text-primary-700 flex-shrink-0" />
             <span className="text-sm text-gray-500">Version:</span>
             <select
               value={quoteId}
               onChange={(e) => router.push(`/dashboard/quotes/${e.target.value}`)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-900 font-medium focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
+              className="text-sm border border-[#E2E8F0] rounded-lg px-3 py-1.5 bg-white text-gray-900 font-medium focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
             >
               {versions.map((v) => (
                 <option key={v.quote_id} value={v.quote_id}>
@@ -743,7 +743,7 @@ export default function QuoteDetailPage() {
               href={`/quote/${quote.sign_token}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
             >
               <Eye className="w-4 h-4" />
               Förhandsgranska
@@ -753,7 +753,7 @@ export default function QuoteDetailPage() {
             <button
               onClick={generateSignLink}
               disabled={generatingSignLink}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50"
             >
               {generatingSignLink ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
               Signeringslänk
@@ -790,7 +790,7 @@ export default function QuoteDetailPage() {
           )}
           <Link
             href={`/dashboard/quotes/${quote.quote_id}/edit`}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             <Edit className="w-4 h-4" />
             Redigera
@@ -798,7 +798,7 @@ export default function QuoteDetailPage() {
           <button
             onClick={duplicateQuote}
             disabled={duplicating}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
             {duplicating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Copy className="w-4 h-4" />}
             Duplicera
@@ -806,7 +806,7 @@ export default function QuoteDetailPage() {
           <button
             onClick={createNewVersion}
             disabled={creatingVersion}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
             {creatingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
             Ny version
@@ -814,7 +814,7 @@ export default function QuoteDetailPage() {
           <button
             onClick={previewPDF}
             disabled={generatingPdf}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
             {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
             Förhandsgranska
@@ -822,14 +822,14 @@ export default function QuoteDetailPage() {
           <button
             onClick={generatePDF}
             disabled={generatingPdf}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200 disabled:opacity-50"
           >
             <Download className="w-4 h-4" />
             Ladda ner PDF
           </button>
           <button
             onClick={() => { setTemplateName(quote.title || ''); setShowSaveTemplate(true) }}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
           >
             <Bookmark className="w-4 h-4" />
             Spara mall
@@ -837,7 +837,7 @@ export default function QuoteDetailPage() {
           {quote.status === 'draft' && (
             <button
               onClick={deleteQuote}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-red-600 hover:bg-red-500/10 hover:border-red-500/30"
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-red-600 hover:bg-red-500/10 hover:border-red-500/30"
             >
               <Trash2 className="w-4 h-4" />
               Ta bort
@@ -849,7 +849,7 @@ export default function QuoteDetailPage() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Customer */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <User className="w-5 h-5 text-primary-500" />
                 Kund
@@ -884,7 +884,7 @@ export default function QuoteDetailPage() {
 
             {/* Reference fields */}
             {(quote.reference_person || quote.customer_reference || quote.project_address) && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-primary-600" />
                   Referenser
@@ -917,7 +917,7 @@ export default function QuoteDetailPage() {
 
             {/* Description */}
             {quote.description && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-amber-400" />
                   Beskrivning
@@ -928,7 +928,7 @@ export default function QuoteDetailPage() {
 
             {/* Introduction text */}
             {quote.introduction_text && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-primary-600" />
                   Inledning
@@ -938,7 +938,7 @@ export default function QuoteDetailPage() {
             )}
 
             {/* Items */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4">Specifikation</h2>
 
               {hasStructuredItems
@@ -949,7 +949,7 @@ export default function QuoteDetailPage() {
 
             {/* Ej inkluderat */}
             {quote.not_included && (
-              <div className="bg-red-50 shadow-sm rounded-xl border border-red-200 p-4 sm:p-6">
+              <div className="bg-red-50 rounded-xl border border-red-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-red-800 mb-3 flex items-center gap-2">
                   <AlertTriangle className="w-5 h-5 text-red-500" />
                   Ej inkluderat
@@ -960,7 +960,7 @@ export default function QuoteDetailPage() {
 
             {/* ATA-villkor */}
             {quote.ata_terms && (
-              <div className="bg-amber-50 shadow-sm rounded-xl border border-amber-200 p-4 sm:p-6">
+              <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
                   <ClipboardList className="w-5 h-5 text-amber-500" />
                   ÄTA-villkor
@@ -971,7 +971,7 @@ export default function QuoteDetailPage() {
 
             {/* Payment plan */}
             {quote.payment_plan && quote.payment_plan.length > 0 && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-primary-600" />
                   Betalningsplan
@@ -1006,7 +1006,7 @@ export default function QuoteDetailPage() {
 
             {/* Conclusion text */}
             {quote.conclusion_text && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <FileText className="w-5 h-5 text-gray-400" />
                   Avslutning
@@ -1018,7 +1018,7 @@ export default function QuoteDetailPage() {
 
           {/* Sidebar - Summary */}
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4">Summering</h2>
 
               <div className="space-y-3 text-sm">
@@ -1117,7 +1117,7 @@ export default function QuoteDetailPage() {
 
             {/* Signature Info */}
             {quote.signature_data && (
-              <div className="bg-white shadow-sm rounded-xl border border-emerald-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-emerald-200 p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <PenTool className="w-5 h-5 text-emerald-600" />
                   E-signerad
@@ -1141,12 +1141,12 @@ export default function QuoteDetailPage() {
 
             {/* Signing link */}
             {quote.sign_token && ['sent', 'opened'].includes(quote.status) && (
-              <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
                 <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
                   <Link2 className="w-5 h-5 text-primary-700" />
                   Signeringslänk
                 </h2>
-                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2">
+                <div className="flex items-center gap-2 bg-gray-50 border border-[#E2E8F0] rounded-lg p-2">
                   <span className="text-xs text-gray-500 truncate flex-1">app.handymate.se/quote/{quote.sign_token.slice(0, 8)}...</span>
                   <button onClick={() => { navigator.clipboard.writeText(`https://app.handymate.se/quote/${quote.sign_token}`); showToast('Kopierad!', 'success') }}
                     className="flex-shrink-0 px-2.5 py-1 bg-primary-700 text-white text-xs rounded-md font-medium">Kopiera</button>
@@ -1155,7 +1155,7 @@ export default function QuoteDetailPage() {
             )}
 
             {/* Progress indicator */}
-            <div className="bg-white shadow-sm rounded-xl border border-gray-200 p-4 sm:p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-primary-700" />
                 Status
@@ -1205,7 +1205,7 @@ export default function QuoteDetailPage() {
       {/* Send Modal — mail-style */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => !sending && setShowSendModal(false)}>
-          <div className="bg-white rounded-2xl border border-gray-200 w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
               <Mail className="w-5 h-5 text-primary-700" />
@@ -1296,12 +1296,12 @@ export default function QuoteDetailPage() {
                   <div className="flex items-start gap-3">
                     <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Kopia</span>
                     <input type="text" value={extraEmails} onChange={e => setExtraEmails(e.target.value)}
-                      placeholder="anna@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
+                      placeholder="anna@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
                   </div>
                   <div className="flex items-start gap-3">
                     <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">BCC</span>
                     <input type="text" value={bccEmails} onChange={e => setBccEmails(e.target.value)}
-                      placeholder="chef@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
+                      placeholder="chef@firma.se" className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50" />
                   </div>
                 </>
               )}
@@ -1317,7 +1317,7 @@ export default function QuoteDetailPage() {
               {/* Bifogat */}
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 w-16 text-right flex-shrink-0"></span>
-                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg">
                   <FileText className="w-4 h-4 text-primary-700" />
                   <span className="text-xs text-gray-600">Offert {quote.quote_number || ''} · {quote.total ? new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(quote.total) + ' kr' : ''}</span>
                 </div>
@@ -1351,7 +1351,7 @@ export default function QuoteDetailPage() {
       {/* Save as Template Modal */}
       {showSaveTemplate && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowSaveTemplate(false)}>
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Spara som mall</h3>
             <div className="mb-4">
               <label className="block text-sm text-gray-500 mb-1">Mallnamn</label>
@@ -1361,13 +1361,13 @@ export default function QuoteDetailPage() {
                 onChange={(e) => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSaveTemplate(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 hover:bg-gray-200"
+                className="flex-1 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
               >
                 Avbryt
               </button>

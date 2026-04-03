@@ -801,7 +801,7 @@ export default function SchedulePage() {
 
   if (loading) {
     return (
-      <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
       </div>
     )
@@ -1156,7 +1156,7 @@ export default function SchedulePage() {
   function renderSidebar() {
     return (
       <div className="hidden lg:block w-64 flex-shrink-0">
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-4 sticky top-8">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sticky top-8">
           {/* Team heading */}
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-900">Team</h3>
@@ -1208,7 +1208,7 @@ export default function SchedulePage() {
               })
               setTimeOffModalOpen(true)
             }}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors mb-4"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-[#E2E8F0] rounded-xl hover:bg-gray-50 transition-colors mb-4"
           >
             <Palmtree className="w-4 h-4" />
             Ansok om ledighet
@@ -1264,7 +1264,7 @@ export default function SchedulePage() {
   // ---------------------------------------------------------------------------
 
   return (
-    <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="pt-16 sm:pt-8 p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
@@ -1289,7 +1289,7 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {entryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingEntry ? 'Redigera post' : 'Ny post'}
@@ -1306,7 +1306,7 @@ export default function SchedulePage() {
                 <select
                   value={entryForm.business_user_id}
                   onChange={(e) => setEntryForm({ ...entryForm, business_user_id: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Valj person...</option>
                   {teamMembers.map((m) => (
@@ -1323,7 +1323,7 @@ export default function SchedulePage() {
                 <select
                   value={entryForm.project_id}
                   onChange={(e) => handleProjectChange(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   <option value="">Inget projekt</option>
                   {projects.map((p) => (
@@ -1342,7 +1342,7 @@ export default function SchedulePage() {
                   value={entryForm.title}
                   onChange={(e) => setEntryForm({ ...entryForm, title: e.target.value })}
                   placeholder="Vad ska goras?"
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -1353,7 +1353,7 @@ export default function SchedulePage() {
                   type="date"
                   value={entryForm.date}
                   onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -1384,7 +1384,7 @@ export default function SchedulePage() {
                       type="time"
                       value={entryForm.start_time}
                       onChange={(e) => setEntryForm({ ...entryForm, start_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     />
                   </div>
                   <div>
@@ -1393,7 +1393,7 @@ export default function SchedulePage() {
                       type="time"
                       value={entryForm.end_time}
                       onChange={(e) => setEntryForm({ ...entryForm, end_time: e.target.value })}
-                      className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     />
                   </div>
                 </div>
@@ -1431,7 +1431,7 @@ export default function SchedulePage() {
                   onChange={(e) => setEntryForm({ ...entryForm, description: e.target.value })}
                   rows={2}
                   placeholder="Valfria anteckningar..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E] resize-none"
                 />
               </div>
 
@@ -1536,7 +1536,7 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {timeOffModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-md sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Ansok om ledighet</h3>
               <button onClick={() => setTimeOffModalOpen(false)} className="text-gray-400 hover:text-gray-900">
@@ -1552,7 +1552,7 @@ export default function SchedulePage() {
                     type="date"
                     value={timeOffForm.start_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, start_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
                 <div>
@@ -1561,7 +1561,7 @@ export default function SchedulePage() {
                     type="date"
                     value={timeOffForm.end_date}
                     onChange={(e) => setTimeOffForm({ ...timeOffForm, end_date: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               </div>
@@ -1571,7 +1571,7 @@ export default function SchedulePage() {
                 <select
                   value={timeOffForm.type}
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, type: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
                   {TIME_OFF_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>
@@ -1588,7 +1588,7 @@ export default function SchedulePage() {
                   onChange={(e) => setTimeOffForm({ ...timeOffForm, note: e.target.value })}
                   rows={2}
                   placeholder="Valfri kommentar..."
-                  className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E] resize-none"
                 />
               </div>
             </div>
@@ -1615,7 +1615,7 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {mobileFilterOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" onClick={() => setMobileFilterOpen(false)}>
-          <div className="absolute top-28 left-4 right-4 bg-white border border-gray-200 rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-28 left-4 right-4 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">Filtrera team</h3>
               <button onClick={toggleAll} className="text-xs text-sky-700 hover:text-primary-700">
@@ -1653,7 +1653,7 @@ export default function SchedulePage() {
                 setTimeOffModalOpen(true)
                 setMobileFilterOpen(false)
               }}
-              className="w-full flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-center gap-2 mt-3 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-[#E2E8F0] rounded-xl hover:bg-gray-50 transition-colors"
             >
               <Palmtree className="w-4 h-4" />
               Ansok om ledighet
@@ -1669,7 +1669,7 @@ export default function SchedulePage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300">
+            <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0]">
               <CalendarDays className="w-5 h-5 text-sky-700" />
             </div>
             <div>
@@ -1688,7 +1688,7 @@ export default function SchedulePage() {
                   } catch {}
                   setSyncing(false)
                 }}
-                className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-sm text-gray-700 hover:border-primary-300 transition"
+                className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:border-primary-300 transition"
                 title="Synka med Google Calendar"
               >
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
@@ -1708,7 +1708,7 @@ export default function SchedulePage() {
         {/* Controls row */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
           {/* Mode toggle */}
-          <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+          <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
             <button
               onClick={() => setMode('calendar')}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1735,7 +1735,7 @@ export default function SchedulePage() {
 
           {/* View switcher */}
           {mode === 'calendar' && (
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+            <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
               <button
                 onClick={() => setView('day')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -1791,7 +1791,7 @@ export default function SchedulePage() {
           {/* Mobile filter button */}
           <button
             onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-            className="lg:hidden flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
+            className="lg:hidden flex items-center gap-2 px-3 py-2 text-sm text-gray-500 hover:text-gray-900 border border-[#E2E8F0] rounded-xl hover:bg-gray-50 transition-colors min-h-[44px]"
           >
             <Filter className="w-4 h-4" />
             Team ({selectedMembers.size}/{teamMembers.length})
@@ -1810,7 +1810,7 @@ export default function SchedulePage() {
 
           {/* Calendar / Utilization content */}
           <div className="flex-1 min-w-0">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
               {mode === 'calendar' ? (
                 <>
                   {/* Week view */}

@@ -104,14 +104,14 @@ export default function CampaignsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -141,7 +141,7 @@ export default function CampaignsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Totalt kampanjer</p>
@@ -153,7 +153,7 @@ export default function CampaignsPage() {
             </div>
           </div>
 
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">SMS skickade</p>
@@ -165,7 +165,7 @@ export default function CampaignsPage() {
             </div>
           </div>
 
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Levererade</p>
@@ -177,7 +177,7 @@ export default function CampaignsPage() {
             </div>
           </div>
 
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-400">Leveransgrad</p>
@@ -205,7 +205,7 @@ export default function CampaignsPage() {
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
                 filter === f.id
                   ? 'bg-primary-700 text-white'
-                  : 'bg-white text-gray-500 hover:text-white border border-gray-200'
+                  : 'bg-white text-gray-500 hover:text-white border border-[#E2E8F0]'
               }`}
             >
               {f.label}
@@ -214,7 +214,7 @@ export default function CampaignsPage() {
         </div>
 
         {/* Campaign List */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200">
+        <div className="bg-white rounded-xl border border-[#E2E8F0]">
           {filteredCampaigns.length === 0 ? (
             <div className="p-12 text-center">
               <Megaphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -234,7 +234,7 @@ export default function CampaignsPage() {
                 <div key={campaign.campaign_id} className="p-4 hover:bg-gray-100/30 transition-all">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center flex-1 min-w-0">
-                      <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300 mr-4">
+                      <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0] mr-4">
                         <MessageSquare className="w-5 h-5 text-sky-700" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -289,7 +289,7 @@ export default function CampaignsPage() {
                         {campaign.status === 'sent' && (
                           <Link
                             href={`/dashboard/campaigns/${campaign.campaign_id}`}
-                            className="px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-primary-700 bg-primary-50 border border-primary-300 rounded-lg"
+                            className="px-3 py-1.5 text-xs font-medium text-sky-700 hover:text-primary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg"
                           >
                             Visa resultat
                           </Link>

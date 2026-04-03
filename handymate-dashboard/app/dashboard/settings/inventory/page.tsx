@@ -126,11 +126,11 @@ export default function InventorySettingsPage() {
   const lowStockCount = items.filter(i => i.min_stock > 0 && i.current_stock <= i.min_stock).length
 
   if (!business.business_id) {
-    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
+    return <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
   }
 
   return (
-    <div className="p-4 md:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
@@ -148,7 +148,7 @@ export default function InventorySettingsPage() {
         ) : (
           <>
             {/* Lagerplatser */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900">Lagerplatser</h2>
                 <button onClick={() => setShowNewLocation(true)} className="flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-700 font-medium">
@@ -177,7 +177,7 @@ export default function InventorySettingsPage() {
             </div>
 
             {/* Artiklar */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-gray-900">Artiklar</h2>
                 <button
@@ -259,7 +259,7 @@ export default function InventorySettingsPage() {
       {/* New Location Modal */}
       {showNewLocation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Ny lagerplats</h2>
               <button onClick={() => setShowNewLocation(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
@@ -287,7 +287,7 @@ export default function InventorySettingsPage() {
       {/* New Item Modal */}
       {showNewItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Ny lagerartikel</h2>
               <button onClick={() => setShowNewItem(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>

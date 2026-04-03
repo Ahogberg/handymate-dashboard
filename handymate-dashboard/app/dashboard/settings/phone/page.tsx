@@ -331,14 +331,14 @@ export default function PhoneSettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -513,13 +513,13 @@ export default function PhoneSettingsPage() {
 
             {/* Step 1: Your number + forward number */}
             {method === 'forwarding' && step === 1 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Steg 2: Ditt Handymate-nummer</h2>
 
                 {hasNumber ? (
                   <div className="mb-6">
                     <p className="text-sm text-gray-600 mb-3">Vi har tilldelat dig numret:</p>
-                    <div className="text-2xl font-mono font-bold text-sky-700 bg-primary-50 border border-primary-300 rounded-lg px-4 py-3 inline-block">
+                    <div className="text-2xl font-mono font-bold text-sky-700 bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-3 inline-block">
                       {formatPhone(config!.assigned_phone_number!)}
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Alla samtal till detta nummer spelas in och analyseras av vår AI.</p>
@@ -564,7 +564,7 @@ export default function PhoneSettingsPage() {
 
             {/* Step 2: Forwarding instructions */}
             {method === 'forwarding' && step === 2 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Steg 3: Ställ in vidarekoppling</h2>
 
                 {/* Operator selector */}
@@ -588,7 +588,7 @@ export default function PhoneSettingsPage() {
                 </div>
 
                 {/* Instructions */}
-                <div className="bg-gray-50 rounded-lg border border-gray-200 p-5">
+                <div className="bg-gray-50 rounded-lg border border-[#E2E8F0] p-5">
                   <h3 className="font-semibold text-gray-900 mb-3">
                     Vidarekoppla alla samtal ({OPERATORS.find(o => o.id === operator)?.name})
                   </h3>
@@ -601,7 +601,7 @@ export default function PhoneSettingsPage() {
                       <span className="w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">2</span>
                       <div>
                         <span className="text-sm text-gray-700">Slå: </span>
-                        <code className="bg-primary-50 border border-primary-300 rounded px-2 py-0.5 text-primary-800 font-mono font-bold text-base">
+                        <code className="bg-primary-50 border border-[#E2E8F0] rounded px-2 py-0.5 text-primary-800 font-mono font-bold text-base">
                           **21*{config?.assigned_phone_number?.replace('+', '') || 'NUMMER'}#
                         </code>
                       </div>
@@ -664,7 +664,7 @@ export default function PhoneSettingsPage() {
 
             {/* Step 3: Verify */}
             {method === 'forwarding' && step === 3 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Steg 4: Verifiera</h2>
                 <p className="text-sm text-gray-600 mb-5">
                   Ring ditt eget nummer från en annan telefon. Om allt fungerar ser du samtalet dyka upp här inom 30 sekunder.
@@ -692,7 +692,7 @@ export default function PhoneSettingsPage() {
                     </Link>
                   </div>
                 ) : verifying ? (
-                  <div className="bg-primary-50 border border-primary-300 rounded-lg p-5 text-center">
+                  <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg p-5 text-center">
                     <Loader2 className="w-8 h-8 text-primary-700 animate-spin mx-auto mb-3" />
                     <p className="text-primary-800 font-medium">Väntar på testsamtal...</p>
                     <p className="text-sm text-sky-700 mt-1">
@@ -725,7 +725,7 @@ export default function PhoneSettingsPage() {
 
             {/* ── PORTING PATH ── */}
             {method === 'porting' && step === 1 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Steg 2: Begär nummerportering</h2>
                 <p className="text-sm text-gray-600 mb-5">
                   Nummerportering kräver att vi skickar en begäran till din operatör. Vi hjälper dig genom processen.
@@ -806,7 +806,7 @@ export default function PhoneSettingsPage() {
         )}
 
         {/* ═══ CALL FLOW EXPLANATION ═══ */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-5">Vad händer med dina samtal?</h2>
 
           {/* Visual flow */}
@@ -850,7 +850,7 @@ export default function PhoneSettingsPage() {
 
         {/* ═══ SETTINGS (shown when phone is configured) ═══ */}
         {hasNumber && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
               <Settings className="w-5 h-5 text-gray-400" />
               Samtalsinställningar
@@ -968,7 +968,7 @@ export default function PhoneSettingsPage() {
                     <button
                       onClick={sendTestSms}
                       disabled={sendingTest}
-                      className="px-4 py-2 border border-primary-300 text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
+                      className="px-4 py-2 border border-[#E2E8F0] text-primary-700 rounded-lg hover:bg-primary-50 transition-colors text-sm disabled:opacity-50 flex items-center gap-2"
                     >
                       {sendingTest ? <Loader2 className="w-4 h-4 animate-spin" /> : <Phone className="w-4 h-4" />}
                       Skicka test-SMS

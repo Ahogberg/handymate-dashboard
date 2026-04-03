@@ -280,7 +280,7 @@ export default function ImportCustomersPage() {
   }
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -330,7 +330,7 @@ export default function ImportCustomersPage() {
         {step === 1 && (
           <div className="space-y-6">
             <div 
-              className={`bg-white shadow-sm rounded-2xl border-2 border-dashed p-12 text-center transition-all ${
+              className={`bg-white rounded-xl border-2 border-dashed p-12 text-center transition-all ${
                 dragOver ? 'border-primary-600 bg-primary-50' : 'border-gray-300 hover:border-gray-300'
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
@@ -355,7 +355,7 @@ export default function ImportCustomersPage() {
               <p className="text-xs text-gray-400 mt-4">Stödjer CSV-filer (komma-, semikolon- eller tab-separerade)</p>
             </div>
 
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Tips för import</h3>
               <ul className="space-y-3 text-sm text-gray-500">
                 <li className="flex items-start gap-3">
@@ -386,7 +386,7 @@ export default function ImportCustomersPage() {
         {/* Step 2: Map columns */}
         {step === 2 && (
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">Mappa kolumner</h3>
@@ -416,7 +416,7 @@ export default function ImportCustomersPage() {
                         ...mapping,
                         [field.key]: e.target.value === '' ? null : parseInt(e.target.value)
                       })}
-                      className="flex-1 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="flex-1 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     >
                       <option value="">-- Välj kolumn --</option>
                       {headers.map((header, index) => (
@@ -437,7 +437,7 @@ export default function ImportCustomersPage() {
             </div>
 
             {/* Preview */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-4">Förhandsgranskning (första 5 rader)</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -490,7 +490,7 @@ export default function ImportCustomersPage() {
         {/* Step 3: Review */}
         {step === 3 && (
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h3 className="text-lg font-medium text-gray-900 mb-2">Redo att importera</h3>
               <p className="text-gray-400 mb-6">
                 {parsedData.length} kunder kommer att importeras
@@ -612,7 +612,7 @@ export default function ImportCustomersPage() {
         {/* Step 4: Done */}
         {step === 4 && importResult && (
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-8 text-center">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
               {importResult.success > 0 ? (
                 <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Check className="w-8 h-8 text-emerald-600" />
@@ -670,7 +670,7 @@ export default function ImportCustomersPage() {
               <div className="flex items-center justify-center gap-4 mt-4">
                 <Link
                   href="/dashboard/customers"
-                  className="px-6 py-3 bg-gray-100 border border-gray-300 rounded-xl font-medium text-gray-900 hover:bg-gray-200"
+                  className="px-6 py-3 bg-white border border-[#E2E8F0] rounded-lg font-medium text-gray-900 hover:bg-gray-200"
                 >
                   Visa kunder
                 </Link>

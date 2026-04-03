@@ -325,7 +325,7 @@ export default function ApprovalsPage() {
   const pendingCount = approvals.filter(a => a.status === 'pending').length
 
   return (
-    <div className="bg-slate-50 min-h-screen">
+    <div className="bg-[#F8FAFC] min-h-screen">
       {/* Header */}
       <div className="px-4 sm:px-8 pt-6 pb-4">
         <div className="flex items-center justify-between">
@@ -339,7 +339,7 @@ export default function ApprovalsPage() {
             </div>
           </div>
           {feedbackMsg && (
-            <div className="px-4 py-2 bg-primary-50 border border-primary-200 rounded-lg text-sm text-primary-700 font-medium">
+            <div className="px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-primary-700 font-medium">
               ✓ {feedbackMsg}
             </div>
           )}
@@ -354,14 +354,14 @@ export default function ApprovalsPage() {
 
       {/* Tabs */}
       <div className="px-4 sm:px-8 pb-4">
-        <div className="flex gap-1 p-1 bg-white rounded-xl border border-gray-200">
+        <div className="flex gap-1 p-1 bg-white rounded-xl border border-[#E2E8F0]">
           {(['pending', 'resolved'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
+                  ? 'bg-primary-50 text-primary-700 border border-[#E2E8F0]'
                   : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
               }`}
             >
@@ -390,7 +390,7 @@ export default function ApprovalsPage() {
           </div>
         ) : approvals.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 bg-primary-50 rounded-xl flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-primary-700" />
             </div>
             <p className="text-gray-900 font-medium text-lg mb-1">
@@ -451,8 +451,8 @@ export default function ApprovalsPage() {
                           return (
                             <div key={act.id} className={`flex items-center gap-3 p-3 rounded-lg ${
                               isDone ? 'bg-green-50 border border-green-200' :
-                              isRejected ? 'bg-gray-50 border border-gray-200 opacity-50' :
-                              'bg-white border border-gray-200'
+                              isRejected ? 'bg-gray-50 border border-[#E2E8F0] opacity-50' :
+                              'bg-white border border-[#E2E8F0]'
                             }`}>
                               <ActIcon className={`w-4 h-4 flex-shrink-0 ${isDone ? 'text-green-600' : isRejected ? 'text-gray-400' : 'text-primary-700'}`} />
                               <div className="flex-1 min-w-0">
@@ -479,7 +479,7 @@ export default function ApprovalsPage() {
                           </button>
                           <button
                             onClick={() => setExpandedPackage(isExpanded ? null : approval.id)}
-                            className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-1"
+                            className="px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-all flex items-center gap-1"
                           >
                             {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                             Granska
@@ -487,7 +487,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAction(approval.id, 'reject')}
                             disabled={actionLoading !== null}
-                            className="px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
+                            className="px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-all"
                           >
                             Avvisa
                           </button>
@@ -500,7 +500,7 @@ export default function ApprovalsPage() {
                           {pendingActions.map(act => {
                             const isRejected = rejectedSet.has(act.id)
                             return (
-                              <div key={act.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                              <div key={act.id} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-sm font-semibold text-gray-900">{act.title}</span>
                                   <button
@@ -564,7 +564,7 @@ export default function ApprovalsPage() {
                   key={approval.id}
                   className={`bg-white border rounded-xl transition-all ${
                     approval.status === 'pending'
-                      ? 'border-gray-200 shadow-sm'
+                      ? 'border-gray-200'
                       : 'border-gray-100 opacity-75'
                   }`}
                 >
@@ -723,7 +723,7 @@ export default function ApprovalsPage() {
                               value={editText}
                               onChange={e => setEditText(e.target.value)}
                               rows={4}
-                              className="w-full px-3 py-2 border border-primary-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
+                              className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 resize-none"
                             />
                           </div>
                         )}
@@ -772,7 +772,7 @@ export default function ApprovalsPage() {
                           {messagePreview && (
                             <button
                               onClick={() => startEdit(approval)}
-                              className="flex items-center gap-2 px-3 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                              className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-all"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                               Redigera
@@ -781,7 +781,7 @@ export default function ApprovalsPage() {
                           <button
                             onClick={() => handleAction(approval.id, 'reject')}
                             disabled={actionLoading !== null}
-                            className="flex items-center gap-2 px-3 py-2 border border-gray-200 hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 text-sm font-medium rounded-lg transition-all"
+                            className="flex items-center gap-2 px-3 py-2 border border-[#E2E8F0] hover:bg-red-50 hover:border-red-200 hover:text-red-600 text-gray-700 text-sm font-medium rounded-lg transition-all"
                           >
                             <XCircle className="w-3.5 h-3.5" />
                             {actionLoading === approval.id + 'reject' ? 'Avvisar...' : 'Avvisa'}
@@ -832,7 +832,7 @@ export default function ApprovalsPage() {
           <>
             <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50" onClick={() => setConfirmModal(null)} />
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-100">
                   <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                     <span>{info.icon}</span> {info.title}
@@ -849,7 +849,7 @@ export default function ApprovalsPage() {
                           ? 'SMS som skickas'
                           : 'Innehåll'}
                       </label>
-                      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                      <div className="bg-gray-50 border border-[#E2E8F0] rounded-xl p-4 text-sm text-gray-700 whitespace-pre-wrap">
                         {msg}
                       </div>
                     </div>
@@ -879,7 +879,7 @@ export default function ApprovalsPage() {
                 <div className="p-6 border-t border-gray-100 flex gap-3">
                   <button
                     onClick={() => setConfirmModal(null)}
-                    className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50"
+                    className="flex-1 px-4 py-3 border border-[#E2E8F0] rounded-xl text-sm text-gray-600 hover:bg-gray-50"
                   >
                     Avbryt
                   </button>

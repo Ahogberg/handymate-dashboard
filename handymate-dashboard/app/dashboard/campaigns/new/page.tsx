@@ -38,7 +38,7 @@ type FilterType = 'all' | 'inactive_30' | 'inactive_90' | 'manual' | 'imported'
 
 export default function NewCampaignPageWrapper() {
   return (
-    <Suspense fallback={<div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><div className="text-gray-500">Laddar...</div></div>}>
+    <Suspense fallback={<div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center"><div className="text-gray-500">Laddar...</div></div>}>
       <NewCampaignPage />
     </Suspense>
   )
@@ -313,14 +313,14 @@ const messageSuggestions = [
 
   if (loading) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-8 bg-slate-50 min-h-screen">
+    <div className="p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -368,7 +368,7 @@ const messageSuggestions = [
         {/* Step 1: Välj mottagare */}
         {step === 1 && (
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Välj mottagare</h2>
               
               {/* Filter options */}
@@ -411,7 +411,7 @@ const messageSuggestions = [
                         placeholder="Sök kund..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                     <button onClick={selectAll} className="text-sm text-sky-700 hover:text-primary-700">
@@ -432,7 +432,7 @@ const messageSuggestions = [
                         key={customer.customer_id}
                         className={`flex items-center p-3 rounded-xl cursor-pointer transition-all ${
                           selectedCustomers.has(customer.customer_id)
-                            ? 'bg-primary-50 border border-primary-300'
+                            ? 'bg-primary-50 border border-[#E2E8F0]'
                             : 'bg-gray-50 border border-transparent hover:bg-gray-100'
                         }`}
                       >
@@ -457,7 +457,7 @@ const messageSuggestions = [
             </div>
 
             {/* Summary */}
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary-100">
@@ -483,19 +483,19 @@ const messageSuggestions = [
 {/* Step 2: Skriv meddelande */}
 {step === 2 && (
   <div className="space-y-6">
-    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Kampanjnamn</h2>
       <input
         type="text"
         value={campaignName}
         onChange={(e) => setCampaignName(e.target.value)}
         placeholder="T.ex. Vårens reaktivering"
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+        className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
       />
     </div>
 
     {/* Kampanjtyp */}
-    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Kampanjtyp</h2>
       <div className="grid grid-cols-2 gap-4">
         <button
@@ -553,11 +553,11 @@ const messageSuggestions = [
       )}
     </div>
 
-    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Meddelande</h2>
 
       {/* Kampanjsyfte + AI-generering */}
-      <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-gray-200">
+      <div className="mb-4 p-4 bg-gray-50 rounded-xl border border-[#E2E8F0]">
         <p className="text-sm font-medium text-gray-700 mb-3">Kampanjsyfte (valfritt)</p>
         <div className="flex gap-2 flex-wrap mb-3">
           {[
@@ -627,7 +627,7 @@ const messageSuggestions = [
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Skriv ditt meddelande här..."
         rows={5}
-        className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 resize-none"
+        className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
       />
       
       <div className="flex items-center justify-between mt-3">
@@ -650,16 +650,16 @@ const messageSuggestions = [
     </div>
 
     {/* Preview */}
-    <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+    <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Förhandsgranskning</h2>
-      <div className="bg-gray-50 rounded-2xl p-4 max-w-sm">
+      <div className="bg-gray-50 rounded-xl p-4 max-w-sm">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-8 h-8 bg-primary-700 rounded-full flex items-center justify-center">
             <MessageSquare className="w-4 h-4 text-gray-900" />
           </div>
           <span className="text-sm font-medium text-gray-900">{business.business_name}</span>
         </div>
-        <div className="bg-gray-100 rounded-2xl rounded-tl-none p-3 mb-3">
+        <div className="bg-gray-100 rounded-xl rounded-tl-none p-3 mb-3">
           <p className="text-sm text-gray-700 whitespace-pre-wrap">
             {message || 'Ditt meddelande visas här...'}
           </p>
@@ -668,11 +668,11 @@ const messageSuggestions = [
         {campaignType === 'interactive' && (
           <div className="space-y-2">
             <div className="flex justify-end">
-              <div className="bg-primary-800 rounded-2xl rounded-tr-none p-3 max-w-[80%]">
+              <div className="bg-primary-800 rounded-xl rounded-tr-none p-3 max-w-[80%]">
                 <p className="text-sm text-gray-900">JA, gärna!</p>
               </div>
             </div>
-            <div className="bg-gray-100 rounded-2xl rounded-tl-none p-3">
+            <div className="bg-gray-100 rounded-xl rounded-tl-none p-3">
               <p className="text-sm text-gray-700">
                 Vad bra! 🎉 Vilken dag passar dig bäst nästa vecka?
               </p>
@@ -705,7 +705,7 @@ const messageSuggestions = [
         {/* Step 3: Bekräfta och skicka */}
         {step === 3 && (
           <div className="space-y-6">
-            <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">Bekräfta och skicka</h2>
               
               <div className="space-y-4">
@@ -789,7 +789,7 @@ const messageSuggestions = [
                         value={scheduledDate}
                         min={minDate}
                         onChange={(e) => setScheduledDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                     <div>
@@ -798,7 +798,7 @@ const messageSuggestions = [
                         type="time"
                         value={scheduledTime}
                         onChange={(e) => setScheduledTime(e.target.value)}
-                        className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                        className="w-full px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-[#0F766E]"
                       />
                     </div>
                   </div>

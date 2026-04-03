@@ -318,7 +318,7 @@ export default function SmsInboxPage() {
                       className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}
                     >
                       <div
-                        className={`max-w-[80%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                        className={`max-w-[80%] sm:max-w-[70%] rounded-xl px-4 py-2.5 ${
                           msg.role === 'user'
                             ? 'bg-white border border-[#E2E8F0] text-[#0F172A]'
                             : msg.role === 'system'

@@ -442,7 +442,7 @@ export default function PricelistPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -474,7 +474,7 @@ export default function PricelistPage() {
         </div>
 
         {/* Suppliers Section */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Building className="w-5 h-5 text-sky-700" />
@@ -486,7 +486,7 @@ export default function PricelistPage() {
                 setSupplierForm({ name: '', customer_number: '', contact_email: '', contact_phone: '' })
                 setShowSupplierModal(true)
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-primary-100 border border-primary-300 rounded-xl text-sky-700 hover:bg-primary-700/30 text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-primary-100 border border-[#E2E8F0] rounded-xl text-sky-700 hover:bg-primary-700/30 text-sm"
             >
               <Plus className="w-4 h-4" />
               Lägg till
@@ -567,7 +567,7 @@ export default function PricelistPage() {
         </div>
 
         {/* Products Section */}
-        <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+        <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
               <Package className="w-5 h-5 text-primary-700" />
@@ -582,14 +582,14 @@ export default function PricelistPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Sök produkter..."
-                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-600"
+                  className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-600"
                 />
               </div>
               {categories.length > 0 && (
                 <select
                   value={selectedCategory || ''}
                   onChange={(e) => setSelectedCategory(e.target.value || null)}
-                  className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 text-sm focus:outline-none focus:border-primary-600"
+                  className="px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-600"
                 >
                   <option value="">Alla kategorier</option>
                   {categories.map(cat => (
@@ -696,7 +696,7 @@ export default function PricelistPage() {
       {/* Supplier Modal */}
       {showSupplierModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingSupplier ? 'Redigera leverantör' : 'Ny leverantör'}
@@ -712,7 +712,7 @@ export default function PricelistPage() {
                   type="text"
                   value={supplierForm.name}
                   onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   placeholder="T.ex. Ahlsell, Elektroskandia"
                 />
               </div>
@@ -722,7 +722,7 @@ export default function PricelistPage() {
                   type="text"
                   value={supplierForm.customer_number}
                   onChange={(e) => setSupplierForm({ ...supplierForm, customer_number: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   placeholder="Ditt kundnummer hos leverantören"
                 />
               </div>
@@ -733,7 +733,7 @@ export default function PricelistPage() {
                     type="email"
                     value={supplierForm.contact_email}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_email: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   />
                 </div>
                 <div>
@@ -742,7 +742,7 @@ export default function PricelistPage() {
                     type="tel"
                     value={supplierForm.contact_phone}
                     onChange={(e) => setSupplierForm({ ...supplierForm, contact_phone: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   />
                 </div>
               </div>
@@ -770,7 +770,7 @@ export default function PricelistPage() {
       {/* Product Modal */}
       {showProductModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingProduct ? 'Redigera produkt' : 'Ny produkt'}
@@ -786,7 +786,7 @@ export default function PricelistPage() {
                   type="text"
                   value={productForm.name}
                   onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -796,7 +796,7 @@ export default function PricelistPage() {
                     type="text"
                     value={productForm.sku}
                     onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   />
                 </div>
                 <div>
@@ -805,7 +805,7 @@ export default function PricelistPage() {
                     type="text"
                     value={productForm.category}
                     onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   />
                 </div>
               </div>
@@ -814,7 +814,7 @@ export default function PricelistPage() {
                 <select
                   value={productForm.supplier_id}
                   onChange={(e) => setProductForm({ ...productForm, supplier_id: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                 >
                   <option value="">Ingen leverantör</option>
                   {suppliers.map(s => (
@@ -829,7 +829,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.purchase_price}
                     onChange={(e) => setProductForm({ ...productForm, purchase_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                     step="0.01"
                   />
                 </div>
@@ -839,7 +839,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.markup_percent}
                     onChange={(e) => setProductForm({ ...productForm, markup_percent: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                   />
                 </div>
                 <div>
@@ -848,7 +848,7 @@ export default function PricelistPage() {
                     type="number"
                     value={productForm.sell_price}
                     onChange={(e) => setProductForm({ ...productForm, sell_price: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:border-primary-600"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600"
                     step="0.01"
                   />
                 </div>
@@ -877,7 +877,7 @@ export default function PricelistPage() {
       {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <FileSpreadsheet className="w-5 h-5 text-sky-700" />
@@ -925,7 +925,7 @@ export default function PricelistPage() {
                     <select
                       value={columnMapping.name || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, name: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -938,7 +938,7 @@ export default function PricelistPage() {
                     <select
                       value={columnMapping.sku || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, sku: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -951,7 +951,7 @@ export default function PricelistPage() {
                     <select
                       value={columnMapping.category || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, category: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -964,7 +964,7 @@ export default function PricelistPage() {
                     <select
                       value={columnMapping.purchase_price || ''}
                       onChange={(e) => setColumnMapping({ ...columnMapping, purchase_price: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900"
                     >
                       <option value="">Välj kolumn</option>
                       {getAvailableColumns().map(col => (
@@ -980,7 +980,7 @@ export default function PricelistPage() {
                     type="number"
                     value={defaultMarkup}
                     onChange={(e) => setDefaultMarkup(parseInt(e.target.value) || 20)}
-                    className="w-32 px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900"
+                    className="w-32 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900"
                   />
                 </div>
 
@@ -1015,7 +1015,7 @@ export default function PricelistPage() {
                     <div className="text-2xl font-bold text-red-600">{importPreview.errors}</div>
                     <div className="text-sm text-red-600/80">Fel</div>
                   </div>
-                  <div className="p-4 bg-gray-100 border border-gray-300 rounded-xl text-center">
+                  <div className="p-4 bg-white border border-[#E2E8F0] rounded-lg text-center">
                     <div className="text-2xl font-bold text-gray-900">{importData.length}</div>
                     <div className="text-sm text-gray-500">Totalt</div>
                   </div>

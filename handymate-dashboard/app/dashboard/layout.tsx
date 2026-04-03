@@ -7,7 +7,7 @@ import Sidebar from '@/components/Sidebar'
 
 const Jobbkompisen = dynamic(() => import('@/components/Jobbkompisen'), {
   ssr: false,
-  loading: () => <div className="fixed bottom-6 right-6 w-14 h-14 bg-primary-100 rounded-2xl animate-pulse z-40" />,
+  loading: () => <div className="fixed bottom-6 right-6 w-14 h-14 bg-primary-100 rounded-xl animate-pulse z-40" />,
 })
 import WelcomeModal from '@/components/WelcomeModal'
 import FeedbackWidget from '@/components/FeedbackWidget'
@@ -43,7 +43,7 @@ export default function DashboardLayout({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
@@ -62,7 +62,7 @@ export default function DashboardLayout({
         <JobbuddyProvider>
           <ErrorBoundary>
             <ToastProvider>
-              <div className="flex min-h-screen bg-slate-50">
+              <div className="flex min-h-screen bg-[#F8FAFC]">
                 <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
                 <main className="flex-1 md:ml-64">
                   <ImpersonationBanner />

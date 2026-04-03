@@ -143,11 +143,11 @@ export default function PlanningInventoryPage() {
   }
 
   if (loading) {
-    return <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
+    return <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 text-primary-700 animate-spin" /></div>
   }
 
   return (
-    <div className="p-4 md:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -190,7 +190,7 @@ export default function PlanningInventoryPage() {
         </div>
 
         {filteredItems.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">Inget lager</h3>
             <p className="text-sm text-gray-500">Lägg till artiklar under Inställningar → Lager & Material.</p>
@@ -239,7 +239,7 @@ export default function PlanningInventoryPage() {
                 )}
                 <div className="space-y-2">
                   {okStock.map(item => (
-                    <div key={item.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                    <div key={item.id} className="bg-white border border-[#E2E8F0] rounded-xl p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <span className="font-medium text-gray-900 text-sm">{item.name}</span>
@@ -264,7 +264,7 @@ export default function PlanningInventoryPage() {
       {/* Withdrawal Modal */}
       {showWithdraw && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Rapportera uttag</h2>
               <button onClick={() => setShowWithdraw(false)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
@@ -334,7 +334,7 @@ export default function PlanningInventoryPage() {
                 {withdrawing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Rapportera uttag
               </button>
-              <button onClick={() => setShowWithdraw(false)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600">Avbryt</button>
+              <button onClick={() => setShowWithdraw(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-600">Avbryt</button>
             </div>
           </div>
         </div>
@@ -343,7 +343,7 @@ export default function PlanningInventoryPage() {
       {/* Restock Modal */}
       {restockItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-gray-900">Fyll på: {restockItem.name}</h2>
               <button onClick={() => setRestockItem(null)} className="p-1 hover:bg-gray-100 rounded-lg"><X className="w-5 h-5 text-gray-400" /></button>
@@ -369,7 +369,7 @@ export default function PlanningInventoryPage() {
               >
                 {restocking ? 'Sparar...' : 'Registrera påfyllning'}
               </button>
-              <button onClick={() => setRestockItem(null)} className="px-4 py-2.5 border border-gray-200 rounded-lg text-sm text-gray-600">Avbryt</button>
+              <button onClick={() => setRestockItem(null)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-600">Avbryt</button>
             </div>
           </div>
         </div>

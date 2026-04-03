@@ -27,7 +27,7 @@ function getRoleBadge(role: string) {
     return {
       label: 'Ägare',
       className:
-        'bg-gradient-to-r from-primary-700/20 to-primary-600/20 text-primary-700 border-primary-300',
+        'bg-[#F0FDFA] text-primary-700 border-primary-300',
     }
   if (role === 'admin')
     return {
@@ -131,11 +131,11 @@ export default function ProfilePage() {
       </div>
 
       {/* Profile card */}
-      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+      <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           {/* Avatar */}
           <div
-            className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-2xl font-bold text-gray-900"
+            className="w-20 h-20 rounded-xl flex items-center justify-center flex-shrink-0 text-2xl font-bold text-gray-900"
             style={{ backgroundColor: user.color || '#7c3aed' }}
           >
             {getInitials(user.name)}
@@ -164,7 +164,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Edit form card */}
-      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mb-6">
+      <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6 mb-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
           <User className="w-5 h-5 text-sky-700" />
           Redigera profil
@@ -180,7 +180,7 @@ export default function ProfilePage() {
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
               placeholder="Ditt namn"
             />
           </div>
@@ -194,7 +194,7 @@ export default function ProfilePage() {
               type="text"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
               placeholder="070-123 45 67"
             />
           </div>
@@ -208,7 +208,7 @@ export default function ProfilePage() {
               type="text"
               value={form.avatar_url}
               onChange={(e) => setForm({ ...form, avatar_url: e.target.value })}
-              className="w-full px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
+              className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 outline-none transition-colors"
               placeholder="https://..."
             />
           </div>
@@ -240,7 +240,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Info card */}
-      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6">
+      <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
           <Shield className="w-5 h-5 text-sky-700" />
           Kontoinformation
@@ -295,7 +295,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Connected Calendars */}
-      <div className="relative bg-white shadow-sm rounded-xl border border-gray-200 p-6 mt-6">
+      <div className="relative bg-white rounded-xl border border-[#E2E8F0] p-6 mt-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-5 flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-sky-700" />
           Anslutna kalendrar

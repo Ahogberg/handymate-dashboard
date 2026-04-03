@@ -463,14 +463,14 @@ export default function CustomersPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <div className="text-gray-500">Laddar...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       {/* Background */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -489,7 +489,7 @@ export default function CustomersPage() {
       {/* Customer Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm sm:p-4">
-          <div className="bg-white border border-gray-200 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingCustomer ? 'Redigera kund' : 'Ny kund'}
@@ -534,7 +534,7 @@ export default function CustomersPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -547,7 +547,7 @@ export default function CustomersPage() {
                     value={form.org_number}
                     onChange={(e) => setForm({ ...form, org_number: e.target.value })}
                     placeholder="XXXXXX-XXXX"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               )}
@@ -560,7 +560,7 @@ export default function CustomersPage() {
                     type="text"
                     value={form.contact_person}
                     onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               )}
@@ -572,7 +572,7 @@ export default function CustomersPage() {
                   value={form.phone_number}
                   onChange={(e) => setForm({ ...form, phone_number: e.target.value })}
                   placeholder="+46..."
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -581,7 +581,7 @@ export default function CustomersPage() {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
               <div>
@@ -591,7 +591,7 @@ export default function CustomersPage() {
                   onChange={(val) => setForm({ ...form, address_line: val })}
                   onSelect={(r) => setForm({ ...form, address_line: r.full_address })}
                   placeholder="Sök adress..."
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
@@ -603,7 +603,7 @@ export default function CustomersPage() {
                     type="text"
                     value={form.reference}
                     onChange={(e) => setForm({ ...form, reference: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               )}
@@ -617,7 +617,7 @@ export default function CustomersPage() {
                     value={form.invoice_address}
                     onChange={(e) => setForm({ ...form, invoice_address: e.target.value })}
                     placeholder="Om annan än besöksadress"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               )}
@@ -630,7 +630,7 @@ export default function CustomersPage() {
                     type="number"
                     value={form.apartment_count}
                     onChange={(e) => setForm({ ...form, apartment_count: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   />
                 </div>
               )}
@@ -644,7 +644,7 @@ export default function CustomersPage() {
                     value={form.personal_number}
                     onChange={(e) => setForm({ ...form, personal_number: e.target.value })}
                     placeholder="YYYYMMDD-XXXX"
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                   />
                   <p className="text-xs text-gray-400 mt-1">Krävs för ROT/RUT-avdrag</p>
                 </div>
@@ -657,7 +657,7 @@ export default function CustomersPage() {
                   <select
                     value={form.default_payment_days}
                     onChange={(e) => setForm({ ...form, default_payment_days: e.target.value })}
-                    className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                    className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                   >
                     <option value="10">10 dagar</option>
                     <option value="15">15 dagar</option>
@@ -694,7 +694,7 @@ export default function CustomersPage() {
                         const suggested = pricingPriceLists.find(pl => pl.segment_id === segId)
                         if (suggested) setForm(prev => ({ ...prev, segment_id: segId, price_list_id: suggested.id }))
                       }}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     >
                       <option value="">Välj segment...</option>
                       {pricingSegments.map(s => (
@@ -707,7 +707,7 @@ export default function CustomersPage() {
                     <select
                       value={form.contract_type_id}
                       onChange={e => setForm({ ...form, contract_type_id: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     >
                       <option value="">Välj avtalsform...</option>
                       {pricingContractTypes.map(ct => (
@@ -720,7 +720,7 @@ export default function CustomersPage() {
                     <select
                       value={form.price_list_id}
                       onChange={e => setForm({ ...form, price_list_id: e.target.value })}
-                      className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                     >
                       <option value="">Välj prislista...</option>
                       {pricingPriceLists.map(pl => (
@@ -741,7 +741,7 @@ export default function CustomersPage() {
                   value={form.property_designation}
                   onChange={(e) => setForm({ ...form, property_designation: e.target.value })}
                   placeholder="T.ex. Stockholm Söder 1:23"
-                  className="w-full px-4 py-2 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                  className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
                 />
                 <p className="text-xs text-gray-400 mt-1">Krävs för ROT-avdrag</p>
               </div>
@@ -776,7 +776,7 @@ export default function CustomersPage() {
         {/* Tabs */}
         <div className="flex flex-col gap-4 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1">
+            <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
               <button
                 onClick={() => setActiveTab('customers')}
                 className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
@@ -821,7 +821,7 @@ export default function CustomersPage() {
               <div className="flex items-center gap-2 sm:ml-auto">
                 <Link
                   href="/dashboard/customers/import"
-                  className="flex items-center justify-center px-4 py-2.5 bg-gray-100 border border-gray-300 rounded-xl font-medium text-gray-900 hover:bg-gray-200 min-h-[44px]"
+                  className="flex items-center justify-center px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg font-medium text-gray-900 hover:bg-gray-200 min-h-[44px]"
                 >
                   <Upload className="w-4 h-4 sm:mr-2" />
                   <span className="hidden sm:inline">Importera</span>
@@ -857,7 +857,7 @@ export default function CustomersPage() {
                   placeholder="Sök kund..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 min-h-[44px]"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] min-h-[44px]"
                 />
               </div>
               {/* Tag filter chips */}
@@ -899,7 +899,7 @@ export default function CustomersPage() {
                   </button>
                   <span className="w-px h-4 bg-gray-200 mx-1" />
                   <select value={sortBy} onChange={e => setSortBy(e.target.value as any)}
-                    className="px-2 py-1 rounded-lg text-xs border border-gray-200 text-gray-500 focus:outline-none">
+                    className="px-2 py-1 rounded-lg text-xs border border-[#E2E8F0] text-gray-500 focus:outline-none">
                     <option value="name">Namn A-Ö</option>
                     <option value="ltv">Livstidsvärde</option>
                     <option value="recent">Senast skapad</option>
@@ -917,7 +917,7 @@ export default function CustomersPage() {
           )}
 
           {activeTab === 'campaigns' && (
-            <div className="flex bg-white border border-gray-200 rounded-xl p-1 overflow-x-auto">
+            <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
               {[
                 { id: 'all', label: 'Alla' },
                 { id: 'draft', label: 'Utkast' },
@@ -940,7 +940,7 @@ export default function CustomersPage() {
         {/* Campaign Stats */}
         {activeTab === 'campaigns' && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                   <Megaphone className="w-5 h-5 text-secondary-700" />
@@ -951,7 +951,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                   <Send className="w-5 h-5 text-primary-600" />
@@ -962,7 +962,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <CheckCircle className="w-5 h-5 text-emerald-600" />
@@ -973,7 +973,7 @@ export default function CustomersPage() {
                 </div>
               </div>
             </div>
-            <div className="bg-white border border-gray-200 rounded-xl p-4">
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
                   <MessageSquare className="w-5 h-5 text-amber-600" />
@@ -996,7 +996,7 @@ export default function CustomersPage() {
                 <Link
                   href={`/dashboard/customers/${customer.customer_id}`}
                   key={customer.customer_id}
-                  className="bg-white shadow-sm rounded-xl sm:rounded-2xl border border-gray-200 p-4 sm:p-5 hover:bg-gray-50 transition-all block"
+                  className="bg-white rounded-xl sm:rounded-xl border border-[#E2E8F0] p-4 sm:p-5 hover:bg-gray-50 transition-all block"
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center">
@@ -1093,7 +1093,7 @@ export default function CustomersPage() {
         )}
 
         {activeTab === 'campaigns' && (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200">
+          <div className="bg-white rounded-xl border border-[#E2E8F0]">
             {filteredCampaigns.length === 0 ? (
               <div className="p-12 text-center">
                 <Megaphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -1113,7 +1113,7 @@ export default function CustomersPage() {
                   <div key={campaign.campaign_id} className="p-4 hover:bg-gray-100/30 transition-all">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center flex-1 min-w-0">
-                        <div className="w-10 h-10 bg-gradient-to-br from-primary-700/20 to-primary-600/20 rounded-xl flex items-center justify-center border border-primary-300 mr-4">
+                        <div className="w-10 h-10 bg-[#F0FDFA] rounded-xl flex items-center justify-center border border-[#E2E8F0] mr-4">
                           <MessageSquare className="w-5 h-5 text-secondary-700" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -1156,7 +1156,7 @@ export default function CustomersPage() {
                           {campaign.status === 'sent' && (
                             <Link
                               href={`/dashboard/campaigns/${campaign.campaign_id}`}
-                              className="px-3 py-1.5 text-xs font-medium text-secondary-700 hover:text-primary-700 bg-primary-50 border border-primary-300 rounded-lg"
+                              className="px-3 py-1.5 text-xs font-medium text-secondary-700 hover:text-primary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg"
                             >
                               Visa resultat
                             </Link>
@@ -1174,7 +1174,7 @@ export default function CustomersPage() {
         {activeTab === 'duplicates' && (
           <div className="space-y-4">
             {duplicates.length === 0 ? (
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
                 <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
                 <p className="text-gray-500">Inga dubbletter hittades!</p>
                 <p className="text-sm text-gray-400 mt-1">Alla kunder verkar vara unika.</p>
@@ -1191,7 +1191,7 @@ export default function CustomersPage() {
                   </div>
                 </div>
                 {duplicates.map((group, gi) => (
-                  <div key={gi} className="bg-white shadow-sm rounded-2xl border border-gray-200 p-5">
+                  <div key={gi} className="bg-white rounded-xl border border-[#E2E8F0] p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <span className={`px-2.5 py-1 text-xs rounded-full font-medium ${
                         group.match_type === 'phone' ? 'bg-primary-100 text-primary-700' :
@@ -1215,7 +1215,7 @@ export default function CustomersPage() {
                               group.customers.filter(o => o.customer_id !== c.customer_id).map(o => o.customer_id)
                             )}
                             disabled={actionLoading}
-                            className="px-3 py-1.5 text-xs font-medium bg-primary-50 text-secondary-700 border border-primary-200 rounded-lg hover:bg-primary-100 disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs font-medium bg-primary-50 text-secondary-700 border border-[#E2E8F0] rounded-lg hover:bg-primary-100 disabled:opacity-50"
                           >
                             Behåll denna
                           </button>
@@ -1233,7 +1233,7 @@ export default function CustomersPage() {
       {/* Tag Management Modal (C1) */}
       {showTagModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-bold text-gray-900">Hantera taggar</h3>
               <button onClick={() => setShowTagModal(false)} className="p-2 text-gray-400 hover:text-gray-900">
@@ -1247,7 +1247,7 @@ export default function CustomersPage() {
                 type="color"
                 value={newTagColor}
                 onChange={(e) => setNewTagColor(e.target.value)}
-                className="w-10 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                className="w-10 h-10 rounded-lg border border-[#E2E8F0] cursor-pointer"
               />
               <input
                 type="text"
@@ -1255,7 +1255,7 @@ export default function CustomersPage() {
                 value={newTagName}
                 onChange={(e) => setNewTagName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleCreateTag()}
-                className="flex-1 px-4 py-2.5 bg-gray-100 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-xl text-gray-900 focus:outline-none focus:border-[#0F766E]"
               />
               <button
                 onClick={handleCreateTag}

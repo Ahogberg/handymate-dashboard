@@ -103,7 +103,7 @@ export default function WeeklyReportPage() {
 
   if (loading && !data) {
     return (
-      <div className="p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-sky-700" />
       </div>
     )
@@ -111,7 +111,7 @@ export default function WeeklyReportPage() {
 
   return (
     <PermissionGate permission="approve_time">
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]" />
       </div>
@@ -120,7 +120,7 @@ export default function WeeklyReportPage() {
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/dashboard/time"
-            className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-500 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
@@ -137,15 +137,15 @@ export default function WeeklyReportPage() {
         {/* Week Nav */}
         <div className="flex items-center gap-3 mb-6">
           <button onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}
-            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <button onClick={() => setCurrentWeek(new Date())}
-            className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm font-medium hover:border-primary-300 min-w-[200px] text-center">
+            className="px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm font-medium hover:border-primary-300 min-w-[200px] text-center">
             V{getWeekNumber()} &middot; {format(weekStart, 'd MMM', { locale: sv })} – {format(new Date(weekStart.getTime() + 6 * 86400000), 'd MMM yyyy', { locale: sv })}
           </button>
           <button onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}
-            className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900">
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -153,23 +153,23 @@ export default function WeeklyReportPage() {
         {/* Totaler */}
         {data && (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
-            <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+            <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
               <p className="text-xs text-gray-500">Total tid</p>
               <p className="text-xl font-bold text-gray-900">{fmtH(data.totals.minutes)}</p>
             </div>
-            <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+            <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
               <p className="text-xs text-gray-500">Fakturerbar</p>
               <p className="text-xl font-bold text-emerald-600">{fmtH(data.totals.billable)}</p>
             </div>
-            <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+            <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
               <p className="text-xs text-gray-500">Övertid</p>
               <p className={`text-xl font-bold ${data.totals.overtime > 0 ? 'text-orange-600' : 'text-gray-900'}`}>{fmtH(data.totals.overtime)}</p>
             </div>
-            <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+            <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
               <p className="text-xs text-gray-500">Intäkter</p>
               <p className="text-xl font-bold text-gray-900">{Math.round(data.totals.revenue).toLocaleString('sv-SE')} kr</p>
             </div>
-            <div className="bg-white shadow-sm rounded-xl p-4 border border-gray-200">
+            <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
               <p className="text-xs text-gray-500">Resor</p>
               <p className="text-xl font-bold text-gray-900">{data.totals.travelKm.toFixed(0)} km</p>
             </div>
@@ -180,7 +180,7 @@ export default function WeeklyReportPage() {
         {data && data.employees.length > 0 ? (
           <div className="space-y-4">
             {data.employees.map(emp => (
-              <div key={emp.user.id} className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <div key={emp.user.id} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                 {/* Person header */}
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -247,7 +247,7 @@ export default function WeeklyReportPage() {
             ))}
           </div>
         ) : (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Clock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Inga tidposter denna vecka</p>
           </div>

@@ -136,11 +136,11 @@ export default function HelpPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[#F8FAFC]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary-700 shadow-lg shadow-primary-600/25 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-primary-700 shadow-lg shadow-primary-600/25 mb-4">
             <HelpCircle className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
@@ -162,7 +162,7 @@ export default function HelpPage() {
               setSearchQuery(e.target.value)
               setOpenIndex(null)
             }}
-            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-2xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600 shadow-sm transition-all text-base"
+            className="w-full pl-12 pr-4 py-4 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-[#0F766E] focus:border-primary-600 transition-all text-base"
           />
         </div>
 
@@ -174,7 +174,7 @@ export default function HelpPage() {
           </h2>
           <div className="space-y-3">
             {filteredFAQ.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-xl p-8 text-center">
                 <Search className="w-10 h-10 text-slate-300 mx-auto mb-3" />
                 <p className="text-slate-500">
                   Inga frågor matchade din sökning.
@@ -192,11 +192,11 @@ export default function HelpPage() {
                 return (
                   <div
                     key={index}
-                    className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden transition-all"
+                    className="bg-white border border-slate-200 rounded-xl overflow-hidden transition-all"
                   >
                     <button
                       onClick={() => toggleFAQ(index)}
-                      className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50 transition-colors"
+                      className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-[#F8FAFC] transition-colors"
                     >
                       <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-primary-50 to-primary-50 border border-primary-100 flex items-center justify-center text-primary-700">
                         {item.icon}
@@ -239,7 +239,7 @@ export default function HelpPage() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary-300 transition-all"
+                className="group bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-primary-300 transition-all"
               >
                 <div className="flex items-start gap-4">
                   <div
@@ -266,9 +266,9 @@ export default function HelpPage() {
             <Mail className="w-5 h-5 text-primary-700" />
             Kontakta support
           </h2>
-          <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+          <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <div className="flex-shrink-0 w-14 h-14 rounded-2xl bg-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-600/20">
+              <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-primary-700 flex items-center justify-center text-white shadow-lg shadow-primary-600/20">
                 <Mail className="w-7 h-7" />
               </div>
               <div className="flex-1">

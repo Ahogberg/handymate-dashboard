@@ -151,14 +151,14 @@ export default function MyPricesPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-slate-50 min-h-screen flex items-center justify-center">
+      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
         <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -180,7 +180,7 @@ export default function MyPricesPage() {
         </div>
 
         {/* Labor / Services */}
-        <div className="bg-white border border-gray-200 rounded-xl mb-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl mb-4">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <Wrench className="w-4 h-4 text-primary-700" />
             <h2 className="font-semibold text-gray-900">Arbete</h2>
@@ -199,14 +199,14 @@ export default function MyPricesPage() {
                   value={item.name}
                   onChange={e => updateItem(item.id, 'name', e.target.value)}
                   placeholder="Tjänstnamn, t.ex. Elinstallation"
-                  className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
+                  className="flex-1 min-w-0 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
                 />
                 <input
                   type="number"
                   value={item.unit_price || ''}
                   onChange={e => updateItem(item.id, 'unit_price', Number(e.target.value))}
                   placeholder="0"
-                  className="w-24 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-600"
+                  className="w-24 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-600"
                 />
                 <input
                   type="number"
@@ -216,12 +216,12 @@ export default function MyPricesPage() {
                   title="Standardantal"
                   min={0.1}
                   step="any"
-                  className="w-16 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-primary-600"
+                  className="w-16 bg-transparent border border-[#E2E8F0] rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-primary-600"
                 />
                 <select
                   value={item.unit}
                   onChange={e => updateItem(item.id, 'unit', e.target.value)}
-                  className="w-24 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-600 text-sm focus:outline-none focus:border-primary-600"
+                  className="w-24 bg-transparent border border-[#E2E8F0] rounded-lg px-2 py-2 text-gray-600 text-sm focus:outline-none focus:border-primary-600"
                 >
                   {UNIT_OPTIONS.map(u => (
                     <option key={u.value} value={u.value}>{u.label}</option>
@@ -248,7 +248,7 @@ export default function MyPricesPage() {
         </div>
 
         {/* Material */}
-        <div className="bg-white border border-gray-200 rounded-xl mb-4">
+        <div className="bg-white border border-[#E2E8F0] rounded-xl mb-4">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
             <Package className="w-4 h-4 text-amber-600" />
             <h2 className="font-semibold text-gray-900">Material</h2>
@@ -268,14 +268,14 @@ export default function MyPricesPage() {
                   value={item.name}
                   onChange={e => updateItem(item.id, 'name', e.target.value)}
                   placeholder="Materialnamn, t.ex. Kakel 30x30"
-                  className="flex-1 min-w-0 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
+                  className="flex-1 min-w-0 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-2 text-gray-900 text-sm focus:outline-none focus:border-primary-600 placeholder-gray-300"
                 />
                 <input
                   type="number"
                   value={item.unit_price || ''}
                   onChange={e => updateItem(item.id, 'unit_price', Number(e.target.value))}
                   placeholder="0"
-                  className="w-24 bg-transparent border border-gray-200 rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-600"
+                  className="w-24 bg-transparent border border-[#E2E8F0] rounded-lg px-3 py-2 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-600"
                 />
                 <input
                   type="number"
@@ -285,12 +285,12 @@ export default function MyPricesPage() {
                   title="Standardantal"
                   min={0.1}
                   step="any"
-                  className="w-16 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-primary-600"
+                  className="w-16 bg-transparent border border-[#E2E8F0] rounded-lg px-2 py-2 text-gray-900 text-sm text-center focus:outline-none focus:border-primary-600"
                 />
                 <select
                   value={item.unit}
                   onChange={e => updateItem(item.id, 'unit', e.target.value)}
-                  className="w-24 bg-transparent border border-gray-200 rounded-lg px-2 py-2 text-gray-600 text-sm focus:outline-none focus:border-primary-600"
+                  className="w-24 bg-transparent border border-[#E2E8F0] rounded-lg px-2 py-2 text-gray-600 text-sm focus:outline-none focus:border-primary-600"
                 >
                   {UNIT_OPTIONS.map(u => (
                     <option key={u.value} value={u.value}>{u.label}</option>
@@ -332,7 +332,7 @@ export default function MyPricesPage() {
         </Link>
 
         {/* Info box */}
-        <div className="bg-primary-50 border border-primary-300 rounded-xl p-5 text-sm text-primary-700">
+        <div className="bg-primary-50 border border-[#E2E8F0] rounded-xl p-5 text-sm text-primary-700">
           <p className="font-medium mb-1">Tips</p>
           <p>Dessa priser hjälper AI-assistenten att skapa mer korrekta offerter. Du kan när som helst justera priserna på enskilda offerter.</p>
         </div>

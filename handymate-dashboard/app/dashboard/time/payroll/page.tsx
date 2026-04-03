@@ -86,12 +86,12 @@ export default function PayrollPage() {
 
   return (
     <PermissionGate permission="see_financials">
-    <div className="p-4 sm:p-8 bg-slate-50 min-h-screen">
+    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="relative">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Link href="/dashboard/time"
-            className="p-2 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900">
+            className="p-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-500 hover:text-gray-900">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div className="flex items-center">
@@ -109,27 +109,27 @@ export default function PayrollPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => changePeriod(-1)}
-              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
+              className="p-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900">
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm font-medium min-w-[180px] text-center capitalize">
+            <span className="px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm font-medium min-w-[180px] text-center capitalize">
               {periodLabel}
             </span>
             <button onClick={() => changePeriod(1)}
-              className="p-2 bg-white border border-gray-200 rounded-lg text-gray-500 hover:text-gray-900">
+              className="p-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-500 hover:text-gray-900">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           <div className="flex gap-2">
             <a href={`/api/time-reports/payroll-export?period=${period}&format=csv`}
-              className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-emerald-300">
+              className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-700 hover:border-emerald-300">
               <Download className="w-4 h-4" />
               CSV
             </a>
             <a href={`/api/time-reports/payroll-export?period=${period}&format=html`}
               target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:border-emerald-300">
+              className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm text-gray-700 hover:border-emerald-300">
               <FileText className="w-4 h-4" />
               PDF
             </a>
@@ -150,14 +150,14 @@ export default function PayrollPage() {
             <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
           </div>
         ) : payroll.length === 0 ? (
-          <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
             <Wallet className="w-10 h-10 text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500">Inga tidrapporter denna period</p>
           </div>
         ) : (
           <div className="space-y-4">
             {payroll.map((p, i) => (
-              <div key={i} className="bg-white shadow-sm rounded-2xl border border-gray-200 overflow-hidden">
+              <div key={i} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
                 <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-900">{p.employee}</h3>
