@@ -1,0 +1,25 @@
+{
+  "name": "handymate-mcp",
+  "version": "1.0.0",
+  "description": "Handymate MCP server — query DB, get business config, read SMS logs",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "handymate-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "eval": "tsx evals/eval.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
