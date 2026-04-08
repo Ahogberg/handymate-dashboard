@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { buildSwishQRData } from '@/lib/swish-qr'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -54,9 +55,16 @@ function getReminderMessage(level: ReminderLevel, vars: {
   interestAmount: number
   customTemplate?: string | null
   assignedPhoneNumber?: string | null
+  swishNumber?: string | null
+  amountRaw?: number
 }): { sms: string; emailSubject: string; emailBody: string } {
   const { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount } = vars
   const suffix = buildSmsSuffix(businessName, vars.assignedPhoneNumber)
+
+  // Bygg Swish-betalningslänk om numret finns
+  const swishNote = vars.swishNumber && vars.amountRaw
+    ? ` Swish: ${vars.swishNumber} (${amount} kr, ange "${invoiceNumber}").`
+    : ''
 
   // Använd custom SMS-mall om den finns
   if (vars.customTemplate) {
@@ -71,7 +79,7 @@ function getReminderMessage(level: ReminderLevel, vars: {
       .replace(/\{late_fee_percent\}/g, String(reminderFee))
     return {
       sms: sms + '\n' + suffix,
-      ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount }),
+      ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
     }
   }
 
@@ -81,27 +89,28 @@ function getReminderMessage(level: ReminderLevel, vars: {
   const interestNote = interestAmount > 0 && (level === 'formal' || level === 'final')
     ? ` Dröjsmålsränta: ${Math.round(interestAmount)} kr.`
     : ''
+  const payInfo = bankgiro ? `Bankgiro ${bankgiro}, OCR: ${ocr}.` : `OCR: ${ocr}.`
 
   switch (level) {
     case 'friendly':
       return {
-        sms: `Hej! Faktura ${invoiceNumber} på ${amount} kr förföll ${dueDate}. Kanske missades? Betala via bankgiro ${bankgiro}, OCR: ${ocr}.\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount }),
+        sms: `Hej! Faktura ${invoiceNumber} på ${amount} kr förföll ${dueDate}. Kanske missades?${swishNote} ${payInfo}\n${suffix}`,
+        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
       }
     case 'firm':
       return {
-        sms: `Påminnelse 2: Faktura ${invoiceNumber} på ${amount} kr är ${daysOverdue} dagar försenad.${feeNote} Bankgiro ${bankgiro}, OCR: ${ocr}.\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount }),
+        sms: `Påminnelse 2: Faktura ${invoiceNumber} på ${amount} kr är ${daysOverdue} dagar försenad.${feeNote}${swishNote} ${payInfo}\n${suffix}`,
+        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
       }
     case 'formal':
       return {
-        sms: `Viktig påminnelse: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad.${feeNote}${interestNote} Bankgiro ${bankgiro}, OCR: ${ocr}.\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount }),
+        sms: `Viktig påminnelse: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad.${feeNote}${interestNote}${swishNote} ${payInfo}\n${suffix}`,
+        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
       }
     case 'final':
       return {
-        sms: `SISTA PÅMINNELSE: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad. Ärendet kan överlämnas till inkasso.${feeNote}${interestNote} Bankgiro ${bankgiro}, OCR: ${ocr}.\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount }),
+        sms: `SISTA PÅMINNELSE: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad. Ärendet kan överlämnas till inkasso.${feeNote}${interestNote}${swishNote} ${payInfo}\n${suffix}`,
+        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
       }
   }
 }
@@ -109,7 +118,7 @@ function getReminderMessage(level: ReminderLevel, vars: {
 function generateEmailContent(level: ReminderLevel, vars: {
   invoiceNumber: string; amount: string; dueDate: string; ocr: string
   businessName: string; daysOverdue: number; bankgiro: string
-  reminderFee: number; interestAmount: number
+  reminderFee: number; interestAmount: number; swishNumber?: string | null
 }): { emailSubject: string; emailBody: string } {
   const { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount } = vars
 
@@ -152,7 +161,7 @@ function generateEmailContent(level: ReminderLevel, vars: {
           </table>` : ''}
           <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;">
             <p style="margin:0 0 4px;font-weight:600;font-size:14px;">Betalningsinformation</p>
-            <p style="margin:0;font-size:14px;color:#64748b;">Bankgiro: ${bankgiro}<br>OCR: ${ocr}</p>
+            <p style="margin:0;font-size:14px;color:#64748b;">${bankgiro ? `Bankgiro: ${bankgiro}<br>` : ''}OCR: ${ocr}${vars.swishNumber ? `<br><strong>Swish:</strong> ${vars.swishNumber}` : ''}</p>
           </div>
           <p>Med vänlig hälsning,<br><strong>${businessName}</strong></p>
         </div>
@@ -239,6 +248,23 @@ async function sendAutoReminders() {
       }
     }
 
+    // Dedup: kolla vilka företag som har aktiva V3 threshold-regler för fakturapåminnelser
+    // Om ja → V3 evaluate-thresholds hanterar redan påminnelser, skippa cron-sändning
+    const v3HandlesInvoiceReminders = new Set<string>()
+    if (businessIds.length > 0) {
+      const { data: v3InvoiceRules } = await supabase
+        .from('v3_automation_rules')
+        .select('business_id')
+        .eq('trigger_type', 'threshold')
+        .eq('is_active', true)
+        .in('business_id', businessIds)
+        .like('trigger_config', '%"entity":"invoice"%')
+
+      for (const r of v3InvoiceRules || []) {
+        v3HandlesInvoiceReminders.add(r.business_id)
+      }
+    }
+
     let remindersSent = 0
     let feesApplied = 0
     const results: Array<{ invoice_id: string; invoice_number: string; level: string; success: boolean; fee_added?: number; interest_added?: number }> = []
@@ -246,6 +272,9 @@ async function sendAutoReminders() {
     for (const inv of overdueInvoices as any[]) {
       const cfg = configMap[inv.business_id]
       if (!cfg) continue
+
+      // Dedup: om V3 threshold-regler hanterar detta företag, skippa cron-påminnelse
+      if (v3HandlesInvoiceReminders.has(inv.business_id)) continue
 
       // Respektera auto_reminder_enabled toggle
       if (!cfg.auto_reminder_enabled) continue
@@ -290,6 +319,8 @@ async function sendAutoReminders() {
         interestAmount,
         customTemplate: cfg.reminder_sms_template,
         assignedPhoneNumber: cfg.assigned_phone_number,
+        swishNumber: cfg.swish_number,
+        amountRaw: amountToPay || 0,
       })
 
       let smsSent = false

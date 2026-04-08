@@ -174,25 +174,10 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* non-blocking */ }
 
-    // Auto-create project: from lead if available, otherwise from quote
+    // Auto-create project from quote (with dedup, milestones, notifications)
     try {
-      if (quote.lead_id) {
-        const { createProjectFromLead } = await import('@/lib/projects/create-from-lead')
-        await createProjectFromLead(business.business_id, quote.lead_id)
-      } else {
-        // Create project directly from quote via API-internal call
-        const { getServerSupabase: getSupa } = await import('@/lib/supabase')
-        const s = getSupa()
-        const projectId = 'proj_' + Math.random().toString(36).substr(2, 9)
-        await s.from('project').insert({
-          project_id: projectId,
-          business_id: business.business_id,
-          customer_id: quote.customer_id,
-          name: quote.title || 'Projekt från offert',
-          status: 'active',
-          quote_id: quoteId,
-        })
-      }
+      const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
+      await createProjectFromQuote(business.business_id, quoteId)
     } catch (projErr) {
       console.error('Auto project creation error (non-blocking):', projErr)
     }

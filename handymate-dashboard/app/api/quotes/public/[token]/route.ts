@@ -240,6 +240,38 @@ export async function POST(
       await sendQuoteSignedConfirmation(quote.business_id, quote.quote_id)
     } catch { /* non-blocking */ }
 
+    // Auto-skapa projekt från signerad offert (non-blocking)
+    try {
+      const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
+      const result = await createProjectFromQuote(quote.business_id, quote.quote_id)
+      if (result.success) {
+        console.log(`[quote/public] Auto-created project ${result.project_id} from quote ${quote.quote_id}`)
+      }
+    } catch (projErr) {
+      console.error('Auto project creation error (non-blocking):', projErr)
+    }
+
+    // Golden Path: flytta deal till "Vunnen"
+    try {
+      const { data: linkedDeal } = await supabase
+        .from('deal')
+        .select('id')
+        .eq('business_id', quote.business_id)
+        .eq('quote_id', quote.quote_id)
+        .maybeSingle()
+
+      if (linkedDeal) {
+        const { moveDeal } = await import('@/lib/pipeline')
+        await moveDeal({
+          dealId: linkedDeal.id,
+          businessId: quote.business_id,
+          toStageSlug: 'won',
+          triggeredBy: 'system',
+          aiReason: 'Offert signerad av kund — deal vunnen',
+        })
+      }
+    } catch { /* non-blocking */ }
+
     return NextResponse.json({ success: true })
 
   } catch (error: any) {

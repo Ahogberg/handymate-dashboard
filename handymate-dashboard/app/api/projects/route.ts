@@ -363,6 +363,67 @@ export async function PUT(request: NextRequest) {
       } catch (invoiceErr) {
         console.error('Auto-invoice on complete error (non-blocking):', invoiceErr)
       }
+
+      // Schemalägg Google-recension 24h efter projektslut
+      try {
+        const { data: customer } = await supabase
+          .from('customer')
+          .select('name, phone_number')
+          .eq('customer_id', project.customer_id)
+          .single()
+
+        const { data: config } = await supabase
+          .from('business_config')
+          .select('business_name, google_review_url')
+          .eq('business_id', business.business_id)
+          .single()
+
+        if (customer?.phone_number && config?.google_review_url) {
+          const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h from now
+          await supabase.from('pending_approvals').insert({
+            business_id: business.business_id,
+            approval_type: 'scheduled_review_request',
+            type: 'scheduled_review_request',
+            title: `Recensionsförfrågan — ${customer.name}`,
+            description: `Skicka Google-recensionsförfrågan till ${customer.name} för projekt "${project.name}"`,
+            risk_level: 'low',
+            status: 'pending',
+            expires_at: scheduledAt.toISOString(),
+            payload: {
+              customer_id: project.customer_id,
+              customer_name: customer.name,
+              customer_phone: customer.phone_number,
+              project_id: project.project_id,
+              project_name: project.name,
+              business_name: config.business_name,
+              google_review_url: config.google_review_url,
+            },
+          })
+        }
+      } catch (reviewErr) {
+        console.error('Review request scheduling error (non-blocking):', reviewErr)
+      }
+
+      // Flytta deal till "Slutfört" i pipeline
+      try {
+        const { data: linkedDeal } = await supabase
+          .from('deal')
+          .select('id')
+          .eq('business_id', business.business_id)
+          .or(`quote_id.eq.${project.quote_id},lead_id.eq.${project.lead_id}`)
+          .maybeSingle()
+
+        if (linkedDeal) {
+          const { moveDeal } = await import('@/lib/pipeline')
+          await moveDeal({
+            dealId: linkedDeal.id,
+            businessId: business.business_id,
+            toStageSlug: 'invoiced',
+            triggeredBy: 'system',
+            aiReason: 'Projekt markerat som slutfört',
+          })
+        }
+      } catch { /* non-blocking */ }
     }
 
     return NextResponse.json({ project })
