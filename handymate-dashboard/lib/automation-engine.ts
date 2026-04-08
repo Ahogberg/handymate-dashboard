@@ -372,6 +372,22 @@ async function handleCreateApproval(
   const title = (config.title as string) || 'Godkännande krävs'
   const description = (config.description as string) || ''
 
+  // Dedup: kolla om en pending approval redan finns för samma entity + titel
+  const entityId = (context.entity_id as string) || (context.id as string)
+  if (entityId) {
+    const { count } = await supabase
+      .from('pending_approvals')
+      .select('*', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .eq('title', title)
+      .eq('status', 'pending')
+      .contains('payload', { entity_id: entityId })
+
+    if ((count || 0) > 0) {
+      return { success: true, data: { skipped: true, reason: 'Approval redan skapad för denna entitet' } }
+    }
+  }
+
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
   const { error } = await supabase.from('pending_approvals').insert({
