@@ -1465,6 +1465,8 @@ async function sendAgentMessageTool(
   const toAgent = input.to_agent as string
   const messageType = input.message_type as string
   const content = input.content as string
+  const reason = (input.reason as string) || undefined
+  const ctxData = (input.context as Record<string, unknown>) || undefined
   const fromAgent = context.agentId || 'matte'
 
   if (!toAgent || !content) {
@@ -1478,13 +1480,18 @@ async function sendAgentMessageTool(
 
   const type = messageType || 'request'
 
+  // Bygg strukturerad metadata för handoff — reason + context sparas för UI och mottagarens prompt
+  const metadata: Record<string, unknown> = { ...(input.metadata as Record<string, unknown> || {}) }
+  if (reason) metadata.reason = reason
+  if (ctxData) metadata.context = ctxData
+
   const { data: inserted, error } = await supabase.from('agent_messages').insert({
     business_id: businessId,
     from_agent: fromAgent,
     to_agent: toAgent,
     message_type: type,
     content,
-    metadata: input.metadata || {},
+    metadata,
   }).select('id').single()
 
   if (error) {
@@ -1513,6 +1520,8 @@ async function sendAgentMessageTool(
           trigger_data: {
             from_agent: fromAgent,
             handoff_message: content,
+            handoff_reason: reason || null,
+            handoff_context: ctxData || null,
             message_id: inserted?.id,
           },
         }),
@@ -1541,7 +1550,7 @@ async function getAgentMessagesTool(
 
   const { data, error } = await supabase
     .from('agent_messages')
-    .select('id, from_agent, message_type, content, created_at')
+    .select('id, from_agent, message_type, content, metadata, created_at')
     .eq('business_id', businessId)
     .eq('to_agent', agentId)
     .eq('status', 'pending')
@@ -1571,6 +1580,8 @@ async function getAgentMessagesTool(
         from: agentNames[m.from_agent] || m.from_agent,
         type: m.message_type,
         content: m.content,
+        reason: m.metadata?.reason || null,
+        context: m.metadata?.context || null,
         time: m.created_at,
       })),
       count: data?.length || 0,

@@ -172,12 +172,12 @@ export async function getAgentMessages(
   businessId: string,
   agentId: string,
   limit = 5
-): Promise<Array<{ from_agent: string; message_type: string; content: string; created_at: string }>> {
+): Promise<Array<{ from_agent: string; message_type: string; content: string; metadata: any; created_at: string }>> {
   const supabase = getServerSupabase()
 
   const { data } = await supabase
     .from('agent_messages')
-    .select('id, from_agent, message_type, content, created_at')
+    .select('id, from_agent, message_type, content, metadata, created_at')
     .eq('business_id', businessId)
     .eq('to_agent', agentId)
     .eq('status', 'pending')
@@ -199,7 +199,7 @@ export async function getAgentMessages(
  * Build prompt injection for pending agent messages
  */
 export function buildMessagesPrompt(
-  messages: Array<{ from_agent: string; message_type: string; content: string }>
+  messages: Array<{ from_agent: string; message_type: string; content: string; metadata?: any }>
 ): string {
   if (messages.length === 0) return ''
 
@@ -212,12 +212,21 @@ export function buildMessagesPrompt(
     lisa: 'Lisa (kundservice)',
   }
 
+  const formatted = messages.map(m => {
+    const name = agentNames[m.from_agent] || m.from_agent
+    const typeLabel = m.message_type === 'handoff' ? ' [HANDOFF]' : ''
+    const lines = [`${name}${typeLabel}: ${m.content}`]
+    if (m.metadata?.reason) lines.push(`  Anledning: ${m.metadata.reason}`)
+    if (m.metadata?.context) lines.push(`  Kontext: ${JSON.stringify(m.metadata.context)}`)
+    return lines.join('\n')
+  })
+
   return `
 
 === Meddelanden från kollegor ===
-${messages.map(m => `${agentNames[m.from_agent] || m.from_agent}: ${m.content}`).join('\n')}
+${formatted.join('\n\n')}
 === Slut på meddelanden ===
-Agera på relevanta meddelanden. Du kan skicka svar via send_agent_message.`
+Agera på relevanta meddelanden — vid HANDOFF, ta över ärendet direkt. Du kan skicka svar via send_agent_message.`
 }
 
 // ── Helpers ──

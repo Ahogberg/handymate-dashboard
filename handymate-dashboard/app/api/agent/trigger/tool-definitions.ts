@@ -445,14 +445,14 @@ export const toolDefinitions = [
   // Inter-agent communication
   {
     name: "send_agent_message",
-    description: "Skicka ett meddelande till en annan agent i teamet. Använd för att delegera, informera eller begära hjälp.",
+    description: "Skicka ett meddelande till en annan agent i teamet. Använd för att delegera, informera eller begära hjälp. Vid 'handoff' — ange reason (varför du lämnar över) och context (ärendedata som t.ex. customer_id, invoice_id, quote_id). Mottagande agent triggas automatiskt.",
     input_schema: {
       type: "object" as const,
       properties: {
         to_agent: {
           type: "string",
-          description: "Mottagande agent: matte, karin, hanna, daniel, eller lars",
-          enum: ["matte", "karin", "hanna", "daniel", "lars"],
+          description: "Mottagande agent: matte, karin, hanna, daniel, lars eller lisa",
+          enum: ["matte", "karin", "hanna", "daniel", "lars", "lisa"],
         },
         message_type: {
           type: "string",
@@ -461,7 +461,15 @@ export const toolDefinitions = [
         },
         content: {
           type: "string",
-          description: "Meddelandet till agenten, på svenska",
+          description: "Kortfattat meddelande eller sammanfattning, på svenska",
+        },
+        reason: {
+          type: "string",
+          description: "Varför överlämning sker (endast för handoff). Ex: 'Kunden frågar om fakturan, utanför min expertis.'",
+        },
+        context: {
+          type: "object",
+          description: "Strukturerad ärendedata (endast för handoff). Ex: {customer_id, invoice_id, sms_conversation_id, amount}",
         },
       },
       required: ["to_agent", "message_type", "content"],
