@@ -64,12 +64,18 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    const triggerResult = triggerRes.ok ? await triggerRes.json() : { error: await triggerRes.text() }
+    const rawText = await triggerRes.text()
+    let triggerResult: any = {}
+    try { triggerResult = JSON.parse(rawText) } catch { triggerResult = { parse_error: true, raw: rawText.slice(0, 500) } }
+
     diagnostics.step2_lisa_trigger = {
       status: triggerRes.status,
-      agent_id: (triggerResult as any).agent_id,
-      tool_calls: (triggerResult as any).tool_calls,
-      final_response: ((triggerResult as any).final_response || '').slice(0, 200),
+      ok: triggerRes.ok,
+      agent_id: triggerResult.agent_id,
+      tool_calls: triggerResult.tool_calls,
+      final_response: (triggerResult.final_response || '').slice(0, 200),
+      error: triggerResult.error || null,
+      raw_if_parse_failed: triggerResult.raw || null,
     }
 
     // Steg 3 — leta efter handoff i agent_messages (senaste 2 min)
