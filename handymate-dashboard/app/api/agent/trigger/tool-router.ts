@@ -1471,33 +1471,63 @@ async function sendAgentMessageTool(
     return { success: false, error: 'Saknar mottagare eller meddelande' }
   }
 
-  const validAgents = ['matte', 'karin', 'hanna', 'daniel', 'lars']
+  const validAgents = ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa']
   if (!validAgents.includes(toAgent)) {
     return { success: false, error: `Okänd agent: ${toAgent}. Giltiga: ${validAgents.join(', ')}` }
   }
 
-  const { error } = await supabase.from('agent_messages').insert({
+  const type = messageType || 'request'
+
+  const { data: inserted, error } = await supabase.from('agent_messages').insert({
     business_id: businessId,
     from_agent: fromAgent,
     to_agent: toAgent,
-    message_type: messageType || 'request',
+    message_type: type,
     content,
-  })
+    metadata: input.metadata || {},
+  }).select('id').single()
 
   if (error) {
     return { success: false, error: `Kunde inte skicka meddelande: ${error.message}` }
   }
 
   const agentNames: Record<string, string> = {
-    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars',
+    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars', lisa: 'Lisa',
+  }
+
+  // Handoff auto-trigger: fire-and-forget anrop till agent/trigger så mottagaren kör direkt
+  let autoTriggered = false
+  if (type === 'handoff') {
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+      fetch(`${appUrl}/api/agent/trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.CRON_SECRET || '',
+        },
+        body: JSON.stringify({
+          business_id: businessId,
+          trigger_type: 'agent_handoff',
+          agent_id: toAgent,
+          trigger_data: {
+            from_agent: fromAgent,
+            handoff_message: content,
+            message_id: inserted?.id,
+          },
+        }),
+      }).catch(() => {})
+      autoTriggered = true
+    } catch { /* non-blocking */ }
   }
 
   return {
     success: true,
     data: {
-      message: `Meddelande skickat till ${agentNames[toAgent]}`,
+      message: `Meddelande skickat till ${agentNames[toAgent]}${autoTriggered ? ' — tar över nu' : ''}`,
       to: toAgent,
-      type: messageType,
+      type,
+      auto_triggered: autoTriggered,
     },
   }
 }
@@ -1531,7 +1561,7 @@ async function getAgentMessagesTool(
   }
 
   const agentNames: Record<string, string> = {
-    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars',
+    matte: 'Matte', karin: 'Karin', hanna: 'Hanna', daniel: 'Daniel', lars: 'Lars', lisa: 'Lisa',
   }
 
   return {

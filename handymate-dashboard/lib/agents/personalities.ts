@@ -47,6 +47,7 @@ Skriv alltid på svenska.`,
       'get_daily_stats', 'check_pending_approvals',
       'create_approval_request', 'log_automation_action',
       'get_project_profitability',
+      'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['invoice_overdue', 'payment_received', 'invoice_created'],
   },
@@ -67,6 +68,7 @@ Skriv alltid på svenska.`,
       'send_sms', 'send_email', 'get_daily_stats',
       'create_approval_request', 'check_pending_approvals',
       'log_automation_action',
+      'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['customer_inactive', 'job_completed', 'leads_batch_ready'],
   },
@@ -88,6 +90,7 @@ Skriv alltid på svenska.`,
       'create_quote', 'get_quotes', 'send_sms', 'send_email',
       'create_approval_request', 'check_pending_approvals',
       'get_daily_stats', 'log_automation_action',
+      'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['lead_created', 'quote_sent', 'quote_opened', 'quote_expired'],
   },
@@ -108,6 +111,7 @@ Skriv alltid på svenska.`,
       'create_booking', 'check_calendar', 'update_project', 'log_time',
       'get_daily_stats', 'create_approval_request',
       'check_pending_approvals', 'log_automation_action',
+      'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['booking_created', 'job_completed', 'work_order_created'],
   },
@@ -129,6 +133,7 @@ Skriv alltid på svenska. Var personlig och empatisk.`,
       'send_sms', 'send_email',
       'get_daily_stats', 'create_approval_request',
       'check_pending_approvals', 'log_automation_action',
+      'send_agent_message', 'get_agent_messages',
     ],
     triggers: ['incoming_call', 'customer_complaint', 'booking_request', 'phone_call'],
   },
@@ -138,6 +143,12 @@ Skriv alltid på svenska. Var personlig och empatisk.`,
  * Bestäm vilken agent som ska hantera en trigger baserat på event-typ.
  */
 export function routeToAgent(triggerType: string, eventName?: string): string {
+  // Agent-handoff — specialisten anges explicit i trigger_data.agent_id
+  // (ingen routing behövs — handoff-avsändaren har redan satt to_agent)
+  if (triggerType === 'agent_handoff') {
+    return 'matte' // fallback om agent_id inte skickas med
+  }
+
   // Lisa hanterar inkommande samtal och kundkommunikation
   if (triggerType === 'phone_call' || triggerType === 'incoming_sms') {
     return 'lisa'

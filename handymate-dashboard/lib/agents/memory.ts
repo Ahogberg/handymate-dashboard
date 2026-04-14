@@ -209,6 +209,7 @@ export function buildMessagesPrompt(
     hanna: 'Hanna (marknad)',
     daniel: 'Daniel (sälj)',
     lars: 'Lars (projekt)',
+    lisa: 'Lisa (kundservice)',
   }
 
   return `

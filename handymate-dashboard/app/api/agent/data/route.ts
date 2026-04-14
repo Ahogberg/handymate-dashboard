@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
         }
       } else {
         // Manual count
-        for (const agentId of ['matte', 'karin', 'hanna', 'daniel', 'lars']) {
+        for (const agentId of ['matte', 'karin', 'hanna', 'daniel', 'lars', 'lisa']) {
           const { count } = await supabase
             .from('agent_memories')
             .select('*', { count: 'exact', head: true })

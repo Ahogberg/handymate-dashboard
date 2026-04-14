@@ -999,7 +999,8 @@ export default function AgentDashboardPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
-  const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string }>>([])
+  const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string }>>([])
+  const [showAllMessages, setShowAllMessages] = useState(false)
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [googleStatus, setGoogleStatus] = useState<{
@@ -1281,12 +1282,31 @@ export default function AgentDashboardPage() {
           {/* Team Communication */}
           {teamMessages.length > 0 && (
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-5">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">Teamkommunikation</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-900">Teamkommunikation</h3>
+                {teamMessages.length > 5 && (
+                  <button
+                    onClick={() => setShowAllMessages(v => !v)}
+                    className="text-xs text-primary-700 hover:text-primary-800 font-medium"
+                  >
+                    {showAllMessages ? 'Visa färre' : `Visa alla (${teamMessages.length})`}
+                  </button>
+                )}
+              </div>
               <div className="space-y-2">
-                {teamMessages.slice(0, 5).map((msg, i) => {
+                {(showAllMessages ? teamMessages : teamMessages.slice(0, 5)).map((msg, i) => {
                   const fromAgent = TEAM.find(a => a.id === msg.from_agent)
                   const toAgent = TEAM.find(a => a.id === msg.to_agent)
                   const timeAgo = formatTimeAgo(msg.created_at)
+                  const typeBadge = (() => {
+                    switch (msg.message_type) {
+                      case 'handoff': return { label: 'Handoff', bg: 'bg-primary-100', text: 'text-primary-800' }
+                      case 'alert': return { label: 'Varning', bg: 'bg-amber-100', text: 'text-amber-800' }
+                      case 'insight': return { label: 'Insikt', bg: 'bg-blue-100', text: 'text-blue-800' }
+                      case 'request': return { label: 'Förfrågan', bg: 'bg-gray-100', text: 'text-gray-700' }
+                      default: return null
+                    }
+                  })()
                   return (
                     <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg bg-gray-50">
                       {fromAgent?.avatar ? (
@@ -1297,12 +1317,19 @@ export default function AgentDashboardPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-700">
-                          <span className="font-medium">{fromAgent?.name || msg.from_agent}</span>
-                          <span className="text-gray-400"> → </span>
-                          <span className="font-medium">{toAgent?.name || msg.to_agent}</span>
-                          <span className="text-gray-400 text-xs ml-2">{timeAgo}</span>
-                        </p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm text-gray-700">
+                            <span className="font-medium">{fromAgent?.name || msg.from_agent}</span>
+                            <span className="text-gray-400"> → </span>
+                            <span className="font-medium">{toAgent?.name || msg.to_agent}</span>
+                          </p>
+                          {typeBadge && (
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${typeBadge.bg} ${typeBadge.text}`}>
+                              {typeBadge.label}
+                            </span>
+                          )}
+                          <span className="text-gray-400 text-xs">{timeAgo}</span>
+                        </div>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">{stripMarkdown(humanizeResponse(msg.content))}</p>
                       </div>
                     </div>
