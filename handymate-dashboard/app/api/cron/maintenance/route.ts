@@ -120,6 +120,14 @@ export async function GET(request: NextRequest) {
         const firstName = (p.customer_name || '').split(' ')[0]
         const bizName = p.business_name || 'Handymate'
         const suffix = buildSmsSuffix(bizName, reviewPhoneMap.get(review.business_id))
+
+        // Portal-länk istället för extern Google-URL — kunden landar i sin kundportal
+        const { getOrCreatePortalLink } = await import('@/lib/portal-link')
+        const portalUrl = p.customer_id
+          ? await getOrCreatePortalLink(supabase, p.customer_id, 'review')
+          : null
+        const reviewLink = portalUrl || p.google_review_url
+
         const smsRes = await fetch('https://api.46elks.com/a1/sms', {
           method: 'POST',
           headers: {
@@ -129,7 +137,7 @@ export async function GET(request: NextRequest) {
           body: new URLSearchParams({
             from: bizName.substring(0, 11),
             to: p.customer_phone,
-            message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${p.google_review_url}\n${suffix}`,
+            message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${reviewLink}\n${suffix}`,
           }).toString(),
         })
 

@@ -27,6 +27,7 @@ interface CustomerCommunicationState {
   paidInvoiceNoReview: { id: string; paidAt: string } | null
   recentCallSummary: string | null
   googleReviewUrl?: string
+  portalReviewUrl?: string
   businessName?: string
 }
 
@@ -158,7 +159,7 @@ function evaluateSimpleRules(
       )
       const threshold = rule.trigger_config?.days_since || 2
       if (daysSince >= threshold) {
-        const reviewUrl = state.googleReviewUrl || ''
+        const reviewUrl = state.portalReviewUrl || state.googleReviewUrl || ''
         const bizName = state.businessName || 'oss'
         const firstName = state.customerName?.split(' ')[0] || ''
 
@@ -409,6 +410,13 @@ async function buildCustomerState(
     .eq('business_id', businessId)
     .single()
 
+  // Portal-länk (skapas om saknas) — kunden landar på portalen, inte extern Google-URL
+  let portalReviewUrl: string | undefined
+  if (bizForReview?.google_review_url) {
+    const { getOrCreatePortalLink } = await import('./portal-link')
+    portalReviewUrl = await getOrCreatePortalLink(supabase, customerId, 'review') || undefined
+  }
+
   const daysSinceContact = lastActivity?.created_at
     ? Math.floor((Date.now() - new Date(lastActivity.created_at).getTime()) / 86400000)
     : null
@@ -442,6 +450,7 @@ async function buildCustomerState(
     paidInvoiceNoReview: paidInvoiceNoReview,
     recentCallSummary: recentCall?.transcript_summary || null,
     googleReviewUrl: bizForReview?.google_review_url || undefined,
+    portalReviewUrl,
     businessName: bizForReview?.business_name || undefined,
   }
 }

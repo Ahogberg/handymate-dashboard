@@ -141,6 +141,13 @@ export async function resolveMessageVariables(
     vars.work_address = customer.address_line
   }
 
+  // Review-länk: pekar på kundportalen (review-fliken), inte extern Google-URL
+  try {
+    const { getOrCreatePortalLink } = await import('./portal-link')
+    const portalUrl = await getOrCreatePortalLink(supabase, context.customerId, 'review')
+    if (portalUrl) vars.review_link = portalUrl
+  } catch { /* non-blocking */ }
+
   // Merge extra variables
   if (context.extraVariables) {
     Object.assign(vars, context.extraVariables)

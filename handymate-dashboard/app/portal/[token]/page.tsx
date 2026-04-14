@@ -20,11 +20,12 @@ import {
   PenTool,
   Eraser,
   FileText as FileSignature,
+  Star,
 } from 'lucide-react'
 
 interface PortalData {
   customer: { name: string; email: string; phone: string; customerId: string }
-  business: { name: string; contactName: string; email: string; phone: string }
+  business: { name: string; contactName: string; email: string; phone: string; googleReviewUrl?: string | null }
   unreadMessages: number
 }
 
@@ -138,7 +139,7 @@ interface Message {
   created_at: string
 }
 
-type Tab = 'projects' | 'quotes' | 'invoices' | 'messages'
+type Tab = 'projects' | 'quotes' | 'invoices' | 'messages' | 'review'
 
 export default function CustomerPortalPage() {
   const params = useParams()
@@ -1294,6 +1295,50 @@ export default function CustomerPortalPage() {
                 </div>
               )
             })()}
+
+            {/* Review Tab — landing-vy från review-SMS */}
+            {activeTab === 'review' && (
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
+                  <div className="w-14 h-14 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Star className="w-7 h-7 text-amber-500 fill-amber-500" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                    Tack {portal.customer.name?.split(' ')[0] || ''}!
+                  </h2>
+                  <p className="text-gray-600 mb-2">
+                    Vi hoppas du är nöjd med jobbet från {portal.business.name}.
+                  </p>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Om du har en stund — en recension betyder enormt mycket för oss.
+                  </p>
+
+                  {portal.business.googleReviewUrl ? (
+                    <a
+                      href={portal.business.googleReviewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-primary-700 text-white rounded-xl font-medium hover:bg-primary-800 transition-colors"
+                    >
+                      <Star className="w-5 h-5" />
+                      Lämna en Google-recension
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : (
+                    <p className="text-sm text-gray-400">
+                      Recensionslänk inte tillgänglig — kontakta {portal.business.name} direkt.
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('projects')}
+                  className="w-full text-center text-sm text-sky-700 hover:underline py-2"
+                >
+                  Gå till portalen →
+                </button>
+              </div>
+            )}
 
             {/* Messages Tab */}
             {activeTab === 'messages' && (
