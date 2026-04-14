@@ -141,17 +141,28 @@ Skriv alltid på svenska. Var personlig och empatisk.`,
 
 /**
  * Bestäm vilken agent som ska hantera en trigger baserat på event-typ.
+ *
+ * Routing-regler (prefix-baserade för 100% täckning):
+ *   invoice_*, payment_*, overdue_*                → karin  (ekonomi)
+ *   quote_*, lead_*, deal_*                        → daniel (sälj)
+ *   booking_*, project_*, milestone_*, job_*,
+ *   work_order_*, dispatch_*                       → lars   (projektledning)
+ *   campaign_*, reactivation_*, review_*,
+ *   customer_inactive, leads_batch_ready,
+ *   neighbour_*                                    → hanna  (marknadsföring)
+ *   incoming_call, call_*, phone_call,
+ *   incoming_sms, customer_complaint,
+ *   booking_request                                → lisa   (kundservice)
+ *   agent_handoff                                  → använd agent_id i body
+ *   manual                                         → matte  (orkestrator)
+ *   allt annat                                     → matte
+ *
+ * Matte orkestrerar — exekverar bara manual och default-fall.
  */
 export function routeToAgent(triggerType: string, eventName?: string): string {
-  // Agent-handoff — specialisten anges explicit i trigger_data.agent_id
-  // (ingen routing behövs — handoff-avsändaren har redan satt to_agent)
+  // Agent-handoff — specialisten anges explicit via body.agent_id i route.ts
   if (triggerType === 'agent_handoff') {
-    return 'matte' // fallback om agent_id inte skickas med
-  }
-
-  // Lisa hanterar inkommande samtal och kundkommunikation
-  if (triggerType === 'phone_call' || triggerType === 'incoming_sms') {
-    return 'lisa'
+    return 'matte' // fallback om agent_id saknas
   }
 
   // Matte hanterar direkta kommandon från hantverkaren
@@ -159,24 +170,59 @@ export function routeToAgent(triggerType: string, eventName?: string): string {
     return 'matte'
   }
 
-  // Event-baserad routing
-  if (eventName) {
-    if (['incoming_call', 'customer_complaint', 'booking_request'].includes(eventName)) return 'lisa'
-    if (['invoice_overdue', 'payment_received', 'invoice_created', 'invoice_reminder'].includes(eventName)) return 'karin'
-    if (['customer_inactive', 'leads_batch_ready', 'campaign_complete', 'neighbour_campaign'].includes(eventName)) return 'hanna'
-    if (['lead_created', 'quote_sent', 'quote_opened', 'quote_expired', 'quote_accepted', 'quote_declined'].includes(eventName)) return 'daniel'
-    if (['booking_created', 'job_completed', 'work_order_created', 'project_health'].includes(eventName)) return 'lars'
+  // Lisa — inkommande kundkontakt (SMS/samtal)
+  if (triggerType === 'phone_call' || triggerType === 'incoming_sms' || triggerType === 'incoming_call') {
+    return 'lisa'
   }
 
-  // Cron-baserad routing
-  if (triggerType === 'cron') {
-    if (eventName?.includes('invoice') || eventName?.includes('overdue') || eventName?.includes('payment')) return 'karin'
-    if (eventName?.includes('campaign') || eventName?.includes('lead') || eventName?.includes('reactivat')) return 'hanna'
-    if (eventName?.includes('quote') || eventName?.includes('pipeline')) return 'daniel'
-    if (eventName?.includes('project') || eventName?.includes('dispatch') || eventName?.includes('booking')) return 'lars'
+  // Slå ihop trigger_type och eventName för prefix-matchning
+  const candidates = [eventName, triggerType].filter(Boolean) as string[]
+  for (const name of candidates) {
+    const agent = matchAgentByPrefix(name)
+    if (agent) return agent
   }
 
-  return 'matte' // Default
+  return 'matte' // Default / orchestrator
+}
+
+/**
+ * Returnerar agent-id baserat på prefix-matchning, eller null om ingen matchar.
+ * Exporterad för återanvändning i tester.
+ */
+export function matchAgentByPrefix(name: string): string | null {
+  const n = name.toLowerCase()
+
+  // Lisa — kundservice / telefoni
+  if (n === 'incoming_call' || n === 'customer_complaint' || n === 'booking_request') return 'lisa'
+  if (n.startsWith('call_')) return 'lisa'
+
+  // Karin — ekonomi
+  if (n.startsWith('invoice_') || n.startsWith('payment_') || n.startsWith('overdue_')) return 'karin'
+
+  // Daniel — sälj
+  if (n.startsWith('quote_') || n.startsWith('lead_') || n.startsWith('deal_')) return 'daniel'
+
+  // Lars — projektledning
+  if (
+    n.startsWith('booking_') ||
+    n.startsWith('project_') ||
+    n.startsWith('milestone_') ||
+    n.startsWith('job_') ||
+    n.startsWith('work_order_') ||
+    n.startsWith('dispatch_')
+  ) return 'lars'
+
+  // Hanna — marknadsföring
+  if (
+    n.startsWith('campaign_') ||
+    n.startsWith('reactivation_') ||
+    n.startsWith('review_') ||
+    n.startsWith('neighbour_') ||
+    n === 'customer_inactive' ||
+    n === 'leads_batch_ready'
+  ) return 'hanna'
+
+  return null
 }
 
 /**
