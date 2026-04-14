@@ -3,20 +3,23 @@
 --
 -- Priserna är skapade i Stripe Dashboard (live mode) och kopplar
 -- billing_plan-raden till rätt återkommande pris.
+--
+-- Matchar på name (Bas / Pro / Business) eftersom plan_id kan variera
+-- mellan miljöer.
 
 UPDATE billing_plan
 SET stripe_price_id = 'price_1TEqXkEOkbEJyOgC5dpXPePq'
-WHERE plan_id = 'starter';
+WHERE name IN ('Bas', 'Starter');
 
 UPDATE billing_plan
 SET stripe_price_id = 'price_1TEqYCEOkbEJyOgCJYGPslmR'
-WHERE plan_id = 'professional';
+WHERE name IN ('Pro', 'Professional');
 
 UPDATE billing_plan
 SET stripe_price_id = 'price_1TEqYcEOkbEJyOgCdxP0TOOG'
-WHERE plan_id = 'business';
+WHERE name = 'Business';
 
--- Verifiering
+-- Verifiering — alla tre planer ska ha stripe_price_id satt
 SELECT plan_id, name, price_sek, stripe_price_id
 FROM billing_plan
 ORDER BY sort_order;
