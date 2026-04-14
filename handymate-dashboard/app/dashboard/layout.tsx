@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Sidebar from '@/components/Sidebar'
 
@@ -26,20 +26,37 @@ export default function DashboardLayout({
 }) {
   const { business, loading, logout } = useAuth(true)
   const router = useRouter()
+  const pathname = usePathname()
 
   // Redirect to onboarding if not completed
   // step >= 7 also counts as done (old 6-step flow finalized at step 7)
   const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 7))
 
-  // Subscription access check — tillfälligt avaktiverad, aktiveras efter verifiering
-  // TODO: Återaktivera när auth-queryn verifierats i produktion
-  const hasAccess = true
+  // Trial-spärr: utgången trial eller past_due skickas till billing-sidan.
+  // Pilots och aktiva prenumerationer släpps förbi. Billing-sidan själv är alltid öppen.
+  const billingAllowlist = ['/dashboard/settings/billing', '/dashboard/billing']
+  const isOnBillingPage = billingAllowlist.some(p => pathname?.startsWith(p))
+  const subscriptionLocked = (() => {
+    if (!business || business.is_pilot) return false
+    const status = business.subscription_status
+    if (status === 'past_due' || status === 'cancelled' || status === 'unpaid') return true
+    if (status === 'trialing' && business.trial_ends_at) {
+      return new Date(business.trial_ends_at).getTime() < Date.now()
+    }
+    return false
+  })()
 
   useEffect(() => {
     if (!loading && business && !onboardingDone) {
       router.push('/onboarding')
     }
   }, [loading, business, onboardingDone, router])
+
+  useEffect(() => {
+    if (!loading && subscriptionLocked && !isOnBillingPage) {
+      router.push('/dashboard/settings/billing?trial=expired')
+    }
+  }, [loading, subscriptionLocked, isOnBillingPage, router])
 
   if (loading) {
     return (
