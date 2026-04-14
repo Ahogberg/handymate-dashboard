@@ -41,18 +41,13 @@ export async function POST(
     const customer = project?.customer as any
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.handymate.se'
 
-    // Try to find customer's portal token for portal URL, fall back to direct sign URL
+    // Föredra portal-URL med djuplänk till ÄTA-tab, fall back till direkt sign-URL
     let signUrl = `${baseUrl}/api/ata/sign/${ata.sign_token}`
     const customerId = ata.customer_id || project?.customer_id
     if (customerId) {
-      const { data: customerData } = await supabase
-        .from('customer')
-        .select('portal_token, portal_enabled')
-        .eq('customer_id', customerId)
-        .single()
-      if (customerData?.portal_token && customerData.portal_enabled) {
-        signUrl = `${baseUrl}/portal/${customerData.portal_token}`
-      }
+      const { getOrCreatePortalLink } = await import('@/lib/portal-link')
+      const portalUrl = await getOrCreatePortalLink(supabase, customerId, 'changes')
+      if (portalUrl) signUrl = portalUrl
     }
 
     const ataLabel = `ÄTA-${ata.ata_number || '?'}`

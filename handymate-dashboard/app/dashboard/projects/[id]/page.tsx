@@ -6058,7 +6058,19 @@ function FieldReportsTab({ projectId, customerId, businessId }: { projectId: str
               </div>
               {r.status === 'sent' && r.signature_token && (
                 <button
-                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/sign/report/${r.signature_token}`)}
+                  onClick={async () => {
+                    let url = `${window.location.origin}/sign/report/${r.signature_token}`
+                    if (customerId) {
+                      try {
+                        const res = await fetch(`/api/portal/link?customer_id=${customerId}&tab=reports`)
+                        if (res.ok) {
+                          const { url: portalUrl } = await res.json()
+                          if (portalUrl) url = portalUrl
+                        }
+                      } catch { /* fallback ovan */ }
+                    }
+                    navigator.clipboard.writeText(url)
+                  }}
                   className="text-xs text-primary-700 hover:underline shrink-0"
                 >
                   Kopiera länk

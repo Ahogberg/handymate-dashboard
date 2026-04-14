@@ -139,7 +139,21 @@ interface Message {
   created_at: string
 }
 
-type Tab = 'projects' | 'quotes' | 'invoices' | 'messages' | 'review'
+type Tab = 'projects' | 'quotes' | 'invoices' | 'messages' | 'review' | 'changes' | 'reports'
+
+interface FieldReport {
+  id: string
+  report_number: string | null
+  title: string
+  work_performed: string | null
+  materials_used: string | null
+  status: string
+  signature_token: string | null
+  signed_at: string | null
+  signed_by: string | null
+  created_at: string
+  project_id: string | null
+}
 
 export default function CustomerPortalPage() {
   const params = useParams()
@@ -168,6 +182,7 @@ export default function CustomerPortalPage() {
   const [newMessage, setNewMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
   const [loadingTab, setLoadingTab] = useState(false)
+  const [reports, setReports] = useState<FieldReport[]>([])
 
   // ÄTA signing state
   const [signingAtaId, setSigningAtaId] = useState<string | null>(null)
@@ -248,6 +263,15 @@ export default function CustomerPortalPage() {
         const res = await fetch(`/api/portal/${token}/messages`)
         const data = await res.json()
         setMessages(data.messages || [])
+      } else if (tab === 'reports') {
+        const res = await fetch(`/api/portal/${token}/reports`)
+        const data = await res.json()
+        setReports(data.reports || [])
+      } else if (tab === 'changes') {
+        // ÄTA-data ligger nästad under projekt — hämta projects
+        const res = await fetch(`/api/portal/${token}/projects`)
+        const data = await res.json()
+        setProjects(data.projects || [])
       }
     } catch {
       console.error('Failed to fetch tab data')
@@ -1295,6 +1319,102 @@ export default function CustomerPortalPage() {
                 </div>
               )
             })()}
+
+            {/* Changes Tab — ÄTA-signering (landing från ÄTA-SMS) */}
+            {activeTab === 'changes' && (
+              <div className="space-y-3">
+                {(() => {
+                  const pendingAtas = projects.flatMap(p =>
+                    (p.atas || [])
+                      .filter(a => a.status !== 'signed' && a.sign_token)
+                      .map(a => ({ ata: a, project: p }))
+                  )
+                  if (pendingAtas.length === 0) {
+                    return (
+                      <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+                        <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
+                        <h3 className="font-semibold text-gray-900">Inget att signera</h3>
+                        <p className="text-sm text-gray-500 mt-1">Du har inga öppna ÄTA just nu.</p>
+                      </div>
+                    )
+                  }
+                  return pendingAtas.map(({ ata, project }) => (
+                    <button
+                      key={ata.change_id}
+                      onClick={() => {
+                        setSelectedProject(project.project_id)
+                        setActiveTab('projects')
+                      }}
+                      className="w-full bg-white rounded-xl border border-gray-200 p-4 text-left hover:border-primary-300 hover:shadow-sm transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="text-xs text-gray-500">{project.name}</p>
+                          <h3 className="font-semibold text-gray-900">ÄTA-{ata.ata_number}</h3>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                          Att signera
+                        </span>
+                      </div>
+                      {ata.description && (
+                        <p className="text-sm text-gray-600 line-clamp-2 mb-2">{ata.description}</p>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-500">{ata.total?.toLocaleString('sv-SE')} kr</span>
+                        <span className="text-sm text-sky-700 flex items-center gap-1">
+                          Signera <ChevronRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                })()}
+              </div>
+            )}
+
+            {/* Reports Tab — fältrapport-signering */}
+            {activeTab === 'reports' && (
+              <div className="space-y-3">
+                {reports.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+                    <FileSignature className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+                    <h3 className="font-semibold text-gray-900">Inga fältrapporter</h3>
+                    <p className="text-sm text-gray-500 mt-1">Det finns inga rapporter att visa.</p>
+                  </div>
+                ) : reports.map(r => (
+                  <div key={r.id} className="bg-white rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-gray-500">{r.report_number || 'Rapport'}</p>
+                        <h3 className="font-semibold text-gray-900">{r.title}</h3>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full shrink-0 ${
+                        r.status === 'signed' ? 'bg-emerald-100 text-emerald-700' :
+                        r.status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-amber-100 text-amber-700'
+                      }`}>
+                        {r.status === 'signed' ? 'Signerad' :
+                         r.status === 'rejected' ? 'Invändning' :
+                         r.status === 'sent' ? 'Att signera' : 'Utkast'}
+                      </span>
+                    </div>
+                    {r.work_performed && (
+                      <p className="text-sm text-gray-600 line-clamp-2 mb-3">{r.work_performed}</p>
+                    )}
+                    {r.status === 'sent' && r.signature_token && (
+                      <a
+                        href={`/sign/report/${r.signature_token}`}
+                        className="inline-flex items-center gap-1.5 text-sm text-sky-700 hover:underline"
+                      >
+                        Öppna och signera <ChevronRight className="w-4 h-4" />
+                      </a>
+                    )}
+                    {r.status === 'signed' && r.signed_by && (
+                      <p className="text-xs text-gray-400">Signerad av {r.signed_by}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Review Tab — landing-vy från review-SMS */}
             {activeTab === 'review' && (
