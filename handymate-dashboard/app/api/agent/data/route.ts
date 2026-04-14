@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
         supabase.from('agent_memories').select('agent_id').eq('business_id', businessId),
         supabase
           .from('agent_messages')
-          .select('id, from_agent, to_agent, message_type, content, status, created_at')
+          .select('id, from_agent, to_agent, message_type, content, metadata, status, created_at')
           .eq('business_id', businessId)
           .order('created_at', { ascending: false })
           .limit(20),

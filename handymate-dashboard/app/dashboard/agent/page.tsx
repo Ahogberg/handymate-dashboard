@@ -999,7 +999,7 @@ export default function AgentDashboardPage() {
   const [showSettings, setShowSettings] = useState(false)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
   const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
-  const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string }>>([])
+  const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string; metadata?: any }>>([])
   const [showAllMessages, setShowAllMessages] = useState(false)
 
   const [savingSettings, setSavingSettings] = useState(false)
@@ -1298,24 +1298,73 @@ export default function AgentDashboardPage() {
                   const fromAgent = TEAM.find(a => a.id === msg.from_agent)
                   const toAgent = TEAM.find(a => a.id === msg.to_agent)
                   const timeAgo = formatTimeAgo(msg.created_at)
+                  const isHandoff = msg.message_type === 'handoff'
                   const typeBadge = (() => {
                     switch (msg.message_type) {
-                      case 'handoff': return { label: 'Handoff', bg: 'bg-primary-100', text: 'text-primary-800' }
+                      case 'handoff': return { label: 'HANDOFF', bg: 'bg-primary-700', text: 'text-white' }
                       case 'alert': return { label: 'Varning', bg: 'bg-amber-100', text: 'text-amber-800' }
                       case 'insight': return { label: 'Insikt', bg: 'bg-blue-100', text: 'text-blue-800' }
                       case 'request': return { label: 'Förfrågan', bg: 'bg-gray-100', text: 'text-gray-700' }
                       default: return null
                     }
                   })()
+
+                  const reason = msg.metadata?.reason
+                  const ctx = msg.metadata?.context
+
+                  const renderAvatar = (a: typeof fromAgent, size = 'w-8 h-8') => (
+                    a?.avatar ? (
+                      <img src={a.avatar} alt={a.name} className={`${size} rounded-full object-cover shrink-0 ring-2 ring-white`} />
+                    ) : (
+                      <div className={`${size} rounded-full ${a?.color || 'bg-gray-400'} flex items-center justify-center text-white text-xs font-bold shrink-0 ring-2 ring-white`}>
+                        {a?.initials || '?'}
+                      </div>
+                    )
+                  )
+
+                  if (isHandoff) {
+                    return (
+                      <div key={i} className="border-2 border-primary-200 bg-primary-50/40 rounded-xl p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center">
+                            {renderAvatar(fromAgent, 'w-8 h-8')}
+                            <span className="mx-1 text-primary-700 font-bold">→</span>
+                            {renderAvatar(toAgent, 'w-8 h-8')}
+                          </div>
+                          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                            <p className="text-sm text-gray-800">
+                              <span className="font-semibold">{fromAgent?.name || msg.from_agent}</span>
+                              <span className="text-gray-400"> lämnar över till </span>
+                              <span className="font-semibold">{toAgent?.name || msg.to_agent}</span>
+                            </p>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary-700 text-white tracking-wide">
+                              HANDOFF
+                            </span>
+                            <span className="text-gray-400 text-xs ml-auto">{timeAgo}</span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-700 mb-1">{stripMarkdown(humanizeResponse(msg.content))}</p>
+                        {reason && (
+                          <p className="text-xs text-gray-600 italic">
+                            <span className="font-medium text-gray-700">Anledning:</span> {reason}
+                          </p>
+                        )}
+                        {ctx && typeof ctx === 'object' && Object.keys(ctx).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {Object.entries(ctx).slice(0, 4).map(([k, v]) => (
+                              <span key={k} className="text-[10px] px-1.5 py-0.5 rounded bg-white border border-primary-200 text-primary-800 font-mono">
+                                {k}: {String(v).slice(0, 20)}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  }
+
                   return (
                     <div key={i} className="flex items-start gap-3 py-2 px-3 rounded-lg bg-gray-50">
-                      {fromAgent?.avatar ? (
-                        <img src={fromAgent.avatar} alt={fromAgent.name} className="w-7 h-7 rounded-full object-cover shrink-0" />
-                      ) : (
-                        <div className={`w-7 h-7 rounded-full ${fromAgent?.color || 'bg-gray-400'} flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-                          {fromAgent?.initials || '?'}
-                        </div>
-                      )}
+                      {renderAvatar(fromAgent, 'w-7 h-7')}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm text-gray-700">
