@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { getOrCreatePortalLink } from '@/lib/portal-link'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -369,24 +370,12 @@ export async function POST(request: NextRequest) {
         .eq('quote_id', quoteId)
     }
 
-    // Auto-skapa kundportal om den saknas
-    let portalToken = customer.portal_token
-    if (!portalToken) {
-      portalToken = crypto.randomUUID()
-      await supabase
-        .from('customer')
-        .update({ portal_token: portalToken, portal_enabled: true })
-        .eq('customer_id', quote.customer_id)
-    } else if (!customer.portal_enabled) {
-      await supabase
-        .from('customer')
-        .update({ portal_enabled: true })
-        .eq('customer_id', quote.customer_id)
-    }
-
     const trackingSessionId = crypto.randomUUID()
-    // Länka till kundportalen med offerter-flik öppen
-    const portalUrl = `${APP_URL}/portal/${portalToken}?tab=quotes`
+    // Länka till kundportalen med offerter-flik öppen (skapar portal_token vid behov)
+    const portalUrl = await getOrCreatePortalLink(supabase, quote.customer_id, 'quotes')
+    if (!portalUrl) {
+      return NextResponse.json({ error: 'Kunde inte skapa portal-länk' }, { status: 500 })
+    }
     const signUrl = portalUrl
     const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&e=opened&s=${trackingSessionId}`
 

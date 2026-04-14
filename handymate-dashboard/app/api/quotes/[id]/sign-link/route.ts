@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getOrCreatePortalLink } from '@/lib/portal-link'
 import crypto from 'crypto'
 
 /**
- * POST /api/quotes/[id]/sign-link - Generera signeringslänk för offert
+ * POST /api/quotes/[id]/sign-link — Generera kundportal-länk för offert
+ *
+ * Returnerar /portal/[token]?tab=quotes så kunden alltid landar i portalen.
  */
 export async function POST(
   request: NextRequest,
@@ -19,10 +22,9 @@ export async function POST(
     const supabase = getServerSupabase()
     const quoteId = params.id
 
-    // Verify quote belongs to business
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('quote_id, status, sign_token')
+      .select('quote_id, status, sign_token, customer_id')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
       .single()
@@ -31,36 +33,35 @@ export async function POST(
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
     }
 
-    // If already has a sign token, return existing URL
-    if (quote.sign_token) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-      return NextResponse.json({
-        url: `${baseUrl}/quote/${quote.sign_token}`,
-        token: quote.sign_token,
-      })
+    // Säkerställ sign_token — krävs för signering
+    let signToken = quote.sign_token
+    if (!signToken) {
+      signToken = crypto.randomUUID()
+      const updates: Record<string, any> = { sign_token: signToken }
+      if (quote.status === 'draft') {
+        updates.status = 'sent'
+        updates.sent_at = new Date().toISOString()
+      }
+      const { error: updateError } = await supabase
+        .from('quotes')
+        .update(updates)
+        .eq('quote_id', quoteId)
+        .eq('business_id', business.business_id)
+
+      if (updateError) throw updateError
     }
 
-    // Generate new sign token
-    const signToken = crypto.randomUUID()
-
-    // Update quote with sign token and set status to 'sent' if draft
-    const updates: any = { sign_token: signToken }
-    if (quote.status === 'draft') {
-      updates.status = 'sent'
-      updates.sent_at = new Date().toISOString()
+    if (!quote.customer_id) {
+      return NextResponse.json({ error: 'Offert saknar kund — kan inte skapa portal-länk' }, { status: 400 })
     }
 
-    const { error: updateError } = await supabase
-      .from('quotes')
-      .update(updates)
-      .eq('quote_id', quoteId)
-      .eq('business_id', business.business_id)
+    const portalUrl = await getOrCreatePortalLink(supabase, quote.customer_id, 'quotes')
+    if (!portalUrl) {
+      return NextResponse.json({ error: 'Kunde inte skapa portal-länk' }, { status: 500 })
+    }
 
-    if (updateError) throw updateError
-
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
     return NextResponse.json({
-      url: `${baseUrl}/quote/${signToken}`,
+      url: portalUrl,
       token: signToken,
     })
 

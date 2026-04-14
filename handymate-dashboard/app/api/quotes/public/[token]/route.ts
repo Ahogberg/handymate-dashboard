@@ -34,7 +34,7 @@ export async function GET(
     if (quote.customer_id) {
       const { data: c } = await supabase
         .from('customer')
-        .select('name, phone_number, email, address_line')
+        .select('name, phone_number, email, address_line, portal_token')
         .eq('customer_id', quote.customer_id)
         .single()
       customer = c

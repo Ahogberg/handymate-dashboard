@@ -350,6 +350,9 @@ export async function POST(request: NextRequest) {
       ai_confidence: body.ai_confidence || null,
       source_transcript: body.source_transcript || null,
       template_id: body.template_id || null,
+      // Generera sign_token redan vid create så portal-länken alltid fungerar,
+      // oavsett om offerten skickas via /quotes/send eller delas direkt.
+      sign_token: crypto.randomUUID(),
       // New fields
       introduction_text: body.introduction_text || null,
       conclusion_text: body.conclusion_text || null,

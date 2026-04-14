@@ -132,6 +132,13 @@ export default function QuoteSignPage() {
         }
 
         const { quote: quoteData, business: businessData, alreadySigned } = data
+
+        // Redirect till kundportalen om kunden har portal_token — all offerthantering sker där
+        if (quoteData?.customer?.portal_token) {
+          window.location.replace(`/portal/${quoteData.customer.portal_token}?tab=quotes`)
+          return
+        }
+
         setQuote(quoteData)
         setBusiness(businessData)
 

@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getOrCreatePortalLink } from '@/lib/portal-link'
 import crypto from 'crypto'
 
 /**
- * POST /api/quotes/sign-link — Generera signeringslänk för offert
+ * POST /api/quotes/sign-link — Generera kundportal-länk för offert
  * Body: { quoteId: string }
+ *
+ * Returnerar /portal/[token]?tab=quotes så kunden alltid landar i portalen.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -21,7 +24,6 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Hämta offert (service role)
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
       .select('quote_id, status, sign_token, customer_id, business_id')
@@ -44,51 +46,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ingen behörighet' }, { status: 403 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-
-    // If already has a sign token, return existing URL
-    if (quote.sign_token) {
-      return NextResponse.json({
-        url: `${baseUrl}/quote/${quote.sign_token}`,
-        token: quote.sign_token,
-      })
-    }
-
-    // Generate new sign token
-    const signToken = crypto.randomUUID()
-
-    // Update quote with sign token and set status to 'sent' if draft
-    const updates: Record<string, any> = { sign_token: signToken }
-    if (quote.status === 'draft') {
-      updates.status = 'sent'
-      updates.sent_at = new Date().toISOString()
-    }
-
-    const { error: updateError } = await supabase
-      .from('quotes')
-      .update(updates)
-      .eq('quote_id', quoteId)
-
-    if (updateError) throw updateError
-
-    // Auto-aktivera kundportal
-    if (quote.customer_id) {
-      const existingToken = await supabase
-        .from('customers')
-        .select('portal_token')
-        .eq('customer_id', quote.customer_id)
-        .single()
-
-      if (!existingToken.data?.portal_token) {
-        await supabase
-          .from('customers')
-          .update({ portal_token: crypto.randomUUID() })
-          .eq('customer_id', quote.customer_id)
+    // Säkerställ sign_token — krävs för signering
+    let signToken = quote.sign_token
+    if (!signToken) {
+      signToken = crypto.randomUUID()
+      const updates: Record<string, any> = { sign_token: signToken }
+      if (quote.status === 'draft') {
+        updates.status = 'sent'
+        updates.sent_at = new Date().toISOString()
       }
+      await supabase.from('quotes').update(updates).eq('quote_id', quoteId)
+    }
+
+    // Bygg portal-länk (skapar portal_token om saknas)
+    if (!quote.customer_id) {
+      return NextResponse.json({ error: 'Offert saknar kund — kan inte skapa portal-länk' }, { status: 400 })
+    }
+    const portalUrl = await getOrCreatePortalLink(supabase, quote.customer_id, 'quotes')
+    if (!portalUrl) {
+      return NextResponse.json({ error: 'Kunde inte skapa portal-länk' }, { status: 500 })
     }
 
     return NextResponse.json({
-      url: `${baseUrl}/quote/${signToken}`,
+      url: portalUrl,
       token: signToken,
     })
 

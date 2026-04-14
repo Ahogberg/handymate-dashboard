@@ -147,6 +147,7 @@ export default function QuoteDetailPage() {
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
   const [generatingSignLink, setGeneratingSignLink] = useState(false)
+  const [portalUrl, setPortalUrl] = useState<string | null>(null)
   const [extraEmails, setExtraEmails] = useState('')
   const [bccEmails, setBccEmails] = useState('')
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
@@ -212,6 +213,16 @@ export default function QuoteDetailPage() {
         const data = await res.json()
         setQuote(data.quote || null)
         setVersions(data.versions || [])
+        if (data.quote?.sign_token && data.quote?.customer_id) {
+          fetch('/api/quotes/sign-link', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ quoteId: data.quote.quote_id }),
+          })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.url) setPortalUrl(d.url) })
+            .catch(() => {})
+        }
       }
     } catch (err) {
       console.error('Failed to fetch quote:', err)
@@ -740,7 +751,7 @@ export default function QuoteDetailPage() {
           )}
           {quote.sign_token && (
             <a
-              href={`/quote/${quote.sign_token}`}
+              href={portalUrl || `/quote/${quote.sign_token}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
@@ -1147,8 +1158,8 @@ export default function QuoteDetailPage() {
                   Signeringslänk
                 </h2>
                 <div className="flex items-center gap-2 bg-gray-50 border border-[#E2E8F0] rounded-lg p-2">
-                  <span className="text-xs text-gray-500 truncate flex-1">app.handymate.se/quote/{quote.sign_token.slice(0, 8)}...</span>
-                  <button onClick={() => { navigator.clipboard.writeText(`https://app.handymate.se/quote/${quote.sign_token}`); showToast('Kopierad!', 'success') }}
+                  <span className="text-xs text-gray-500 truncate flex-1">{portalUrl ? portalUrl.replace(/^https?:\/\//, '').slice(0, 48) + '...' : `app.handymate.se/quote/${quote.sign_token.slice(0, 8)}...`}</span>
+                  <button onClick={() => { navigator.clipboard.writeText(portalUrl || `https://app.handymate.se/quote/${quote.sign_token}`); showToast('Kopierad!', 'success') }}
                     className="flex-shrink-0 px-2.5 py-1 bg-primary-700 text-white text-xs rounded-md font-medium">Kopiera</button>
                 </div>
               </div>
