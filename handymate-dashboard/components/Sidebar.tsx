@@ -25,6 +25,7 @@ import {
   Mail,
   MessageSquare,
   Megaphone,
+  CheckSquare,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -76,6 +77,7 @@ const NAV: NavItem[] = [
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Säljtratt', icon: TrendingUp, href: '/dashboard/pipeline' },
+  { type: 'link', key: 'tasks', label: 'Uppgifter', icon: CheckSquare, href: '/dashboard/tasks' },
   { type: 'link', key: 'calendar', label: 'Kalender', icon: Calendar, href: '/dashboard/calendar' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
   { type: 'link', key: 'sms_inbox', label: 'SMS', icon: MessageSquare, href: '/dashboard/sms-inbox' },

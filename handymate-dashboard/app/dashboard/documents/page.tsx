@@ -798,7 +798,8 @@ export default function DocumentsPage() {
                   {filteredDocuments.map(doc => (
                     <div
                       key={doc.id}
-                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group"
+                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group cursor-pointer"
+                      onClick={() => viewDocument(doc)}
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -830,7 +831,7 @@ export default function DocumentsPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                           <button
                             onClick={() => viewDocument(doc)}
                             className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
@@ -884,7 +885,8 @@ export default function DocumentsPage() {
                   {filteredUploads.map(file => (
                     <div
                       key={`${file.source}-${file.id}`}
-                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group"
+                      className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group cursor-pointer"
+                      onClick={() => { if (file.file_url) window.open(file.file_url, '_blank') }}
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -917,7 +919,7 @@ export default function DocumentsPage() {
                             </span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                           {file.file_url && (
                             <a
                               href={file.file_url}
@@ -1242,17 +1244,16 @@ export default function DocumentsPage() {
               )}
               <button
                 onClick={() => {
-                  const blob = new Blob([viewHtml], { type: 'text/html' })
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement('a')
-                  a.href = url
-                  a.download = `${viewDoc.title || 'dokument'}.html`
-                  a.click()
-                  URL.revokeObjectURL(url)
+                  const printWin = window.open('', '_blank')
+                  if (printWin) {
+                    printWin.document.write(viewHtml)
+                    printWin.document.close()
+                    printWin.onload = () => { printWin.print() }
+                  }
                 }}
                 className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm text-gray-700 transition-all"
               >
-                <Download className="w-4 h-4 inline mr-2" /> Ladda ner HTML
+                <Download className="w-4 h-4 inline mr-2" /> Ladda ner PDF
               </button>
             </div>
           </div>

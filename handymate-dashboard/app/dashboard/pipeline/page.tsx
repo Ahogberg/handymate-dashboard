@@ -421,7 +421,8 @@ export default function PipelinePage() {
   const [lastContact, setLastContact] = useState<{ date: string; type: string } | null>(null)
 
   const [showNewDeal, setShowNewDeal] = useState(false)
-  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '' })
+  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '' })
+  const [jobTypes, setJobTypes] = useState<string[]>([])
   const [newDealSubmitting, setNewDealSubmitting] = useState(false)
   const [customers, setCustomers] = useState<CustomerOption[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
@@ -431,6 +432,9 @@ export default function PipelinePage() {
   const [newCustomerSubmitting, setNewCustomerSubmitting] = useState(false)
   const [newDealFiles, setNewDealFiles] = useState<File[]>([])
   const [newDealUploading, setNewDealUploading] = useState(false)
+  const [nextStepPrompt, setNextStepPrompt] = useState<{ dealId: string; dealTitle: string; jobType: string } | null>(null)
+  const [nextStepTask, setNextStepTask] = useState('')
+  const [nextStepSaving, setNextStepSaving] = useState(false)
 
   // View toggle
   const [pipelineView, setPipelineView] = useState<'kanban' | 'timeline'>('kanban')
@@ -833,6 +837,38 @@ export default function PipelinePage() {
     }
   }, [])
 
+  function getSuggestedTask(title: string, jobType: string): string {
+    const jt = (jobType || title).toLowerCase()
+    if (jt.includes('bad') || jt.includes('renovering')) return 'Boka besiktning och ta mått'
+    if (jt.includes('el') || jt.includes('installation')) return 'Planera elritning och materialbeställning'
+    if (jt.includes('målning') || jt.includes('måleri')) return 'Uppskatta ytor och beställ färg'
+    if (jt.includes('vvs') || jt.includes('rör')) return 'Boka vattenavstängning och materialcheck'
+    if (jt.includes('snickeri') || jt.includes('bygg')) return 'Boka platsbesök och ta mått'
+    if (jt.includes('saner')) return 'Boka provtagning och miljöanalys'
+    if (jt.includes('tak')) return 'Boka takinspektion och offert'
+    if (jt.includes('golv')) return 'Mäta ytor och beställa golvmaterial'
+    return 'Boka kundmöte och gör behovsanalys'
+  }
+
+  async function createNextStepTask() {
+    if (!nextStepPrompt || !nextStepTask.trim()) return
+    setNextStepSaving(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: nextStepTask.trim(),
+          deal_id: nextStepPrompt.dealId,
+          visibility: 'team',
+        }),
+      })
+      if (res.ok) showToast('Uppgift skapad!', 'success')
+    } catch { /* ignore */ }
+    setNextStepPrompt(null)
+    setNextStepSaving(false)
+  }
+
   function formatFileSize(bytes: number | null) {
     if (!bytes) return ''
     if (bytes < 1024) return `${bytes} B`
@@ -847,6 +883,15 @@ export default function PipelinePage() {
       .eq('business_id', business.business_id)
       .order('name', { ascending: true })
     setCustomers(data || [])
+  }, [business.business_id])
+
+  const fetchJobTypes = useCallback(async () => {
+    const { data } = await supabase
+      .from('business_config')
+      .select('services_offered')
+      .eq('business_id', business.business_id)
+      .single()
+    setJobTypes(data?.services_offered || [])
   }, [business.business_id])
 
   useEffect(() => {
@@ -866,6 +911,7 @@ export default function PipelinePage() {
       setShowNewDeal(true)
       setNewDealForm(prev => ({ ...prev, customer_id: custId, title: custName ? `Jobb för ${custName}` : '' }))
       fetchCustomers()
+      fetchJobTypes()
       // Rensa URL:en
       window.history.replaceState(null, '', '/dashboard/pipeline')
     }
@@ -975,7 +1021,8 @@ export default function PipelinePage() {
           customerId: newDealForm.customer_id || null,
           value: newDealForm.value ? parseFloat(newDealForm.value) : null,
           priority: newDealForm.priority,
-          description: newDealForm.description.trim() || null
+          description: newDealForm.description.trim() || null,
+          job_type: newDealForm.job_type || null
         })
       })
       if (!res.ok) throw new Error()
@@ -1022,12 +1069,18 @@ export default function PipelinePage() {
         showToast('Deal skapad', 'success')
       }
 
+      const createdTitle = newDealForm.title.trim()
+      const createdJobType = newDealForm.job_type || ''
       setShowNewDeal(false)
-      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '' })
+      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '' })
       setCustomerSearch('')
       setNewDealFiles([])
       setShowNewCustomerForm(false)
       fetchPipeline()
+
+      const suggestedTask = getSuggestedTask(createdTitle, createdJobType)
+      setNextStepTask(suggestedTask)
+      setNextStepPrompt({ dealId: createdDeal.id, dealTitle: createdTitle, jobType: createdJobType })
     } catch {
       showToast('Kunde inte skapa deal', 'error')
     } finally {
@@ -1532,7 +1585,7 @@ export default function PipelinePage() {
                 <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
               </button>
               {/* Stage settings removed — stages are locked */}
-              <button onClick={() => { setShowNewDeal(true); fetchCustomers() }}
+              <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes() }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-lg shadow-primary-600/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
               </button>
@@ -2639,6 +2692,16 @@ export default function PipelinePage() {
                     </select>
                   </div>
                 </div>
+                {jobTypes.length > 0 && (
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Jobbtyp</label>
+                    <select value={newDealForm.job_type} onChange={e => setNewDealForm(prev => ({ ...prev, job_type: e.target.value }))}
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                      <option value="">Välj jobbtyp...</option>
+                      {jobTypes.map(jt => <option key={jt} value={jt}>{jt}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
                   <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={3}
@@ -2967,6 +3030,34 @@ export default function PipelinePage() {
               <button onClick={() => setShowSiteVisit(false)} className="px-4 py-2.5 border border-[#E2E8F0] rounded-xl text-sm text-gray-500">
                 Avbryt
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Next step prompt after deal creation */}
+      {nextStepPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-sm p-6">
+            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <CheckSquare className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h3 className="text-center text-lg font-semibold text-gray-900 mb-1">Lead skapat!</h3>
+            <p className="text-center text-sm text-gray-500 mb-4">Förslag på nästa steg:</p>
+            <input
+              type="text"
+              value={nextStepTask}
+              onChange={e => setNextStepTask(e.target.value)}
+              className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none mb-4"
+              placeholder="T.ex. Boka kundmöte..."
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setNextStepPrompt(null)} className="flex-1 px-4 py-2.5 text-sm text-gray-600 border border-[#E2E8F0] rounded-xl hover:bg-gray-50">Hoppa över</button>
+              <button
+                onClick={createNextStepTask}
+                disabled={nextStepSaving || !nextStepTask.trim()}
+                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-xl disabled:opacity-50"
+              >{nextStepSaving ? 'Sparar...' : 'Skapa uppgift'}</button>
             </div>
           </div>
         </div>
