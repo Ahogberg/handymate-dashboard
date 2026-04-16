@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
@@ -7,8 +7,15 @@ export const dynamic = 'force-dynamic'
  * GET /api/cron/expire-approvals
  * Marks pending approvals as expired if expires_at has passed.
  * Run daily (or more frequently) via vercel.json cron.
+ *
+ * Requires: Authorization: Bearer ${CRON_SECRET}
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   try {
     const supabase = getServerSupabase()
 
@@ -27,6 +34,6 @@ export async function GET() {
     return NextResponse.json({ expired: count })
   } catch (error: any) {
     console.error('[expire-approvals] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    if (linkError || !linkData) {
+    if (linkError || !linkData?.properties?.action_link) {
       console.error('Magic link error:', linkError)
       return NextResponse.json({ error: 'Failed to generate login link' }, { status: 500 })
     }
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     cookieStore.set('handymate_impersonating', 'true', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
       maxAge: 60 * 60 * 2, // 2 hours
       path: '/'
@@ -83,31 +83,19 @@ export async function GET(request: NextRequest) {
 
     cookieStore.set('handymate_admin_id', tokenData.admin_user_id, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: true,
       sameSite: 'lax',
       maxAge: 60 * 60 * 2, // 2 hours
       path: '/'
     })
 
-    // Redirect to the magic link
-    // The magic link will authenticate the user and redirect to dashboard
-    const magicLink = linkData.properties?.action_link
-
-    if (magicLink) {
-      return NextResponse.redirect(magicLink)
-    }
-
-    // Fallback: return info for manual action
-    return NextResponse.json({
-      success: true,
-      message: 'Impersonation verified. Please use the credentials to log in.',
-      email: userData.user.email
-    })
+    // Always redirect — never return the magic link in JSON
+    return NextResponse.redirect(linkData.properties.action_link)
 
   } catch (error: any) {
     console.error('Verify impersonation error:', error)
     return NextResponse.json({
-      error: error.message || 'Verification failed'
+      error: 'Verification failed'
     }, { status: 500 })
   }
 }

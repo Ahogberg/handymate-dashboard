@@ -4,7 +4,20 @@ import { getServerSupabase } from '@/lib/supabase'
 
 /**
  * GET /api/gdpr/export - Exportera all affärsdata (GDPR Art. 20)
+ *
+ * Default: personnummer redigeras till YYYYMMDD-**** för att minimera
+ * känsligt läckage. Använd ?include_sensitive=true för fullständig export
+ * (krävs för ROT/RUT-arkivering och Skatteverket-ansökningar).
  */
+function redactPersonalNumber(pn: string | null | undefined): string | null {
+  if (!pn) return pn || null
+  const clean = pn.replace(/[^0-9]/g, '')
+  if (clean.length < 8) return '****'
+  // Behåll födelsedatum (YYYYMMDD eller YYMMDD), dölj sista 4
+  const prefix = clean.length >= 10 ? clean.slice(0, clean.length - 4) : clean.slice(0, 6)
+  return `${prefix}-****`
+}
+
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -12,10 +25,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const includeSensitive = request.nextUrl.searchParams.get('include_sensitive') === 'true'
+
     const supabase = getServerSupabase()
     const bid = business.business_id
 
-    // Fetch all business data in parallel
     const [
       configRes,
       customersRes,
@@ -36,12 +50,41 @@ export async function GET(request: NextRequest) {
       supabase.from('project').select('*').eq('business_id', bid),
     ])
 
+    // Redigera personnummer om ej opt-in
+    const customers = (customersRes.data || []).map((c: any) => {
+      if (includeSensitive) return c
+      return {
+        ...c,
+        personal_number: redactPersonalNumber(c.personal_number),
+      }
+    })
+
+    const quotes = (quotesRes.data || []).map((q: any) => {
+      if (includeSensitive) return q
+      return {
+        ...q,
+        personnummer: redactPersonalNumber(q.personnummer),
+      }
+    })
+
+    const invoices = (invoicesRes.data || []).map((i: any) => {
+      if (includeSensitive) return i
+      return {
+        ...i,
+        personnummer: redactPersonalNumber(i.personnummer),
+      }
+    })
+
     const exportData = {
       exported_at: new Date().toISOString(),
+      sensitive_data_included: includeSensitive,
+      notice: includeSensitive
+        ? 'Denna export innehåller personnummer. Hantera enligt GDPR.'
+        : 'Personnummer är redigerade. Använd ?include_sensitive=true för ROT/RUT-arkivering.',
       business: configRes.data,
-      customers: customersRes.data || [],
-      quotes: quotesRes.data || [],
-      invoices: invoicesRes.data || [],
+      customers,
+      quotes,
+      invoices,
       bookings: bookingsRes.data || [],
       time_entries: timeEntriesRes.data || [],
       call_recordings: recordingsRes.data || [],
@@ -59,6 +102,6 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('GDPR export error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Export misslyckades' }, { status: 500 })
   }
 }

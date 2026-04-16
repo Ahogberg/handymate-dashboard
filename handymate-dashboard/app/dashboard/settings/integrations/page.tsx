@@ -3,11 +3,17 @@
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export default function IntegrationsPage() {
   const business = useBusiness()
   const [copied, setCopied] = useState(false)
+  const [googleStatus, setGoogleStatus] = useState<{
+    calendarConnected: boolean
+    gmailConnected: boolean
+  }>({ calendarConnected: false, gmailConnected: false })
+  const [widgetEnabled, setWidgetEnabled] = useState(false)
+  const [statusLoading, setStatusLoading] = useState(true)
 
   const embedCode = `<script src="https://app.handymate.se/embed.js" data-key="HM-${business.business_id?.slice(0, 8) || 'abc123'}"></script>`
 
@@ -16,6 +22,28 @@ export default function IntegrationsPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  useEffect(() => {
+    if (!business.business_id) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const googleRes = await fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null)
+        if (cancelled) return
+        setGoogleStatus({
+          calendarConnected: !!(googleRes?.connected && googleRes?.syncEnabled),
+          gmailConnected: !!(googleRes?.gmailScopeGranted && googleRes?.gmailSendScopeGranted),
+        })
+        // widget_enabled hämtas via URL-widget-sidan; för nu visa "Ej kopplad" som default
+        setWidgetEnabled(false)
+      } catch {
+        /* non-blocking */
+      } finally {
+        if (!cancelled) setStatusLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [business.business_id])
 
   if (!business.business_id) {
     return (
@@ -31,7 +59,7 @@ export default function IntegrationsPage() {
       title: 'Hemsida-widget',
       description: 'Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt',
       href: '/dashboard/settings/website-widget',
-      connected: false,
+      connected: widgetEnabled,
       color: 'text-primary-700 bg-primary-50',
     },
     {
@@ -39,7 +67,7 @@ export default function IntegrationsPage() {
       title: 'Google Calendar',
       description: 'Synka bokningar med din kalender automatiskt',
       href: '/dashboard/settings',
-      connected: false,
+      connected: googleStatus.calendarConnected,
       color: 'text-blue-600 bg-blue-50',
     },
     {
@@ -47,7 +75,7 @@ export default function IntegrationsPage() {
       title: 'Gmail',
       description: 'Importera leads automatiskt från din inkorg',
       href: '/dashboard/settings',
-      connected: false,
+      connected: googleStatus.gmailConnected,
       color: 'text-red-500 bg-red-50',
     },
   ]
@@ -80,8 +108,11 @@ export default function IntegrationsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-gray-900">{item.title}</span>
-                  {item.connected && (
+                  {!statusLoading && item.connected && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Kopplad</span>
+                  )}
+                  {!statusLoading && !item.connected && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
                   )}
                 </div>
                 <p className="text-sm text-gray-500 truncate">{item.description}</p>

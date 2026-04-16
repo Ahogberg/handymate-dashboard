@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
-import { getAuthenticatedBusiness, checkEmailRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -28,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check
-    const emailLimit = checkEmailRateLimit(business.business_id)
+    const emailLimit = await checkEmailRateLimitDb(business.business_id)
     if (!emailLimit.allowed) {
       return NextResponse.json({ error: emailLimit.error }, { status: 429 })
     }

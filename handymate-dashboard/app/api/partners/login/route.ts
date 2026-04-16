@@ -38,6 +38,6 @@ export async function POST(request: NextRequest) {
     return response
   } catch (error: any) {
     console.error('[partner-login] Error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Inloggning misslyckades' }, { status: 500 })
   }
 }

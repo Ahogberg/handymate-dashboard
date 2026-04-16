@@ -74,6 +74,6 @@ export async function POST(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Generate sign link error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte generera signeringslänk' }, { status: 500 })
   }
 }

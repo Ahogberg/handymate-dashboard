@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness, checkSmsRateLimit, getBusinessPlanFromConfig } from '@/lib/auth'
+import { getAuthenticatedBusiness, getBusinessPlanFromConfig } from '@/lib/auth'
+import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import { getServerSupabase } from '@/lib/supabase'
 
@@ -14,8 +15,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Rate limit check (per-minute burst protection)
-    const rateLimit = checkSmsRateLimit(business.business_id)
+    // Rate limit check (DB-backed, persistent across serverless instances)
+    const rateLimit = await checkSmsRateLimitDb(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }

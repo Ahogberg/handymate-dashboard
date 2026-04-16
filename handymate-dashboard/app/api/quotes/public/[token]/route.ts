@@ -69,7 +69,7 @@ export async function GET(
 
   } catch (error: any) {
     console.error('Get public quote error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte läsa offerten' }, { status: 500 })
   }
 }
 
@@ -276,6 +276,6 @@ export async function POST(
 
   } catch (error: any) {
     console.error('Quote public POST error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Kunde inte behandla din begäran' }, { status: 500 })
   }
 }

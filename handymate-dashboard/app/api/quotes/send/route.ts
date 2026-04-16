@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
@@ -223,13 +224,13 @@ export async function POST(request: NextRequest) {
 
     // Rate limit check
     if (method === 'sms' || method === 'both') {
-      const smsLimit = checkSmsRateLimit(business.business_id)
+      const smsLimit = await checkSmsRateLimitDb(business.business_id)
       if (!smsLimit.allowed) {
         return NextResponse.json({ error: smsLimit.error }, { status: 429 })
       }
     }
     if (method === 'email' || method === 'both') {
-      const emailLimit = checkEmailRateLimit(business.business_id)
+      const emailLimit = await checkEmailRateLimitDb(business.business_id)
       if (!emailLimit.allowed) {
         return NextResponse.json({ error: emailLimit.error }, { status: 429 })
       }
@@ -284,7 +285,7 @@ export async function POST(request: NextRequest) {
     ) {
       // Skapa approval istf att skicka direkt
       const approvalId = `appr_4e_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
-      await supabase.from('pending_approvals').insert({
+      const { error: apprErr } = await supabase.from('pending_approvals').insert({
         id: approvalId,
         business_id: quote.business_id,
         approval_type: 'four_eyes_quote',
@@ -305,11 +306,21 @@ export async function POST(request: NextRequest) {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       })
 
+      if (apprErr) {
+        console.error('[quotes/send] Failed to create approval:', apprErr)
+        return NextResponse.json({ error: 'Kunde inte skapa godkännandebegäran' }, { status: 500 })
+      }
+
       // Uppdatera status till pending_approval
-      await supabase
+      const { error: statusErr } = await supabase
         .from('quotes')
         .update({ status: 'pending_approval' })
         .eq('quote_id', quoteId)
+
+      if (statusErr) {
+        console.error('[quotes/send] Failed to update quote status:', statusErr)
+        return NextResponse.json({ error: 'Godkännande skapad men offertens status kunde inte uppdateras' }, { status: 500 })
+      }
 
       return NextResponse.json({
         requires_approval: true,
@@ -498,13 +509,23 @@ ${suffix}`
     }
 
     // Uppdatera offert-status
-    await supabase
+    const { error: statusUpdateErr } = await supabase
       .from('quotes')
       .update({
         status: 'sent',
         sent_at: new Date().toISOString()
       })
       .eq('quote_id', quoteId)
+
+    if (statusUpdateErr) {
+      // Kritiskt: offert skickades via SMS/mail men status sparades inte
+      console.error('[quotes/send] CRITICAL: Status-update failed after send:', statusUpdateErr)
+      return NextResponse.json({
+        success: true,
+        smsSent, emailSent,
+        warning: 'Offerten skickades men status kunde inte uppdateras. Ladda om sidan.',
+      })
+    }
 
     // Pipeline: move deal to quote_sent if exists
     try {

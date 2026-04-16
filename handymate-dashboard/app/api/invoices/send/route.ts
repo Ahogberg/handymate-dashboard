@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
-import { getAuthenticatedBusiness, checkSmsRateLimit, checkEmailRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
@@ -39,13 +40,13 @@ export async function POST(request: NextRequest) {
 
     // Rate limit check
     if (send_sms) {
-      const smsLimit = checkSmsRateLimit(business.business_id)
+      const smsLimit = await checkSmsRateLimitDb(business.business_id)
       if (!smsLimit.allowed) {
         return NextResponse.json({ error: smsLimit.error }, { status: 429 })
       }
     }
     if (send_email) {
-      const emailLimit = checkEmailRateLimit(business.business_id)
+      const emailLimit = await checkEmailRateLimitDb(business.business_id)
       if (!emailLimit.allowed) {
         return NextResponse.json({ error: emailLimit.error }, { status: 429 })
       }
@@ -214,10 +215,15 @@ export async function POST(request: NextRequest) {
 
     // Uppdatera fakturastatus
     if (results.email || results.sms) {
-      await supabase
+      const { error: statusErr } = await supabase
         .from('invoice')
         .update({ status: 'sent' })
         .eq('invoice_id', invoice_id)
+
+      if (statusErr) {
+        console.error('[invoices/send] Status update failed after send:', statusErr)
+        results.errors.push(`Status: ${statusErr.message}`)
+      }
 
       // Logga aktivitet
       await supabase

@@ -14,6 +14,61 @@ import StepPayment from './components/StepPayment'
 import type { OnboardingData } from './types'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 
+// ── CSV parsing ───────────────────────────────────────────────────────
+/**
+ * Parsar en CSV-sträng till kundobjekt.
+ * Stödjer kolumner: namn, telefon, email (i valfri ordning)
+ * Header-rad detekteras automatiskt.
+ */
+function parseCsvCustomers(csvText: string): Array<{ name: string; phone: string; email?: string }> {
+  const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0)
+  if (lines.length === 0) return []
+
+  // Detect separator (, or ;)
+  const firstLine = lines[0]
+  const sep = firstLine.includes(';') && !firstLine.includes(',') ? ';' : ','
+
+  // Parse rows
+  const rows = lines.map(line => line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, '')))
+
+  // Detect header row
+  const headerCandidates = rows[0].map(c => c.toLowerCase())
+  const hasHeader = headerCandidates.some(h =>
+    ['namn', 'name', 'telefon', 'phone', 'mobil', 'email', 'e-post', 'mail'].includes(h)
+  )
+
+  let nameIdx = 0, phoneIdx = 1, emailIdx = 2
+
+  if (hasHeader) {
+    const findCol = (...keys: string[]) => headerCandidates.findIndex(h => keys.includes(h))
+    nameIdx = findCol('namn', 'name', 'kundnamn') ?? 0
+    phoneIdx = findCol('telefon', 'phone', 'mobil', 'mobilnummer', 'telnr') ?? 1
+    emailIdx = findCol('email', 'e-post', 'mail', 'epost')
+    if (nameIdx === -1) nameIdx = 0
+    if (phoneIdx === -1) phoneIdx = 1
+  }
+
+  const dataRows = hasHeader ? rows.slice(1) : rows
+
+  const customers: Array<{ name: string; phone: string; email?: string }> = []
+  for (const row of dataRows) {
+    const name = row[nameIdx]?.trim() || ''
+    let phone = row[phoneIdx]?.trim() || ''
+    const email = emailIdx >= 0 && emailIdx < row.length ? row[emailIdx]?.trim() || undefined : undefined
+
+    if (!name || !phone) continue
+
+    // Normalisera svenskt telefonnummer
+    phone = phone.replace(/[\s\-()]/g, '')
+    if (phone.startsWith('0')) phone = '+46' + phone.slice(1)
+    if (!phone.startsWith('+')) phone = '+46' + phone
+
+    customers.push({ name, phone, email })
+  }
+
+  return customers
+}
+
 // ── Steps ─────────────────────────────────────────────────────────────
 const STEPS = [
   { label: 'Företag', icon: Building2 },
@@ -444,14 +499,40 @@ export default function OnboardingPage() {
             {/* CSV upload */}
             <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Eller ladda upp CSV</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Format: <code className="bg-gray-100 px-1 rounded">namn,telefon,email</code> (header-rad är valfri)
+              </p>
               <label className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-primary-500 hover:text-primary-700 cursor-pointer transition-colors">
                 <Upload className="w-4 h-4" />
                 Välj CSV-fil med kunder
-                <input type="file" className="hidden" accept=".csv"
-                  onChange={(e) => {
+                <input type="file" className="hidden" accept=".csv,.txt"
+                  onChange={async (e) => {
                     const f = e.target.files?.[0]
-                    if (f) setCsvFile(f)
-                    // TODO: Parse CSV and populate importedCustomers
+                    if (!f) return
+                    setCsvFile(f)
+                    try {
+                      const text = await f.text()
+                      const parsed = parseCsvCustomers(text)
+                      if (parsed.length === 0) {
+                        alert('Inga kunder kunde läsas från filen. Kontrollera formatet: namn,telefon,email')
+                        return
+                      }
+                      setImportedCustomers(prev => {
+                        // Dedupe på telefon
+                        const seen = new Set(prev.map(c => c.phone))
+                        const next = [...prev]
+                        for (const c of parsed) {
+                          if (!seen.has(c.phone)) {
+                            next.push(c)
+                            seen.add(c.phone)
+                          }
+                        }
+                        return next
+                      })
+                    } catch (err) {
+                      console.error('CSV parse error:', err)
+                      alert('Kunde inte läsa CSV-filen. Se till att den är textbaserad (UTF-8).')
+                    }
                   }}
                 />
               </label>
@@ -477,9 +558,33 @@ export default function OnboardingPage() {
               <button onClick={() => setStep(2)} className="px-4 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm">
                 <ArrowLeft className="w-4 h-4 inline mr-1" />Tillbaka
               </button>
-              <button onClick={async () => { await saveProgress(4); setStep(4) }}
+              <button
+                onClick={async () => {
+                  // Spara alla importerade kunder till DB innan nästa steg
+                  if (importedCustomers.length > 0) {
+                    try {
+                      const res = await fetch('/api/customers/bulk', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ customers: importedCustomers }),
+                      })
+                      if (!res.ok) {
+                        const err = await res.json().catch(() => ({}))
+                        console.error('Customer bulk import failed:', err)
+                        alert(`${importedCustomers.length} kunder kunde inte sparas — försök igen eller hoppa över.`)
+                        return
+                      }
+                    } catch (err) {
+                      console.error('Customer bulk import error:', err)
+                      alert('Nätverksfel vid sparning av kunder — försök igen.')
+                      return
+                    }
+                  }
+                  await saveProgress(4)
+                  setStep(4)
+                }}
                 className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-medium text-sm hover:bg-primary-700">
-                {importedCustomers.length > 0 ? 'Fortsätt' : 'Hoppa över — lägg till senare'}
+                {importedCustomers.length > 0 ? `Fortsätt med ${importedCustomers.length} kunder` : 'Hoppa över — lägg till senare'}
               </button>
             </div>
           </div>

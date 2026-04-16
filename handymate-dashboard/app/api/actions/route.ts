@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getAuthenticatedBusiness, checkSmsRateLimit, checkPhoneApiRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
+import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'send_sms': {
         // SMS rate limit check
-        const smsLimit = checkSmsRateLimit(authBusiness.business_id)
+        const smsLimit = await checkSmsRateLimitDb(authBusiness.business_id)
         if (!smsLimit.allowed) {
           return NextResponse.json({ error: smsLimit.error }, { status: 429 })
         }
@@ -222,7 +223,7 @@ export async function POST(request: NextRequest) {
 
 case 'create_booking': {
   // SMS rate limit check (booking sends confirmation SMS)
-  const bookingSmsLimit = checkSmsRateLimit(authBusiness.business_id)
+  const bookingSmsLimit = await checkSmsRateLimitDb(authBusiness.business_id)
   if (!bookingSmsLimit.allowed) {
     return NextResponse.json({ error: bookingSmsLimit.error }, { status: 429 })
   }

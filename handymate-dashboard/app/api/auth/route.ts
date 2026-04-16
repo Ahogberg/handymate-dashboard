@@ -96,7 +96,7 @@ if (action === 'register') {
   }
 
   // 3. Skapa owner-rad i business_users (för team-funktioner)
-  await supabaseAdmin
+  const { error: businessUserError } = await supabaseAdmin
     .from('business_users')
     .insert({
       business_id: businessId,
@@ -112,6 +112,14 @@ if (action === 'register') {
       can_approve_time: true,
       can_create_invoices: true,
     })
+
+  if (businessUserError) {
+    // Rollback: ta bort business_config + auth-user så användaren inte hamnar i limbo
+    console.error('[Register] business_users insert failed, rolling back:', businessUserError)
+    await supabaseAdmin.from('business_config').delete().eq('business_id', businessId)
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+    return NextResponse.json({ error: 'Kunde inte skapa användarrelation' }, { status: 500 })
+  }
 
   // 4. Referral-spårning
   if (referralCode) {
@@ -346,6 +354,6 @@ if (action === 'login') {
 
   } catch (error: any) {
     console.error('Auth error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: 'Autentisering misslyckades' }, { status: 500 })
   }
 }

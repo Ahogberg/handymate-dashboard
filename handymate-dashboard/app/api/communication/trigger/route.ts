@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { getServerSupabase } from '@/lib/supabase'
 import {
   resolveMessageVariables,
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const rateLimit = checkSmsRateLimit(business.business_id)
+    const rateLimit = await checkSmsRateLimitDb(business.business_id)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }

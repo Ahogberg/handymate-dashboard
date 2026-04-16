@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { createHash } from 'crypto'
+import { verifyElksSignature } from '@/lib/elks-signature'
 
 /**
  * Incoming SMS webhook from 46elks.
@@ -28,6 +29,17 @@ export async function POST(request: NextRequest) {
     // charset suffix ("…; charset=UTF-8"). Parsing via URLSearchParams is
     // reliable regardless of Content-Type variant.
     const text = await request.text()
+
+    // Verifiera 46elks-signatur (kan inaktiveras via ELKS_SKIP_SIGNATURE i dev)
+    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
+      // Skapa en klon med body för signaturvalidering
+      const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: text })
+      if (!verifyElksSignature(req, text)) {
+        console.error('[SMS Incoming] Ogiltig 46elks-signatur, avvisar webhook')
+        return new NextResponse('Unauthorized', { status: 401 })
+      }
+    }
+
     const params = new URLSearchParams(text)
     const from = params.get('from') ?? ''
     const to = params.get('to') ?? ''

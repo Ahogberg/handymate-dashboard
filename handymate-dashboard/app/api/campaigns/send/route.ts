@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -84,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check
-    const rateLimit = checkSmsRateLimit(businessId)
+    const rateLimit = await checkSmsRateLimitDb(businessId)
     if (!rateLimit.allowed) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     // Skicka SMS till varje mottagare
     for (const recipient of recipients) {
-      const smsRateLimit = checkSmsRateLimit(businessId)
+      const smsRateLimit = await checkSmsRateLimitDb(businessId)
       if (!smsRateLimit.allowed) {
         // Sluta skicka om rate limit nås
         await supabase

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
-import { getAuthenticatedBusiness, checkSmsRateLimit } from '@/lib/auth'
+import { getAuthenticatedBusiness } from '@/lib/auth'
+import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
 
     // Check SMS rate limit if the action involves sending SMS
     if (suggestion.suggestion_type === 'sms' || suggestion.suggestion_type === 'reschedule') {
-      const smsLimit = checkSmsRateLimit(authBusiness.business_id)
+      const smsLimit = await checkSmsRateLimitDb(authBusiness.business_id)
       if (!smsLimit.allowed) {
         return NextResponse.json({ error: smsLimit.error }, { status: 429 })
       }

@@ -152,7 +152,7 @@ export async function POST(
     const newCount = currentCount + 1
 
     // Create invoice_reminders record
-    await supabase
+    const { error: reminderInsertErr } = await supabase
       .from('invoice_reminders')
       .insert({
         business_id: business.business_id,
@@ -160,15 +160,19 @@ export async function POST(
         reminder_number: newCount,
         sent_at: new Date().toISOString(),
         sent_method: smsSent ? 'sms' : 'failed',
-        fee_amount: currentCount > 0 ? reminderFee : 0, // No fee on first reminder
+        fee_amount: currentCount > 0 ? reminderFee : 0,
         penalty_interest_amount: penaltyInterestAmount,
         total_with_fees: totalWithFees,
         message: message,
       })
-    // Log errors but don't block
+
+    if (reminderInsertErr) {
+      console.error('[invoice/reminder] Failed to log reminder:', reminderInsertErr)
+      // Fortsätt ändå — SMS har redan skickats, men warna i svaret
+    }
 
     // Update invoice with reminder info
-    await supabase
+    const { error: invoiceUpdateErr } = await supabase
       .from('invoice')
       .update({
         status: 'overdue',
@@ -178,6 +182,11 @@ export async function POST(
         penalty_interest: penaltyInterest,
       })
       .eq('invoice_id', invoiceId)
+
+    if (invoiceUpdateErr) {
+      console.error('[invoice/reminder] Failed to update invoice:', invoiceUpdateErr)
+      // Kritiskt: payment tracking inkonsistent
+    }
 
     // Log SMS
     if (smsSent) {
