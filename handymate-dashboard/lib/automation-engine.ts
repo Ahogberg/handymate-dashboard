@@ -28,6 +28,7 @@ export interface AutomationRule {
   run_count: number
   last_run_at: string | null
   last_run_status: string | null
+  agent_id: string | null
   created_at: string
   updated_at: string
 }
@@ -142,9 +143,13 @@ async function logExecution(
     result?: Record<string, unknown>
     errorMessage?: string
     approvalId?: string
+    agentId?: string | null
   }
 ): Promise<void> {
   try {
+    // Härled agent_id från rule om inte explicit satt
+    const agentId = params.agentId ?? deriveAgentId(params.ruleName, params.actionType, params.triggerType)
+
     await supabase.from('v3_automation_logs').insert({
       business_id: params.businessId,
       rule_id: params.ruleId,
@@ -156,10 +161,26 @@ async function logExecution(
       result: params.result || {},
       error_message: params.errorMessage || null,
       approval_id: params.approvalId || null,
+      agent_id: agentId,
     })
   } catch (err: unknown) {
     console.error('[automation-engine] Failed to log execution:', err)
   }
+}
+
+/**
+ * Härleder vilken agent som "äger" en regel baserat på namn + action.
+ * Matche mot samma prefix-regler som lib/agents/personalities.ts.
+ */
+function deriveAgentId(ruleName: string, actionType: string, triggerType: string): string {
+  const n = ruleName.toLowerCase()
+  if (n.includes('faktur') || n.includes('betaln') || n.includes('påminnels') || n.includes('fortnox')) return 'karin'
+  if (n.includes('offert') || n.includes('lead') || n.includes('pipeline') || n.includes('quote')) return 'daniel'
+  if (n.includes('bokning') || n.includes('projekt') || n.includes('arbetsorder') || n.includes('äta') || n.includes('ata')) return 'lars'
+  if (n.includes('kampanj') || n.includes('reaktiv') || n.includes('granne') || n.includes('recension') || n.includes('review')) return 'hanna'
+  if (n.includes('samtal') || n.includes('sms') || n.includes('missat') || n.includes('inkomm')) return 'lisa'
+  if (n.includes('morgon') || triggerType === 'manual') return 'matte'
+  return 'matte'
 }
 
 async function updateRuleStats(
@@ -755,6 +776,7 @@ export async function executeRule(
       ruleName: typedRule.name,
       triggerType: typedRule.trigger_type,
       actionType: typedRule.action_type,
+      agentId: typedRule.agent_id ?? null,
       status: 'skipped',
       context,
       result: { reason: 'Utanför arbetstider' },
@@ -793,6 +815,7 @@ export async function executeRule(
       ruleName: typedRule.name,
       triggerType: typedRule.trigger_type,
       actionType: typedRule.action_type,
+      agentId: typedRule.agent_id ?? null,
       status: 'pending_approval',
       context,
       result: approvalResult.data,
