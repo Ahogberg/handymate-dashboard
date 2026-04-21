@@ -52,6 +52,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -902,6 +903,14 @@ export default function PipelinePage() {
     }
     load()
   }, [fetchPipeline, fetchAiActivities, fetchTeamMembers])
+
+  // Realtime + polling: uppdatera pipelinen när deals/uppgifter ändras
+  useRealtimeRefresh({
+    tables: ['deal', 'task', 'sms_conversation'],
+    businessId: business.business_id,
+    onChange: () => { fetchPipeline(); fetchAiActivities() },
+    pollIntervalMs: 30_000,
+  })
 
   // Öppna ny deal-modal om redirect från kundregistrering
   useEffect(() => {
@@ -2269,18 +2278,88 @@ export default function PipelinePage() {
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                              {/* Expanded detail with activity timeline */}
+                              {/* Expanded detail with inline edit + activity timeline */}
                               {isExpanded && (
                                 <div className="px-3 pb-3 border-t border-gray-100">
+                                  {/* Inline edit — titel + beskrivning */}
+                                  <div className="mt-3 space-y-2">
+                                    <input
+                                      type="text"
+                                      defaultValue={task.title}
+                                      onBlur={async e => {
+                                        const val = e.target.value.trim()
+                                        if (!val || val === task.title) return
+                                        try {
+                                          const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, title: val }) })
+                                          if (!res.ok) throw new Error()
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          fetchTaskActivities(task.id)
+                                          showToast('Uppgift uppdaterad', 'success')
+                                        } catch { showToast('Kunde inte spara', 'error') }
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded text-sm text-gray-900 focus:outline-none focus:border-primary-400"
+                                      placeholder="Titel"
+                                    />
+                                    <textarea
+                                      defaultValue={task.description || ''}
+                                      rows={2}
+                                      onBlur={async e => {
+                                        const val = e.target.value
+                                        if (val === (task.description || '')) return
+                                        try {
+                                          const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, description: val || null }) })
+                                          if (!res.ok) throw new Error()
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          showToast('Beskrivning sparad', 'success')
+                                        } catch { showToast('Kunde inte spara', 'error') }
+                                      }}
+                                      className="w-full px-2.5 py-1.5 bg-white border border-[#E2E8F0] rounded text-sm text-gray-700 focus:outline-none focus:border-primary-400 resize-none"
+                                      placeholder="Beskrivning (valfritt)"
+                                    />
+                                  </div>
                                   <div className="flex items-center gap-2 mt-2 mb-2 flex-wrap">
+                                    <input
+                                      type="date"
+                                      defaultValue={task.due_date || ''}
+                                      onChange={async e => {
+                                        const val = e.target.value || null
+                                        try {
+                                          const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, due_date: val }) })
+                                          if (!res.ok) throw new Error()
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          fetchTaskActivities(task.id)
+                                          showToast('Datum uppdaterat', 'success')
+                                        } catch { showToast('Kunde inte spara', 'error') }
+                                      }}
+                                      className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-700 focus:outline-none focus:border-primary-400"
+                                    />
+                                    <input
+                                      type="time"
+                                      defaultValue={task.due_time ? task.due_time.slice(0, 5) : ''}
+                                      onChange={async e => {
+                                        const val = e.target.value || null
+                                        try {
+                                          const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, due_time: val }) })
+                                          if (!res.ok) throw new Error()
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          fetchTaskActivities(task.id)
+                                          showToast('Tid uppdaterad', 'success')
+                                        } catch { showToast('Kunde inte spara', 'error') }
+                                      }}
+                                      className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-700 focus:outline-none focus:border-primary-400"
+                                    />
                                     {teamMembers.length > 0 && (
                                       <select
                                         value={task.assigned_to || ''}
                                         onChange={async e => {
                                           const val = e.target.value || null
-                                          await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, assigned_to: val }) })
-                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
-                                          fetchTaskActivities(task.id)
+                                          try {
+                                            const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, assigned_to: val }) })
+                                            if (!res.ok) throw new Error()
+                                            if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                            fetchTaskActivities(task.id)
+                                            showToast('Tilldelning ändrad', 'success')
+                                          } catch { showToast('Kunde inte spara', 'error') }
                                         }}
                                         className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                       >
@@ -2291,9 +2370,13 @@ export default function PipelinePage() {
                                     <select
                                       value={task.priority}
                                       onChange={async e => {
-                                        await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, priority: e.target.value }) })
-                                        if (selectedDeal) fetchDealTasks(selectedDeal.id)
-                                        fetchTaskActivities(task.id)
+                                        try {
+                                          const res = await fetch('/api/tasks', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: task.id, priority: e.target.value }) })
+                                          if (!res.ok) throw new Error()
+                                          if (selectedDeal) fetchDealTasks(selectedDeal.id)
+                                          fetchTaskActivities(task.id)
+                                          showToast('Prioritet ändrad', 'success')
+                                        } catch { showToast('Kunde inte spara', 'error') }
                                       }}
                                       className="px-2 py-1 bg-gray-50 border border-[#E2E8F0] rounded text-xs text-gray-600 focus:outline-none focus:border-primary-400"
                                     >

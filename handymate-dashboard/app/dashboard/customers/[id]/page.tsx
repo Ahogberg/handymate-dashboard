@@ -167,6 +167,7 @@ export default function CustomerDetailPage() {
   const searchParams = useSearchParams()
   const business = useBusiness()
   const { user: currentUser } = useCurrentUser()
+  const mainToast = useToast()
   const customerId = (params as any)?.id as string
 
   const tabParam = searchParams?.get('tab')
@@ -432,7 +433,10 @@ export default function CustomerDetailPage() {
   }
 
   async function saveEdit() {
-    if (!editForm.name || !editForm.phone_number) return
+    if (!editForm.name || !editForm.phone_number) {
+      mainToast.error('Namn och telefonnummer krävs')
+      return
+    }
     setEditSaving(true)
     try {
       const res = await fetch('/api/actions', {
@@ -443,14 +447,19 @@ export default function CustomerDetailPage() {
           data: { customerId, ...editForm }
         })
       })
-      if (res.ok) {
-        setIsEditing(false)
-        fetchData()
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Okänt fel' }))
+        mainToast.error(err.error || 'Kunde inte spara ändringarna')
+        return
       }
-    } catch {
-      // Error
+      setIsEditing(false)
+      fetchData()
+      mainToast.success('Kunduppgifter sparade')
+    } catch (err: any) {
+      mainToast.error(err?.message || 'Något gick fel — försök igen')
+    } finally {
+      setEditSaving(false)
     }
-    setEditSaving(false)
   }
 
   // Document functions

@@ -30,6 +30,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
@@ -173,6 +174,14 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData()
   }, [business.business_id])
+
+  // Realtime + polling: uppdatera när samtal/SMS/uppgifter/godkännanden händer
+  useRealtimeRefresh({
+    tables: ['pending_approvals', 'task', 'sms_conversation', 'booking', 'customer_activity'],
+    businessId: business.business_id,
+    onChange: () => fetchData(),
+    pollIntervalMs: 30_000,
+  })
 
   async function fetchInsights() {
     try {
