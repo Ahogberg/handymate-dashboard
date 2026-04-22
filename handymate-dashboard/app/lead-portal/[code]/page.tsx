@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import {
   Plus,
   Send,
@@ -16,9 +16,10 @@ import {
   X,
   AlertTriangle,
 } from 'lucide-react'
+import { LEAD_CATEGORIES, getLeadCategory } from '@/lib/lead-categories'
 
 interface PortalData {
-  source: { id: string; name: string; portal_code: string }
+  source: { id: string; name: string; portal_code: string; default_category: string | null }
   business: { business_name: string; logo_url: string | null; contact_name: string | null }
   leads: Lead[]
   stats: { total: number; contacted: number; won: number }
@@ -36,6 +37,7 @@ interface Lead {
   created_at: string
   estimated_value: number | null
   pipeline_stage_key: string | null
+  category: string | null
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -53,7 +55,9 @@ const serviceOptions = [
 
 export default function LeadPortalPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const code = params?.code as string
+  const urlCategory = searchParams?.get('kategori') || searchParams?.get('category') || ''
 
   const [data, setData] = useState<PortalData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -68,6 +72,7 @@ export default function LeadPortalPage() {
   const [formPhone, setFormPhone] = useState('')
   const [formEmail, setFormEmail] = useState('')
   const [formService, setFormService] = useState('')
+  const [formCategory, setFormCategory] = useState(urlCategory)
   const [formDescription, setFormDescription] = useState('')
   const [formAddress, setFormAddress] = useState('')
   const [formValue, setFormValue] = useState('')
@@ -87,12 +92,16 @@ export default function LeadPortalPage() {
       }
       const json = await res.json()
       setData(json)
+      // Default-kategori från källan om URL-param saknas och fältet är tomt
+      if (!urlCategory && !formCategory && json.source?.default_category) {
+        setFormCategory(json.source.default_category)
+      }
     } catch {
       setError('Kunde inte ladda portalen.')
     } finally {
       setLoading(false)
     }
-  }, [code])
+  }, [code, urlCategory, formCategory])
 
   useEffect(() => {
     fetchData()
@@ -123,6 +132,7 @@ export default function LeadPortalPage() {
           phone: formPhone.trim(),
           email: formEmail.trim() || null,
           service: formService || null,
+          category: formCategory || null,
           description: formDescription.trim() || null,
           address: formAddress.trim() || null,
           estimated_value: formValue ? parseInt(formValue) : null,
@@ -136,11 +146,12 @@ export default function LeadPortalPage() {
       const result = await res.json()
       setSubmitted({ lead_id: result.lead_id, lead_number: result.lead_number })
 
-      // Reset form
+      // Reset form (behåll kategori — fortsatt relevant för samma källa)
       setFormName('')
       setFormPhone('')
       setFormEmail('')
       setFormService('')
+      setFormCategory(urlCategory || data?.source?.default_category || '')
       setFormDescription('')
       setFormAddress('')
       setFormValue('')
@@ -288,7 +299,23 @@ export default function LeadPortalPage() {
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Uppdragsinformation</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tjänst</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Kategori
+                      {urlCategory && <span className="ml-1 text-[10px] text-primary-700">(från länk)</span>}
+                    </label>
+                    <select
+                      value={formCategory}
+                      onChange={e => setFormCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none bg-white"
+                    >
+                      <option value="">Välj kategori...</option>
+                      {LEAD_CATEGORIES.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Tjänst (frivilligt)</label>
                     <select
                       value={formService}
                       onChange={e => setFormService(e.target.value)}
@@ -300,6 +327,8 @@ export default function LeadPortalPage() {
                       ))}
                     </select>
                   </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Estimerat värde (kr)</label>
                     <input
@@ -402,12 +431,20 @@ export default function LeadPortalPage() {
                     <div key={lead.lead_id} className="bg-white rounded-xl border border-gray-200 p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-medium text-gray-900 text-sm truncate">{lead.name}</h3>
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${status.color}`}>
                               <StatusIcon className="w-3 h-3" />
                               {status.label}
                             </span>
+                            {(() => {
+                              const cat = getLeadCategory(lead.category)
+                              return cat ? (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${cat.bgClass}`}>
+                                  {cat.label}
+                                </span>
+                              ) : null
+                            })()}
                           </div>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                             {lead.phone && (

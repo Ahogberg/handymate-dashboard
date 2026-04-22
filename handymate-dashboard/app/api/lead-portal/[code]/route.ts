@@ -26,7 +26,7 @@ export async function GET(
     // Hämta källa med business-info
     const { data: source, error: srcErr } = await supabase
       .from('lead_sources')
-      .select('id, name, business_id, portal_code, is_active, created_at')
+      .select('id, name, business_id, portal_code, is_active, created_at, default_category')
       .eq('portal_code', code)
       .eq('is_active', true)
       .single()
@@ -45,7 +45,7 @@ export async function GET(
     // Hämta leads för denna källa
     const { data: leads } = await supabase
       .from('leads')
-      .select('lead_id, name, phone, email, status, notes, source, source_ref, created_at, estimated_value, pipeline_stage_key')
+      .select('lead_id, name, phone, email, status, notes, source, source_ref, created_at, estimated_value, pipeline_stage_key, category')
       .eq('lead_source_id', source.id)
       .order('created_at', { ascending: false })
 
@@ -62,6 +62,7 @@ export async function GET(
         id: source.id,
         name: source.name,
         portal_code: source.portal_code,
+        default_category: (source as any).default_category || null,
       },
       business: {
         business_name: business?.business_name || 'Okänt företag',
@@ -91,7 +92,7 @@ export async function POST(
     // Hämta källa
     const { data: source } = await supabase
       .from('lead_sources')
-      .select('id, name, business_id, is_active')
+      .select('id, name, business_id, is_active, default_category')
       .eq('portal_code', code)
       .eq('is_active', true)
       .single()
@@ -101,7 +102,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { name, phone, email, service, description, address, estimated_value, desired_date, source_ref } = body
+    const { name, phone, email, service, category, description, address, estimated_value, desired_date, source_ref } = body
 
     if (!name || !phone) {
       return NextResponse.json({ error: 'Namn och telefon krävs' }, { status: 400, headers: corsHeaders })
@@ -172,6 +173,7 @@ export async function POST(
       estimated_value: estimated_value ? parseInt(estimated_value) : null,
       lead_source_id: source.id,
       source_ref: source_ref || null,
+      category: category || (source as any).default_category || null,
       ...(leadNumber ? { lead_number: leadNumber } : {}),
     })
 

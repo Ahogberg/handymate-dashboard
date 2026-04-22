@@ -54,6 +54,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Hämta senaste lead-kategori per kund (för pipeline-badge)
+    const categoryMap: Record<string, string | null> = {}
+    if (customerIds.length > 0) {
+      const { data: leadCategories } = await supabase
+        .from('leads')
+        .select('customer_id, category, created_at')
+        .in('customer_id', customerIds)
+        .eq('business_id', business.business_id)
+        .not('category', 'is', null)
+        .order('created_at', { ascending: false })
+      for (const l of (leadCategories || []) as any[]) {
+        if (l.customer_id && !categoryMap[l.customer_id]) {
+          categoryMap[l.customer_id] = l.category
+        }
+      }
+    }
+
     // Group deals by stage_id and attach customer
     const dealsByStage: Record<string, any[]> = {}
     for (const stage of stages) {
@@ -62,7 +79,8 @@ export async function GET(request: NextRequest) {
     for (const deal of deals || []) {
       const enrichedDeal = {
         ...deal,
-        customer: deal.customer_id ? customerMap[deal.customer_id] || null : null
+        customer: deal.customer_id ? customerMap[deal.customer_id] || null : null,
+        category: deal.customer_id ? categoryMap[deal.customer_id] || null : null,
       }
       if (dealsByStage[deal.stage_id]) {
         dealsByStage[deal.stage_id].push(enrichedDeal)

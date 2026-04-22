@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { name, notes } = await request.json()
+    const { name, notes, default_category } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Namn krävs' }, { status: 400 })
@@ -79,6 +79,7 @@ export async function POST(request: NextRequest) {
         business_id: business.business_id,
         name,
         notes: notes || null,
+        default_category: default_category || null,
       })
       .select()
       .single()
@@ -103,7 +104,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { id, name, notes, is_active } = await request.json()
+    const { id, name, notes, is_active, default_category } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'ID krävs' }, { status: 400 })
@@ -113,6 +114,7 @@ export async function PUT(request: NextRequest) {
     if (name !== undefined) updates.name = name
     if (notes !== undefined) updates.notes = notes
     if (is_active !== undefined) updates.is_active = is_active
+    if (default_category !== undefined) updates.default_category = default_category || null
 
     const { data: source, error } = await supabase
       .from('lead_sources')

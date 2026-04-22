@@ -18,6 +18,7 @@ import {
   X,
   TrendingUp,
 } from 'lucide-react'
+import { LEAD_CATEGORIES, getLeadCategory } from '@/lib/lead-categories'
 
 interface LeadSource {
   id: string
@@ -27,6 +28,7 @@ interface LeadSource {
   is_active: boolean
   created_at: string
   notes: string | null
+  default_category: string | null
   lead_count: number
   won_count: number
 }
@@ -38,6 +40,7 @@ export default function LeadSourcesPage() {
   const [showModal, setShowModal] = useState(false)
   const [newName, setNewName] = useState('')
   const [newNotes, setNewNotes] = useState('')
+  const [newCategory, setNewCategory] = useState('')
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -65,12 +68,13 @@ export default function LeadSourcesPage() {
       const res = await fetch('/api/settings/lead-sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() || null }),
+        body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() || null, default_category: newCategory || null }),
       })
       if (!res.ok) throw new Error('Create failed')
       setShowModal(false)
       setNewName('')
       setNewNotes('')
+      setNewCategory('')
       fetchSources()
     } catch (err) {
       console.error('Kunde inte skapa lead-källa:', err)
@@ -89,6 +93,19 @@ export default function LeadSourcesPage() {
       setSources(prev => prev.map(s => s.id === source.id ? { ...s, is_active: !s.is_active } : s))
     } catch (err) {
       console.error('Kunde inte uppdatera:', err)
+    }
+  }
+
+  const handleCategoryChange = async (sourceId: string, category: string) => {
+    try {
+      await fetch('/api/settings/lead-sources', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: sourceId, default_category: category || null }),
+      })
+      setSources(prev => prev.map(s => s.id === sourceId ? { ...s, default_category: category || null } : s))
+    } catch (err) {
+      console.error('Kunde inte uppdatera kategori:', err)
     }
   }
 
@@ -189,7 +206,17 @@ export default function LeadSourcesPage() {
                         <Link2 className="w-5 h-5 text-primary-700" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{source.name}</h3>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-semibold text-gray-900">{source.name}</h3>
+                          {(() => {
+                            const cat = getLeadCategory(source.default_category)
+                            return cat ? (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${cat.bgClass}`}>
+                                {cat.label}
+                              </span>
+                            ) : null
+                          })()}
+                        </div>
                         {source.notes && <p className="text-xs text-gray-400">{source.notes}</p>}
                       </div>
                     </div>
@@ -246,6 +273,21 @@ export default function LeadSourcesPage() {
                       {copiedId === source.id + '-key' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                       {copiedId === source.id + '-key' ? 'Kopierad!' : 'Kopiera'}
                     </button>
+                  </div>
+
+                  {/* Rad 4: Standardkategori */}
+                  <div className="flex items-center gap-2 mb-3 bg-gray-50 rounded-lg px-3 py-2">
+                    <span className="text-xs text-gray-500 whitespace-nowrap">Standardkategori:</span>
+                    <select
+                      value={source.default_category || ''}
+                      onChange={e => handleCategoryChange(source.id, e.target.value)}
+                      className="flex-1 bg-white border border-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:border-primary-600"
+                    >
+                      <option value="">Ingen — leverantören väljer</option>
+                      {LEAD_CATEGORIES.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
                   </div>
 
                   {/* Rad 4: Statistik + åtgärder */}
@@ -310,6 +352,22 @@ export default function LeadSourcesPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                   autoFocus
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Standardkategori</label>
+                <select
+                  value={newCategory}
+                  onChange={e => setNewCategory(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none bg-white"
+                >
+                  <option value="">Ingen — leverantören väljer per lead</option>
+                  {LEAD_CATEGORIES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Förifyller kategori i portalen. Leverantören kan ändra per lead.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Anteckningar</label>

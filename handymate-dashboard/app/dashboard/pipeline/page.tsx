@@ -53,6 +53,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
+import { getLeadCategory } from '@/lib/lead-categories'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
@@ -110,6 +111,7 @@ interface Deal {
   loss_reason: string | null
   loss_reason_detail: string | null
   assigned_to: string | null
+  category: string | null
   created_at: string
   updated_at: string
   customer?: {
@@ -3190,6 +3192,14 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
                 via {deal.source}
               </span>
             )}
+            {(() => {
+              const cat = getLeadCategory(deal.category)
+              return cat ? (
+                <span className={`px-1.5 py-0.5 text-[9px] font-medium rounded-full border flex-shrink-0 ${cat.bgClass}`} title={`Kategori: ${cat.label}`}>
+                  {cat.label}
+                </span>
+              ) : null
+            })()}
           </div>
           <p className="text-xs text-gray-500 mt-0.5 truncate ml-3.5">{deal.customer?.customer_number && <span className="font-medium">Kund {deal.customer.customer_number} · </span>}{deal.customer?.name || <span className="italic text-gray-400">Okänd kund</span>}</p>
           {deal.description && !deal.customer?.name && <p className="text-xs text-gray-400 mt-0.5 truncate ml-3.5">{deal.description}</p>}
