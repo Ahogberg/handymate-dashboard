@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
       priority,
       job_type,
       source,
+      assigned_to,
     } = body
 
     if (!title) {
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
         source: source || 'manual',
         deal_number: nextNumber,
         job_type: job_type || null,
+        assigned_to: assigned_to || null,
       })
       .select()
       .single()

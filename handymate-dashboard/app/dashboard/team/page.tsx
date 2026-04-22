@@ -10,6 +10,7 @@ import {
   Mail,
   Phone,
   Shield,
+  Briefcase,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -49,6 +50,7 @@ interface TeamMember {
   accepted_at: string | null
   last_login_at: string | null
   created_at: string
+  specialties?: string[]
 }
 
 type Filter = 'all' | 'active' | 'invited' | 'inactive'
@@ -202,6 +204,10 @@ export default function TeamPage() {
   // Edit form
   const [editForm, setEditForm] = useState<InviteForm>({ ...DEFAULT_INVITE_FORM })
 
+  // Jobbtyper (för specialiteter-multiselect)
+  const [jobTypes, setJobTypes] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([])
+  const [editSpecialties, setEditSpecialties] = useState<string[]>([])
+
   // Toast
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' | 'warning' }>({ show: false, message: '', type: 'success' })
 
@@ -232,6 +238,14 @@ export default function TeamPage() {
       fetchMembers()
     }
   }, [business.business_id, fetchMembers])
+
+  useEffect(() => {
+    if (!business.business_id) return
+    fetch('/api/job-types')
+      .then(r => r.ok ? r.json() : { job_types: [] })
+      .then(d => setJobTypes(d.job_types || []))
+      .catch(() => { /* non-blocking */ })
+  }, [business.business_id])
 
   // ---------------------------------------------------------------------------
   // Filtering
@@ -341,6 +355,7 @@ export default function TeamPage() {
       can_approve_time: member.can_approve_time,
       can_create_invoices: member.can_create_invoices,
     })
+    setEditSpecialties(member.specialties || [])
     setShowPermissions(false)
     setConfirmDeactivate(false)
     setEditModalOpen(true)
@@ -368,6 +383,7 @@ export default function TeamPage() {
         can_manage_users: editForm.can_manage_users,
         can_approve_time: editForm.can_approve_time,
         can_create_invoices: editForm.can_create_invoices,
+        specialties: editSpecialties,
       }
 
       const res = await fetch('/api/team', {
@@ -753,6 +769,40 @@ export default function TeamPage() {
                   className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50"
                 />
               </div>
+
+              {/* Specialiteter (jobbtyper personen kan utföra) */}
+              {jobTypes.length > 0 && (
+                <div className="border border-[#E2E8F0] rounded-xl px-4 py-3">
+                  <label className="flex items-center gap-2 text-sm text-gray-700 font-medium mb-2">
+                    <Briefcase className="w-4 h-4 text-gray-500" />
+                    Specialiteter
+                  </label>
+                  <p className="text-xs text-gray-500 mb-3">
+                    Vilka jobbtyper kan {editForm.name || 'personen'} utföra? Nya deals föreslår då automatiskt rätt person.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {jobTypes.map(jt => {
+                      const selected = editSpecialties.includes(jt.slug)
+                      return (
+                        <button
+                          key={jt.id}
+                          type="button"
+                          onClick={() => setEditSpecialties(prev => prev.includes(jt.slug) ? prev.filter(s => s !== jt.slug) : [...prev, jt.slug])}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                            selected
+                              ? 'border-transparent text-white'
+                              : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                          }`}
+                          style={selected ? { backgroundColor: jt.color } : {}}
+                        >
+                          {!selected && <span className="w-2 h-2 rounded-full" style={{ backgroundColor: jt.color }} />}
+                          {jt.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Permissions toggle section */}
               {editingMember.role !== 'owner' && (

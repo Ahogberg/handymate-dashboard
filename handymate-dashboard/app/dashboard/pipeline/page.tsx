@@ -172,6 +172,7 @@ interface TeamMember {
   name: string
   color: string
   role: string
+  specialties?: string[]
 }
 
 interface DealNote {
@@ -424,8 +425,9 @@ export default function PipelinePage() {
   const [lastContact, setLastContact] = useState<{ date: string; type: string } | null>(null)
 
   const [showNewDeal, setShowNewDeal] = useState(false)
-  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '' })
+  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '', assigned_to: '' })
   const [leadSourceOptions, setLeadSourceOptions] = useState<Array<{ id: string; name: string; source_type: string; color: string | null }>>([])
+  const [jobTypeOptions, setJobTypeOptions] = useState<Array<{ id: string; name: string; slug: string; color: string }>>([])
   const [jobTypes, setJobTypes] = useState<string[]>([])
   const [newDealSubmitting, setNewDealSubmitting] = useState(false)
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -685,7 +687,7 @@ export default function PipelinePage() {
       if (!res.ok) return
       const data = await res.json()
       setTeamMembers((data.members || []).filter((m: any) => m.is_active).map((m: any) => ({
-        id: m.id, name: m.name, color: m.color || '#3B82F6', role: m.role
+        id: m.id, name: m.name, color: m.color || '#3B82F6', role: m.role, specialties: m.specialties || []
       })))
     } catch { /* silent */ }
   }, [])
@@ -907,6 +909,15 @@ export default function PipelinePage() {
     } catch { /* non-blocking */ }
   }, [])
 
+  const fetchJobTypeOptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/job-types')
+      if (!res.ok) return
+      const data = await res.json()
+      setJobTypeOptions(data.job_types || [])
+    } catch { /* non-blocking */ }
+  }, [])
+
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -934,6 +945,7 @@ export default function PipelinePage() {
       fetchCustomers()
       fetchJobTypes()
       fetchLeadSources()
+      fetchJobTypeOptions()
       // Rensa URL:en
       window.history.replaceState(null, '', '/dashboard/pipeline')
     }
@@ -1046,6 +1058,7 @@ export default function PipelinePage() {
           description: newDealForm.description.trim() || null,
           job_type: newDealForm.job_type || null,
           source: newDealForm.source || null,
+          assigned_to: newDealForm.assigned_to || null,
         })
       })
       if (!res.ok) throw new Error()
@@ -1095,7 +1108,7 @@ export default function PipelinePage() {
       const createdTitle = newDealForm.title.trim()
       const createdJobType = newDealForm.job_type || ''
       setShowNewDeal(false)
-      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '' })
+      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '', assigned_to: '' })
       setCustomerSearch('')
       setNewDealFiles([])
       setShowNewCustomerForm(false)
@@ -1608,7 +1621,7 @@ export default function PipelinePage() {
                 <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
               </button>
               {/* Stage settings removed — stages are locked */}
-              <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes(); fetchLeadSources() }}
+              <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes(); fetchLeadSources(); fetchJobTypeOptions() }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-lg shadow-primary-600/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
               </button>
@@ -1708,7 +1721,7 @@ export default function PipelinePage() {
                     {stageDeals.length === 0 && <div className="flex items-center justify-center py-8 text-gray-300 text-xs">{isDropTarget ? 'Släpp här' : 'Inga deals'}</div>}
                     {stageDeals.map(deal => (
                       <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
+                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
                     ))}
                     {stage.id === 'won' && (
                       <a href="/dashboard/projects" className="flex items-center justify-center gap-1.5 py-3 mt-1 text-xs text-primary-700 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
@@ -1741,7 +1754,7 @@ export default function PipelinePage() {
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
                       {dealsForStage(lostStage.id).map(deal => (
                         <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
+                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
                       ))}
                     </div>
                   </>
@@ -1772,7 +1785,7 @@ export default function PipelinePage() {
                 {dealsForStage(stages[mobileStageIndex].id).length === 0 && <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Inga deals i detta steg</div>}
                 {dealsForStage(stages[mobileStageIndex].id).map(deal => (
                   <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} />
+                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
                 ))}
               </div>
             )}
@@ -2804,16 +2817,54 @@ export default function PipelinePage() {
                     </select>
                   </div>
                 </div>
-                {jobTypes.length > 0 && (
-                  <div>
-                    <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Jobbtyp</label>
-                    <select value={newDealForm.job_type} onChange={e => setNewDealForm(prev => ({ ...prev, job_type: e.target.value }))}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
-                      <option value="">Välj jobbtyp...</option>
-                      {jobTypes.map(jt => <option key={jt} value={jt}>{jt}</option>)}
-                    </select>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400 uppercase tracking-wider block">Jobbtyp</label>
+                    <Link href="/dashboard/settings/job-types" className="text-[10px] text-primary-700 hover:text-primary-800">
+                      Hantera →
+                    </Link>
                   </div>
-                )}
+                  <select
+                    value={newDealForm.job_type}
+                    onChange={e => {
+                      const val = e.target.value
+                      setNewDealForm(prev => ({ ...prev, job_type: val }))
+                      // Föreslå automatiskt person med matchande specialitet
+                      if (val && !newDealForm.assigned_to) {
+                        const match = teamMembers.find(m => Array.isArray((m as any).specialties) && (m as any).specialties.includes(val))
+                        if (match) setNewDealForm(prev => ({ ...prev, job_type: val, assigned_to: match.id }))
+                      }
+                    }}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400"
+                  >
+                    <option value="">Välj jobbtyp...</option>
+                    {jobTypeOptions.length > 0
+                      ? jobTypeOptions.map(jt => <option key={jt.id} value={jt.slug}>{jt.name}</option>)
+                      : jobTypes.map(jt => <option key={jt} value={jt}>{jt}</option>)
+                    }
+                  </select>
+                </div>
+
+                {/* Tilldela till teammedlem */}
+                <div>
+                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Tilldela till</label>
+                  <select
+                    value={newDealForm.assigned_to}
+                    onChange={e => setNewDealForm(prev => ({ ...prev, assigned_to: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400"
+                  >
+                    <option value="">Ej tilldelad</option>
+                    {teamMembers.map(m => {
+                      const specs = Array.isArray((m as any).specialties) ? (m as any).specialties : []
+                      const matches = newDealForm.job_type && specs.includes(newDealForm.job_type)
+                      return (
+                        <option key={m.id} value={m.id}>
+                          {m.name}{matches ? ' ✓ matchar jobbtyp' : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-xs text-gray-400 uppercase tracking-wider block">Var kom kunden ifrån?</label>
@@ -3216,9 +3267,12 @@ interface DealCardProps {
   onClick: () => void
   onQuickSms?: (deal: Deal) => void
   onOpenTasks?: (deal: Deal) => void
+  teamMembers?: TeamMember[]
 }
 
-function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onOpenTasks }: DealCardProps) {
+function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSms, onOpenTasks, teamMembers }: DealCardProps) {
+  const assignee = deal.assigned_to && teamMembers ? teamMembers.find(m => m.id === deal.assigned_to) : null
+  const assigneeInitials = assignee ? assignee.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : ''
   return (
     <div draggable onDragStart={e => onDragStart(e, deal.id)} onDragEnd={onDragEnd} onClick={onClick}
       className={`group relative p-3 rounded-lg border border-[#E2E8F0] bg-white cursor-pointer transition-all hover:shadow-md hover:border-gray-300 ${isDragging ? 'opacity-40 scale-95 rotate-1' : ''}`}>
@@ -3265,6 +3319,15 @@ function DealCard({ deal, isDragging, onDragStart, onDragEnd, onClick, onQuickSm
           {deal.lead_temperature && <span className={`w-1.5 h-1.5 rounded-full ${deal.lead_temperature === 'hot' ? 'bg-red-500' : deal.lead_temperature === 'warm' ? 'bg-amber-500' : 'bg-primary-500'}`} title={deal.lead_temperature === 'hot' ? 'Het lead' : deal.lead_temperature === 'warm' ? 'Varm lead' : 'Kall lead'} />}
         </div>
         <div className="flex items-center gap-2">
+          {assignee && (
+            <span
+              className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0"
+              style={{ backgroundColor: assignee.color || '#3B82F6' }}
+              title={`Tilldelad: ${assignee.name}`}
+            >
+              {assigneeInitials}
+            </span>
+          )}
           {deal.response_time_seconds != null && deal.response_time_seconds > 0 && (
             <span className={`text-[10px] flex items-center gap-0.5 ${deal.response_time_seconds < 60 ? 'text-green-500' : deal.response_time_seconds < 3600 ? 'text-amber-500' : 'text-red-400'}`} title="Svarstid">
               <Zap className="w-2.5 h-2.5" />{deal.response_time_seconds < 60 ? `${deal.response_time_seconds}s` : deal.response_time_seconds < 3600 ? `${Math.round(deal.response_time_seconds / 60)}m` : `${Math.round(deal.response_time_seconds / 3600)}h`}

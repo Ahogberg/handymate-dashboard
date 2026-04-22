@@ -97,6 +97,11 @@ export default function AnalyticsPage() {
     monthlyTrend: { month: string; amount: number }[]
     materialCost: number; laborCost: number; overhead: number
   } | null>(null)
+  const [jobTypeStats, setJobTypeStats] = useState<{
+    total_value: number
+    total_deals: number
+    rows: Array<{ slug: string; name: string; color: string; deal_count: number; deal_value: number; quote_count: number; quote_accepted_count: number; accepted_value: number; share_pct: number; share_deals_pct: number }>
+  } | null>(null)
 
   if (!canAccess('lead_intelligence')) {
     return <UpgradePrompt featureKey="lead_intelligence" />
@@ -109,11 +114,12 @@ export default function AnalyticsPage() {
   async function fetchAll() {
     setLoading(true)
     try {
-      const [speedRes, winLossRes, insightsRes, econRes] = await Promise.all([
+      const [speedRes, winLossRes, insightsRes, econRes, jobTypesRes] = await Promise.all([
         fetch(`/api/analytics/speed-to-lead?period=${period}&business_id=${business.business_id}`),
         fetch(`/api/analytics/win-loss?period=${period}&business_id=${business.business_id}`),
         fetch(`/api/analytics/insights?business_id=${business.business_id}`),
         fetch(`/api/analytics/economics?business_id=${business.business_id}`),
+        fetch(`/api/analytics/job-types`),
       ])
 
       if (speedRes.ok) setSpeedData(await speedRes.json())
@@ -123,6 +129,7 @@ export default function AnalyticsPage() {
         setInsights(data.insights || [])
       }
       if (econRes.ok) setEcon(await econRes.json())
+      if (jobTypesRes.ok) setJobTypeStats(await jobTypesRes.json())
     } catch { /* ignore */ }
     setLoading(false)
   }
@@ -474,6 +481,57 @@ export default function AnalyticsPage() {
                 </div>
               </div>
             </div>
+
+            {/* Jobbtyp-uppdelning */}
+            {jobTypeStats && jobTypeStats.rows.length > 0 && (
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Intäkter per jobbtyp</h3>
+                    <p className="text-xs text-gray-500">Senaste 12 månaderna — baserat på accepterade offerter</p>
+                  </div>
+                  <p className="text-right">
+                    <span className="text-xs text-gray-400 uppercase tracking-wider">Totalt</span>
+                    <span className="block text-sm font-bold text-gray-900">
+                      {jobTypeStats.total_value.toLocaleString('sv-SE')} kr
+                    </span>
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {jobTypeStats.rows.filter(r => r.accepted_value > 0 || r.deal_count > 0).map(row => (
+                    <div key={row.slug}>
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: row.color }} />
+                          <span className="font-medium text-gray-900">{row.name}</span>
+                          <span className="text-gray-400">· {row.deal_count} deals · {row.quote_accepted_count} accepterade offerter</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-700 font-medium">{row.accepted_value.toLocaleString('sv-SE')} kr</span>
+                          <span className="text-gray-400 w-10 text-right">{row.share_pct}%</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${row.share_pct}%`,
+                            backgroundColor: row.color,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {jobTypeStats.rows.every(r => r.accepted_value === 0 && r.deal_count === 0) && (
+                  <p className="text-center text-sm text-gray-400 py-6">
+                    Inga jobb kopplade till jobbtyper än. Börja tagga deals i pipelinen!
+                  </p>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

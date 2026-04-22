@@ -31,6 +31,7 @@ import {
   Trash2,
   Pencil,
   Package,
+  Briefcase,
   CalendarDays,
   UsersRound,
   Star,
@@ -1324,6 +1325,7 @@ export default function SettingsPage() {
         { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
         { id: '_link_automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations' },
         { id: '_link_leads', label: 'Lead-källor', icon: Link2, href: '/dashboard/settings/lead-sources' },
+        { id: '_link_jobtypes', label: 'Jobbtyper', icon: Briefcase, href: '/dashboard/settings/job-types' },
         { id: '_link_inventory', label: 'Lager & Material', icon: Package, href: '/dashboard/settings/inventory' },
       ],
     },
@@ -1648,46 +1650,29 @@ export default function SettingsPage() {
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
 
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Tjänster ni erbjuder</label>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {config.services_offered?.map((service) => (
-                  <span key={service} className="flex items-center px-3 py-1.5 bg-primary-100 border border-[#E2E8F0] rounded-lg text-sm text-primary-700">
-                    {service}
-                    <button onClick={() => removeService(service)} className="ml-2 text-secondary-700 hover:text-gray-900">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+            {/* Tjänster har flyttat till egen sida: Jobbtyper */}
+            <Link
+              href="/dashboard/settings/job-types"
+              className="flex items-center justify-between p-4 bg-white border border-[#E2E8F0] rounded-xl hover:border-primary-400 hover:bg-primary-50/30 transition-colors group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-primary-600/20 to-primary-500/20 border border-primary-300">
+                  <Briefcase className="w-5 h-5 text-primary-700" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Jobbtyper</p>
+                  <p className="text-sm text-gray-400">
+                    Hantera vilka typer av arbete ni utför — används för delegering och statistik
+                  </p>
+                  {config.services_offered && config.services_offered.length > 0 && (
+                    <p className="text-xs text-primary-700 mt-1">
+                      {config.services_offered.length} befintlig{config.services_offered.length === 1 ? '' : 'a'} tjänst{config.services_offered.length === 1 ? '' : 'er'} migreras automatiskt
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={newService}
-                  onChange={(e) => setNewService(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addService()}
-                  placeholder="Lägg till tjänst..."
-                  className="flex-1 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-                />
-                <button
-                  onClick={addService}
-                  className="px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
-                >
-                  <Plus className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-2 mt-3">
-                {SERVICE_SUGGESTIONS.filter(s => !config.services_offered?.includes(s)).slice(0, 6).map((suggestion) => (
-                  <button
-                    key={suggestion}
-                    onClick={() => setConfig({ ...config, services_offered: [...(config.services_offered || []), suggestion] })}
-                    className="px-2 py-1 bg-gray-50 border border-gray-300/50 rounded-lg text-xs text-gray-400 hover:text-gray-900 hover:border-gray-300"
-                  >
-                    + {suggestion}
-                  </button>
-                ))}
-              </div>
-            </div>
+              <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-primary-700 transition-colors" />
+            </Link>
           </div>
         )}
 

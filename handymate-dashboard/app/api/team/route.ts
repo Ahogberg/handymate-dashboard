@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
     const { data: members, error } = await supabase
       .from('business_users')
-      .select('id, business_id, user_id, role, name, email, phone, title, hourly_cost, hourly_rate, color, avatar_url, is_active, can_see_all_projects, can_see_financials, can_manage_users, can_approve_time, can_create_invoices, invite_token, invite_expires_at, invited_at, accepted_at, last_login_at, created_at')
+      .select('id, business_id, user_id, role, name, email, phone, title, hourly_cost, hourly_rate, color, avatar_url, is_active, can_see_all_projects, can_see_financials, can_manage_users, can_approve_time, can_create_invoices, specialties, invite_token, invite_expires_at, invited_at, accepted_at, last_login_at, created_at')
       .eq('business_id', business.business_id)
       .order('role')
       .order('name')
@@ -104,6 +104,7 @@ export async function PATCH(request: NextRequest) {
       if (body.can_manage_users !== undefined) updates.can_manage_users = body.can_manage_users
       if (body.can_approve_time !== undefined) updates.can_approve_time = body.can_approve_time
       if (body.can_create_invoices !== undefined) updates.can_create_invoices = body.can_create_invoices
+      if (body.specialties !== undefined) updates.specialties = Array.isArray(body.specialties) ? body.specialties : []
     }
 
     if (Object.keys(updates).length === 0) {
