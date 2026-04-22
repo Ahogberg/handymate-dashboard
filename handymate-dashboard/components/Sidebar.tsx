@@ -72,6 +72,7 @@ const NAV: NavItem[] = [
     children: [
       { label: 'Översikt', href: '/dashboard', exact: true },
       { label: 'Analys', href: '/dashboard/analytics', featureGate: 'lead_intelligence' },
+      { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
     ],
   },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
