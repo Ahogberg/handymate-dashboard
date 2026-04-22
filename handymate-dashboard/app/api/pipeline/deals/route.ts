@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
       description,
       priority,
       job_type,
+      source,
     } = body
 
     if (!title) {
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
         stage_id: stage.id,
         description: description || null,
         priority: priority || 'medium',
-        source: 'manual',
+        source: source || 'manual',
         deal_number: nextNumber,
         job_type: job_type || null,
       })

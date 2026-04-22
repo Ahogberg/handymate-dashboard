@@ -424,7 +424,8 @@ export default function PipelinePage() {
   const [lastContact, setLastContact] = useState<{ date: string; type: string } | null>(null)
 
   const [showNewDeal, setShowNewDeal] = useState(false)
-  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '' })
+  const [newDealForm, setNewDealForm] = useState({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '' })
+  const [leadSourceOptions, setLeadSourceOptions] = useState<Array<{ id: string; name: string; source_type: string; color: string | null }>>([])
   const [jobTypes, setJobTypes] = useState<string[]>([])
   const [newDealSubmitting, setNewDealSubmitting] = useState(false)
   const [customers, setCustomers] = useState<CustomerOption[]>([])
@@ -897,6 +898,15 @@ export default function PipelinePage() {
     setJobTypes(data?.services_offered || [])
   }, [business.business_id])
 
+  const fetchLeadSources = useCallback(async () => {
+    try {
+      const res = await fetch('/api/lead-sources/list')
+      if (!res.ok) return
+      const data = await res.json()
+      setLeadSourceOptions(data.sources || [])
+    } catch { /* non-blocking */ }
+  }, [])
+
   useEffect(() => {
     async function load() {
       setLoading(true)
@@ -923,6 +933,7 @@ export default function PipelinePage() {
       setNewDealForm(prev => ({ ...prev, customer_id: custId, title: custName ? `Jobb för ${custName}` : '' }))
       fetchCustomers()
       fetchJobTypes()
+      fetchLeadSources()
       // Rensa URL:en
       window.history.replaceState(null, '', '/dashboard/pipeline')
     }
@@ -1033,7 +1044,8 @@ export default function PipelinePage() {
           value: newDealForm.value ? parseFloat(newDealForm.value) : null,
           priority: newDealForm.priority,
           description: newDealForm.description.trim() || null,
-          job_type: newDealForm.job_type || null
+          job_type: newDealForm.job_type || null,
+          source: newDealForm.source || null,
         })
       })
       if (!res.ok) throw new Error()
@@ -1083,7 +1095,7 @@ export default function PipelinePage() {
       const createdTitle = newDealForm.title.trim()
       const createdJobType = newDealForm.job_type || ''
       setShowNewDeal(false)
-      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '' })
+      setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '' })
       setCustomerSearch('')
       setNewDealFiles([])
       setShowNewCustomerForm(false)
@@ -1596,7 +1608,7 @@ export default function PipelinePage() {
                 <span className="hidden xl:inline">{hideEmpty ? 'Visa alla' : 'Dölj tomma'}</span>
               </button>
               {/* Stage settings removed — stages are locked */}
-              <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes() }}
+              <button onClick={() => { setShowNewDeal(true); fetchCustomers(); fetchJobTypes(); fetchLeadSources() }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-700 text-white text-sm font-medium transition-all shadow-lg shadow-primary-600/10">
                 <Plus className="w-4 h-4" /><span className="hidden sm:inline">Ny deal</span>
               </button>
@@ -2661,7 +2673,22 @@ export default function PipelinePage() {
                     className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Kund</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400 uppercase tracking-wider block">Kund</label>
+                    {!newDealForm.customer_id && !showNewCustomerForm && (
+                      <button
+                        onClick={() => {
+                          setShowNewCustomerForm(true)
+                          setShowCustomerDropdown(false)
+                          const parts = customerSearch.trim().split(/\s+/)
+                          setNewCustomerForm({ firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '', phone: '', email: '' })
+                        }}
+                        className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800 font-medium"
+                      >
+                        <Plus className="w-3 h-3" /> Ny kund
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <input type="text" value={customerSearch}
@@ -2787,6 +2814,32 @@ export default function PipelinePage() {
                     </select>
                   </div>
                 )}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs text-gray-400 uppercase tracking-wider block">Var kom kunden ifrån?</label>
+                    <Link href="/dashboard/settings/lead-sources" className="text-[10px] text-primary-700 hover:text-primary-800">
+                      Hantera källor →
+                    </Link>
+                  </div>
+                  <select value={newDealForm.source} onChange={e => setNewDealForm(prev => ({ ...prev, source: e.target.value }))}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                    <option value="">Välj källa (valfritt)...</option>
+                    {leadSourceOptions.filter(s => s.source_type === 'manual').length > 0 && (
+                      <optgroup label="Egna kanaler">
+                        {leadSourceOptions.filter(s => s.source_type === 'manual').map(s => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {leadSourceOptions.filter(s => s.source_type !== 'manual').length > 0 && (
+                      <optgroup label="Leverantörsportaler">
+                        {leadSourceOptions.filter(s => s.source_type !== 'manual').map(s => (
+                          <option key={s.id} value={s.name}>{s.name}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
                 <div>
                   <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Beskrivning</label>
                   <textarea value={newDealForm.description} onChange={e => setNewDealForm(prev => ({ ...prev, description: e.target.value }))} placeholder="Kort beskrivning..." rows={3}

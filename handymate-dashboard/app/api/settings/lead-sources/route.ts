@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { name, notes, default_category } = await request.json()
+    const { name, notes, default_category, source_type, color } = await request.json()
 
     if (!name) {
       return NextResponse.json({ error: 'Namn krävs' }, { status: 400 })
@@ -80,6 +80,8 @@ export async function POST(request: NextRequest) {
         name,
         notes: notes || null,
         default_category: default_category || null,
+        source_type: source_type === 'manual' ? 'manual' : 'portal',
+        color: color || null,
       })
       .select()
       .single()
@@ -104,7 +106,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { id, name, notes, is_active, default_category } = await request.json()
+    const { id, name, notes, is_active, default_category, color } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'ID krävs' }, { status: 400 })
@@ -115,6 +117,7 @@ export async function PUT(request: NextRequest) {
     if (notes !== undefined) updates.notes = notes
     if (is_active !== undefined) updates.is_active = is_active
     if (default_category !== undefined) updates.default_category = default_category || null
+    if (color !== undefined) updates.color = color || null
 
     const { data: source, error } = await supabase
       .from('lead_sources')

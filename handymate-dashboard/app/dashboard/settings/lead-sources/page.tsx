@@ -29,18 +29,42 @@ interface LeadSource {
   created_at: string
   notes: string | null
   default_category: string | null
+  source_type: 'portal' | 'manual' | null
+  color: string | null
   lead_count: number
   won_count: number
 }
+
+const CHANNEL_COLORS = [
+  { name: 'Teal', value: '#0F766E' },
+  { name: 'Blå', value: '#2563EB' },
+  { name: 'Lila', value: '#7C3AED' },
+  { name: 'Rosa', value: '#DB2777' },
+  { name: 'Orange', value: '#EA580C' },
+  { name: 'Grön', value: '#16A34A' },
+  { name: 'Amber', value: '#D97706' },
+  { name: 'Grå', value: '#64748B' },
+]
+
+const CHANNEL_SUGGESTIONS = [
+  { name: 'Rekommendation', color: '#16A34A' },
+  { name: 'Hemsida', color: '#0F766E' },
+  { name: 'Facebook', color: '#2563EB' },
+  { name: 'Google Ads', color: '#EA580C' },
+  { name: 'Instagram', color: '#DB2777' },
+  { name: 'Spontanbesök', color: '#64748B' },
+]
 
 export default function LeadSourcesPage() {
   const business = useBusiness()
   const [sources, setSources] = useState<LeadSource[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [modalType, setModalType] = useState<'portal' | 'manual'>('portal')
   const [newName, setNewName] = useState('')
   const [newNotes, setNewNotes] = useState('')
   const [newCategory, setNewCategory] = useState('')
+  const [newColor, setNewColor] = useState('#0F766E')
   const [creating, setCreating] = useState(false)
   const [copiedId, setCopiedId] = useState<string | null>(null)
 
@@ -68,19 +92,52 @@ export default function LeadSourcesPage() {
       const res = await fetch('/api/settings/lead-sources', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), notes: newNotes.trim() || null, default_category: newCategory || null }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          notes: newNotes.trim() || null,
+          default_category: newCategory || null,
+          source_type: modalType,
+          color: modalType === 'manual' ? newColor : null,
+        }),
       })
       if (!res.ok) throw new Error('Create failed')
       setShowModal(false)
       setNewName('')
       setNewNotes('')
       setNewCategory('')
+      setNewColor('#0F766E')
       fetchSources()
     } catch (err) {
       console.error('Kunde inte skapa lead-källa:', err)
     } finally {
       setCreating(false)
     }
+  }
+
+  const handleQuickAdd = async (suggestion: { name: string; color: string }) => {
+    try {
+      await fetch('/api/settings/lead-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: suggestion.name,
+          source_type: 'manual',
+          color: suggestion.color,
+        }),
+      })
+      fetchSources()
+    } catch (err) {
+      console.error('Kunde inte lägga till kanal:', err)
+    }
+  }
+
+  const openModal = (type: 'portal' | 'manual') => {
+    setModalType(type)
+    setNewName('')
+    setNewNotes('')
+    setNewCategory('')
+    setNewColor('#0F766E')
+    setShowModal(true)
   }
 
   const handleToggle = async (source: LeadSource) => {
@@ -154,41 +211,119 @@ export default function LeadSourcesPage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900">Lead-källor</h1>
-            <p className="text-sm text-gray-500">Koppla externa leverantörer som skickar leads</p>
+            <p className="text-sm text-gray-500">Var dina kunder kommer ifrån — portaler och egna kanaler</p>
           </div>
-          <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" />
-            Lägg till källa
-          </button>
         </div>
 
-        {/* Lista */}
+        {/* Lista — delad i manuella kanaler + portaler */}
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
           </div>
-        ) : sources.length === 0 ? (
-          <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-            <Link2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">Inga lead-källor ännu</h3>
-            <p className="text-sm text-gray-500 mb-6 max-w-md mx-auto">
-              Lägg till leverantörer som Webolia, Offerta eller andra som skickar leads till dig.
-              Varje källa får en unik portal-länk.
-            </p>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Lägg till din första källa
-            </button>
-          </div>
         ) : (
-          <div className="space-y-4">
-            {sources.map(source => {
+          <>
+            {/* SEKTION 1 — Egna kanaler */}
+            <section className="mb-8">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Egna kanaler</h2>
+                  <p className="text-xs text-gray-500">Där dina kunder hittar dig — rekommendation, Facebook, Google m.fl.</p>
+                </div>
+                <button
+                  onClick={() => openModal('manual')}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-primary-700 text-white rounded-lg hover:bg-primary-800 text-xs font-medium"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Ny kanal
+                </button>
+              </div>
+
+              {(() => {
+                const manualSources = sources.filter(s => s.source_type === 'manual')
+                if (manualSources.length === 0) {
+                  return (
+                    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
+                      <p className="text-sm text-gray-500 mb-3">Inga kanaler ännu. Lägg till snabbt:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {CHANNEL_SUGGESTIONS.map(s => (
+                          <button
+                            key={s.name}
+                            onClick={() => handleQuickAdd(s)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700 transition-colors"
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                            <Plus className="w-3 h-3 text-gray-400" />
+                            {s.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-100">
+                    {manualSources.map(source => (
+                      <div key={source.id} className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: source.color || '#0F766E' }} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-gray-900 truncate">{source.name}</p>
+                            <p className="text-xs text-gray-400">
+                              {source.lead_count} leads · {source.won_count} vunna
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => handleToggle(source)}
+                            className="p-1.5 text-gray-400 hover:text-primary-700"
+                            title={source.is_active ? 'Inaktivera' : 'Aktivera'}
+                          >
+                            {source.is_active ? <ToggleRight className="w-5 h-5 text-primary-700" /> : <ToggleLeft className="w-5 h-5" />}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(source.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600"
+                            title="Ta bort"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </section>
+
+            {/* SEKTION 2 — Portaler */}
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Leverantörsportaler</h2>
+                  <p className="text-xs text-gray-500">Webolia, Offerta m.fl. som skickar leads via portal-länk</p>
+                </div>
+                <button
+                  onClick={() => openModal('portal')}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white border border-primary-700 text-primary-700 rounded-lg hover:bg-primary-50 text-xs font-medium"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Ny portal
+                </button>
+              </div>
+              {(() => {
+                const portalSources = sources.filter(s => s.source_type !== 'manual')
+                if (portalSources.length === 0) {
+                  return (
+                    <div className="bg-white rounded-xl border border-[#E2E8F0] p-8 text-center">
+                      <Link2 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">Inga leverantörsportaler ännu.</p>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="space-y-4">
+                    {portalSources.map(source => {
               const portalUrl = getPortalUrl(source.portal_code)
               const convRate = source.lead_count > 0
                 ? Math.round((source.won_count / source.lead_count) * 100)
@@ -326,7 +461,11 @@ export default function LeadSourcesPage() {
                 </div>
               )
             })}
-          </div>
+                  </div>
+                )
+              })()}
+            </section>
+          </>
         )}
       </div>
 
@@ -335,7 +474,9 @@ export default function LeadSourcesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Lägg till lead-källa</h2>
+              <h2 className="text-lg font-bold text-gray-900">
+                {modalType === 'manual' ? 'Ny kanal' : 'Ny leverantörsportal'}
+              </h2>
               <button onClick={() => setShowModal(false)} className="p-1 hover:bg-gray-100 rounded-lg">
                 <X className="w-5 h-5 text-gray-400" />
               </button>
@@ -343,42 +484,65 @@ export default function LeadSourcesPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Namn på källa *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Namn *</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
-                  placeholder="t.ex. Webolia"
+                  placeholder={modalType === 'manual' ? 't.ex. Rekommendation' : 't.ex. Webolia'}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none"
                   autoFocus
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Standardkategori</label>
-                <select
-                  value={newCategory}
-                  onChange={e => setNewCategory(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none bg-white"
-                >
-                  <option value="">Ingen — leverantören väljer per lead</option>
-                  {LEAD_CATEGORIES.map(c => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Förifyller kategori i portalen. Leverantören kan ändra per lead.
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Anteckningar</label>
-                <textarea
-                  value={newNotes}
-                  onChange={e => setNewNotes(e.target.value)}
-                  placeholder="t.ex. Säljer leads inom el och VVS"
-                  rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-none"
-                />
-              </div>
+
+              {modalType === 'manual' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Färg</label>
+                  <div className="flex flex-wrap gap-2">
+                    {CHANNEL_COLORS.map(c => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setNewColor(c.value)}
+                        className={`w-8 h-8 rounded-full border-2 transition-all ${newColor === c.value ? 'border-gray-900 scale-110' : 'border-transparent'}`}
+                        style={{ backgroundColor: c.value }}
+                        title={c.name}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {modalType === 'portal' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Standardkategori</label>
+                    <select
+                      value={newCategory}
+                      onChange={e => setNewCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none bg-white"
+                    >
+                      <option value="">Ingen — leverantören väljer per lead</option>
+                      {LEAD_CATEGORIES.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Förifyller kategori i portalen. Leverantören kan ändra per lead.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Anteckningar</label>
+                    <textarea
+                      value={newNotes}
+                      onChange={e => setNewNotes(e.target.value)}
+                      placeholder="t.ex. Säljer leads inom el och VVS"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-600 focus:border-primary-600 outline-none resize-none"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 mt-6">
