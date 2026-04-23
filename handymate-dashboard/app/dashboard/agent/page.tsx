@@ -999,11 +999,39 @@ export default function AgentDashboardPage() {
   // Chat-modal state
   const [chatOpen, setChatOpen] = useState(false)
   const [chatInitial, setChatInitial] = useState('')
+  const [chatAutoCheckedInitial, setChatAutoCheckedInitial] = useState(false)
 
   function openChatWith(initial: string) {
     setChatInitial(initial)
     setChatOpen(true)
   }
+
+  // Auto-öppna chatten om det finns en pågående konversation från senaste 6 timmarna
+  useEffect(() => {
+    if (chatAutoCheckedInitial || !business.business_id) return
+    setChatAutoCheckedInitial(true)
+
+    // Kolla sessionStorage så vi inte öppnar automatiskt flera gånger per session
+    try {
+      const alreadyOpened = sessionStorage.getItem('matte-chat-auto-opened')
+      if (alreadyOpened) return
+    } catch { /* noop */ }
+
+    fetch('/api/matte/conversations')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        const latest = data?.conversations?.[0]
+        if (!latest) return
+        const updatedAt = new Date(latest.updated_at).getTime()
+        const sixHoursAgo = Date.now() - 6 * 3_600_000
+        if (updatedAt > sixHoursAgo && latest.message_count > 0) {
+          setChatInitial('')
+          setChatOpen(true)
+          try { sessionStorage.setItem('matte-chat-auto-opened', '1') } catch { /* noop */ }
+        }
+      })
+      .catch(() => { /* non-blocking */ })
+  }, [chatAutoCheckedInitial, business.business_id])
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [googleStatus, setGoogleStatus] = useState<{
