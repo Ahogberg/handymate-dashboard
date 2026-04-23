@@ -297,9 +297,13 @@ export async function POST(request: NextRequest) {
       : `Hantera denna ${trigger_type}-trigger.`
 
     // Use any[] for messages to avoid SDK version type conflicts
-    const messages: any[] = [
-      { role: 'user', content: userMessage as string },
-    ]
+    // Om konversation finns (chat-läge) → använd hela historiken som kontext
+    const conversation = Array.isArray(trigger_data?.conversation) ? trigger_data.conversation : null
+    const messages: any[] = conversation && conversation.length > 0
+      ? conversation
+          .filter((m: any) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+          .map((m: any) => ({ role: m.role, content: m.content }))
+      : [{ role: 'user', content: userMessage as string }]
 
     const steps: Array<{
       step: number

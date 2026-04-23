@@ -36,6 +36,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import { useBusiness } from '@/lib/BusinessContext'
 import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
+import MatteChatModal from '@/components/MatteChatModal'
 import {
   AreaChart,
   Area,
@@ -885,14 +886,11 @@ const QUICK_BUTTONS = [
   { emoji: '📅', label: 'Bokningar', text: 'Vilka bokningar har jag den här veckan?' },
 ]
 
-function ManualTrigger({ businessId, onTriggered }: {
-  businessId: string; onTriggered: () => void
+function ManualTrigger({ businessId, onTriggered, onOpenChat }: {
+  businessId: string; onTriggered: () => void; onOpenChat: (initial: string) => void
 }) {
   const [instruction, setInstruction] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
   const [placeholderIdx, setPlaceholderIdx] = useState(0)
-  const [agentResponse, setAgentResponse] = useState<{ type: 'success' | 'error'; text: string; meta?: string } | null>(null)
   const [history, setHistory] = useState<string[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -901,43 +899,19 @@ function ManualTrigger({ businessId, onTriggered }: {
     return () => clearInterval(interval)
   }, [])
 
-  async function handleTrigger() {
+  function handleTrigger() {
     if (!instruction.trim()) return
     const query = instruction.trim()
-    setLoading(true)
-    setAgentResponse(null)
-    setElapsed(0)
-    const timer = setInterval(() => setElapsed(s => s + 1), 1000)
 
-    // Add to history (max 5, no duplicates)
+    // Spara i history (max 5, inga dubbletter)
     setHistory(prev => {
       const filtered = prev.filter(h => h !== query)
       return [query, ...filtered].slice(0, 5)
     })
 
-    try {
-      const response = await fetch('/api/agent/trigger', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ trigger_type: 'manual', trigger_data: { instruction: query } }),
-      })
-      const data = await response.json()
-      if (response.ok) {
-        const text = data.final_response || `Klart — ${data.tool_calls || 0} steg`
-        const meta = `${data.tool_calls || 0} steg · ${((data.duration_ms || 0) / 1000).toFixed(1)}s`
-        setAgentResponse({ type: 'success', text, meta })
-        setInstruction('')
-        onTriggered()
-      } else {
-        setAgentResponse({ type: 'error', text: data.error || `Fel (${response.status})` })
-      }
-    } catch (err: any) {
-      setAgentResponse({ type: 'error', text: err.message || 'Nätverksfel' })
-    } finally {
-      clearInterval(timer)
-      setLoading(false)
-    }
+    // Öppna chat-modalen med texten förifylld
+    onOpenChat(query)
+    setInstruction('')
   }
 
   function removeFromHistory(query: string) {
@@ -973,58 +947,33 @@ function ManualTrigger({ businessId, onTriggered }: {
       <div className="flex gap-2">
         <input ref={inputRef} type="text" value={instruction}
           onChange={e => setInstruction(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !loading && handleTrigger()}
+          onKeyDown={e => e.key === 'Enter' && handleTrigger()}
           placeholder={PLACEHOLDER_EXAMPLES[placeholderIdx]}
-          className="flex-1 px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-[#0F766E] focus:border-primary-600"
-          disabled={loading} />
-        <button onClick={handleTrigger} disabled={loading || !instruction.trim()}
+          className="flex-1 px-4 py-2.5 rounded-lg border border-[#E2E8F0] text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-600" />
+        <button onClick={handleTrigger} disabled={!instruction.trim()}
           className="px-4 py-2.5 rounded-lg bg-primary-800 text-white text-sm font-medium hover:bg-primary-900 disabled:opacity-50 transition-all flex items-center gap-2 shadow-primary-600/20">
-          {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {loading ? `${elapsed}s…` : 'Kör'}
+          <Send className="w-4 h-4" />
+          Kör
         </button>
       </div>
 
       {/* Quick buttons */}
       <div className="flex flex-wrap gap-1.5 mt-2.5">
+        <button
+          type="button"
+          onClick={() => onOpenChat('')}
+          className="px-2.5 py-1 rounded-lg bg-primary-50 border border-primary-200 text-xs text-primary-800 hover:bg-primary-100 transition-colors font-medium"
+        >
+          💬 Öppna chatt
+        </button>
         {QUICK_BUTTONS.map(btn => (
           <button key={btn.label} type="button"
             onClick={() => { setInstruction(btn.text); inputRef.current?.focus() }}
-            disabled={loading}
-            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-[#E2E8F0] text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors disabled:opacity-50">
+            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-[#E2E8F0] text-xs text-gray-600 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
             {btn.emoji} {btn.label}
           </button>
         ))}
       </div>
-
-      {/* Agent response */}
-      {agentResponse && (
-        <div className={`mt-4 rounded-xl border p-4 ${
-          agentResponse.type === 'success'
-            ? 'bg-white border-gray-200'
-            : 'bg-red-50 border-red-200'
-        }`}>
-          {agentResponse.type === 'success' ? (
-            <>
-              <div className="flex items-start gap-2.5">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="w-3.5 h-3.5 text-primary-700" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-line">{agentResponse.text}</div>
-                  {agentResponse.meta && (
-                    <p className="text-[10px] text-gray-400 mt-2">{agentResponse.meta}</p>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-red-700">
-              <XCircle className="w-4 h-4 shrink-0" />
-              {agentResponse.text}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
@@ -1046,6 +995,15 @@ export default function AgentDashboardPage() {
   const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
   const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string; metadata?: any }>>([])
   const [showAllMessages, setShowAllMessages] = useState(false)
+
+  // Chat-modal state
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatInitial, setChatInitial] = useState('')
+
+  function openChatWith(initial: string) {
+    setChatInitial(initial)
+    setChatOpen(true)
+  }
 
   const [savingSettings, setSavingSettings] = useState(false)
   const [googleStatus, setGoogleStatus] = useState<{
@@ -1321,6 +1279,7 @@ export default function AgentDashboardPage() {
             <ManualTrigger
               businessId={business.business_id}
               onTriggered={() => { fetchRuns(); fetchStats(); fetchChartData() }}
+              onOpenChat={openChatWith}
             />
           </div>
 
@@ -1493,6 +1452,14 @@ export default function AgentDashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Chat-modal */}
+      <MatteChatModal
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        avatarUrl={TEAM[0].avatar}
+        initialPrompt={chatInitial}
+      />
     </div>
   )
 }
