@@ -43,6 +43,20 @@ interface Customer {
   phone_number: string
 }
 
+interface CalendarTask {
+  id: string
+  title: string
+  description: string | null
+  status: 'pending' | 'in_progress' | 'done'
+  priority: 'low' | 'medium' | 'high'
+  due_date: string | null
+  due_time: string | null
+  assigned_to: string | null
+  assigned_user: { id: string; name: string; color: string } | null
+  customer_id: string | null
+  deal_id: string | null
+}
+
 type ViewMode = 'week' | 'day'
 
 // ---------------------------------------------------------------------------
@@ -184,6 +198,15 @@ export default function CalendarPage() {
   const [googleConnected, setGoogleConnected] = useState(true) // optimistic
   const [loading, setLoading] = useState(true)
 
+  // ─── Tasks ────────────────────────────────────────────────────────────────
+  const [tasks, setTasks] = useState<CalendarTask[]>([])
+  const [showTasks, setShowTasks] = useState(true)
+  const [showDone, setShowDone] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<CalendarTask | null>(null)
+  const [newTaskDate, setNewTaskDate] = useState<string | null>(null)
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [taskSaving, setTaskSaving] = useState(false)
+
   // ─── Booking modal ────────────────────────────────────────────────────────
   const [bookingModalOpen, setBookingModalOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<HandymateEvent | null>(null)
@@ -234,6 +257,16 @@ export default function CalendarPage() {
   // Data fetching
   // ═══════════════════════════════════════════════════════════════════════════
 
+  const fetchTasks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/tasks?my=false&status=all')
+      if (res.ok) {
+        const data = await res.json()
+        setTasks(data.tasks || [])
+      }
+    } catch { /* non-blocking */ }
+  }, [])
+
   const fetchEvents = useCallback(async () => {
     if (!business.business_id) return
     setLoading(true)
@@ -249,6 +282,7 @@ export default function CalendarPage() {
         setGoogleEvents(data.google || [])
         setGoogleConnected(data.googleConnected ?? false)
       }
+      fetchTasks()
     } catch (err) {
       console.error('Failed to fetch calendar events:', err)
     }
@@ -402,6 +436,63 @@ export default function CalendarPage() {
     return { hm, gc, allDay }
   }
 
+  function getTasksForDay(date: Date) {
+    if (!showTasks) return { timed: [], untimed: [] }
+    const dateStr = formatDateISO(date)
+    const filtered = tasks.filter(t => {
+      if (t.due_date !== dateStr) return false
+      if (!showDone && t.status === 'done') return false
+      return true
+    })
+    const timed = filtered.filter(t => t.due_time)
+    const untimed = filtered.filter(t => !t.due_time)
+    return { timed, untimed }
+  }
+
+  async function toggleTaskStatus(task: CalendarTask) {
+    const newStatus = task.status === 'done' ? 'pending' : 'done'
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: task.id, status: newStatus }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      // Rollback
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: task.status } : t))
+      showToast('Kunde inte uppdatera uppgift', 'error')
+    }
+  }
+
+  async function createQuickTask() {
+    if (!newTaskTitle.trim() || !newTaskDate) return
+    setTaskSaving(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          due_date: newTaskDate,
+          priority: 'medium',
+          visibility: 'team',
+        }),
+      })
+      if (!res.ok) throw new Error()
+      setNewTaskTitle('')
+      setNewTaskDate(null)
+      fetchTasks()
+      showToast('Uppgift skapad', 'success')
+    } catch {
+      showToast('Kunde inte skapa uppgift', 'error')
+    } finally {
+      setTaskSaving(false)
+    }
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // Render helpers
   // ═══════════════════════════════════════════════════════════════════════════
@@ -421,6 +512,7 @@ export default function CalendarPage() {
 
   function renderDayColumn(date: Date, widthClass: string) {
     const { hm, gc } = getEventsForDay(date)
+    const { timed: timedTasks, untimed: untimedTasks } = getTasksForDay(date)
 
     // Combine for overlap detection
     type UnifiedEvent = { start: string; end: string; source: 'hm' | 'gc'; event: HandymateEvent | GoogleEvent }
@@ -528,6 +620,71 @@ export default function CalendarPage() {
             )
           }
         })}
+
+        {/* Uppgifter med tid — renderas ovanpå timgriddet */}
+        {timedTasks.map(task => {
+          if (!task.due_time) return null
+          const [h, m] = task.due_time.split(':').map(Number)
+          const hour = h + m / 60
+          if (hour < HOUR_START || hour > HOUR_END) return null
+          const top = (hour - HOUR_START) * CELL_HEIGHT
+          const done = task.status === 'done'
+          const priorityColor = task.priority === 'high' ? '#EF4444' : task.priority === 'low' ? '#94A3B8' : '#D97706'
+          return (
+            <div
+              key={`task-${task.id}`}
+              onClick={(e) => { e.stopPropagation(); setSelectedTask(task) }}
+              className={`absolute z-10 rounded-md px-2 py-0.5 cursor-pointer overflow-hidden border border-dashed flex items-center gap-1.5 right-1 ${done ? 'opacity-50 bg-gray-50 border-gray-300' : 'bg-amber-50/80 hover:bg-amber-100 border-amber-300'}`}
+              style={{ top: top - 10, height: 22, left: '50%' }}
+              title={`${task.title}${task.assigned_user ? ` · ${task.assigned_user.name}` : ''}`}
+            >
+              <button
+                onClick={(e) => { e.stopPropagation(); toggleTaskStatus(task) }}
+                className={`w-3 h-3 rounded-sm border-2 flex-shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400 hover:border-amber-600'}`}
+              >
+                {done && <span className="text-white text-[7px] leading-none">✓</span>}
+              </button>
+              <span
+                className={`text-[10px] font-medium truncate flex-1 ${done ? 'text-gray-500 line-through' : 'text-amber-900'}`}
+              >
+                {task.due_time.slice(0, 5)} {task.title}
+              </span>
+              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: priorityColor }} />
+            </div>
+          )
+        })}
+
+        {/* Uppgifter utan tid — radas längst ner */}
+        {untimedTasks.length > 0 && (
+          <div className="absolute left-0 right-0 bottom-0 px-1 py-1 space-y-0.5 z-10 pointer-events-none">
+            {untimedTasks.slice(0, 4).map(task => {
+              const done = task.status === 'done'
+              const priorityColor = task.priority === 'high' ? '#EF4444' : task.priority === 'low' ? '#94A3B8' : '#D97706'
+              return (
+                <div
+                  key={`utask-${task.id}`}
+                  onClick={(e) => { e.stopPropagation(); setSelectedTask(task) }}
+                  className={`rounded px-1.5 py-0.5 cursor-pointer pointer-events-auto flex items-center gap-1 ${done ? 'bg-gray-100 opacity-60' : 'bg-amber-50 border border-amber-200 hover:bg-amber-100'}`}
+                  title={task.title}
+                >
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleTaskStatus(task) }}
+                    className={`w-2.5 h-2.5 rounded-sm border flex-shrink-0 flex items-center justify-center ${done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-400'}`}
+                  >
+                    {done && <span className="text-white text-[6px] leading-none">✓</span>}
+                  </button>
+                  <span className={`text-[9px] truncate flex-1 ${done ? 'text-gray-500 line-through' : 'text-amber-900'}`}>
+                    {task.title}
+                  </span>
+                  <span className="w-1 h-1 rounded-full flex-shrink-0" style={{ backgroundColor: priorityColor }} />
+                </div>
+              )
+            })}
+            {untimedTasks.length > 4 && (
+              <p className="text-[9px] text-gray-400 text-center pointer-events-none">+{untimedTasks.length - 4} fler</p>
+            )}
+          </div>
+        )}
       </div>
     )
   }
@@ -599,6 +756,26 @@ export default function CalendarPage() {
                 Dag
               </button>
             </div>
+
+            {/* Visa uppgifter-toggle */}
+            <button
+              onClick={() => setShowTasks(!showTasks)}
+              className={`flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-[12px] font-medium border transition-colors ${showTasks ? 'bg-amber-50 border-amber-300 text-amber-900' : 'bg-white border-[#E2E8F0] text-gray-500'}`}
+              title={showTasks ? 'Dölj uppgifter' : 'Visa uppgifter'}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              <span className="hidden sm:inline">Uppgifter</span>
+            </button>
+
+            {/* New task button */}
+            <button
+              onClick={() => { setNewTaskDate(formatDateISO(new Date())); setNewTaskTitle('') }}
+              className="flex items-center gap-1.5 px-2.5 py-2 bg-white border border-amber-300 text-amber-900 rounded-lg text-[13px] font-medium hover:bg-amber-50 transition-colors"
+              title="Ny uppgift för idag"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden md:inline">Uppgift</span>
+            </button>
 
             {/* New booking button */}
             <button
@@ -794,6 +971,173 @@ export default function CalendarPage() {
                 className="px-4 py-2.5 border border-red-200 text-red-600 rounded-lg text-[13px] hover:bg-red-50 transition-colors"
               >
                 Ta bort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Task Detail Modal ────────────────────────────────────── */}
+      {selectedTask && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={() => setSelectedTask(null)}>
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-md sm:mx-4 p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[15px] font-semibold text-gray-900 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                Uppgift
+              </h3>
+              <button onClick={() => setSelectedTask(null)} className="p-1 text-gray-400 hover:text-gray-900">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Titel</label>
+                <input
+                  type="text"
+                  defaultValue={selectedTask.title}
+                  onBlur={async (e) => {
+                    const val = e.target.value.trim()
+                    if (!val || val === selectedTask.title) return
+                    await fetch('/api/tasks', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: selectedTask.id, title: val }),
+                    })
+                    fetchTasks()
+                  }}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-600"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Datum</label>
+                  <input
+                    type="date"
+                    defaultValue={selectedTask.due_date || ''}
+                    onChange={async (e) => {
+                      await fetch('/api/tasks', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: selectedTask.id, due_date: e.target.value || null }),
+                      })
+                      fetchTasks()
+                    }}
+                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-600"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Tid</label>
+                  <input
+                    type="time"
+                    defaultValue={selectedTask.due_time ? selectedTask.due_time.slice(0, 5) : ''}
+                    onChange={async (e) => {
+                      await fetch('/api/tasks', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: selectedTask.id, due_time: e.target.value || null }),
+                      })
+                      fetchTasks()
+                    }}
+                    className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-700 focus:outline-none focus:border-primary-600"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] uppercase tracking-wider text-gray-400 mb-1">Prioritet</label>
+                <select
+                  defaultValue={selectedTask.priority}
+                  onChange={async (e) => {
+                    await fetch('/api/tasks', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: selectedTask.id, priority: e.target.value }),
+                    })
+                    fetchTasks()
+                  }}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:border-primary-600"
+                >
+                  <option value="low">Låg</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">Hög</option>
+                </select>
+              </div>
+
+              {selectedTask.assigned_user && (
+                <div className="text-xs text-gray-500 flex items-center gap-2">
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold text-white"
+                    style={{ backgroundColor: selectedTask.assigned_user.color || '#3B82F6' }}
+                  >
+                    {selectedTask.assigned_user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </span>
+                  <span>Tilldelad: {selectedTask.assigned_user.name}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-gray-100">
+              <button
+                onClick={async () => {
+                  await toggleTaskStatus(selectedTask)
+                  setSelectedTask(null)
+                }}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium ${selectedTask.status === 'done' ? 'bg-gray-100 text-gray-700' : 'bg-emerald-500 text-white hover:bg-emerald-600'}`}
+              >
+                {selectedTask.status === 'done' ? '↺ Markera som att göra' : '✓ Markera klar'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Ta bort uppgiften?')) return
+                  await fetch(`/api/tasks?id=${selectedTask.id}`, { method: 'DELETE' })
+                  setSelectedTask(null)
+                  fetchTasks()
+                }}
+                className="px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+              >
+                Ta bort
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Quick New Task Modal ─────────────────────────────────── */}
+      {newTaskDate && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={() => { setNewTaskDate(null); setNewTaskTitle('') }}>
+          <div className="bg-white rounded-t-2xl sm:rounded-xl w-full sm:max-w-sm sm:mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[15px] font-semibold text-gray-900">Ny uppgift</h3>
+              <button onClick={() => { setNewTaskDate(null); setNewTaskTitle('') }} className="p-1 text-gray-400 hover:text-gray-900">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mb-3">{new Date(newTaskDate).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+            <input
+              type="text"
+              value={newTaskTitle}
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && newTaskTitle.trim()) createQuickTask() }}
+              placeholder="Vad behöver göras?"
+              autoFocus
+              className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 focus:outline-none focus:border-primary-600 mb-4"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setNewTaskDate(null); setNewTaskTitle('') }}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              >
+                Avbryt
+              </button>
+              <button
+                onClick={createQuickTask}
+                disabled={!newTaskTitle.trim() || taskSaving}
+                className="flex-1 px-4 py-2 text-sm bg-primary-700 text-white rounded-lg font-medium disabled:opacity-50"
+              >
+                {taskSaving ? 'Skapar...' : 'Skapa uppgift'}
               </button>
             </div>
           </div>
