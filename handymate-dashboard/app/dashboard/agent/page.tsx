@@ -160,6 +160,35 @@ const TRIGGER_CONFIG: Record<string, { label: string; icon: typeof Phone; color:
   cron: { label: 'Automatisk kontroll', icon: Clock, color: 'text-primary-600', bg: 'bg-primary-600/10 border-primary-600/20' },
 }
 
+// Mappar cron_type till begriplig svensk beskrivning av VAD som kontrollerades
+const CRON_TYPE_LABELS: Record<string, string> = {
+  agent_context: 'Morgonens översikt',
+  morning_report: 'Morgonrapport',
+  communication_check: 'Kollade samtal och meddelanden',
+  daily_check: 'Kollade samtal och meddelanden',
+  check_overdue: 'Kollade förfallna fakturor',
+  quote_followup: 'Följde upp offerter',
+  nurture: 'Uppföljning av leads',
+  evaluate_thresholds: 'Kollade automationsregler',
+  gmail_poll: 'Kollade Gmail för nya mail',
+  gmail_lead_import: 'Letade nya leads i Gmail',
+  sync_calendars: 'Synkade kalendern',
+  sync_phone_webhooks: 'Synkade telefoni-inställningar',
+  project_health: 'Kontrollerade projektstatus',
+  generate_insights: 'Analyserade veckan',
+  seasonality: 'Säsongsanalys',
+  send_reminders: 'Skickade påminnelser',
+  send_campaigns: 'Skickade kampanjer',
+  monthly_review: 'Månadsrapport',
+  maintenance: 'Databasunderhåll',
+  expire_approvals: 'Städade utgångna godkännanden',
+}
+
+function getCronLabel(cronType: unknown): string | null {
+  if (!cronType || typeof cronType !== 'string') return null
+  return CRON_TYPE_LABELS[cronType] || null
+}
+
 const TOOL_CONFIG: Record<string, { label: string; icon: typeof Search; friendlyLabel: string }> = {
   search_customers: { label: 'Sök kund', icon: Search, friendlyLabel: 'Sökte efter kunder' },
   get_customer: { label: 'Hämta kund', icon: Eye, friendlyLabel: 'Hämtade kundinfo' },
@@ -239,15 +268,23 @@ function formatToolResultSummary(tool: string, result: { success: boolean; data?
 }
 
 // Humanize technical agent responses for display
-function humanizeResponse(text: string): string {
-  if (!text) return text
+// cronLabel: om detta är en cron-körning, vad kontrollerades?
+// (ex. "Kollade samtal och meddelanden", "Kollade förfallna fakturor")
+function humanizeResponse(text: string, cronLabel?: string | null): string {
+  if (!text) return cronLabel ? `${cronLabel} — inga åtgärder behövs` : text
+
+  // Ignorera enordssvar som "Perfekt!", "Ok", "Klar" etc — de säger ingenting
+  const trimmed = text.trim().replace(/[!.?]+$/, '')
+  if (trimmed.length < 15 && /^(perfekt|ok|okej|klar|klart|bra|utmärkt|all(a|t))/i.test(trimmed)) {
+    return cronLabel ? `${cronLabel} — allt ser bra ut` : 'Klar'
+  }
 
   // ── Step 1: Try to extract a clean one-line summary ────────────────
   // Many cron responses follow the pattern: "Status: Lugnt läge ✅" or similar
   const statusMatch = text.match(/Status:\s*(.+?)(?:\n|$)/i)
   const isCronCheck = /communication.?check|daglig.?statistik|schemalagd.?kontroll|status\s+f.r\s+\d{4}/i.test(text)
 
-  if (isCronCheck) {
+  if (isCronCheck || cronLabel) {
     // Parse the key numbers from the response
     const leads = text.match(/(\d+)\s*nya?\s*leads?/i)?.[1]
     const quotes = text.match(/(\d+)\s*(?:nya?\s*)?offert(?:er)?\s*skapad/i)?.[1]
@@ -267,15 +304,19 @@ function humanizeResponse(text: string): string {
     if (customers && customers !== '0') highlights.push(`${customers} nya kunder`)
     if (approvals && approvals !== '0') highlights.push(`${approvals} godkännanden väntar`)
 
+    const prefix = cronLabel || 'Kontroll klar'
     if (highlights.length > 0) {
-      return `Kontroll klar — ${highlights.join(', ')}`
+      return `${prefix} — ${highlights.join(', ')}`
     }
 
     // All zeros → calm status
     if (statusMatch && /lugnt/i.test(statusMatch[1])) {
-      return 'Kontroll klar — lugnt läge, inga åtgärder behövs'
+      return `${prefix} — lugnt läge, inga åtgärder behövs`
     }
-    return 'Kontroll klar — allt ser bra ut, inga åtgärder behövs'
+    if (isCronCheck) {
+      return `${prefix} — allt ser bra ut, inga åtgärder behövs`
+    }
+    // cronLabel satt men ingen cron-check-pattern → använd labeln som prefix
   }
 
   // ── Step 2: For non-cron responses, do lighter cleanup ─────────────
@@ -435,6 +476,8 @@ function ActivityItem({ run, isSelected, onClick }: {
 }) {
   const trigger = TRIGGER_CONFIG[run.trigger_type] || TRIGGER_CONFIG.manual
   const agent = getAgentForRun(run)
+  const cronLabel = run.trigger_type === 'cron' ? getCronLabel((run.trigger_data as any)?.cron_type) : null
+  const triggerLabel = cronLabel || trigger.label
 
   return (
     <button
@@ -453,7 +496,7 @@ function ActivityItem({ run, isSelected, onClick }: {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-semibold text-gray-900">{agent.name}</span>
-            <span className="text-xs text-gray-400">{trigger.label}</span>
+            <span className="text-xs text-gray-400">{triggerLabel}</span>
             <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${
               run.status === 'completed'
                 ? 'bg-emerald-100 text-emerald-700'
@@ -463,7 +506,7 @@ function ActivityItem({ run, isSelected, onClick }: {
             </span>
           </div>
           <p className="text-sm text-gray-600 line-clamp-2 leading-relaxed">
-            {stripMarkdown(humanizeResponse(run.final_response || '(Inget svar)'))}
+            {stripMarkdown(humanizeResponse(run.final_response || '(Inget svar)', cronLabel))}
           </p>
           <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
             <span className="flex items-center gap-1">
@@ -534,6 +577,8 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
   const trigger = TRIGGER_CONFIG[run.trigger_type] || TRIGGER_CONFIG.manual
   const TriggerIcon = trigger.icon
   const [showTech, setShowTech] = useState(false)
+  const cronLabel = run.trigger_type === 'cron' ? getCronLabel((run.trigger_data as any)?.cron_type) : null
+  const titleLabel = cronLabel || trigger.label
 
   // Flatten all tool calls from steps
   const allToolCalls = run.steps.flatMap(s => s.tool_calls || [])
@@ -558,7 +603,7 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
           <div>
             <div className="flex items-center gap-2 mb-2">
               <TriggerIcon className={`w-5 h-5 ${trigger.color}`} />
-              <span className="text-lg font-bold text-gray-900">{trigger.label}</span>
+              <span className="text-lg font-bold text-gray-900">{titleLabel}</span>
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
                 run.status === 'completed'
                   ? 'bg-emerald-100 text-emerald-700'
@@ -579,9 +624,9 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
         {/* Summary — rendered as proper markdown */}
         <div className="mt-3 p-3 bg-white rounded-lg border border-[#E2E8F0] text-sm text-gray-700 leading-relaxed prose prose-sm prose-gray max-w-none [&_h1]:text-base [&_h1]:font-bold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-semibold [&_h4]:text-sm [&_h4]:font-medium [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4 [&_li]:text-gray-600 [&_p]:my-1 [&_strong]:font-semibold [&_em]:italic [&_a]:text-primary-700">
           {run.final_response ? (
-            <ReactMarkdown>{humanizeResponse(run.final_response)}</ReactMarkdown>
+            <ReactMarkdown>{humanizeResponse(run.final_response, cronLabel)}</ReactMarkdown>
           ) : (
-            <p className="text-gray-400 italic">(Inget svar)</p>
+            <p className="text-gray-400 italic">{cronLabel ? `${cronLabel} — inga åtgärder behövs` : '(Inget svar)'}</p>
           )}
         </div>
 
