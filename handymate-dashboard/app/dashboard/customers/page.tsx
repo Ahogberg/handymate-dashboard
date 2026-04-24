@@ -293,12 +293,16 @@ export default function CustomersPage() {
         body: JSON.stringify({ action: 'delete_customer', data: { customerId } }),
       })
 
-      if (!response.ok) throw new Error('Något gick fel')
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: 'Kunde inte ta bort kunden' }))
+        showToast(errData.error || 'Kunde inte ta bort kunden', 'error')
+        return
+      }
 
       showToast('Kund borttagen!', 'success')
       fetchData()
-    } catch {
-      showToast('Något gick fel', 'error')
+    } catch (err: any) {
+      showToast(err?.message || 'Kunde inte nå servern — försök igen', 'error')
     }
   }
 
