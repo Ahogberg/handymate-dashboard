@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { X, Send, Plus, MessageCircle, Sparkles, Trash2, Menu } from 'lucide-react'
+import { getAgentById } from '@/lib/agents/team'
 
 interface ChatMessage {
   id?: string
   role: 'user' | 'assistant'
   content: string
   created_at?: string
+  delegated_to?: string | null
 }
 
 interface Conversation {
@@ -160,7 +162,13 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
       }
       const data = await res.json()
       if (data.assistant_message) {
-        setMessages(prev => [...prev, { id: data.assistant_message.id, role: 'assistant', content: data.assistant_message.content, created_at: data.assistant_message.created_at }])
+        setMessages(prev => [...prev, {
+          id: data.assistant_message.id,
+          role: 'assistant',
+          content: data.assistant_message.content,
+          created_at: data.assistant_message.created_at,
+          delegated_to: data.assistant_message.delegated_to || null,
+        }])
       }
       fetchConversations()
     } catch {
@@ -333,9 +341,21 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
                       : 'bg-white border border-gray-200 text-gray-800 rounded-bl-sm'
                   }`}>
                     {msg.role === 'assistant' ? (
-                      <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_strong]:font-semibold [&_a]:text-primary-700">
-                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                      </div>
+                      <>
+                        <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_strong]:font-semibold [&_a]:text-primary-700">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                        {msg.delegated_to && (() => {
+                          const agent = getAgentById(msg.delegated_to)
+                          if (!agent) return null
+                          return (
+                            <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">
+                              <span className={`w-2 h-2 rounded-full ${agent.color}`} />
+                              <span>💬 via {agent.name} <span className="text-gray-400">({agent.role})</span></span>
+                            </div>
+                          )
+                        })()}
+                      </>
                     ) : (
                       <p className="whitespace-pre-wrap">{msg.content}</p>
                     )}

@@ -102,6 +102,19 @@ export async function POST(
     assistantContent = `Kunde inte nå AI-tjänsten just nu. ${err?.message || ''}`
   }
 
+  // Parse delegation-markör [DELEGATED:agent_id] och ta bort från synligt innehåll
+  let delegatedTo: string | null = null
+  const delegatedMatch = assistantContent.match(/\[DELEGATED:([a-z]+)\]/i)
+  if (delegatedMatch) {
+    const candidate = delegatedMatch[1].toLowerCase()
+    const validAgents = ['karin', 'daniel', 'lars', 'hanna', 'lisa']
+    if (validAgents.includes(candidate)) {
+      delegatedTo = candidate
+    }
+    // Ta bort markören ur synligt innehåll oavsett giltighet
+    assistantContent = assistantContent.replace(/\[DELEGATED:[a-z]+\]/gi, '').trim()
+  }
+
   // 4. Spara assistant-meddelande
   const { data: assistantMsg } = await supabase
     .from('matte_messages')
@@ -111,6 +124,7 @@ export async function POST(
       role: 'assistant',
       content: assistantContent,
       agent_run_id: agentRunId,
+      delegated_to: delegatedTo,
     })
     .select()
     .single()
