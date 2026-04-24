@@ -37,6 +37,7 @@ import ReactMarkdown from 'react-markdown'
 import { useBusiness } from '@/lib/BusinessContext'
 import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 import MatteChatModal from '@/components/MatteChatModal'
+import AgentMemoriesModal from '@/components/AgentMemoriesModal'
 import { TEAM, type TeamAgent } from '@/lib/agents/team'
 import {
   AreaChart,
@@ -976,6 +977,9 @@ export default function AgentDashboardPage() {
   const [chatInitial, setChatInitial] = useState('')
   const [chatAutoCheckedInitial, setChatAutoCheckedInitial] = useState(false)
 
+  // Minnes-modal state
+  const [memoriesAgentId, setMemoriesAgentId] = useState<string | null>(null)
+
   function openChatWith(initial: string) {
     setChatInitial(initial)
     setChatOpen(true)
@@ -1210,7 +1214,16 @@ export default function AgentDashboardPage() {
               <span className="text-[11px] text-gray-500 block">{agent.role}</span>
               {allowed && agent.description && <span className="text-[10px] text-gray-400 hidden sm:block mt-0.5">{agent.description}</span>}
               {allowed && (memoryCounts[agent.id] || 0) > 0 && (
-                <span className="text-[10px] text-primary-700 block mt-0.5">🧠 {memoryCounts[agent.id]} lärdomar</span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setMemoriesAgentId(agent.id) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setMemoriesAgentId(agent.id) } }}
+                  className="inline-flex items-center gap-1 text-[10px] text-primary-700 mt-1 px-2 py-0.5 rounded-full bg-primary-50 border border-primary-100 hover:bg-primary-100 hover:border-primary-200 transition-colors cursor-pointer"
+                  title={`Se vad ${agent.name} kommer ihåg om ditt företag`}
+                >
+                  🧠 Minns {memoryCounts[agent.id]} sak{memoryCounts[agent.id] === 1 ? '' : 'er'}
+                </span>
               )}
               {isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Under utbildning</span>}
               {!allowed && !isTraining && <span className="text-[10px] text-amber-600 block mt-0.5">Pro-plan</span>}
@@ -1462,6 +1475,22 @@ export default function AgentDashboardPage() {
         onClose={() => setChatOpen(false)}
         avatarUrl={TEAM[0].avatar}
         initialPrompt={chatInitial}
+      />
+
+      {/* Minnes-modal */}
+      <AgentMemoriesModal
+        open={!!memoriesAgentId}
+        agentId={memoriesAgentId}
+        onClose={() => setMemoriesAgentId(null)}
+        onDeleted={() => {
+          // Uppdatera räknaren efter radering
+          if (memoriesAgentId) {
+            setMemoryCounts(prev => ({
+              ...prev,
+              [memoriesAgentId]: Math.max(0, (prev[memoriesAgentId] || 0) - 1),
+            }))
+          }
+        }}
       />
     </div>
   )
