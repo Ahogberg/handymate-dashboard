@@ -36,7 +36,7 @@ import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
-import TeamActivityStrip from '@/components/TeamActivityStrip'
+import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import IdentityPill from '@/components/IdentityPill'
 
 interface Booking {
@@ -130,6 +130,7 @@ export default function DashboardPage() {
   const [insightsExpanded, setInsightsExpanded] = useState(false)
   const [seasonSummary, setSeasonSummary] = useState<string | null>(null)
   const [savedTimeText, setSavedTimeText] = useState<string | null>(null)
+  const [teamSummaryText, setTeamSummaryText] = useState<string | null>(null)
 
   // Per-section loading states for skeleton UI
   const [bookingsLoaded, setBookingsLoaded] = useState(false)
@@ -584,12 +585,20 @@ export default function DashboardPage() {
             {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}!
           </h1>
           <p className="text-sm sm:text-base text-gray-500">
-            Här är vad ditt AI-team har hanterat åt dig
+            <span className="capitalize">
+              {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
+            </span>
+            {teamSummaryText && (
+              <>
+                {' · '}
+                <span>{teamSummaryText}</span>
+              </>
+            )}
           </p>
         </div>
 
         {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h */}
-        <TeamActivityStrip />
+        <TeamActivityStrip onLoaded={(summary) => setTeamSummaryText(buildSummaryText(summary))} />
 
         {/* Welcome popup — visas bara en gång */}
         {showWelcome && (

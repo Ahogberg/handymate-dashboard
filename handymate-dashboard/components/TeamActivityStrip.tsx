@@ -24,11 +24,29 @@ interface TeamActivityResponse {
   }
 }
 
+export function buildSummaryText(summary: TeamActivityResponse['summary']): string {
+  const parts: string[] = []
+  if (summary.total_calls > 0) parts.push(`${summary.total_calls} kundsamtal`)
+  if (summary.total_sms > 0 && parts.length < 2) parts.push(`${summary.total_sms} SMS`)
+  if (summary.total_quotes > 0) parts.push(`${summary.total_quotes} offerter`)
+  if (summary.total_bookings_updated > 0 && parts.length < 2) parts.push(`${summary.total_bookings_updated} bokningar`)
+  if (summary.total_automations > 0 && parts.length < 2) parts.push(`${summary.total_automations} automatiseringar`)
+
+  if (parts.length === 0) return 'AI-teamet är på plats — inga inkommande just nu'
+  if (parts.length === 1) return `AI-teamet har hanterat ${parts[0]} sedan igår kväll`
+  return `AI-teamet har hanterat ${parts.slice(0, -1).join(', ')} och ${parts[parts.length - 1]} sedan igår kväll`
+}
+
+interface TeamActivityStripProps {
+  onLoaded?: (summary: TeamActivityResponse['summary']) => void
+}
+
 /**
- * Visar vad varje AI-team-medlem har gjort senaste 24h.
- * Renderas högst upp på dashboarden under identity-pill.
+ * Vertikal lista över AI-teamets aktivitet senaste 24h.
+ * Visar bara aktiva agenter (idle filtreras bort) — Matte exkluderas eftersom
+ * han representeras av docken nere till höger.
  */
-export default function TeamActivityStrip() {
+export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) {
   const [data, setData] = useState<TeamActivityResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -36,23 +54,31 @@ export default function TeamActivityStrip() {
     fetch('/api/dashboard/team-activity')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
-        if (d) setData(d)
+        if (d) {
+          setData(d)
+          onLoaded?.(d.summary)
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [])
+  }, [onLoaded])
 
   if (loading) {
     return (
       <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {TEAM.map(agent => (
-            <div key={agent.id} className="animate-pulse">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-full bg-gray-200" />
-                <div className="h-3 bg-gray-200 rounded w-16" />
+        <div className="flex items-center justify-between mb-3">
+          <div className="h-4 bg-gray-200 rounded w-32 animate-pulse" />
+          <div className="h-3 bg-gray-100 rounded w-40 animate-pulse" />
+        </div>
+        <div className="space-y-2.5">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 py-1.5 animate-pulse">
+              <div className="w-9 h-9 rounded-full bg-gray-200 flex-shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 bg-gray-200 rounded w-24" />
+                <div className="h-2.5 bg-gray-100 rounded w-3/4" />
               </div>
-              <div className="h-3 bg-gray-100 rounded w-full" />
+              <div className="h-2.5 bg-gray-100 rounded w-16" />
             </div>
           ))}
         </div>
@@ -62,86 +88,65 @@ export default function TeamActivityStrip() {
 
   if (!data) return null
 
-  const summaryParts: string[] = []
-  if (data.summary.total_calls > 0) {
-    summaryParts.push(`${data.summary.total_calls} kundsamtal`)
-  }
-  if (data.summary.total_sms > 0) {
-    summaryParts.push(`${data.summary.total_sms} SMS`)
-  }
-  if (data.summary.total_quotes > 0) {
-    summaryParts.push(`${data.summary.total_quotes} offerter`)
-  }
-  if (data.summary.total_bookings_updated > 0) {
-    summaryParts.push(`${data.summary.total_bookings_updated} bokningar`)
-  }
-  if (data.summary.total_automations > 0 && summaryParts.length < 3) {
-    summaryParts.push(`${data.summary.total_automations} automatiseringar`)
-  }
+  // Filtrera: visa bara aktiva, exkludera Matte (han har egen dock)
+  const activeAgents = data.agents.filter(a => !a.idle && a.id !== 'matte')
 
-  const summaryText = summaryParts.length > 0
-    ? `AI-teamet har hanterat ${summaryParts.slice(0, 3).join(', ')} sedan igår kväll`
-    : `AI-teamet är på plats — inga inkommande just nu`
+  if (activeAgents.length === 0) {
+    return (
+      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-semibold text-gray-900">Ditt AI-team idag</h2>
+          <span className="text-[11px] text-gray-500">Senaste 24 timmarna</span>
+        </div>
+        <p className="text-xs text-gray-500 italic py-2">
+          Teamet är på plats men inget har kommit in än — du blir notifierad så fort något händer.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-900">Ditt AI-team idag</h2>
-        <span className="text-xs text-gray-500">
-          {data.summary.active_agents} av {TEAM.length} aktiva
+        <span className="text-[11px] text-gray-500">
+          Senaste 24 timmarna · {activeAgents.length} aktiva
         </span>
       </div>
 
-      <p className="text-xs text-gray-600 mb-4 leading-relaxed">{summaryText}</p>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {data.agents.map(activity => {
+      <div className="divide-y divide-gray-50">
+        {activeAgents.map(activity => {
           const agent = getAgentById(activity.id)
           if (!agent) return null
 
           return (
-            <div
-              key={activity.id}
-              className={`flex flex-col gap-1.5 p-2.5 rounded-lg transition-all ${
-                activity.idle
-                  ? 'opacity-60 bg-gray-50'
-                  : 'bg-gradient-to-br from-white to-gray-50 border border-gray-100'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                {agent.avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={agent.avatar}
-                    alt={agent.name}
-                    className={`w-8 h-8 rounded-full object-cover flex-shrink-0 ${
-                      activity.idle ? 'grayscale' : ''
-                    }`}
-                  />
-                ) : (
-                  <div className={`w-8 h-8 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
-                    {agent.initials}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-gray-900 truncate">{agent.name}</p>
-                  <p className="text-[10px] text-gray-500 truncate">{agent.role}</p>
+            <div key={activity.id} className="flex items-center gap-3 py-2.5">
+              {agent.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={agent.avatar}
+                  alt={agent.name}
+                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                />
+              ) : (
+                <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
+                  {agent.initials}
                 </div>
-              </div>
-
-              <div className="min-h-[28px]">
-                {activity.stat && (
-                  <span className="text-base font-bold text-gray-900 leading-tight">
-                    {activity.stat}
-                  </span>
-                )}
-                <p className={`text-[11px] leading-tight ${activity.idle ? 'text-gray-400 italic' : 'text-gray-600'}`}>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
+                <p className="text-xs text-gray-600 leading-snug mt-0.5">
+                  {activity.stat && (
+                    <span className="font-semibold text-gray-900">{activity.stat} </span>
+                  )}
                   {activity.action}
                 </p>
-                {activity.meta && (
-                  <p className="text-[10px] text-gray-400 mt-0.5">{activity.meta}</p>
-                )}
               </div>
+              {activity.meta && (
+                <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">
+                  {activity.meta}
+                </span>
+              )}
             </div>
           )
         })}
