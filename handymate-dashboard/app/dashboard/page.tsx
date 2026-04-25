@@ -35,7 +35,6 @@ import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
-import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import IdentityPill from '@/components/IdentityPill'
 
@@ -840,11 +839,6 @@ export default function DashboardPage() {
             )
           })()
         )}
-
-        {/* ═══ Morning Brief ═══ */}
-        <div className="max-w-3xl mx-auto mb-8">
-          <MorningBriefWidget />
-        </div>
 
         {/* KPI cards — 2 per row on mobile, 4 on desktop */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
