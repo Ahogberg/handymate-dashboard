@@ -19,7 +19,7 @@ import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentM
 export const maxDuration = 60
 
 const MAX_STEPS = 10
-const MODEL = 'claude-sonnet-4-20250514'
+const MODEL = 'claude-sonnet-4-6'
 
 export async function POST(request: NextRequest) {
   try {
@@ -327,13 +327,34 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now()
 
+    // Cache-aware system-prompt: array-format med ephemeral cache_control
+    // ger ~90% rabatt på cache-hits och stora besparingar i tool-loopen.
+    const systemPromptCached: any = [
+      {
+        type: 'text',
+        text: systemPrompt,
+        cache_control: { type: 'ephemeral' },
+      },
+    ]
+
+    // Antal messages innan loopen börjar — initial user-meddelande(n).
+    // Används för att trimma tool-historiken utan att tappa initial context.
+    const initialMessageCount = messages.length
+
     for (let step = 0; step < MAX_STEPS; step++) {
+      // Trimma message-historiken: behåll initial + senaste 4 (2 par tool_use+tool_result)
+      // Reducerar token-volym på iterationer 3+ utan att förlora aktuell context.
+      const toolMessages = messages.slice(initialMessageCount)
+      const messagesToSend = toolMessages.length <= 4
+        ? messages
+        : [...messages.slice(0, initialMessageCount), ...toolMessages.slice(-4)]
+
       const response: any = await (anthropic.messages as any).create({
         model: MODEL,
         max_tokens: 4096,
-        system: systemPrompt,
+        system: systemPromptCached,
         tools: (agentAllowedTools === 'all' ? toolDefinitions : toolDefinitions.filter((t: any) => agentAllowedTools.includes(t.name))) as any,
-        messages,
+        messages: messagesToSend,
       })
 
       totalTokens +=
