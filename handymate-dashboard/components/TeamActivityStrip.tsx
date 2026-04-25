@@ -88,61 +88,56 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
 
   if (!data) return null
 
-  // Filtrera: visa bara aktiva, exkludera Matte (han har egen dock)
-  const activeAgents = data.agents.filter(a => !a.idle && a.id !== 'matte')
-
-  if (activeAgents.length === 0) {
-    return (
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-gray-900">Ditt AI-team idag</h2>
-          <span className="text-[11px] text-gray-500">Senaste 24 timmarna</span>
-        </div>
-        <p className="text-xs text-gray-500 italic py-2">
-          Teamet är på plats men inget har kommit in än — du blir notifierad så fort något händer.
-        </p>
-      </div>
-    )
-  }
+  // Visa alla agenter utom Matte (han har egen dock-knapp). Idle agenter
+  // visas också, bara dämpade — så listan aldrig försvinner.
+  const visibleAgents = data.agents.filter(a => a.id !== 'matte')
+  const activeCount = visibleAgents.filter(a => !a.idle).length
 
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-semibold text-gray-900">Ditt AI-team idag</h2>
         <span className="text-[11px] text-gray-500">
-          Senaste 24 timmarna · {activeAgents.length} aktiva
+          Senaste 24 timmarna · {activeCount} aktiva
         </span>
       </div>
 
       <div className="divide-y divide-gray-50">
-        {activeAgents.map(activity => {
+        {visibleAgents.map(activity => {
           const agent = getAgentById(activity.id)
           if (!agent) return null
 
           return (
             <div key={activity.id} className="flex items-center gap-3 py-2.5">
-              {agent.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={agent.avatar}
-                  alt={agent.name}
-                  className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold flex-shrink-0`}>
-                  {agent.initials}
-                </div>
-              )}
+              <div className="relative flex-shrink-0">
+                {agent.avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={agent.avatar}
+                    alt={agent.name}
+                    className={`w-9 h-9 rounded-full object-cover ${activity.idle ? 'opacity-60 grayscale' : ''}`}
+                  />
+                ) : (
+                  <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold ${activity.idle ? 'opacity-60' : ''}`}>
+                    {agent.initials}
+                  </div>
+                )}
+                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${activity.idle ? 'bg-gray-300' : 'bg-emerald-500'}`} />
+              </div>
+
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
-                <p className="text-xs text-gray-600 leading-snug mt-0.5">
+                <p className={`text-sm font-semibold leading-tight ${activity.idle ? 'text-gray-500' : 'text-gray-900'}`}>
+                  {agent.name}
+                </p>
+                <p className={`text-xs leading-snug mt-0.5 ${activity.idle ? 'text-gray-400 italic' : 'text-gray-600'}`}>
                   {activity.stat && (
                     <span className="font-semibold text-gray-900">{activity.stat} </span>
                   )}
                   {activity.action}
                 </p>
               </div>
-              {activity.meta && (
+
+              {activity.meta && !activity.idle && (
                 <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">
                   {activity.meta}
                 </span>
