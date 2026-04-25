@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { useBusiness } from '@/lib/BusinessContext'
+import { getAgentById } from '@/lib/agents/team'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -328,20 +329,29 @@ export default function Jobbkompisen() {
   if (!isOpen) {
     const hasSuggestions = suggestions.length > 0
     const hasActiveJob = !!activeTimer
+    const matte = getAgentById('matte')
 
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all z-50 ${
+        aria-label="Öppna Jobbkompisen"
+        className={`fixed bottom-6 right-6 w-14 h-14 rounded-2xl shadow-lg flex items-center justify-center hover:scale-105 transition-all z-50 overflow-hidden ${
           hasActiveJob
-            ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20'
-            : 'bg-primary-700 shadow-primary-600/10'
+            ? 'bg-gradient-to-br from-emerald-500 to-primary-600 shadow-emerald-500/20 ring-2 ring-emerald-300'
+            : 'bg-white shadow-primary-600/10 ring-1 ring-primary-200'
         }`}
       >
         {hasActiveJob ? (
           <Mic className="w-6 h-6 text-white animate-pulse" />
+        ) : matte?.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={matte.avatar}
+            alt="Matte"
+            className="w-full h-full object-cover"
+          />
         ) : (
-          <Sparkles className="w-6 h-6 text-white" />
+          <Sparkles className="w-6 h-6 text-primary-700" />
         )}
         {hasSuggestions && (
           <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] font-bold bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-full">

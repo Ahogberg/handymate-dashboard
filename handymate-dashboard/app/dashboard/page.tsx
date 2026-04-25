@@ -36,6 +36,8 @@ import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
+import TeamActivityStrip from '@/components/TeamActivityStrip'
+import IdentityPill from '@/components/IdentityPill'
 
 interface Booking {
   booking_id: string
@@ -577,13 +579,17 @@ export default function DashboardPage() {
       <div className="relative">
         {/* Header */}
         <div className="mb-6 sm:mb-8">
+          <IdentityPill />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1 sm:mb-2">
             {getGreeting()}{getFirstName() ? `, ${getFirstName()}` : ''}!
           </h1>
           <p className="text-sm sm:text-base text-gray-500">
-            Översikt för {business.business_name}
+            Här är vad ditt AI-team har hanterat åt dig
           </p>
         </div>
+
+        {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h */}
+        <TeamActivityStrip />
 
         {/* Welcome popup — visas bara en gång */}
         {showWelcome && (
@@ -952,10 +958,12 @@ export default function DashboardPage() {
               )}
             </div>
           ) : todayLoaded ? (
-            <div className="flex items-center justify-center py-5 text-gray-400">
-              <div className="text-center">
-                <p className="text-sm text-gray-400">Inget att göra just nu</p>
-                <p className="text-xs text-gray-300 mt-0.5">Uppgifter, bokningar och godkännanden visas här</p>
+            <div className="flex items-center justify-center py-6">
+              <div className="text-center max-w-sm">
+                <p className="text-sm text-gray-700 font-medium">Inget på ditt bord just nu</p>
+                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                  AI-teamet håller i kommunikation, offerter och bokningar i bakgrunden — du blir notifierad när något kräver ditt godkännande.
+                </p>
               </div>
             </div>
           ) : (
