@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { isAdmin } from '@/lib/admin-auth'
 
 /**
- * GET /api/debug/storage — diagnostisera storage-problem
+ * GET /api/debug/storage — diagnostisera storage-problem (admin-only i produktion)
  */
 export async function GET(request: NextRequest) {
   try {
+    if (process.env.NODE_ENV === 'production') {
+      const adminCheck = await isAdmin(request)
+      if (!adminCheck.isAdmin) {
+        return NextResponse.json({ error: 'Endast för admin i produktion' }, { status: 403 })
+      }
+    }
+
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

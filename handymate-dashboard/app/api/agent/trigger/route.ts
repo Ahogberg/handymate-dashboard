@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getAuthenticatedBusiness, isBillingActive } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { ensureValidToken } from '@/lib/google-calendar'
 import Anthropic from '@anthropic-ai/sdk'
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const { data: bizConfig } = await supabase
       .from('business_config')
       .select(
-        'business_id, user_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, personal_phone, pricing_settings, knowledge_base, working_hours'
+        'business_id, user_id, business_name, contact_name, contact_email, branch, service_area, phone_number, assigned_phone_number, personal_phone, pricing_settings, knowledge_base, working_hours, subscription_status, trial_ends_at'
       )
       .eq('business_id', businessId)
       .single()
@@ -90,6 +90,16 @@ export async function POST(request: NextRequest) {
         { error: 'Business config not found' },
         { status: 404 }
       )
+    }
+
+    // Blockera agent-körning om trial gått ut eller past_due
+    // (gäller alla triggers: manual, cron, phone_call, incoming_sms)
+    const billingCheck = isBillingActive(bizConfig)
+    if (!billingCheck.allowed) {
+      return NextResponse.json({
+        error: billingCheck.message || 'Prenumerationen är inte aktiv',
+        billing_inactive: true,
+      }, { status: 402 })
     }
 
     // Fetch Google Calendar/Gmail connection for this business

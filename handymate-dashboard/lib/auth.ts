@@ -331,13 +331,86 @@ export function getBusinessPlanFromConfig(business: any): PlanType {
 }
 
 /**
+ * Kontrollerar subscription-status.
+ * Returnerar 'active' om allt OK, annars en spärr-anledning.
+ *
+ * - active      → full tillgång
+ * - trialing    → tillgång om trial_ends_at inte passerats
+ * - trial_expired → blockera (trial har gått ut, inte uppgraderad)
+ * - past_due    → blockera (betalning misslyckades)
+ * - canceled    → blockera
+ * - inactive    → blockera
+ */
+export function checkSubscriptionStatus(business: any): {
+  active: boolean
+  reason?: 'trial_expired' | 'past_due' | 'canceled' | 'inactive'
+  message?: string
+} {
+  const status = String(business.subscription_status || '').toLowerCase()
+
+  if (status === 'trialing') {
+    const trialEnd = business.trial_ends_at ? new Date(business.trial_ends_at) : null
+    if (trialEnd && trialEnd.getTime() < Date.now()) {
+      return {
+        active: false,
+        reason: 'trial_expired',
+        message: 'Din provperiod har gått ut. Uppgradera för att fortsätta använda Handymate.',
+      }
+    }
+    return { active: true }
+  }
+
+  if (status === 'past_due') {
+    return {
+      active: false,
+      reason: 'past_due',
+      message: 'Din betalning misslyckades. Uppdatera kortet i Inställningar → Prenumeration för att återaktivera tjänsten.',
+    }
+  }
+
+  if (status === 'canceled' || status === 'cancelled') {
+    return {
+      active: false,
+      reason: 'canceled',
+      message: 'Din prenumeration är uppsagd.',
+    }
+  }
+
+  if (status === 'inactive') {
+    return {
+      active: false,
+      reason: 'inactive',
+      message: 'Ditt konto är inaktivt. Kontakta support.',
+    }
+  }
+
+  // active, paid eller okänd status → tillåt (fail-open för att inte bryta befintliga kunder)
+  return { active: true }
+}
+
+/**
  * Checks if a business has access to a feature.
  * Returns 403-ready error info if not allowed.
+ *
+ * Blockerar både på plan-nivå (feature-gate) och på subscription-status
+ * (trial_expired, past_due).
  */
 export function checkFeatureAccess(
   business: any,
   featureKey: string
-): { allowed: boolean; error?: string; feature?: string; required_plan?: string } {
+): { allowed: boolean; error?: string; feature?: string; required_plan?: string; message?: string } {
+  // Först: kolla subscription-status (blockerar allt om trial ute eller past_due)
+  const subCheck = checkSubscriptionStatus(business)
+  if (!subCheck.active) {
+    return {
+      allowed: false,
+      error: subCheck.reason || 'subscription_inactive',
+      feature: featureKey,
+      message: subCheck.message,
+    }
+  }
+
+  // Sen: kolla plan-access
   const plan = getBusinessPlanFromConfig(business)
   if (hasFeature(plan, featureKey)) {
     return { allowed: true }
@@ -351,5 +424,18 @@ export function checkFeatureAccess(
     error: 'feature_not_available',
     feature: featureKey,
     required_plan: requiredPlan,
+  }
+}
+
+/**
+ * Snabbkoll för kostnadsalstrande aktioner (SMS, email, agent-trigger).
+ * Returnerar true om action är tillåten givet subscription-status.
+ * Feature-gates hanteras separat via checkFeatureAccess.
+ */
+export function isBillingActive(business: any): { allowed: boolean; message?: string } {
+  const status = checkSubscriptionStatus(business)
+  return {
+    allowed: status.active,
+    message: status.message,
   }
 }

@@ -139,12 +139,15 @@ export default function CustomersPage() {
   async function fetchData() {
     setLoading(true)
 
-    // Fetch customers
+    // Fetch customers — begränsa till 500 senaste för browserprestanda.
+    // Äldre kunder nås via sök.
+    const CUSTOMER_FETCH_LIMIT = 500
     const { data: customersData } = await supabase
       .from('customer')
       .select('*')
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
+      .limit(CUSTOMER_FETCH_LIMIT)
 
     // Fetch campaigns
     const { data: campaignsData } = await supabase

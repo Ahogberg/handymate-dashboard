@@ -7,9 +7,20 @@ import bcrypt from 'bcryptjs'
 import { SignJWT, jwtVerify } from 'jose'
 import { getServerSupabase } from '@/lib/supabase'
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.CRON_SECRET || 'partner-jwt-fallback-secret'
-)
+// PARTNER_JWT_SECRET är en separat secret från CRON_SECRET.
+// Fallback till CRON_SECRET för bakåtkompatibilitet, men logga varning.
+// Inga fallback till hårdkodad sträng — det är en säkerhetsrisk om env-vars saknas.
+function getJwtSecret(): Uint8Array {
+  const secret = process.env.PARTNER_JWT_SECRET || process.env.CRON_SECRET
+  if (!secret) {
+    throw new Error(
+      'PARTNER_JWT_SECRET (eller CRON_SECRET som fallback) måste vara satt. ' +
+      'Konfigurera minst en i miljövariablerna innan partner-API används.'
+    )
+  }
+  return new TextEncoder().encode(secret)
+}
+
 const JWT_EXPIRES = '30d'
 
 export interface Partner {
@@ -143,7 +154,7 @@ export async function loginPartner(
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime(JWT_EXPIRES)
     .setIssuedAt()
-    .sign(JWT_SECRET)
+    .sign(getJwtSecret())
 
   // Remove password_hash from response
   const { password_hash: _, ...partner } = data
@@ -156,7 +167,7 @@ export async function loginPartner(
  */
 export async function getPartnerFromToken(token: string): Promise<Partner | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
+    const { payload } = await jwtVerify(token, getJwtSecret())
     const partnerId = payload.partnerId as string
     if (!partnerId) return null
 

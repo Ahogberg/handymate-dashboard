@@ -12,6 +12,7 @@ const Jobbkompisen = dynamic(() => import('@/components/Jobbkompisen'), {
 import WelcomeModal from '@/components/WelcomeModal'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
+import BillingStatusBanner from '@/components/BillingStatusBanner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { useAuth } from '@/lib/useAuth'
@@ -83,6 +84,7 @@ export default function DashboardLayout({
                 <Sidebar businessName={business.business_name} businessId={business.business_id} onLogout={logout} />
                 <main className="flex-1 md:ml-64">
                   <ImpersonationBanner />
+                  <BillingStatusBanner />
                   {children}
                 </main>
                 <Jobbkompisen />

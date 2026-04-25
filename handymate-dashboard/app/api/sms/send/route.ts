@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAuthenticatedBusiness, getBusinessPlanFromConfig } from '@/lib/auth'
+import { getAuthenticatedBusiness, getBusinessPlanFromConfig, isBillingActive } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 import { getServerSupabase } from '@/lib/supabase'
@@ -21,13 +21,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: rateLimit.error }, { status: 429 })
     }
 
-    // Hämta plan för kvot-check
+    // Hämta plan + subscription-status för billing-check
     const supabase = getServerSupabase()
     const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('subscription_plan')
+      .select('subscription_plan, subscription_status, trial_ends_at')
       .eq('business_id', business.business_id)
       .single()
+
+    // Blockera om trial gått ut eller betalning misslyckats
+    const billingCheck = isBillingActive(bizConfig || {})
+    if (!billingCheck.allowed) {
+      return NextResponse.json({
+        error: billingCheck.message || 'Prenumerationen är inte aktiv',
+        billing_inactive: true,
+      }, { status: 402 })
+    }
 
     const plan = getBusinessPlanFromConfig(bizConfig || {})
 

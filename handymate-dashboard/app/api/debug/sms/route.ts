@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { isAdmin } from '@/lib/admin-auth'
 
 /**
  * POST /api/debug/sms — Test-SMS till hantverkarens eget nummer
- * Kräver auth. Skickar ett test-SMS via 46elks.
+ * Kräver admin-auth i produktion (skyddar mot missbruk av SMS-kostnader).
  */
 export async function POST(request: NextRequest) {
+  // I produktion: endast admins får trigga debug-endpoints
+  if (process.env.NODE_ENV === 'production') {
+    const adminCheck = await isAdmin(request)
+    if (!adminCheck.isAdmin) {
+      return NextResponse.json({ error: 'Endast för admin i produktion' }, { status: 403 })
+    }
+  }
+
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

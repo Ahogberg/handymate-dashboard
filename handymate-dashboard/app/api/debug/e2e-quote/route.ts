@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
 
 /**
@@ -15,6 +16,13 @@ import { getServerSupabase } from '@/lib/supabase'
 export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === 'production') {
+    const adminCheck = await isAdmin(request)
+    if (!adminCheck.isAdmin) {
+      return NextResponse.json({ error: 'Endast för admin i produktion' }, { status: 403 })
+    }
+  }
+
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
