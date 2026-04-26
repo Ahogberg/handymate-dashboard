@@ -14,6 +14,7 @@ import {
   renderImageGrid,
   wrapInPage,
 } from '@/lib/document-html'
+import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,11 +55,13 @@ export async function POST(request: NextRequest) {
 
     const { data: config } = await supabase
       .from('business_config')
-      .select('accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website')
+      .select('business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website, quote_template_style')
       .eq('business_id', business.business_id)
       .single()
 
-    const html = generateQuoteHTML(quote, business, config)
+    const templateData = buildQuoteTemplateData(quote, business, config)
+    const renderFn = selectTemplate(config?.quote_template_style)
+    const html = renderFn(templateData)
 
     return new NextResponse(html, {
       headers: {
@@ -129,11 +132,13 @@ export async function GET(request: NextRequest) {
     // Hämta business-config (används som business-objekt i PDF-generatorn)
     const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered')
+      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, quote_template_style')
       .eq('business_id', quote.business_id)
       .single()
 
-    const html = generateQuoteHTML(quote, bizConfig, bizConfig)
+    const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig)
+    const renderFn = selectTemplate(bizConfig?.quote_template_style)
+    const html = renderFn(templateData)
 
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
