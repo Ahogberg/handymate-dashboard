@@ -1,5 +1,7 @@
 'use client'
 
+import './onboarding.css'
+
 export default function OnboardingLayout({
   children,
 }: {

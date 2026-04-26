@@ -1,690 +1,267 @@
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Loader2, Mail, Building2, Phone, Users, Sparkles, Upload,
-  Check, ChevronRight, Shield, ArrowLeft, MessageSquare, Send
-} from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { BRANCH_HOURLY_RATE, ROT_BRANCHES, RUT_BRANCHES } from './constants'
-import Step1BusinessAccount from './components/Step1BusinessAccount'
-import Step3Phone from './components/Step3Phone'
-import StepPayment from './components/StepPayment'
-import type { OnboardingData } from './types'
-import AddressAutocomplete from '@/components/AddressAutocomplete'
+import Step1MeetTheTeam from './components/Step1MeetTheTeam'
+import Step2Business from './components/Step2Business'
+import Step3HowYouWork from './components/Step3HowYouWork'
+import Step4PhoneNumber from './components/Step4PhoneNumber'
+import Step5Activate from './components/Step5Activate'
+import Step6LiveTour from './components/Step6LiveTour'
+import type { OnboardingFormData } from './types-redesign'
 
-// ── CSV parsing ───────────────────────────────────────────────────────
+const TOTAL_STEPS = 6
+
 /**
- * Parsar en CSV-sträng till kundobjekt.
- * Stödjer kolumner: namn, telefon, email (i valfri ordning)
- * Header-rad detekteras automatiskt.
+ * Onboarding-orchestrator (Claude Design redesign).
+ *
+ * Step-mappning till business_config.onboarding_step:
+ *   0 = Step1MeetTheTeam (intro, ingen DB)
+ *   1 = Step2Business    (account skapas, businessId sätts)
+ *   2 = Step3HowYouWork  (specialties + hours + price)
+ *   3 = Step4PhoneNumber (phone reserveras)
+ *   4 = Step5Activate    (Stripe payment)
+ *   5 = Step6LiveTour    (live tour, klar = onboarding_completed_at)
+ *
+ * Resume-logik: Vid sidvisning hämtas onboarding_step från DB.
+ * Användaren landar på rätt steg om de stängt mitt i flödet.
  */
-function parseCsvCustomers(csvText: string): Array<{ name: string; phone: string; email?: string }> {
-  const lines = csvText.split(/\r?\n/).filter(l => l.trim().length > 0)
-  if (lines.length === 0) return []
-
-  // Detect separator (, or ;)
-  const firstLine = lines[0]
-  const sep = firstLine.includes(';') && !firstLine.includes(',') ? ';' : ','
-
-  // Parse rows
-  const rows = lines.map(line => line.split(sep).map(c => c.trim().replace(/^["']|["']$/g, '')))
-
-  // Detect header row
-  const headerCandidates = rows[0].map(c => c.toLowerCase())
-  const hasHeader = headerCandidates.some(h =>
-    ['namn', 'name', 'telefon', 'phone', 'mobil', 'email', 'e-post', 'mail'].includes(h)
-  )
-
-  let nameIdx = 0, phoneIdx = 1, emailIdx = 2
-
-  if (hasHeader) {
-    const findCol = (...keys: string[]) => headerCandidates.findIndex(h => keys.includes(h))
-    nameIdx = findCol('namn', 'name', 'kundnamn') ?? 0
-    phoneIdx = findCol('telefon', 'phone', 'mobil', 'mobilnummer', 'telnr') ?? 1
-    emailIdx = findCol('email', 'e-post', 'mail', 'epost')
-    if (nameIdx === -1) nameIdx = 0
-    if (phoneIdx === -1) phoneIdx = 1
-  }
-
-  const dataRows = hasHeader ? rows.slice(1) : rows
-
-  const customers: Array<{ name: string; phone: string; email?: string }> = []
-  for (const row of dataRows) {
-    const name = row[nameIdx]?.trim() || ''
-    let phone = row[phoneIdx]?.trim() || ''
-    const email = emailIdx >= 0 && emailIdx < row.length ? row[emailIdx]?.trim() || undefined : undefined
-
-    if (!name || !phone) continue
-
-    // Normalisera svenskt telefonnummer
-    phone = phone.replace(/[\s\-()]/g, '')
-    if (phone.startsWith('0')) phone = '+46' + phone.slice(1)
-    if (!phone.startsWith('+')) phone = '+46' + phone
-
-    customers.push({ name, phone, email })
-  }
-
-  return customers
-}
-
-// ── Steps ─────────────────────────────────────────────────────────────
-const STEPS = [
-  { label: 'Företag', icon: Building2 },
-  { label: 'Telefon', icon: Phone },
-  { label: 'Betalning', icon: Shield },
-  { label: 'Kunder', icon: Users },
-  { label: 'Aktivera', icon: Sparkles },
-]
-
-// ── Pricing plans ─────────────────────────────────────────────────────
-const PLANS = [
-  { id: 'starter', name: 'Bas', price: '2 495', monthly: 2495, features: ['AI-telefonassistent', 'Offerter & Fakturor', 'Kundhantering', 'Pipeline', '1 användare'] },
-  { id: 'professional', name: 'Pro', price: '5 995', monthly: 5995, popular: true, features: ['Allt i Bas +', 'Automationer & Nurture', 'Lead-generering', 'Offertmallar (obegränsat)', '5 användare', 'Fortnox-integration'] },
-  { id: 'business', name: 'Business', price: '11 995', monthly: 11995, features: ['Allt i Pro +', 'Obegränsade användare', 'Egen AI-röst', 'Dedikerad support', 'Egen domän'] },
-]
-
-// ── Branch SMS templates ──────────────────────────────────────────────
-function getSmsTemplate(branch: string, businessName: string): string {
-  const templates: Record<string, string> = {
-    electrician: `Hej! Det är ${businessName}. Vi har lediga tider just nu — behöver du hjälp med något el-arbete? Svara JA så ringer vi upp dig!`,
-    plumber: `Hej! ${businessName} här. Har du funderat på att se över ditt värmesystem? Vi har lediga tider nu. Svara JA!`,
-    painter: `Hej! ${businessName} här. Dags att fräscha upp hemmet? Vi erbjuder kostnadsfri offert. Svara JA så hör vi av oss!`,
-    construction: `Hej! ${businessName} här. Planerar du en renovering? Vi har kapacitet nu — svara JA för en kostnadsfri konsultation!`,
-  }
-  return templates[branch] || `Hej! Det är ${businessName}. Vi har lediga tider just nu — behöver du hjälp med något? Svara JA så ringer vi!`
-}
-
 export default function OnboardingPage() {
   const router = useRouter()
+  const [step, setStep] = useState(0)
+  const [data, setData] = useState<OnboardingFormData>({ fSkatt: true })
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [step, setStep] = useState(0) // 0=payment, 1=company, 2=phone, 3=customers, 4=sms wow
-  const [data, setData] = useState<OnboardingData | null>(null)
-  const [isNewUser, setIsNewUser] = useState(false)
-  const [emailPending, setEmailPending] = useState(false)
-  const [pendingEmail, setPendingEmail] = useState('')
-  const [selectedPlan, setSelectedPlan] = useState('professional')
 
-  // Step 1 state
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [uploadingLogo, setUploadingLogo] = useState(false)
-  const [orgNumber, setOrgNumber] = useState('')
-  const [fSkatt, setFSkatt] = useState(true)
-  const [serviceArea, setServiceArea] = useState('')
-
-  // Step 3 state
-  const [csvFile, setCsvFile] = useState<File | null>(null)
-  const [importedCustomers, setImportedCustomers] = useState<Array<{ name: string; phone: string; email?: string }>>([])
-  const [manualName, setManualName] = useState('')
-  const [manualPhone, setManualPhone] = useState('')
-  const [importing, setImporting] = useState(false)
-
-  // Step 4 state
-  const [smsText, setSmsText] = useState('')
-  const [smsCount, setSmsCount] = useState(0)
-  const [sendingSms, setSendingSms] = useState(false)
-  const [smsSent, setSmsSent] = useState(0)
-  const [smsDone, setSmsDone] = useState(false)
-
+  // Vid load: kolla om användaren redan börjat onboarding
   useEffect(() => {
-    async function loadOnboarding() {
+    let cancelled = false
+    async function load() {
       try {
         const res = await fetch('/api/onboarding')
         if (!res.ok) {
-          setIsNewUser(true)
-          setStep(0)
-          setLoading(false)
+          // Ny användare — börja från Step 1 (intro)
+          if (!cancelled) {
+            setStep(0)
+            setLoading(false)
+          }
           return
         }
-        const d: OnboardingData = await res.json()
-        setData(d)
-        if (d.onboarding_step >= 5 || d.onboarding_completed_at) {
+        const d = await res.json()
+        if (cancelled) return
+
+        // Klar — redirecta direkt till dashboard
+        if (d.onboarding_completed_at) {
           router.push('/dashboard')
           return
         }
-        // Resume: map DB step to UI step
-        // DB: 0=start, 1=telefon done, 2=betalning done, 3=kunder done, 4+=SMS
-        if (d.onboarding_step >= 4) setStep(4)
-        else if (d.onboarding_step >= 3) setStep(3)
-        else if (d.onboarding_step >= 2) setStep(2)
-        else if (d.onboarding_step >= 1) setStep(1)
-        else setStep(0)
-      } catch {
-        setIsNewUser(true)
-        setStep(0)
-      } finally {
+
+        // Resume: mappa DB-step till UI-step
+        const dbStep = d.onboarding_step || 0
+        const uiStep = Math.max(0, Math.min(dbStep, TOTAL_STEPS - 1))
+
+        // Återställ form-data från DB om finns
+        const restored: OnboardingFormData = {
+          businessId: d.business_id,
+          companyName: d.business_name,
+          trade: d.branch,
+          orgNumber: d.org_number,
+          area: d.service_area,
+          contactName: d.contact_name,
+          email: d.contact_email,
+          phone: d.phone_number,
+          fSkatt: true,
+          ...(d.onboarding_data || {}),
+        }
+
+        setData(restored)
+        setStep(uiStep)
         setLoading(false)
+      } catch {
+        if (!cancelled) {
+          setStep(0)
+          setLoading(false)
+        }
       }
     }
-    loadOnboarding()
+    load()
+    return () => {
+      cancelled = true
+    }
   }, [router])
 
-  const saveProgress = useCallback(async (s: number) => {
-    try {
-      await fetch('/api/onboarding', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: s }),
-      })
-    } catch { /* silent */ }
-  }, [])
-
-  const goNext = useCallback(async () => {
-    const next = Math.min(step + 1, 4)
-    setSaving(true)
-    await saveProgress(next)
-    setStep(next)
-    setSaving(false)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [step, saveProgress])
-
-  const handleUpdate = useCallback((updates: Partial<OnboardingData>) => {
-    setData(prev => prev ? { ...prev, ...updates } : null)
-  }, [])
-
-  const handleStep1Complete = useCallback(async (
-    businessId: string,
-    isEmailPending: boolean,
-    formData: { business_name: string; branch: string; contact_name: string; contact_email: string; phone_number: string }
-  ) => {
-    const baseData: OnboardingData = {
-      business_id: businessId,
-      business_name: formData.business_name,
-      display_name: formData.business_name,
-      contact_name: formData.contact_name,
-      contact_email: formData.contact_email,
-      phone_number: formData.phone_number,
-      branch: formData.branch,
-      service_area: serviceArea,
-      org_number: orgNumber,
-      address: '',
-      services_offered: [],
-      default_hourly_rate: BRANCH_HOURLY_RATE[formData.branch] || 450,
-      callout_fee: 0,
-      rot_enabled: ROT_BRANCHES.includes(formData.branch),
-      rut_enabled: RUT_BRANCHES.includes(formData.branch),
-      assigned_phone_number: null,
-      forward_phone_number: null,
-      call_mode: null,
-      phone_setup_type: null,
-      lead_sources: [],
-      lead_email_address: null,
-      knowledge_base: null,
-      onboarding_step: 2,
-      onboarding_data: {},
-      onboarding_completed_at: null,
-      working_hours: null,
-      industry: null,
-      google_connected: false,
-      gmail_enabled: false,
-    }
-    setData(baseData)
-    setIsNewUser(false)
-
-    if (isEmailPending) {
-      setPendingEmail(formData.contact_email)
-      setEmailPending(true)
-      return
-    }
-
-    // Save logo + extra fields
-    if (logoUrl || orgNumber) {
+  // Save progress till DB (bara om vi har businessId)
+  const saveProgress = useCallback(
+    async (s: number, extraData?: Record<string, unknown>) => {
+      if (!data.businessId) return
       try {
         await fetch('/api/onboarding', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            data: { logo_url: logoUrl, org_number: orgNumber, f_skatt: fSkatt, service_area: serviceArea }
-          }),
+          body: JSON.stringify({ step: s, data: extraData || {} }),
         })
-      } catch { /* silent */ }
+      } catch {
+        // Silent — onboarding fortsätter ändå, kan resume senare
+      }
+    },
+    [data.businessId],
+  )
+
+  const next = useCallback(async () => {
+    const newStep = Math.min(step + 1, TOTAL_STEPS - 1)
+    setStep(newStep)
+
+    // Spara form-data till business_config + onboarding_step
+    if (data.businessId && newStep > 0) {
+      await saveProgress(newStep, sanitizeForSave(data))
+
+      // För step 3 (specialties + hours + price) — skriv DIREKT till business_config-kolumner
+      if (step === 2 && data.businessId) {
+        try {
+          const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
+          const supabase = createClientComponentClient()
+          const workingHours = buildWorkingHours(data)
+          await supabase
+            .from('business_config')
+            .update({
+              specialties: data.specialties || [],
+              working_hours: workingHours,
+              hourly_rate_min: data.priceMin ?? null,
+              hourly_rate_max: data.priceMax ?? null,
+              default_hourly_rate: data.priceMax
+                ? Math.round((data.priceMin! + data.priceMax) / 2)
+                : null,
+            })
+            .eq('business_id', data.businessId)
+        } catch {
+          // silent
+        }
+      }
+
+      // Step 4 (phone) — skriv assigned_phone_number
+      if (step === 3 && data.businessId && data.lisaNumber) {
+        try {
+          const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
+          const supabase = createClientComponentClient()
+          await supabase
+            .from('business_config')
+            .update({
+              assigned_phone_number: data.lisaNumber.replace(/\s/g, ''),
+              phone_setup_type: data.phoneMode === 'forward' ? 'keep_existing' : 'new_number',
+            })
+            .eq('business_id', data.businessId)
+        } catch {
+          // silent
+        }
+      }
     }
+  }, [step, data, saveProgress])
 
-    // Generate SMS template
-    setSmsText(getSmsTemplate(formData.branch, formData.business_name))
-    setStep(1) // → Telefon
-    saveProgress(1).catch(() => {})
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [logoUrl, orgNumber, fSkatt, serviceArea, saveProgress])
+  const back = useCallback(() => {
+    setStep(s => Math.max(0, s - 1))
+  }, [])
 
-  async function handleLogoUpload(file: File) {
-    if (file.size > 2 * 1024 * 1024) { alert('Max 2 MB'); return }
-    setUploadingLogo(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const res = await fetch('/api/business/logo', { method: 'POST', body: formData })
-      const d = await res.json()
-      if (res.ok && d.logo_url) setLogoUrl(d.logo_url)
-    } catch { /* silent */ }
-    setUploadingLogo(false)
-  }
-
-  function addManualCustomer() {
-    if (!manualName.trim() || !manualPhone.trim()) return
-    setImportedCustomers(prev => [...prev, { name: manualName.trim(), phone: manualPhone.trim() }])
-    setManualName('')
-    setManualPhone('')
-  }
-
-  async function handleSendSms() {
-    if (importedCustomers.length === 0 || !smsText.trim()) return
-    setSendingSms(true)
-    const toSend = importedCustomers.slice(0, smsCount || importedCustomers.length)
-    let sent = 0
-    for (const customer of toSend) {
+  const finish = useCallback(async () => {
+    if (data.businessId) {
       try {
-        await fetch('/api/sms/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: customer.phone,
-            message: smsText.replace('[namn]', customer.name).replace('[name]', customer.name),
-          }),
-        })
-        sent++
-        setSmsSent(sent)
-      } catch { /* continue */ }
+        const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
+        const supabase = createClientComponentClient()
+        await supabase
+          .from('business_config')
+          .update({
+            onboarding_step: 10, // Compat med befintlig "klar"-konvention
+            onboarding_completed_at: new Date().toISOString(),
+            welcome_tour_seen: new Date().toISOString(),
+          })
+          .eq('business_id', data.businessId)
+      } catch {
+        // silent
+      }
     }
-    setSmsDone(true)
-    setSendingSms(false)
-    // Complete onboarding
-    try {
-      await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: 5 }),
-      })
-    } catch { /* silent */ }
-  }
-
-  async function completeOnboarding() {
-    try {
-      await fetch('/api/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ step: 5 }),
-      })
-    } catch { /* silent */ }
     router.push('/dashboard')
-  }
+  }, [data.businessId, router])
 
-  // ── Loading ─────────────────────────────────────────────────────────
+  const setDataUpdater = useCallback(
+    (updater: (d: OnboardingFormData) => OnboardingFormData) => setData(updater),
+    [],
+  )
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
-      </div>
-    )
-  }
-
-  // ── Email pending ───────────────────────────────────────────────────
-  if (emailPending) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-4">
-        <div className="max-w-md w-full text-center space-y-6">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto">
-            <Mail className="w-8 h-8 text-primary-700" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900">Bekräfta din e-post</h1>
-          <p className="text-gray-500">
-            Vi har skickat ett mail till <span className="text-gray-900 font-medium">{pendingEmail}</span>.
-            Klicka på länken för att aktivera ditt konto.
-          </p>
-          <a href="/login" className="block w-full py-3 bg-primary-700 text-white rounded-xl font-medium hover:bg-primary-700">
-            Gå till inloggning
-          </a>
-        </div>
-      </div>
-    )
-  }
-
-  const totalSteps = STEPS.length
-  const progress = ((step + 1) / totalSteps) * 100
-
-  const stepProps = data ? {
-    data,
-    onNext: goNext,
-    onBack: step > 1 ? () => setStep(step - 1) : undefined,
-    onUpdate: handleUpdate,
-    saving,
-  } : null
-
-  return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-2xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
-              <img src="/logo.png" alt="Handymate" className="w-7 h-7 object-contain" />
-            </div>
-            <span className="text-gray-900 font-semibold text-lg">Handymate</span>
-          </div>
-          {/* Progress bar */}
-          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-            <div className="h-full bg-primary-700 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="flex justify-between mt-2">
-            {STEPS.map((s, i) => (
-              <span key={s.label} className={`text-[10px] font-medium ${i <= step ? 'text-primary-700' : 'text-gray-300'}`}>
-                {i < step ? '✓' : ''} {s.label}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 py-8">
-
-        {/* ── STEP 0: Payment ─────────────────────────────────── */}
-        {/* ── STEP 0: Företag ─────────────────────────────── */}
-        {step === 0 && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Företagsinfo</h1>
-              <p className="text-gray-500 text-sm">Steg 1 av 5 — tar ca 2 minuter</p>
-            </div>
-
-            {/* Logo upload */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <label className="block text-sm font-medium text-gray-700 mb-3">Företagslogga</label>
-              <div className="flex items-center gap-4">
-                {logoUrl ? (
-                  <img src={logoUrl} alt="Logga" className="w-16 h-16 object-contain rounded-xl border border-gray-200" />
-                ) : (
-                  <div className="w-16 h-16 bg-gray-100 rounded-xl border border-dashed border-gray-300 flex items-center justify-center">
-                    <Building2 className="w-6 h-6 text-gray-300" />
-                  </div>
-                )}
-                <div>
-                  <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 text-sm font-medium rounded-lg hover:bg-primary-100">
-                    <Upload className="w-3.5 h-3.5" />
-                    {logoUrl ? 'Byt logga' : 'Ladda upp'}
-                    <input type="file" className="hidden" accept=".png,.jpg,.jpeg,.svg,.webp"
-                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = '' }}
-                    />
-                  </label>
-                  {uploadingLogo && <Loader2 className="w-4 h-4 text-primary-600 animate-spin inline ml-2" />}
-                  <p className="text-xs text-gray-400 mt-1">Syns på offerter, fakturor och brev. PNG/JPG/SVG, max 2MB</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Org number + F-skatt */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Org-nummer</label>
-                  <input type="text" value={orgNumber} onChange={e => setOrgNumber(e.target.value)}
-                    placeholder="XXXXXX-XXXX"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-500 mb-1">Tjänsteområde</label>
-                  <input type="text" value={serviceArea} onChange={e => setServiceArea(e.target.value)}
-                    placeholder="Postnummer eller stad"
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-600"
-                  />
-                </div>
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={fSkatt} onChange={e => setFSkatt(e.target.checked)}
-                  className="w-4 h-4 text-primary-700 rounded border-gray-300 focus:ring-primary-600"
-                />
-                <span className="text-sm text-gray-700">F-skattsedel innehas</span>
-              </label>
-            </div>
-
-            {/* Step1 registration form (business name, branch, contact, email, phone) */}
-            <Step1BusinessAccount onComplete={handleStep1Complete} />
-          </div>
-        )}
-
-        {/* ── STEP 1: Phone ───────────────────────────────────── */}
-        {step === 1 && stepProps && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Ditt företagsnummer</h1>
-              <p className="text-gray-500 text-sm">Steg 2 av 5</p>
-            </div>
-            <Step3Phone {...stepProps} />
-          </div>
-        )}
-
-        {/* ── STEP 2: Betalning (Stripe Elements) ─────────────── */}
-        {step === 2 && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Aktivera ditt konto</h1>
-              <p className="text-gray-500 text-sm">Steg 3 av 5</p>
-            </div>
-            <StepPayment
-              selectedPlan={selectedPlan}
-              onComplete={async () => { await saveProgress(3); setStep(3) }}
-              onBack={() => setStep(1)}
+      <div className="ob-page">
+        <div className="ob-card-wrap">
+          <div
+            className="ob-screen"
+            style={{
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexDirection: 'row',
+            }}
+          >
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                border: '3px solid var(--ob-primary-100)',
+                borderTopColor: 'var(--ob-primary-700)',
+                borderRadius: '50%',
+                animation: 'ob-spin 0.9s linear infinite',
+              }}
             />
           </div>
-        )}
+        </div>
+      </div>
+    )
+  }
 
-        {/* ── STEP 3: Import Customers ────────────────────────── */}
+  return (
+    <div className="ob-page">
+      <div className="ob-card-wrap">
+        {step === 0 && <Step1MeetTheTeam onNext={next} />}
+        {step === 1 && (
+          <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        )}
+        {step === 2 && (
+          <Step3HowYouWork onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        )}
         {step === 3 && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Lägg till dina kunder</h1>
-              <p className="text-gray-500 text-sm">Steg 3 av 4 — importera befintliga kunder</p>
-            </div>
-
-            {/* Manual add */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Lägg till manuellt</h3>
-              <div className="flex gap-2">
-                <input type="text" value={manualName} onChange={e => setManualName(e.target.value)}
-                  placeholder="Namn" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/30"
-                />
-                <input type="tel" value={manualPhone} onChange={e => setManualPhone(e.target.value)}
-                  placeholder="Telefon" className="flex-1 px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-600/30"
-                />
-                <button onClick={addManualCustomer} disabled={!manualName.trim() || !manualPhone.trim()}
-                  className="px-4 py-2 bg-primary-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-                  Lägg till
-                </button>
-              </div>
-            </div>
-
-            {/* CSV upload */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Eller ladda upp CSV</h3>
-              <p className="text-xs text-gray-500 mb-3">
-                Format: <code className="bg-gray-100 px-1 rounded">namn,telefon,email</code> (header-rad är valfri)
-              </p>
-              <label className="flex items-center justify-center gap-2 py-4 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-primary-500 hover:text-primary-700 cursor-pointer transition-colors">
-                <Upload className="w-4 h-4" />
-                Välj CSV-fil med kunder
-                <input type="file" className="hidden" accept=".csv,.txt"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0]
-                    if (!f) return
-                    setCsvFile(f)
-                    try {
-                      const text = await f.text()
-                      const parsed = parseCsvCustomers(text)
-                      if (parsed.length === 0) {
-                        alert('Inga kunder kunde läsas från filen. Kontrollera formatet: namn,telefon,email')
-                        return
-                      }
-                      setImportedCustomers(prev => {
-                        // Dedupe på telefon
-                        const seen = new Set(prev.map(c => c.phone))
-                        const next = [...prev]
-                        for (const c of parsed) {
-                          if (!seen.has(c.phone)) {
-                            next.push(c)
-                            seen.add(c.phone)
-                          }
-                        }
-                        return next
-                      })
-                    } catch (err) {
-                      console.error('CSV parse error:', err)
-                      alert('Kunde inte läsa CSV-filen. Se till att den är textbaserad (UTF-8).')
-                    }
-                  }}
-                />
-              </label>
-              {csvFile && <p className="text-xs text-primary-700 mt-2">Vald fil: {csvFile.name}</p>}
-            </div>
-
-            {/* Imported list */}
-            {importedCustomers.length > 0 && (
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <p className="text-sm font-medium text-gray-900 mb-2">{importedCustomers.length} kunder tillagda</p>
-                <div className="space-y-1 max-h-40 overflow-y-auto">
-                  {importedCustomers.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-100 last:border-0">
-                      <span className="text-gray-700">{c.name}</span>
-                      <span className="text-gray-400">{c.phone}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button onClick={() => setStep(2)} className="px-4 py-3 border border-gray-200 rounded-xl text-gray-600 text-sm">
-                <ArrowLeft className="w-4 h-4 inline mr-1" />Tillbaka
-              </button>
-              <button
-                onClick={async () => {
-                  // Spara alla importerade kunder till DB innan nästa steg
-                  if (importedCustomers.length > 0) {
-                    try {
-                      const res = await fetch('/api/customers/bulk', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ customers: importedCustomers }),
-                      })
-                      if (!res.ok) {
-                        const err = await res.json().catch(() => ({}))
-                        console.error('Customer bulk import failed:', err)
-                        alert(`${importedCustomers.length} kunder kunde inte sparas — försök igen eller hoppa över.`)
-                        return
-                      }
-                    } catch (err) {
-                      console.error('Customer bulk import error:', err)
-                      alert('Nätverksfel vid sparning av kunder — försök igen.')
-                      return
-                    }
-                  }
-                  await saveProgress(4)
-                  setStep(4)
-                }}
-                className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-medium text-sm hover:bg-primary-700">
-                {importedCustomers.length > 0 ? `Fortsätt med ${importedCustomers.length} kunder` : 'Hoppa över — lägg till senare'}
-              </button>
-            </div>
-          </div>
+          <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
         )}
-
-        {/* ── STEP 4: SMS Reactivation Wow ────────────────────── */}
         {step === 4 && (
-          <div className="space-y-6">
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">Nå dina kunder direkt 🚀</h1>
-              <p className="text-gray-500 text-sm">Steg 4 av 4 — din första kampanj</p>
-            </div>
-
-            {importedCustomers.length > 0 && !smsDone ? (
-              <>
-                <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                  <p className="text-sm text-gray-700 mb-4">
-                    Du har precis lagt till <strong>{importedCustomers.length}</strong> kunder.
-                    Skicka ett meddelande och se vem som är intresserad!
-                  </p>
-
-                  <label className="block text-sm font-medium text-gray-700 mb-2">SMS-text</label>
-                  <textarea
-                    value={smsText}
-                    onChange={e => setSmsText(e.target.value)}
-                    rows={3}
-                    maxLength={320}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600/30 resize-y"
-                  />
-                  <p className="text-xs text-gray-400 mt-1">{smsText.length}/320 tecken</p>
-
-                  {/* SMS preview */}
-                  <div className="mt-4 bg-gray-50 rounded-xl p-4">
-                    <p className="text-xs text-gray-400 mb-2">Förhandsvisning:</p>
-                    <div className="bg-primary-700 text-white rounded-2xl rounded-bl-md px-4 py-2.5 text-sm max-w-[85%]">
-                      {smsText.replace('[namn]', importedCustomers[0]?.name || 'Kund').replace('[name]', importedCustomers[0]?.name || 'Kund')}
-                    </div>
-                  </div>
-
-                  {/* Count slider */}
-                  <div className="mt-4">
-                    <label className="text-sm text-gray-700">
-                      Skicka till: <strong>{smsCount || importedCustomers.length}</strong> av {importedCustomers.length}
-                    </label>
-                    <input type="range" min={1} max={importedCustomers.length}
-                      value={smsCount || importedCustomers.length}
-                      onChange={e => setSmsCount(parseInt(e.target.value))}
-                      className="w-full mt-1 accent-primary-700"
-                    />
-                    <p className="text-xs text-gray-400 mt-1">
-                      Uppskattad kostnad: {smsCount || importedCustomers.length} × 0,89 kr = {((smsCount || importedCustomers.length) * 0.89).toFixed(0)} kr
-                    </p>
-                  </div>
-                </div>
-
-                {sendingSms && (
-                  <div className="bg-primary-50 border border-primary-300 rounded-xl p-4 text-center">
-                    <Loader2 className="w-5 h-5 text-primary-700 animate-spin mx-auto mb-2" />
-                    <p className="text-sm text-primary-700">Skickar... {smsSent}/{smsCount || importedCustomers.length}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-3">
-                  <button onClick={completeOnboarding}
-                    className="px-4 py-3 border border-gray-200 rounded-xl text-gray-500 text-sm">
-                    Hoppa över
-                  </button>
-                  <button onClick={handleSendSms} disabled={sendingSms || !smsText.trim()}
-                    className="flex-1 py-3 bg-primary-700 text-white rounded-xl font-semibold text-sm hover:bg-primary-700 disabled:opacity-50 flex items-center justify-center gap-2">
-                    <Send className="w-4 h-4" />
-                    Skicka nu
-                  </button>
-                </div>
-              </>
-            ) : smsDone ? (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center space-y-4">
-                <div className="text-5xl">🎉</div>
-                <h2 className="text-xl font-bold text-gray-900">{smsSent} SMS skickade!</h2>
-                <p className="text-sm text-gray-500">Du får en notis när någon svarar.</p>
-                <button onClick={() => router.push('/dashboard')}
-                  className="w-full py-3 bg-primary-700 text-white rounded-xl font-semibold hover:bg-primary-700">
-                  Gå till Dashboard
-                </button>
-              </div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center space-y-4">
-                <MessageSquare className="w-12 h-12 text-gray-300 mx-auto" />
-                <h2 className="text-lg font-semibold text-gray-900">SMS-reaktivering</h2>
-                <p className="text-sm text-gray-500">
-                  Lägg till kunder och skicka din första kampanj från Marknadsföring → SMS-kampanjer
-                </p>
-                <button onClick={completeOnboarding}
-                  className="w-full py-3 bg-primary-700 text-white rounded-xl font-semibold hover:bg-primary-700">
-                  Gå till Dashboard
-                </button>
-              </div>
-            )}
-          </div>
+          <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
         )}
+        {step === 5 && <Step6LiveTour onFinish={finish} data={data} />}
       </div>
     </div>
   )
+}
+
+/**
+ * Tar bara med fält som ska persisteras i onboarding_data JSONB.
+ * Strippar bort businessId, password, etc.
+ */
+function sanitizeForSave(d: OnboardingFormData): Record<string, unknown> {
+  const {
+    businessId: _bid,
+    password: _p,
+    emailPending: _e,
+    logoDataUrl: _l,
+    ...rest
+  } = d
+  return rest
+}
+
+/**
+ * Konverterar Step3-formdata till business_config.working_hours JSONB-format.
+ * DAYS-array är [mån, tis, ons, tor, fre, lör, sön] — booleans.
+ */
+function buildWorkingHours(d: OnboardingFormData): Record<string, { active: boolean; start: string; end: string }> {
+  const days = d.days || [true, true, true, true, true, false, false]
+  const start = `${String(d.startHour ?? 7).padStart(2, '0')}:00`
+  const end = `${String(d.endHour ?? 17).padStart(2, '0')}:00`
+  const keys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+  const result: Record<string, { active: boolean; start: string; end: string }> = {}
+  keys.forEach((k, i) => {
+    result[k] = { active: !!days[i], start, end }
+  })
+  return result
 }
