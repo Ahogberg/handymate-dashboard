@@ -115,21 +115,31 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
                   <img
                     src={agent.avatar}
                     alt={agent.name}
-                    className={`w-9 h-9 rounded-full object-cover ${activity.idle ? 'opacity-60 grayscale' : ''}`}
+                    className="w-9 h-9 rounded-full object-cover"
                   />
                 ) : (
-                  <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold ${activity.idle ? 'opacity-60' : ''}`}>
+                  <div className={`w-9 h-9 rounded-full ${agent.color} flex items-center justify-center text-white text-xs font-semibold`}>
                     {agent.initials}
                   </div>
                 )}
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${activity.idle ? 'bg-gray-300' : 'bg-emerald-500'}`} />
+                <span
+                  className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                    activity.idle ? 'bg-emerald-300' : 'bg-emerald-500'
+                  }`}
+                  title={activity.idle ? 'Standby' : 'Aktiv'}
+                />
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-semibold leading-tight ${activity.idle ? 'text-gray-500' : 'text-gray-900'}`}>
-                  {agent.name}
-                </p>
-                <p className={`text-xs leading-snug mt-0.5 ${activity.idle ? 'text-gray-400 italic' : 'text-gray-600'}`}>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
+                  {activity.idle && (
+                    <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                      Standby
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-600 leading-snug mt-0.5">
                   {activity.stat && (
                     <span className="font-semibold text-gray-900">{activity.stat} </span>
                   )}

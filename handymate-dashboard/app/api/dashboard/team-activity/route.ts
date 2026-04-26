@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         meta: lisaLatest ? formatTime(lisaLatest.created_at) : null,
         idle: false,
       }
-    : { id: 'lisa', stat: null, action: 'Inga inkommande just nu', meta: null, idle: true }
+    : { id: 'lisa', stat: null, action: 'På plats — redo att ta samtal och SMS', meta: null, idle: true }
 
   // ── DANIEL: Säljare (offerter) ────────────────────────────
   const sentQuotes = quotes.filter(q => q.sent_at && new Date(q.sent_at) >= new Date(sinceIso))
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
           meta: null,
           idle: false,
         }
-      : { id: 'daniel', stat: null, action: 'Inga aktiva offerter idag', meta: null, idle: true }
+      : { id: 'daniel', stat: null, action: 'Bevakar offert-pipeline — följer upp automatiskt', meta: null, idle: true }
 
   // ── KARIN: Ekonom (fakturor + påminnelser) ────────────────
   const totalInvoiced = invoices.reduce((sum, i) => sum + (Number(i.total) || 0), 0)
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest) {
         meta: invoices[0] ? formatTime(invoices[0].created_at) : null,
         idle: false,
       }
-    : { id: 'karin', stat: null, action: 'Inga fakturor att hantera', meta: null, idle: true }
+    : { id: 'karin', stat: null, action: 'Håller koll på fakturor och betalningar', meta: null, idle: true }
 
   // ── LARS: Projektledare (bokningar) ──────────────────────
   const updatedBookings = bookings.filter(b =>
@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
         meta: updatedBookings[0] ? formatTime(updatedBookings[0].updated_at) : null,
         idle: false,
       }
-    : { id: 'lars', stat: null, action: 'Inga bokningar att hantera', meta: null, idle: true }
+    : { id: 'lars', stat: null, action: 'Bevakar bokningar och projektstatus', meta: null, idle: true }
 
   // ── HANNA: Marknad (kampanjer + SMS-flöden) ──────────────
   const campaignActions = automationLogs.filter(l =>
@@ -177,7 +177,7 @@ export async function GET(request: NextRequest) {
         meta: campaignActions[0] ? formatTime(campaignActions[0].created_at) : null,
         idle: false,
       }
-    : { id: 'hanna', stat: null, action: 'Inga aktiva kampanjer', meta: null, idle: true }
+    : { id: 'hanna', stat: null, action: 'Förbereder kampanjer — spanar efter nya leads', meta: null, idle: true }
 
   // ── MATTE: Chefsassistent (totalt) ────────────────────────
   const matteRuns = agentRuns.filter(r => r.agent_id === 'matte' || !r.agent_id)
