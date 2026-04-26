@@ -60,7 +60,8 @@ export async function POST(request: NextRequest) {
       .single()
 
     const templateData = buildQuoteTemplateData(quote, business, config)
-    const renderFn = selectTemplate(config?.quote_template_style)
+    // Per-quote override → fallback till business default
+    const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
     const html = renderFn(templateData)
 
     return new NextResponse(html, {
@@ -137,7 +138,8 @@ export async function GET(request: NextRequest) {
       .single()
 
     const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig)
-    const renderFn = selectTemplate(bizConfig?.quote_template_style)
+    // Per-quote override → fallback till business default
+    const renderFn = selectTemplate(quote.template_style || bizConfig?.quote_template_style)
     const html = renderFn(templateData)
 
     return new NextResponse(html, {

@@ -350,6 +350,9 @@ export async function POST(request: NextRequest) {
       ai_confidence: body.ai_confidence || null,
       source_transcript: body.source_transcript || null,
       template_id: body.template_id || null,
+      template_style: ['modern', 'premium', 'friendly'].includes(body.template_style)
+        ? body.template_style
+        : null,
       // Generera sign_token redan vid create så portal-länken alltid fungerar,
       // oavsett om offerten skickas via /quotes/send eller delas direkt.
       sign_token: crypto.randomUUID(),
@@ -513,6 +516,11 @@ export async function PUT(request: NextRequest) {
     if (body.detail_level !== undefined) updates.detail_level = body.detail_level
     if (body.show_unit_prices !== undefined) updates.show_unit_prices = body.show_unit_prices
     if (body.show_quantities !== undefined) updates.show_quantities = body.show_quantities
+    if (body.template_style !== undefined) {
+      updates.template_style = ['modern', 'premium', 'friendly'].includes(body.template_style)
+        ? body.template_style
+        : null
+    }
 
     if (body.status !== undefined) {
       updates.status = body.status

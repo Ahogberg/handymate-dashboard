@@ -272,6 +272,10 @@ export default function EditQuotePage() {
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
 
+  // Visuell stil — overridar business default per offert
+  const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
+  const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
+
   // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
@@ -386,7 +390,7 @@ export default function EditQuotePage() {
         .eq('is_active', true),
       supabase
         .from('business_config')
-        .select('pricing_settings')
+        .select('pricing_settings, quote_template_style')
         .eq('business_id', business.business_id)
         .single(),
       supabase
@@ -399,6 +403,10 @@ export default function EditQuotePage() {
     setCustomers(customersApiRes?.customers || customersApiRes?.data || [])
     setPriceList(priceListRes.data || [])
     setCustomCategories((categoriesRes.data as CustomCategory[]) || [])
+    const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
+    if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {
+      setBusinessDefaultStyle(defaultStyle)
+    }
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
         hourly_rate: 650,
@@ -502,6 +510,12 @@ export default function EditQuotePage() {
       setShowUnitPrices(quote.show_unit_prices ?? true)
       setShowQuantities(quote.show_quantities ?? true)
 
+      // Visuell stil — null = använd business default
+      const qStyle = quote.template_style as 'modern' | 'premium' | 'friendly' | null | undefined
+      if (qStyle && ['modern', 'premium', 'friendly'].includes(qStyle)) {
+        setTemplateStyle(qStyle)
+      }
+
       // ROT/RUT
       setPersonnummer(quote.personnummer || '')
       setFastighetsbeteckning(quote.fastighetsbeteckning || '')
@@ -600,6 +614,7 @@ export default function EditQuotePage() {
         personnummer: (hasRotItems || hasRutItems) ? personnummer || null : null,
         fastighetsbeteckning: hasRotItems ? fastighetsbeteckning || null : null,
         valid_days: validDays,
+        template_style: templateStyle, // null = använd business default
       }
     },
     [
@@ -629,6 +644,7 @@ export default function EditQuotePage() {
       hasRotItems,
       hasRutItems,
       validDays,
+      templateStyle,
     ]
   )
 
@@ -1417,6 +1433,58 @@ export default function EditQuotePage() {
           {/* Right Column — Sidebar                                    */}
           {/* ══════════════════════════════════════════════════════════ */}
           <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+            {/* Stil-väljare — overridar business default per offert */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Offertstil</span>
+                {templateStyle && (
+                  <button
+                    type="button"
+                    onClick={() => setTemplateStyle(null)}
+                    className="text-[10px] text-[#94A3B8] hover:text-primary-700"
+                  >
+                    Återställ till standard
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'modern', label: 'Modern', tagline: 'Ren & tidlös' },
+                  { id: 'premium', label: 'Premium', tagline: 'Påkostad' },
+                  { id: 'friendly', label: 'Friendly', tagline: 'Varm' },
+                ] as const).map(opt => {
+                  const effective = templateStyle || businessDefaultStyle
+                  const isSelected = effective === opt.id
+                  const isDefault = !templateStyle && businessDefaultStyle === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTemplateStyle(opt.id)}
+                      className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-[#E2E8F0] hover:border-primary-300'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-[#1E293B]">{opt.label}</div>
+                      <div className="text-[10px] text-[#94A3B8]">{opt.tagline}</div>
+                      {isDefault && <div className="text-[9px] text-primary-700 mt-0.5">Standard</div>}
+                    </button>
+                  )
+                })}
+              </div>
+              <a
+                href={`/api/quotes/pdf?id=${quoteId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 inline-flex items-center gap-1.5 text-[11px] text-primary-700 hover:text-primary-800 font-medium"
+              >
+                <Eye className="w-3 h-3" />
+                Förhandsgranska design (sparas först)
+              </a>
+            </div>
+
             {/* Preview panel (collapsible) */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl hidden lg:block">
               <button

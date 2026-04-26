@@ -293,6 +293,10 @@ export default function NewQuotePage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | undefined>(undefined)
 
+  // Visuell stil — overridar business default per offert. null = använd default.
+  const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
+  const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
+
   // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
@@ -481,7 +485,7 @@ export default function NewQuotePage() {
         .eq('is_active', true),
       supabase
         .from('business_config')
-        .select('pricing_settings')
+        .select('pricing_settings, quote_template_style')
         .eq('business_id', business.business_id)
         .single(),
       supabase
@@ -497,6 +501,10 @@ export default function NewQuotePage() {
     setCustomers(customersApiRes?.customers || [])
     setPriceList(priceListRes.data || [])
     setCustomCategories((customCatRes.data as CustomCategory[]) || [])
+    const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
+    if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {
+      setBusinessDefaultStyle(defaultStyle)
+    }
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
         hourly_rate: 650,
@@ -1181,6 +1189,7 @@ export default function NewQuotePage() {
           ai_confidence: aiConfidence || null,
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
+          template_style: templateStyle, // null = använd business default
           attachments: attachments.length > 0 ? attachments : [],
           deal_id: searchParams?.get('deal_id') || searchParams?.get('lead_id') || null,
         }),
@@ -1951,6 +1960,52 @@ export default function NewQuotePage() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* Stil-väljare — overridar business default per offert */}
+            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Offertstil</span>
+                {templateStyle && (
+                  <button
+                    type="button"
+                    onClick={() => setTemplateStyle(null)}
+                    className="text-[10px] text-[#94A3B8] hover:text-primary-700"
+                  >
+                    Återställ till standard
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'modern', label: 'Modern', tagline: 'Ren & tidlös' },
+                  { id: 'premium', label: 'Premium', tagline: 'Påkostad' },
+                  { id: 'friendly', label: 'Friendly', tagline: 'Varm' },
+                ] as const).map(opt => {
+                  const effective = templateStyle || businessDefaultStyle
+                  const isSelected = effective === opt.id
+                  const isDefault = !templateStyle && businessDefaultStyle === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTemplateStyle(opt.id)}
+                      className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                        isSelected
+                          ? 'border-primary-600 bg-primary-50'
+                          : 'border-[#E2E8F0] hover:border-primary-300'
+                      }`}
+                    >
+                      <div className="text-xs font-semibold text-[#1E293B]">{opt.label}</div>
+                      <div className="text-[10px] text-[#94A3B8]">{opt.tagline}</div>
+                      {isDefault && <div className="text-[9px] text-primary-700 mt-0.5">Standard</div>}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-[#94A3B8] mt-2 leading-relaxed">
+                Stilen speglas i den färdiga offerten — slutdesignen visas via "Förhandsgranska design" efter sparad offert.
+              </p>
             </div>
 
             {/* Preview panel (collapsible) */}
