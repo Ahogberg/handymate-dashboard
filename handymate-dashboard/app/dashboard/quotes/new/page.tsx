@@ -335,7 +335,8 @@ export default function NewQuotePage() {
   const [showTemplatePanel, setShowTemplatePanel] = useState(false)
 
   // Preview panel in sidebar + mobile modal
-  const [showPreviewPanel, setShowPreviewPanel] = useState(false)
+  // Default öppen — mallen är huvudfokuset på sidan
+  const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   // 'design' = iframe med slutdesign (matchar PDF), 'compact' = React-preview
   const [previewMode, setPreviewMode] = useState<'design' | 'compact'>('design')
@@ -1314,8 +1315,8 @@ export default function NewQuotePage() {
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
-      <div className="max-w-6xl mx-auto">
+    <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
+      <div className="max-w-[1600px] mx-auto">
         {/* ── Header ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center">
@@ -1344,7 +1345,7 @@ export default function NewQuotePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(540px,40%)] gap-5 items-start">
           {/* ══════════════════════════════════════════════════════════ */}
           {/* Left Column — Form                                       */}
           {/* ══════════════════════════════════════════════════════════ */}
@@ -1994,9 +1995,9 @@ export default function NewQuotePage() {
           </div>
 
           {/* ══════════════════════════════════════════════════════════ */}
-          {/* Right Column — Sidebar                                    */}
+          {/* Right Column — Live mall + verktyg                       */}
           {/* ══════════════════════════════════════════════════════════ */}
-          <div className="flex flex-col gap-3 lg:sticky lg:top-4">
+          <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-1">
             {/* Template panel */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
               <button
@@ -2102,7 +2103,7 @@ export default function NewQuotePage() {
                   {previewMode === 'design' ? (
                     <TemplatePreviewFrame
                       payload={templatePreviewPayload}
-                      className="h-[700px]"
+                      className="h-[calc(100vh-200px)] min-h-[700px]"
                     />
                   ) : (
                     debouncedPreviewData && (
