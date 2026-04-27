@@ -83,3 +83,15 @@ export function getTriggeredByStyle(t: string): string {
     default: return 'bg-gray-100 text-gray-500 border-gray-200'
   }
 }
+
+export function formatFileSize(bytes: number | null): string {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+export function extractEmailName(from: string): string {
+  const match = from.match(/^"?([^"<]+)"?\s*</)
+  return match ? match[1].trim() : from.split('@')[0]
+}
