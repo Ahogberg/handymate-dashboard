@@ -61,9 +61,35 @@ import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REA
 import { todayDateStr, nowTimeStr } from '@/lib/datetime-defaults'
 import TaskPresetPicker from '@/components/TaskPresetPicker'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
-import { TimelineView } from '@/components/pipeline/TimelineView'
+import { TimelineView } from './components/TimelineView'
+import { PipelineStats as PipelineStatsView } from './components/PipelineStats'
 import { CopyId } from '@/components/CopyId'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
+import type {
+  Stage,
+  Deal,
+  CustomerDocument,
+  Task,
+  TaskActivity,
+  TeamMember,
+  DealNote,
+  CustomerTag,
+  Activity,
+  PipelineStats,
+  Toast,
+  CustomerOption,
+} from './types'
+import {
+  formatValue,
+  formatValueCompact,
+  formatColumnValue,
+  timeAgo,
+  getPriorityDot,
+  getPriorityLabel,
+  getPriorityBadgeStyle,
+  getTriggeredByLabel,
+  getTriggeredByStyle,
+} from './helpers'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -73,248 +99,6 @@ const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas')
   ),
   ssr: false,
 })
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface Stage {
-  id: string
-  name: string
-  slug: string
-  color: string
-  sort_order: number
-  is_system: boolean
-  is_won: boolean
-  is_lost: boolean
-}
-
-interface Deal {
-  id: string
-  deal_number: number | null
-  title: string
-  description: string | null
-  value: number | null
-  stage_id: string
-  priority: string
-  customer_id: string | null
-  quote_id: string | null
-  invoice_id: string | null
-  source: string | null
-  source_call_id: string | null
-  lead_source_platform: string | null
-  lead_temperature: string | null
-  lead_score: number | null
-  lead_score_factors: Record<string, number> | null
-  lead_reasoning: string | null
-  suggested_action: string | null
-  estimated_value: number | null
-  first_response_at: string | null
-  response_time_seconds: number | null
-  loss_reason: string | null
-  loss_reason_detail: string | null
-  assigned_to: string | null
-  category: string | null
-  created_at: string
-  updated_at: string
-  customer?: {
-    customer_id: string
-    name: string
-    phone_number: string
-    email: string
-    address_line: string | null
-    customer_type?: string
-    org_number?: string
-    contact_person?: string
-    personal_number?: string
-    customer_number?: string
-  } | null
-}
-
-interface CustomerDocument {
-  id: string
-  file_name: string
-  file_url: string
-  file_type: string | null
-  file_size: number | null
-  category: string
-  uploaded_at: string
-}
-
-interface Task {
-  id: string
-  title: string
-  description: string | null
-  status: 'pending' | 'in_progress' | 'done'
-  priority: 'low' | 'medium' | 'high'
-  due_date: string | null
-  due_time: string | null
-  customer_id: string | null
-  deal_id: string | null
-  project_id: string | null
-  assigned_to: string | null
-  assigned_user: { id: string; name: string; color: string } | null
-  completed_at: string | null
-  created_by: string | null
-  created_at: string
-}
-
-interface TaskActivity {
-  id: string
-  task_id: string
-  actor: string | null
-  action: string
-  description: string
-  old_value: string | null
-  new_value: string | null
-  created_at: string
-}
-
-interface TeamMember {
-  id: string
-  name: string
-  color: string
-  role: string
-  specialties?: string[]
-}
-
-interface DealNote {
-  id: string
-  deal_id: string
-  content: string
-  created_by: string | null
-  created_at: string
-  updated_at: string
-}
-
-interface CustomerTag {
-  name: string
-  color: string
-}
-
-interface Activity {
-  id: string
-  deal_id: string
-  activity_type: string
-  description: string | null
-  from_stage_name?: string
-  to_stage_name?: string
-  triggered_by: string
-  ai_confidence: number | null
-  ai_reason: string | null
-  undone_at: string | null
-  created_at: string
-  deal_title?: string
-}
-
-interface PipelineStats {
-  totalDeals: number
-  totalValue: number
-  wonValue: number
-  newLeadsToday: number
-  needsFollowUp: number
-}
-
-interface Toast {
-  show: boolean
-  message: string
-  type: 'success' | 'error' | 'info'
-}
-
-interface CustomerOption {
-  customer_id: string
-  name: string
-  phone_number: string
-  email: string | null
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function formatValue(v: number | null | undefined): string {
-  if (v == null || v === 0) return '0 kr'
-  return `${v.toLocaleString('sv-SE')} kr`
-}
-
-function formatValueCompact(v: number | null | undefined): string {
-  if (v == null || v === 0) return '0 kr'
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1).replace('.0', '')}M kr`
-  if (v >= 1000) return `${Math.round(v / 1000)}k kr`
-  return `${v} kr`
-}
-
-function formatColumnValue(v: number): string {
-  if (v === 0) return '0 kr'
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1).replace('.0', '')}M kr`
-  if (v >= 1000) return `${Math.round(v / 1000)}k kr`
-  return `${v} kr`
-}
-
-function timeAgo(date: string): string {
-  const now = new Date()
-  const d = new Date(date)
-  const diffMs = now.getTime() - d.getTime()
-  const diffMin = Math.floor(diffMs / 60000)
-  const diffHour = Math.floor(diffMin / 60)
-  const diffDay = Math.floor(diffHour / 24)
-  const diffWeek = Math.floor(diffDay / 7)
-
-  if (diffMin < 1) return 'just nu'
-  if (diffMin < 60) return `${diffMin} min`
-  if (diffHour < 24) return `${diffHour}h`
-  if (diffDay < 7) return `${diffDay}d`
-  if (diffWeek < 5) return `${diffWeek}v`
-  return `${Math.floor(diffDay / 30)} mån`
-}
-
-function getPriorityDot(p: string): string {
-  switch (p) {
-    case 'urgent': return 'bg-red-500'
-    case 'high': return 'bg-orange-500'
-    case 'medium': return 'bg-yellow-400'
-    case 'low': return 'bg-green-400'
-    default: return 'bg-gray-300'
-  }
-}
-
-function getPriorityLabel(p: string): string {
-  switch (p) {
-    case 'urgent': return 'Brådskande'
-    case 'high': return 'Hög'
-    case 'medium': return 'Medium'
-    case 'low': return 'Låg'
-    default: return 'Låg'
-  }
-}
-
-function getPriorityBadgeStyle(p: string): string {
-  switch (p) {
-    case 'urgent': return 'bg-gray-200 text-gray-700 border-gray-300'
-    case 'high': return 'bg-gray-150 text-gray-600 border-gray-200'
-    case 'medium': return 'bg-gray-100 text-gray-500 border-gray-200'
-    case 'low': return 'bg-gray-50 text-gray-400 border-gray-100'
-    default: return 'bg-gray-100 text-gray-500 border-gray-200'
-  }
-}
-
-function getTriggeredByLabel(t: string): string {
-  switch (t) {
-    case 'ai': return 'AI'
-    case 'user': return 'Användare'
-    case 'system': return 'System'
-    default: return t
-  }
-}
-
-function getTriggeredByStyle(t: string): string {
-  switch (t) {
-    case 'ai': return 'bg-primary-100 text-sky-700 border-primary-200'
-    case 'user': return 'bg-gray-100 text-gray-600 border-gray-200'
-    case 'system': return 'bg-gray-100 text-gray-500 border-gray-200'
-    default: return 'bg-gray-100 text-gray-500 border-gray-200'
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -2025,16 +1809,7 @@ export default function PipelinePage() {
         )}
 
         {/* Stats Footer */}
-        {stats && (
-          <div className="flex-shrink-0 border-t border-gray-200 px-4 lg:px-6 py-3 bg-white/60 backdrop-blur-sm">
-            <div className="flex items-center gap-4 lg:gap-8 overflow-x-auto text-xs">
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-primary-700" /><span className="text-gray-500">Aktiva:</span><span className="text-gray-900 font-medium">{stats.totalDeals}</span><span className="text-gray-400">({formatValueCompact(stats.totalValue)})</span></div>
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-emerald-400" /><span className="text-gray-500">Vunna:</span><span className="text-gray-900 font-medium">{formatValueCompact(stats.wonValue)}</span></div>
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-primary-500" /><span className="text-gray-500">Nya idag:</span><span className="text-gray-900 font-medium">{stats.newLeadsToday}</span></div>
-              <div className="flex items-center gap-2 flex-shrink-0"><div className="w-2 h-2 rounded-full bg-amber-400" /><span className="text-gray-500">Uppföljning:</span><span className="text-gray-900 font-medium">{stats.needsFollowUp}</span></div>
-            </div>
-          </div>
-        )}
+        <PipelineStatsView stats={stats} />
       </div>
 
       {/* Deal Detail Modal */}
