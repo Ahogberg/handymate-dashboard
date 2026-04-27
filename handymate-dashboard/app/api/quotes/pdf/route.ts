@@ -53,6 +53,16 @@ export async function POST(request: NextRequest) {
       quote.customer = customer
     }
 
+    // Resolva deal-nummer om offerten är kopplad till ett ärende
+    if (quote.deal_id) {
+      const { data: deal } = await supabase
+        .from('deal')
+        .select('deal_number')
+        .eq('id', quote.deal_id)
+        .maybeSingle()
+      if (deal?.deal_number != null) quote.deal_number = deal.deal_number
+    }
+
     const { data: config } = await supabase
       .from('business_config')
       .select('business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website, quote_template_style')
@@ -128,6 +138,16 @@ export async function GET(request: NextRequest) {
         .eq('customer_id', quote.customer_id)
         .single()
       quote.customer = customer
+    }
+
+    // Resolva deal-nummer om offerten är kopplad till ett ärende
+    if (quote.deal_id) {
+      const { data: deal } = await supabase
+        .from('deal')
+        .select('deal_number')
+        .eq('id', quote.deal_id)
+        .maybeSingle()
+      if (deal?.deal_number != null) quote.deal_number = deal.deal_number
     }
 
     // Hämta business-config (används som business-objekt i PDF-generatorn)

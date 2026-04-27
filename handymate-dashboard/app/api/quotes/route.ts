@@ -380,6 +380,7 @@ export async function POST(request: NextRequest) {
     if (body.personnummer) insertData.personnummer = body.personnummer
     if (body.fastighetsbeteckning) insertData.fastighetsbeteckning = body.fastighetsbeteckning
     if (body.lead_id) insertData.lead_id = body.lead_id
+    if (body.deal_id) insertData.deal_id = body.deal_id
 
     const { data: quote, error: insertError } = await supabase
       .from('quotes')
@@ -521,6 +522,7 @@ export async function PUT(request: NextRequest) {
         ? body.template_style
         : null
     }
+    if (body.deal_id !== undefined) updates.deal_id = body.deal_id || null
 
     if (body.status !== undefined) {
       updates.status = body.status

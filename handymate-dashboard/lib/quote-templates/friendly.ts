@@ -78,6 +78,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .doc-meta { text-align: right; position: relative; }
 .doc-label { font-size: 11px; color: rgba(255,255,255,0.7); font-weight: 500; }
 .doc-number { font-weight: 800; font-size: 26px; letter-spacing: -0.02em; margin-top: 2px; }
+.doc-ref { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; }
 .doc-dates { font-size: 12px; color: rgba(255,255,255,0.85); margin-top: 8px; line-height: 1.7; }
 .card { background: var(--paper); border-radius: 14px; padding: 20px 22px; box-shadow: 0 2px 6px rgba(15,23,42,0.04), 0 0 0 1px rgba(15,23,42,0.04); }
 .card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--teal); margin-bottom: 10px; }
@@ -153,6 +154,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
     <div class="doc-meta">
       <div class="doc-label">Offert</div>
       <div class="doc-number">${escapeHtml(data.quote.number)}</div>
+      ${data.quote.dealNumber ? `<div class="doc-ref">Ärende ${escapeHtml(data.quote.dealNumber)}</div>` : ''}
       <div class="doc-dates">Utfärdad ${escapeHtml(data.quote.issuedDate)}<br/>Giltig till ${escapeHtml(data.quote.validUntilDate)}</div>
     </div>
   </header>

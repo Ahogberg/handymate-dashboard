@@ -69,6 +69,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .header-meta { font-size: 12px; color: rgba(255,255,255,0.7); line-height: 1.9; text-align: right; }
 .header-meta strong { color: #fff; font-weight: 600; display: inline-block; min-width: 90px; }
 .quote-tagline { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 15px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--amber-light); margin-top: 14px; }
+.quote-ref { font-family: 'Syne', sans-serif; font-size: 13px; color: rgba(255,255,255,0.7); margin-top: 8px; letter-spacing: 0.04em; }
 .body { padding: 22mm 20mm; flex: 1; display: flex; flex-direction: column; }
 .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--line); }
 .party-label { font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; letter-spacing: 0.24em; text-transform: uppercase; color: var(--amber); margin-bottom: 8px; }
@@ -142,6 +143,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
     <div class="header-main">
       <div>
         <div class="quote-number">${escapeHtml(data.quote.number)}</div>
+        ${data.quote.dealNumber ? `<div class="quote-ref">Ärende ${escapeHtml(data.quote.dealNumber)}</div>` : ''}
         ${tagline ? `<div class="quote-tagline">${escapeHtml(tagline)}</div>` : ''}
       </div>
       <div class="header-meta">

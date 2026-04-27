@@ -162,6 +162,9 @@ export function buildQuoteTemplateData(
     },
     quote: {
       number: quote.quote_number || (quote.quote_id ? String(quote.quote_id).substring(0, 8).toUpperCase() : ''),
+      // Vi sätter dealNumber från ett resolverat dealReference-fält som PDF-routen
+      // injicerar (eller direkt på quote-objektet vid preview)
+      dealNumber: quote.deal_number != null ? `#${quote.deal_number}` : (quote.dealReference || null),
       issuedDate,
       validUntilDate,
       title: quote.title || 'Offert',

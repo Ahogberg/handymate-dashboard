@@ -46,6 +46,8 @@ export interface QuoteTemplateItem {
 
 export interface QuoteTemplateQuote {
   number: string
+  /** Ärende-/dealreferens från säljtratten — visas som "Ärende #1003" på offerten */
+  dealNumber?: string | null
   issuedDate: string
   validUntilDate: string
   title: string

@@ -92,6 +92,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .doc-meta { text-align: right; }
 .doc-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
 .doc-number { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; color: var(--ink); letter-spacing: -0.02em; margin-top: 2px; }
+.doc-ref { font-size: 11px; color: var(--muted); margin-top: 4px; font-weight: 500; }
 .doc-dates { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.7; }
 .doc-dates strong { color: var(--ink); font-weight: 600; }
 .accent { height: 2px; background: var(--teal); margin: 20px 0 28px; opacity: 0.85; }
@@ -163,6 +164,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
     <div class="doc-meta">
       <div class="doc-label">Offert</div>
       <div class="doc-number">${escapeHtml(data.quote.number)}</div>
+      ${data.quote.dealNumber ? `<div class="doc-ref">Ärende ${escapeHtml(data.quote.dealNumber)}</div>` : ''}
       <div class="doc-dates">
         <div><strong>Utfärdad:</strong> ${escapeHtml(data.quote.issuedDate)}</div>
         <div><strong>Giltig till:</strong> ${escapeHtml(data.quote.validUntilDate)}</div>

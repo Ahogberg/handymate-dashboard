@@ -17,6 +17,7 @@ import { useToast } from '@/components/Toast'
 import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
+import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import {
@@ -293,6 +294,7 @@ export default function EditQuotePage() {
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
+  const [previewMode, setPreviewMode] = useState<'design' | 'compact'>('design')
 
   // Add-row dropdown
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
@@ -368,6 +370,58 @@ export default function EditQuotePage() {
     }, 500)
     return () => clearTimeout(timer)
   }, [title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate, introductionText, conclusionText, notIncluded, ataTerms, calculatedPaymentPlan, referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities, showCategorySubtotals, customCategories])
+
+  // Payload till TemplatePreviewFrame — speglar PUT-payloaden så previewn matchar PDF
+  const templatePreviewPayload: TemplatePreviewPayload = useMemo(() => {
+    const validUntil = new Date()
+    validUntil.setDate(validUntil.getDate() + (validDays || 30))
+    return {
+      quote: {
+        quote_id: quoteId,
+        quote_number: quoteNumberRef.current || undefined,
+        title: title || 'Offert',
+        status: quoteStatus,
+        items: [],
+        subtotal: totals.subtotal,
+        discount_percent: discountPercent,
+        discount_amount: totals.discountAmount,
+        vat_rate: vatRate,
+        vat_amount: totals.vat,
+        total: totals.total,
+        rot_work_cost: totals.rotWorkCost,
+        rot_deduction: totals.rotDeduction,
+        rot_customer_pays: totals.rotCustomerPays,
+        rut_work_cost: totals.rutWorkCost,
+        rut_deduction: totals.rutDeduction,
+        rut_customer_pays: totals.rutCustomerPays,
+        customer_pays: totals.rotCustomerPays || totals.rutCustomerPays || totals.total,
+        valid_until: validUntil.toISOString().split('T')[0],
+        introduction_text: introductionText || null,
+        conclusion_text: conclusionText || null,
+        not_included: notIncluded || null,
+        ata_terms: ataTerms || null,
+        payment_terms_text: paymentTermsText || null,
+        reference_person: referencePerson || null,
+        customer_reference: customerReference || null,
+        project_address: projectAddress || null,
+        detail_level: detailLevel,
+        show_unit_prices: showUnitPrices,
+        show_quantities: showQuantities,
+        personnummer: personnummer || null,
+        fastighetsbeteckning: fastighetsbeteckning || null,
+        template_style: templateStyle,
+      },
+      quote_items: recalculated.map((it, idx) => ({ ...it, sort_order: idx })),
+      customer_id: selectedCustomer || null,
+      template_style: templateStyle,
+    }
+  }, [
+    quoteId, title, quoteStatus, totals, validDays, discountPercent, vatRate,
+    introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText,
+    referencePerson, customerReference, projectAddress, detailLevel,
+    showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
+    templateStyle, selectedCustomer, recalculated,
+  ])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Data fetching
@@ -1031,7 +1085,7 @@ export default function EditQuotePage() {
           <div className="flex flex-col gap-4">
             {/* ── Kund ──────────────────────────────────────────────── */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Kund</div>
+              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Kund</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
                   <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
@@ -1088,20 +1142,20 @@ export default function EditQuotePage() {
 
             {/* ── Offertrader ────────────────────────────────────────── */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Offertrader</div>
+              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Offertrader</div>
 
               {/* Table header (desktop) */}
               {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_100px_64px_28px] gap-1 px-2 pb-2 border-b border-gray-100 mb-1">
+                <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 px-2 pb-2 border-b border-gray-200 mb-1">
                   <span />
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Typ</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400">Beskrivning</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Antal</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Enhet</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-right">Pris</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-right">Summa</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">Kategori</span>
-                  <span className="text-[9px] tracking-wider uppercase text-gray-400 text-center">ROT</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Typ</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500">Beskrivning</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Antal</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Enhet</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-right">Pris</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-right">Summa</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Kategori</span>
+                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">ROT</span>
                   <span />
                 </div>
               )}
@@ -1256,8 +1310,8 @@ export default function EditQuotePage() {
                 onClick={() => setShowStandardTexts(!showStandardTexts)}
                 className="w-full flex items-center justify-between px-7 py-4 text-left"
               >
-                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Referenser och texter</span>
-                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showStandardTexts ? 'rotate-180' : ''}`} />
+                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Referenser och texter</span>
+                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showStandardTexts ? 'rotate-180' : ''}`} />
               </button>
               {showStandardTexts && (
                 <div className="px-7 pb-6 space-y-4">
@@ -1344,11 +1398,11 @@ export default function EditQuotePage() {
                 onClick={() => setShowPaymentPlan(!showPaymentPlan)}
                 className="w-full flex items-center justify-between px-7 py-4 text-left"
               >
-                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">
+                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">
                   Betalningsplan
                   {paymentPlan.length > 0 && ` (${paymentPlan.length})`}
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showPaymentPlan ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showPaymentPlan ? 'rotate-180' : ''}`} />
               </button>
               {showPaymentPlan && (
                 <div className="px-7 pb-6">
@@ -1393,8 +1447,8 @@ export default function EditQuotePage() {
                 onClick={() => setShowDisplaySettings(!showDisplaySettings)}
                 className="w-full flex items-center justify-between px-7 py-4 text-left"
               >
-                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Visningsinställningar</span>
-                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} />
+                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Visningsinställningar</span>
+                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} />
               </button>
               {showDisplaySettings && (
                 <div className="px-7 pb-6 space-y-4">
@@ -1436,7 +1490,7 @@ export default function EditQuotePage() {
             {/* Stil-väljare — overridar business default per offert */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Offertstil</span>
+                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Offertstil</span>
                 {templateStyle && (
                   <button
                     type="button"
@@ -1493,25 +1547,54 @@ export default function EditQuotePage() {
                 className="w-full flex items-center justify-between px-6 py-4 text-left"
               >
                 <span className="flex items-center gap-2">
-                  <Eye className="w-3.5 h-3.5 text-[#CBD5E1]" />
-                  <span className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1]">Förhandsgranska</span>
+                  <Eye className="w-3.5 h-3.5 text-[#64748B]" />
+                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Förhandsgranska</span>
                 </span>
-                <ChevronDown className={`w-4 h-4 text-[#CBD5E1] transition-transform ${showPreviewPanel ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showPreviewPanel ? 'rotate-180' : ''}`} />
               </button>
-              {showPreviewPanel && debouncedPreviewData && (
-                <div className="px-3 pb-3">
-                  <QuotePreview
-                    data={debouncedPreviewData}
-                    businessName={business.business_name}
-                    contactName={business.contact_name}
-                  />
+              {showPreviewPanel && (
+                <div className="px-3 pb-3 space-y-2">
+                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode('design')}
+                      className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                        previewMode === 'design' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Slutdesign
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewMode('compact')}
+                      className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                        previewMode === 'compact' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      Kompakt
+                    </button>
+                  </div>
+                  {previewMode === 'design' ? (
+                    <TemplatePreviewFrame
+                      payload={templatePreviewPayload}
+                      className="h-[700px]"
+                    />
+                  ) : (
+                    debouncedPreviewData && (
+                      <QuotePreview
+                        data={debouncedPreviewData}
+                        businessName={business.business_name}
+                        contactName={business.contact_name}
+                      />
+                    )
+                  )}
                 </div>
               )}
             </div>
 
             {/* Summary */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
-              <div className="text-[10px] tracking-[0.1em] uppercase text-[#CBD5E1] mb-4">Summering <span className="normal-case">(exkl. moms)</span></div>
+              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Summering <span className="normal-case">(exkl. moms)</span></div>
 
               <div className="space-y-1">
                 <div className="flex justify-between py-[5px] text-[13px]">
