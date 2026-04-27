@@ -462,6 +462,9 @@ export default function PipelinePage() {
   const [showFilter, setShowFilter] = useState(false)
   const [filterSearch, setFilterSearch] = useState('')
   const [filterPriority, setFilterPriority] = useState<string>('all')
+  const [filterCustomerType, setFilterCustomerType] = useState<string>('all')
+  const [filterAssignedTo, setFilterAssignedTo] = useState<string>('all')
+  const [filterSource, setFilterSource] = useState<string>('all')
   const filterRef = useRef<HTMLDivElement>(null)
   const [lostExpanded, setLostExpanded] = useState(false)
   const [mobileStageIndex, setMobileStageIndex] = useState(0)
@@ -1488,15 +1491,84 @@ export default function PipelinePage() {
   const filteredDeals = deals.filter(d => {
     if (filterSearch) {
       const s = filterSearch.toLowerCase()
-      if (!d.title.toLowerCase().includes(s) && !(d.customer?.name || '').toLowerCase().includes(s)) return false
+      const matches =
+        d.title.toLowerCase().includes(s) ||
+        (d.customer?.name || '').toLowerCase().includes(s) ||
+        (d.customer?.phone_number || '').toLowerCase().includes(s) ||
+        (d.customer?.email || '').toLowerCase().includes(s) ||
+        (d.customer?.customer_number || '').toLowerCase().includes(s) ||
+        String(d.deal_number || '').includes(s)
+      if (!matches) return false
     }
     if (filterPriority !== 'all' && d.priority !== filterPriority) return false
+    if (filterCustomerType !== 'all') {
+      // 'unknown' matchar deals utan kundtyp eller utan kund alls
+      const ct = d.customer?.customer_type || ''
+      if (filterCustomerType === 'unknown') {
+        if (ct !== '') return false
+      } else if (ct !== filterCustomerType) {
+        return false
+      }
+    }
+    if (filterAssignedTo !== 'all') {
+      if (filterAssignedTo === 'unassigned') {
+        if (d.assigned_to) return false
+      } else if (d.assigned_to !== filterAssignedTo) {
+        return false
+      }
+    }
+    if (filterSource !== 'all') {
+      const src = d.lead_source_platform || d.source || ''
+      if (filterSource === 'unknown') {
+        if (src !== '') return false
+      } else if (src !== filterSource) {
+        return false
+      }
+    }
     return true
   })
 
   function dealsForStage(stageId: string): Deal[] { return filteredDeals.filter(d => d.stage_id === stageId) }
   function stageValue(stageId: string): number { return dealsForStage(stageId).reduce((sum, d) => sum + (d.value || 0), 0) }
-  const hasActiveFilters = filterSearch !== '' || filterPriority !== 'all'
+  const activeFilterCount =
+    (filterSearch !== '' ? 1 : 0) +
+    (filterPriority !== 'all' ? 1 : 0) +
+    (filterCustomerType !== 'all' ? 1 : 0) +
+    (filterAssignedTo !== 'all' ? 1 : 0) +
+    (filterSource !== 'all' ? 1 : 0)
+  const hasActiveFilters = activeFilterCount > 0
+
+  // Unika värden för filter-dropdowns
+  const customerTypeOptions = Array.from(
+    new Set(deals.map(d => d.customer?.customer_type || '').filter(Boolean))
+  ).sort()
+  const sourceOptions = Array.from(
+    new Set(deals.map(d => d.lead_source_platform || d.source || '').filter(Boolean))
+  ).sort()
+
+  // Mänskliga etiketter för filter-dropdowns
+  function customerTypeLabel(t: string): string {
+    const map: Record<string, string> = {
+      private: 'Privatperson',
+      company: 'Företag',
+      brf: 'Bostadsrättsförening',
+      property: 'Fastighetsbolag',
+      insurance: 'Försäkringsärende',
+    }
+    return map[t.toLowerCase()] || t
+  }
+  function sourceLabel(s: string): string {
+    const map: Record<string, string> = {
+      manual: 'Manuell',
+      ai: 'AI-skapad',
+      call: 'Telefonsamtal',
+      vapi_call: 'Inkommande samtal',
+      inbound_sms: 'Inkommande SMS',
+      website_form: 'Webbformulär',
+      gmail: 'E-post',
+    }
+    return map[s.toLowerCase()] || s
+  }
 
   const filteredCustomers = customers.filter(c => {
     if (!customerSearch) return true
@@ -1580,21 +1652,47 @@ export default function PipelinePage() {
                 </button>
               </div>
 
+              {/* Synligt sökfält */}
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Sök ärende, kund, telefon..."
+                  value={filterSearch}
+                  onChange={e => setFilterSearch(e.target.value)}
+                  className="pl-9 pr-8 py-2 w-56 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400 focus:w-72 transition-all"
+                />
+                {filterSearch && (
+                  <button
+                    onClick={() => setFilterSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    aria-label="Rensa sökning"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
               <div className="relative" ref={filterRef}>
                 <button onClick={() => setShowFilter(!showFilter)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-primary-50 border-primary-300 text-sky-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${hasActiveFilters ? 'bg-primary-50 border-primary-300 text-primary-700' : 'bg-white border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300'}`}>
                   <Filter className="w-4 h-4" />
                   <span className="hidden sm:inline text-sm">Filter</span>
-                  {hasActiveFilters && <span className="w-2 h-2 rounded-full bg-primary-700" />}
+                  {activeFilterCount > 0 && (
+                    <span className="bg-primary-700 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                      {activeFilterCount}
+                    </span>
+                  )}
                 </button>
                 {showFilter && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl z-50">
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl z-50">
                     <div className="space-y-3">
-                      <div>
+                      {/* Mobilversion av sökfältet */}
+                      <div className="sm:hidden">
                         <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Sök</label>
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input type="text" placeholder="Sök deal eller kund..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+                          <input type="text" placeholder="Ärende, kund, telefon..." value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
                             className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400" />
                         </div>
                       </div>
@@ -1609,7 +1707,57 @@ export default function PipelinePage() {
                           <option value="low">Låg</option>
                         </select>
                       </div>
-                      {hasActiveFilters && <button onClick={() => { setFilterSearch(''); setFilterPriority('all') }} className="text-xs text-sky-700 hover:text-primary-700">Rensa filter</button>}
+                      {customerTypeOptions.length > 0 && (
+                        <div>
+                          <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Kundtyp</label>
+                          <select value={filterCustomerType} onChange={e => setFilterCustomerType(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                            <option value="all">Alla</option>
+                            {customerTypeOptions.map(ct => (
+                              <option key={ct} value={ct}>{customerTypeLabel(ct)}</option>
+                            ))}
+                            <option value="unknown">Ingen kundtyp angiven</option>
+                          </select>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Ansvarig</label>
+                        <select value={filterAssignedTo} onChange={e => setFilterAssignedTo(e.target.value)}
+                          className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                          <option value="all">Alla</option>
+                          <option value="unassigned">Ej tilldelad</option>
+                          {teamMembers.map(m => (
+                            <option key={m.id} value={m.id}>{m.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      {sourceOptions.length > 0 && (
+                        <div>
+                          <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Källa</label>
+                          <select value={filterSource} onChange={e => setFilterSource(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+                            <option value="all">Alla</option>
+                            {sourceOptions.map(s => (
+                              <option key={s} value={s}>{sourceLabel(s)}</option>
+                            ))}
+                            <option value="unknown">Okänd källa</option>
+                          </select>
+                        </div>
+                      )}
+                      {hasActiveFilters && (
+                        <button
+                          onClick={() => {
+                            setFilterSearch('')
+                            setFilterPriority('all')
+                            setFilterCustomerType('all')
+                            setFilterAssignedTo('all')
+                            setFilterSource('all')
+                          }}
+                          className="text-xs text-primary-700 hover:underline font-medium"
+                        >
+                          Rensa alla filter ({activeFilterCount})
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
