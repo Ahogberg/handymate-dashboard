@@ -5,7 +5,13 @@ import { getStageBySlug } from '@/lib/pipeline'
 import { getNextCaseNumber } from '@/lib/numbering'
 
 /**
- * GET - Lista deals för ett företag
+ * GET - Lista deals för ett företag.
+ *
+ * Varje deal berikas med project-data via project.deal_id-join så att
+ * unified pipeline-vyn kan visa projekt-status, datum, budget och spenderat
+ * på samma rad som dealen — utan separat fetch.
+ *
+ * Response-shape: { deals: Array<Deal & { project: ProjectSummary | null }> }
  */
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +42,58 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ deals: deals || [] })
+    const dealList = deals || []
+
+    // Hämta projekt kopplade till dessa deals (project.deal_id) i en query
+    const dealIds = dealList.map((d: any) => d.id).filter(Boolean)
+    let projectByDealId: Record<string, any> = {}
+
+    if (dealIds.length > 0) {
+      const { data: projects } = await supabase
+        .from('project')
+        .select('project_id, deal_id, name, status, start_date, end_date, progress_percent, budget_amount')
+        .eq('business_id', business.business_id)
+        .in('deal_id', dealIds)
+
+      const projectList = projects || []
+      const projectIds = projectList.map((p: any) => p.project_id)
+
+      // Beräkna spenderat per projekt från time_entry (samma mönster som /api/projects)
+      let spentByProjectId: Record<string, number> = {}
+      if (projectIds.length > 0) {
+        const { data: timeEntries } = await supabase
+          .from('time_entry')
+          .select('project_id, duration_minutes, hourly_rate')
+          .in('project_id', projectIds)
+
+        for (const t of (timeEntries || [])) {
+          const hours = (t.duration_minutes || 0) / 60
+          const amount = hours * (t.hourly_rate || 0)
+          spentByProjectId[t.project_id] = (spentByProjectId[t.project_id] || 0) + amount
+        }
+      }
+
+      for (const p of projectList) {
+        if (!p.deal_id) continue
+        projectByDealId[p.deal_id] = {
+          id: p.project_id,
+          name: p.name,
+          status: p.status,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          progress_percent: p.progress_percent ?? 0,
+          budget_sek: p.budget_amount ?? null,
+          spent_sek: Math.round(spentByProjectId[p.project_id] || 0),
+        }
+      }
+    }
+
+    const enrichedDeals = dealList.map((d: any) => ({
+      ...d,
+      project: projectByDealId[d.id] || null,
+    }))
+
+    return NextResponse.json({ deals: enrichedDeals })
   } catch (error: any) {
     console.error('Get deals error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
