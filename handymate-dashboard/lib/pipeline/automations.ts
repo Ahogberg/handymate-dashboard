@@ -5,6 +5,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import type { PipelineStageId } from './stages'
+import { advanceProjectStage, SYSTEM_STAGES } from '@/lib/project-stages/automation-engine'
 
 export async function onDealStageChanged(
   dealId: string,
@@ -110,6 +111,8 @@ async function handleQuoteAccepted(dealId: string, businessId: string) {
       .eq('deal_id', dealId)
       .single()
 
+    let createdProjectId: string | null = existingProject?.project_id || null
+
     if (!existingProject) {
       // Hämta offerttitel som fallback om dealen saknar titel
       let quoteTitle: string | null = null
@@ -126,9 +129,11 @@ async function handleQuoteAccepted(dealId: string, businessId: string) {
       // ärende-id i säljtratten och i projektlistan (deal #1003 → P-1003).
       const projectNumber = deal.deal_number ? `P-${deal.deal_number}` : null
       const projectName = deal.title || quoteTitle || 'Projekt'
+      const newProjectId = 'proj_' + Math.random().toString(36).substring(2, 14)
+      createdProjectId = newProjectId
 
       await supabase.from('project').insert({
-        project_id: 'proj_' + Math.random().toString(36).substring(2, 14),
+        project_id: newProjectId,
         business_id: businessId,
         customer_id: deal.customer_id,
         deal_id: dealId,
@@ -164,6 +169,15 @@ async function handleQuoteAccepted(dealId: string, businessId: string) {
         won_at: new Date().toISOString(),
         closed_at: new Date().toISOString(),
       }).eq('id', dealId)
+    }
+
+    // Aktivera projektets workflow-stage 'Kontrakt signerat' (non-blocking)
+    if (createdProjectId) {
+      try {
+        await advanceProjectStage(createdProjectId, SYSTEM_STAGES.CONTRACT_SIGNED, businessId)
+      } catch (err) {
+        console.error('[Pipeline Automation] advanceProjectStage failed:', err)
+      }
     }
   } catch (err) {
     console.error('[Pipeline Automation] handleQuoteAccepted error:', err)

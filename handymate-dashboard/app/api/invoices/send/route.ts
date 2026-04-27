@@ -255,6 +255,20 @@ export async function POST(request: NextRequest) {
         console.error('Pipeline trigger error (non-blocking):', pipelineErr)
       }
 
+      // Project workflow stage: 'Faktura skickad' (non-blocking)
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
+        const project = await findProjectForEntity({
+          businessId: business.business_id,
+          invoiceId: invoice_id,
+        })
+        if (project) {
+          await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_SENT, business.business_id)
+        }
+      } catch (err) {
+        console.error('[invoices/send] advanceProjectStage failed:', err)
+      }
+
       // Smart communication: trigger invoice_sent event
       try {
         const { triggerEventCommunication } = await import('@/lib/smart-communication')

@@ -400,6 +400,26 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
+    // Project workflow stage: 'Jobb påbörjat' när status blir 'active'
+    if (body.status === 'active' && project) {
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+        await advanceProjectStage(project.project_id, SYSTEM_STAGES.JOB_STARTED, business.business_id)
+      } catch (err) {
+        console.error('[projects] advanceProjectStage failed:', err)
+      }
+    }
+
+    // Project workflow stage: 'Slutbesiktning' när status blir 'completed'
+    if (body.status === 'completed' && project) {
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+        await advanceProjectStage(project.project_id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
+      } catch (err) {
+        console.error('[projects] advanceProjectStage failed:', err)
+      }
+    }
+
     // Fire job_completed event → triggar review request + nurture
     if (body.status === 'completed' && project) {
       try {

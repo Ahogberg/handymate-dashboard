@@ -440,6 +440,23 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
+    // Project workflow stage-uppdatering vid statusändring (non-blocking)
+    if (fields.status === 'paid' || fields.status === 'sent') {
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
+        const project = await findProjectForEntity({
+          businessId: business.business_id,
+          invoiceId: invoice.invoice_id,
+        })
+        if (project) {
+          const stage = fields.status === 'paid' ? SYSTEM_STAGES.INVOICE_PAID : SYSTEM_STAGES.INVOICE_SENT
+          await advanceProjectStage(project.project_id, stage, business.business_id)
+        }
+      } catch (err) {
+        console.error('[invoice status] advanceProjectStage failed:', err)
+      }
+    }
+
     return NextResponse.json({ invoice })
 
   } catch (error: any) {
