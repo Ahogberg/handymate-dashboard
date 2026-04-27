@@ -138,8 +138,11 @@ export async function GET(request: NextRequest) {
       .single()
 
     const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig)
-    // Per-quote override → fallback till business default
-    const renderFn = selectTemplate(quote.template_style || bizConfig?.quote_template_style)
+    // Style-precedence: ?style=... (settings-preview) > quote.template_style > business default
+    const styleOverride = request.nextUrl.searchParams.get('style')
+    const renderFn = selectTemplate(
+      styleOverride || quote.template_style || bizConfig?.quote_template_style,
+    )
     const html = renderFn(templateData)
 
     return new NextResponse(html, {

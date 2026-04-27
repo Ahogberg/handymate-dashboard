@@ -148,7 +148,11 @@ export async function GET(request: NextRequest) {
     invoice.ocr_number = ocrNumber
 
     const templateData = buildInvoiceTemplateData(invoice, businessConfig, swishQR)
-    const renderFn = selectInvoiceTemplate(businessConfig?.quote_template_style)
+    // Style-precedence: ?style=... (settings-preview) > business default
+    const styleOverride = request.nextUrl.searchParams.get('style')
+    const renderFn = selectInvoiceTemplate(
+      styleOverride || businessConfig?.quote_template_style,
+    )
     const html = renderFn(templateData)
 
     return new NextResponse(html, {

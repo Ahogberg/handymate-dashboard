@@ -159,7 +159,7 @@ export default function DocumentStylePage() {
           <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {sampleQuoteId && (
               <a
-                href={`/api/quotes/pdf?id=${sampleQuoteId}`}
+                href={`/api/quotes/pdf?id=${sampleQuoteId}&style=${style}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-4 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between hover:border-primary-300 transition-colors"
@@ -178,7 +178,7 @@ export default function DocumentStylePage() {
             )}
             {sampleInvoiceId && (
               <a
-                href={`/api/invoices/pdf?invoiceId=${sampleInvoiceId}`}
+                href={`/api/invoices/pdf?invoiceId=${sampleInvoiceId}&style=${style}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-4 bg-white border border-[#E2E8F0] rounded-xl flex items-center justify-between hover:border-primary-300 transition-colors"
