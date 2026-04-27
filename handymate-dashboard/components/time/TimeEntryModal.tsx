@@ -274,14 +274,19 @@ export default function TimeEntryModal({
 
         {/* Beskrivning */}
         <div className="mb-4">
-          <label className={labelClass}>Beskrivning <span className="text-[11px] text-[#CBD5E1]">(valfri)</span></label>
-          <input
-            type="text"
+          <label className={labelClass}>
+            Beskrivning <span className="text-[11px] text-[#CBD5E1]">(valfri)</span>
+          </label>
+          <textarea
             value={formData.description}
             onChange={e => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
-            placeholder="Vad har du gjort?"
-            className={inputClass}
+            placeholder="Vad har du gjort? T.ex. ”Demonterat kakel i badrum, började bila”"
+            rows={3}
+            className={`${inputClass} resize-y min-h-[72px] leading-relaxed`}
           />
+          <p className="text-[11px] text-[#94A3B8] mt-1">
+            Visas på fakturarad om tiden faktureras till kund — håll det neutralt och beskrivande.
+          </p>
         </div>
 
         {/* Fakturerbar */}

@@ -198,9 +198,14 @@ export default function JobTypesPage() {
 
         {/* Info om delegering */}
         <div className="mt-6 p-4 bg-primary-50 border border-primary-100 rounded-xl text-sm text-primary-900">
-          <p className="font-medium mb-1">💡 Nästa steg</p>
+          <div className="flex items-center gap-2 mb-1">
+            <p className="font-medium">💡 Snart kommer</p>
+            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary-100 text-primary-700 border border-primary-200">
+              Kommer snart
+            </span>
+          </div>
           <p className="text-xs text-primary-800">
-            Koppla jobbtyper till personer via <Link href="/dashboard/settings/team" className="underline font-medium">Team</Link> — sätt vilka specialiteter varje person har. Nya deals föreslår då automatiskt rätt person.
+            Snart kommer du kunna koppla jobbtyper till personer i teamet — sätt vilka specialiteter varje person har, så föreslår nya deals automatiskt rätt person.
           </p>
         </div>
       </div>

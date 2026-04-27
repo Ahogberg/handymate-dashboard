@@ -240,57 +240,68 @@ export default function LeadSourcesPage() {
 
               {(() => {
                 const manualSources = sources.filter(s => s.source_type === 'manual')
-                if (manualSources.length === 0) {
-                  return (
-                    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5">
-                      <p className="text-sm text-gray-500 mb-3">Inga kanaler ännu. Lägg till snabbt:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {CHANNEL_SUGGESTIONS.map(s => (
-                          <button
-                            key={s.name}
-                            onClick={() => handleQuickAdd(s)}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700 transition-colors"
-                          >
-                            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
-                            <Plus className="w-3 h-3 text-gray-400" />
-                            {s.name}
-                          </button>
+                const existingNames = new Set(manualSources.map(s => s.name.toLowerCase()))
+                const remainingSuggestions = CHANNEL_SUGGESTIONS.filter(s => !existingNames.has(s.name.toLowerCase()))
+                return (
+                  <div className="space-y-3">
+                    {/* Snabblägg-till — alltid synliga (ej redan tillagda) */}
+                    {remainingSuggestions.length > 0 && (
+                      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
+                        <p className="text-xs text-gray-500 mb-2">Lägg till snabbt:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {remainingSuggestions.map(s => (
+                            <button
+                              key={s.name}
+                              onClick={() => handleQuickAdd(s)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs text-gray-700 transition-colors"
+                            >
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                              <Plus className="w-3 h-3 text-gray-400" />
+                              {s.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Lista över tillagda egna kanaler */}
+                    {manualSources.length > 0 ? (
+                      <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-100">
+                        {manualSources.map(source => (
+                          <div key={source.id} className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: source.color || '#0F766E' }} />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium text-gray-900 truncate">{source.name}</p>
+                                <p className="text-xs text-gray-400">
+                                  {source.lead_count} leads · {source.won_count} vunna
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <button
+                                onClick={() => handleToggle(source)}
+                                className="p-1.5 text-gray-400 hover:text-primary-700"
+                                title={source.is_active ? 'Inaktivera' : 'Aktivera'}
+                              >
+                                {source.is_active ? <ToggleRight className="w-5 h-5 text-primary-700" /> : <ToggleLeft className="w-5 h-5" />}
+                              </button>
+                              <button
+                                onClick={() => handleDelete(source.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-600"
+                                title="Ta bort"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
                         ))}
                       </div>
-                    </div>
-                  )
-                }
-                return (
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-100">
-                    {manualSources.map(source => (
-                      <div key={source.id} className="flex items-center justify-between px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: source.color || '#0F766E' }} />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-gray-900 truncate">{source.name}</p>
-                            <p className="text-xs text-gray-400">
-                              {source.lead_count} leads · {source.won_count} vunna
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            onClick={() => handleToggle(source)}
-                            className="p-1.5 text-gray-400 hover:text-primary-700"
-                            title={source.is_active ? 'Inaktivera' : 'Aktivera'}
-                          >
-                            {source.is_active ? <ToggleRight className="w-5 h-5 text-primary-700" /> : <ToggleLeft className="w-5 h-5" />}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(source.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600"
-                            title="Ta bort"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                    ) : remainingSuggestions.length === 0 ? (
+                      <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 text-center text-sm text-gray-500">
+                        Inga egna kanaler ännu — klicka "Ny kanal" ovan för att lägga till en med egen färg och namn.
                       </div>
-                    ))}
+                    ) : null}
                   </div>
                 )
               })()}

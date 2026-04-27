@@ -639,8 +639,10 @@ export default function SettingsPage() {
 
       if (error) throw error
       showToast('Inställningar sparade!', 'success')
-    } catch (error) {
-      showToast('Kunde inte spara', 'error')
+    } catch (error: any) {
+      console.error('[settings/handleSave] failed:', error)
+      const msg = error?.message || error?.error_description
+      showToast(msg ? `Kunde inte spara: ${msg}` : 'Kunde inte spara', 'error')
     } finally {
       setSaving(false)
     }
