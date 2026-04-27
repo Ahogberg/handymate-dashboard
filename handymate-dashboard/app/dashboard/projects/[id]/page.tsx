@@ -10,6 +10,7 @@ import {
   Plus,
   Edit,
   Trash2,
+  Check,
   CheckCircle,
   XCircle,
   AlertTriangle,
@@ -227,7 +228,7 @@ interface ExtraCost {
   date: string
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports' | 'tasks'
 
 interface ScheduleEntry {
   id: string
@@ -477,6 +478,22 @@ export default function ProjectDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null)
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [changes, setChanges] = useState<Change[]>([])
+  // Uppgifter kopplade till projektet (synk med /dashboard/tasks)
+  const [projectTasks, setProjectTasks] = useState<Array<{
+    id: string
+    title: string
+    description: string | null
+    status: 'pending' | 'in_progress' | 'done'
+    priority: 'low' | 'medium' | 'high'
+    due_date: string | null
+    due_time: string | null
+    assigned_to: string | null
+    assigned_user: { id: string; name: string; color: string } | null
+  }>>([])
+  const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskAssignee, setNewTaskAssignee] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [savingNewTask, setSavingNewTask] = useState(false)
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [materials, setMaterials] = useState<ProjectMaterial[]>([])
@@ -767,6 +784,16 @@ export default function ProjectDetailPage() {
     } catch { /* ignore */ }
   }, [projectId])
 
+  const fetchProjectTasks = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/tasks?project_id=${projectId}`)
+      if (res.ok) {
+        const data = await res.json()
+        setProjectTasks(data.tasks || [])
+      }
+    } catch { /* ignore */ }
+  }, [projectId])
+
   useEffect(() => {
     if (activeTab === 'team') {
       fetchProjectTeam()
@@ -796,7 +823,12 @@ export default function ProjectDetailPage() {
     if (activeTab === 'ai_log') {
       fetchAiLogs()
     }
-  }, [activeTab, fetchProjectTeam])
+    if (activeTab === 'tasks') {
+      fetchProjectTasks()
+      // Återanvänd team-listan om vi inte redan hämtat den (för assignee-dropdown)
+      if (allTeamMembers.length === 0) fetchProjectTeam()
+    }
+  }, [activeTab, fetchProjectTeam, fetchProjectTasks, allTeamMembers.length])
 
   // Re-fetch documents when category filter changes
   useEffect(() => {
@@ -804,6 +836,55 @@ export default function ProjectDetailPage() {
       fetchDocuments()
     }
   }, [docCategory])
+
+  async function createProjectTask() {
+    if (!newTaskTitle.trim()) return
+    setSavingNewTask(true)
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          project_id: projectId,
+          assigned_to: newTaskAssignee || null,
+          due_date: newTaskDueDate || null,
+          visibility: 'project',
+        }),
+      })
+      if (res.ok) {
+        setNewTaskTitle('')
+        setNewTaskAssignee('')
+        setNewTaskDueDate('')
+        fetchProjectTasks()
+      } else {
+        showToast('Kunde inte skapa uppgift', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setSavingNewTask(false)
+  }
+
+  async function toggleProjectTask(taskId: string, currentStatus: string) {
+    const newStatus = currentStatus === 'done' ? 'pending' : 'done'
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: taskId, status: newStatus }),
+      })
+      if (res.ok) fetchProjectTasks()
+    } catch { /* ignore */ }
+  }
+
+  async function deleteProjectTask(taskId: string) {
+    if (!confirm('Ta bort uppgiften?')) return
+    try {
+      const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
+      if (res.ok) fetchProjectTasks()
+    } catch { /* ignore */ }
+  }
 
   async function fetchAiLogs() {
     setAiLogLoading(true)
@@ -1459,6 +1540,7 @@ export default function ProjectDetailPage() {
       { key: 'schedule', label: 'Schema' },
       { key: 'milestones', label: 'Delmoment' },
       { key: 'changes', label: 'ÄTA' },
+      { key: 'tasks', label: 'Uppgifter' },
     ]},
     { group: 'FÄLT', items: [
       { key: 'arbetsorder', label: 'Arbetsorder' },
@@ -2244,6 +2326,133 @@ export default function ProjectDetailPage() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === TAB: Uppgifter === */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Uppgifter</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Synkas med <Link href={`/dashboard/tasks`} className="text-primary-700 hover:underline">Mina uppgifter</Link>
+                </p>
+              </div>
+              <span className="text-xs text-gray-400">
+                {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
+              </span>
+            </div>
+
+            {/* Lägg till ny uppgift */}
+            <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
+              <input
+                type="text"
+                value={newTaskTitle}
+                onChange={e => setNewTaskTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && newTaskTitle.trim()) createProjectTask() }}
+                placeholder="Vad behöver göras?"
+                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={newTaskAssignee}
+                  onChange={e => setNewTaskAssignee(e.target.value)}
+                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:border-primary-700 focus:outline-none"
+                >
+                  <option value="">Tilldela...</option>
+                  {allTeamMembers.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+                <input
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={e => setNewTaskDueDate(e.target.value)}
+                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:border-primary-700 focus:outline-none"
+                />
+                <button
+                  onClick={createProjectTask}
+                  disabled={!newTaskTitle.trim() || savingNewTask}
+                  className="ml-auto flex items-center gap-1.5 px-4 py-1.5 bg-primary-700 rounded-lg text-white text-xs font-medium hover:opacity-90 disabled:opacity-50"
+                >
+                  {savingNewTask ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                  Lägg till
+                </button>
+              </div>
+            </div>
+
+            {/* Task-lista */}
+            {projectTasks.length === 0 ? (
+              <div className="bg-white border border-[#E2E8F0] rounded-xl p-8 text-center">
+                <p className="text-sm text-gray-500">Inga uppgifter på det här projektet ännu.</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-[#E2E8F0] rounded-xl divide-y divide-[#F1F5F9]">
+                {projectTasks
+                  .sort((a, b) => {
+                    if (a.status === 'done' && b.status !== 'done') return 1
+                    if (a.status !== 'done' && b.status === 'done') return -1
+                    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+                    if (a.due_date) return -1
+                    if (b.due_date) return 1
+                    return 0
+                  })
+                  .map(task => {
+                    const today = new Date().toISOString().split('T')[0]
+                    const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
+                    return (
+                      <div key={task.id} className="flex items-start gap-3 p-3 hover:bg-[#F8FAFC]">
+                        <button
+                          onClick={() => toggleProjectTask(task.id, task.status)}
+                          className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                            task.status === 'done'
+                              ? 'bg-primary-700 border-primary-700'
+                              : 'border-gray-300 hover:border-primary-700'
+                          }`}
+                          aria-label={task.status === 'done' ? 'Markera ej klar' : 'Markera klar'}
+                        >
+                          {task.status === 'done' && <Check className="w-3 h-3 text-white" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                            {task.title}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                            {task.due_date && (
+                              <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
+                                {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                                {task.due_time && ` ${task.due_time.slice(0, 5)}`}
+                              </span>
+                            )}
+                            {task.assigned_user && (
+                              <span className="flex items-center gap-1">
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
+                                  style={{ backgroundColor: task.assigned_user.color || '#64748B' }}
+                                >
+                                  {task.assigned_user.name.charAt(0)}
+                                </span>
+                                {task.assigned_user.name}
+                              </span>
+                            )}
+                            {task.priority === 'high' && (
+                              <span className="text-red-600 font-medium">Hög</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteProjectTask(task.id)}
+                          className="p-1 text-gray-300 hover:text-red-600 rounded"
+                          aria-label="Ta bort"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )
+                  })}
               </div>
             )}
           </div>
