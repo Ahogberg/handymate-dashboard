@@ -209,6 +209,37 @@ export interface PipelineContextValue {
   dragOverStageId: string | null
   setDragOverStageId: Dispatch<SetStateAction<string | null>>
 
+  // ─── Filter ────────────────────────────────────────────────────────────
+  filterSearch: string
+  setFilterSearch: Dispatch<SetStateAction<string>>
+  filterPriority: string
+  setFilterPriority: Dispatch<SetStateAction<string>>
+  filterCustomerType: string
+  setFilterCustomerType: Dispatch<SetStateAction<string>>
+  filterAssignedTo: string
+  setFilterAssignedTo: Dispatch<SetStateAction<string>>
+  filterSource: string
+  setFilterSource: Dispatch<SetStateAction<string>>
+  customerTypeOptions: string[]
+  sourceOptions: string[]
+  customerTypeLabel: (t: string) => string
+  sourceLabel: (s: string) => string
+  hasActiveFilters: boolean
+  activeFilterCount: number
+
+  // ─── View hjälpare ─────────────────────────────────────────────────────
+  hideEmpty: boolean
+  toggleHideEmpty: () => void
+  scrollPipeline: (dir: 'left' | 'right') => void
+  scrollContainerRef: React.RefObject<HTMLDivElement>
+
+  // ─── New deal-modal triggers ───────────────────────────────────────────
+  setShowNewDeal: Dispatch<SetStateAction<boolean>>
+  fetchCustomers: () => Promise<void>
+  fetchJobTypes: () => Promise<void>
+  fetchLeadSources: () => Promise<void>
+  fetchJobTypeOptions: () => Promise<void>
+
   // ─── Toast ─────────────────────────────────────────────────────────────
   toast: Toast
   showToast: (message: string, type?: Toast['type']) => void
