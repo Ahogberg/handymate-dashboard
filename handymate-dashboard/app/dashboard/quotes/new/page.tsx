@@ -26,6 +26,8 @@ import TemplateSelector from '@/components/quotes/TemplateSelector'
 import QuotePreview from '@/components/quotes/QuotePreview'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
+import ModernCanvas from '@/components/quotes/editable/ModernCanvas'
+import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import ItemRow from '@/components/quotes/ItemRow'
 import {
   DndContext,
@@ -338,8 +340,8 @@ export default function NewQuotePage() {
   // Default öppen — mallen är huvudfokuset på sidan
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
-  // 'design' = iframe med slutdesign (matchar PDF), 'compact' = React-preview
-  const [previewMode, setPreviewMode] = useState<'design' | 'compact'>('design')
+  // 'live' = inline-redigerbar React-mall, 'design' = iframe (slutdesign), 'compact' = React-preview
+  const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
 
   // ─── Derived: standard texts grouped by type ──────────────────────────────
   const textsByType = useMemo(() => {
@@ -493,6 +495,78 @@ export default function NewQuotePage() {
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle, dealIdFromQuery,
   ])
+
+  // Client-side QuoteTemplateData för live-canvas (samma shape som backend genererar)
+  const liveTemplateData: QuoteTemplateData = useMemo(() => {
+    const validUntil = new Date()
+    validUntil.setDate(validUntil.getDate() + (validDays || 30))
+    const subtotalRaw = items.reduce((sum, it: any) => sum + ((it.quantity || 0) * (it.unit_price || 0)), 0)
+    const discountAmount = subtotalRaw * (discountPercent / 100)
+    const subtotalExVat = subtotalRaw - discountAmount
+    const vatAmount = subtotalExVat * (vatRate / 100)
+    const totalIncVat = subtotalExVat + vatAmount
+
+    const formatDate = (d: Date) => d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    return {
+      business: {
+        name: business.business_name || 'Företag',
+        orgNumber: (business as any).org_number || '',
+        address: (business as any).address || '',
+        contactName: business.contact_name || '',
+        phone: (business as any).phone_number || '',
+        email: business.contact_email || '',
+        website: (business as any).website || null,
+        bankgiro: (business as any).bankgiro || null,
+        plusgiro: (business as any).plusgiro || null,
+        swish: (business as any).swish_number || null,
+        fSkatt: !!(business as any).f_skatt_registered,
+        momsRegnr: (business as any).vat_number || null,
+        accentColor: (business as any).accent_color || '#0F766E',
+        logoUrl: (business as any).logo_url || null,
+        tagline: (business as any).tagline || (business as any).service_area || null,
+      },
+      customer: {
+        name: selectedCustomerObj?.name || 'Kund',
+        address: selectedCustomerObj?.address_line || null,
+        postalCode: null,
+        city: null,
+        phone: selectedCustomerObj?.phone_number || null,
+        email: selectedCustomerObj?.email || null,
+        personnummer: personnummer || null,
+        reference: customerReference || null,
+      },
+      quote: {
+        number: 'PREVIEW',
+        dealNumber: null,
+        issuedDate: formatDate(new Date()),
+        validUntilDate: formatDate(validUntil),
+        title: title || 'Offert',
+        description: null,
+        items: items
+          .filter((i: any) => (i.item_type || 'item') === 'item')
+          .map((i: any) => ({
+            name: i.description || '',
+            description: null,
+            quantity: Number(i.quantity || 0),
+            unit: i.unit || 'st',
+            unitPrice: Number(i.unit_price || 0),
+            total: Number(i.total || 0),
+            isRotEligible: !!i.is_rot_eligible,
+            isRutEligible: !!i.is_rut_eligible,
+          })),
+        subtotalExVat,
+        vatAmount,
+        totalIncVat,
+        amountToPay: totalIncVat,
+        paymentTerms: paymentTermsText || '30 dagar netto',
+        warrantyText: null,
+        introductionText: introductionText || null,
+        conclusionText: conclusionText || null,
+        notIncluded: notIncluded || null,
+      },
+    }
+  }, [business, selectedCustomerObj, title, items, validDays, discountPercent, vatRate, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Data fetching
@@ -2079,8 +2153,24 @@ export default function NewQuotePage() {
               </button>
               {showPreviewPanel && (
                 <div className="px-3 pb-3 space-y-2">
-                  {/* Toggle: Slutdesign (iframe) eller Kompakt (React) */}
+                  {/* Toggle: Live-redigera / Slutdesign / Kompakt */}
                   <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                    {(() => {
+                      const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => liveAvailable && setPreviewMode('live')}
+                          disabled={!liveAvailable}
+                          className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
+                            previewMode === 'live' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                          } ${!liveAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
+                          title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering kommer snart för Premium/Friendly'}
+                        >
+                          Live ✏️
+                        </button>
+                      )
+                    })()}
                     <button
                       type="button"
                       onClick={() => setPreviewMode('design')}
@@ -2100,7 +2190,55 @@ export default function NewQuotePage() {
                       Kompakt
                     </button>
                   </div>
-                  {previewMode === 'design' ? (
+                  {previewMode === 'live' && (templateStyle || businessDefaultStyle) === 'modern' ? (
+                    <div className="bg-gray-50 rounded-xl overflow-auto border border-[#E2E8F0] h-[calc(100vh-200px)] min-h-[700px] p-4">
+                      <ModernCanvas
+                        data={liveTemplateData}
+                        handlers={{
+                          onTitleChange: setTitle,
+                          onIntroChange: setIntroductionText,
+                          onCustomerNameChange: undefined, // Kund redigeras via formuläret nedan
+                          onPaymentTermsChange: setPaymentTermsText,
+                          onItemChange: (idx, updated) => {
+                            // Hitta motsvarande QuoteItem (filtrerade till 'item') och uppdatera
+                            const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
+                            const target = itemRows[idx]
+                            if (!target) return
+                            setItems(prev => prev.map(it => it.id === target.id
+                              ? {
+                                  ...it,
+                                  description: updated.name,
+                                  quantity: updated.quantity,
+                                  unit_price: updated.unitPrice,
+                                  total: updated.total,
+                                }
+                              : it))
+                          },
+                          onItemAdd: () => {
+                            const newItem: any = {
+                              id: 'tmp_' + Math.random().toString(36).slice(2, 10),
+                              item_type: 'item',
+                              description: '',
+                              quantity: 1,
+                              unit: 'st',
+                              unit_price: 0,
+                              total: 0,
+                              is_rot_eligible: false,
+                              is_rut_eligible: false,
+                              sort_order: items.length,
+                            }
+                            setItems(prev => [...prev, newItem])
+                          },
+                          onItemRemove: (idx) => {
+                            const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
+                            const target = itemRows[idx]
+                            if (!target) return
+                            setItems(prev => prev.filter(it => it.id !== target.id))
+                          },
+                        }}
+                      />
+                    </div>
+                  ) : previewMode === 'design' || (previewMode === 'live' && (templateStyle || businessDefaultStyle) !== 'modern') ? (
                     <TemplatePreviewFrame
                       payload={templatePreviewPayload}
                       className="h-[calc(100vh-200px)] min-h-[700px]"
