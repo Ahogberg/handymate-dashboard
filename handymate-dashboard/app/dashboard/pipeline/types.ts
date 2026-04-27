@@ -22,6 +22,15 @@ export interface DealProjectSummary {
   progress_percent: number
   budget_sek: number | null
   spent_sek: number
+  current_workflow_stage_id?: string | null
+  workflow_stage_entered_at?: string | null
+  current_stage?: {
+    id: string
+    name: string
+    color: string
+    icon: string
+    position: number
+  } | null
 }
 
 export interface Deal {

@@ -194,8 +194,13 @@ export interface PipelineContextValue {
   lastContact: { date: string; type: string } | null
 
   // ─── Modal-triggers (för kort/cards att öppna modaler) ─────────────────
+  showSiteVisit: boolean
   setShowSiteVisit: Dispatch<SetStateAction<boolean>>
+  siteVisitForm: SiteVisitForm
   setSiteVisitForm: Dispatch<SetStateAction<SiteVisitForm>>
+  siteVisitSaving: boolean
+  siteVisitTeam: SiteVisitTeamMember[]
+  bookSiteVisit: () => Promise<void>
   setQuickSmsTarget: Dispatch<SetStateAction<QuickSmsTarget | null>>
   setQuickSmsText: Dispatch<SetStateAction<string>>
   setLossDealId: Dispatch<SetStateAction<string | null>>
