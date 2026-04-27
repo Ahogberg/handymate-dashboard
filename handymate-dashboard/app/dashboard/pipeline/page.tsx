@@ -60,6 +60,7 @@ import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
 import { todayDateStr, nowTimeStr } from '@/lib/datetime-defaults'
 import TaskPresetPicker from '@/components/TaskPresetPicker'
+import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import { TimelineView } from '@/components/pipeline/TimelineView'
 import { CopyId } from '@/components/CopyId'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
@@ -411,6 +412,8 @@ export default function PipelinePage() {
   const [dealTasks, setDealTasks] = useState<Task[]>([])
   const [showDealTaskPresetPicker, setShowDealTaskPresetPicker] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDescription, setNewTaskDescription] = useState('')
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [newTaskDueDate, setNewTaskDueDate] = useState(todayDateStr())
   const [newTaskDueTime, setNewTaskDueTime] = useState(nowTimeStr())
   const [newTaskAssignee, setNewTaskAssignee] = useState('')
@@ -751,6 +754,8 @@ export default function PipelinePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTaskTitle.trim(),
+          description: newTaskDescription.trim() || null,
+          priority: newTaskPriority,
           deal_id: selectedDeal.id,
           customer_id: selectedDeal.customer_id,
           due_date: newTaskDueDate || null,
@@ -760,6 +765,8 @@ export default function PipelinePage() {
       })
       if (!res.ok) throw new Error()
       setNewTaskTitle('')
+      setNewTaskDescription('')
+      setNewTaskPriority('medium')
       setNewTaskDueDate(todayDateStr())
       setNewTaskDueTime(nowTimeStr())
       setNewTaskAssignee('')
@@ -2352,6 +2359,117 @@ export default function PipelinePage() {
                       )}
                     </div>
 
+                    {/* Pågående uppgifter — kompakt vy. Avslutade ligger kvar under Uppgifter-fliken. */}
+                    {(() => {
+                      const openTasks = dealTasks.filter(t => t.status !== 'done')
+                      if (openTasks.length === 0) return null
+                      // Sortera: förfallna först, sedan hög-prio, sedan på datum
+                      const sorted = [...openTasks].sort((a, b) => {
+                        const aOverdue = !!a.due_date && new Date(a.due_date + (a.due_time ? `T${a.due_time}` : 'T23:59:59')) < new Date()
+                        const bOverdue = !!b.due_date && new Date(b.due_date + (b.due_time ? `T${b.due_time}` : 'T23:59:59')) < new Date()
+                        if (aOverdue && !bOverdue) return -1
+                        if (!aOverdue && bOverdue) return 1
+                        const aHigh = a.priority === 'high'
+                        const bHigh = b.priority === 'high'
+                        if (aHigh && !bHigh) return -1
+                        if (!aHigh && bHigh) return 1
+                        if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+                        if (a.due_date) return -1
+                        if (b.due_date) return 1
+                        return 0
+                      })
+                      const overdueCount = sorted.filter(t => !!t.due_date && new Date(t.due_date + (t.due_time ? `T${t.due_time}` : 'T23:59:59')) < new Date()).length
+                      const highPrioCount = sorted.filter(t => t.priority === 'high').length
+                      return (
+                        <div>
+                          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="text-xs text-gray-400 uppercase tracking-wider">Pågående uppgifter</h4>
+                              {overdueCount > 0 && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide bg-red-100 text-red-700 px-1.5 py-0.5 rounded">
+                                  {overdueCount} försenad{overdueCount === 1 ? '' : 'e'}
+                                </span>
+                              )}
+                              {highPrioCount > 0 && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                                  {highPrioCount} viktig{highPrioCount === 1 ? '' : 'a'}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setDealTab('tasks')}
+                              className="text-[11px] text-primary-700 hover:underline"
+                            >
+                              Visa alla →
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {sorted.slice(0, 5).map(task => {
+                              const isOverdue = !!task.due_date && new Date(task.due_date + (task.due_time ? `T${task.due_time}` : 'T23:59:59')) < new Date()
+                              const isHighPrio = task.priority === 'high'
+                              const initials = task.assigned_user?.name
+                                ? task.assigned_user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                                : null
+                              return (
+                                <div key={task.id} className={`relative flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${
+                                  isOverdue
+                                    ? 'border-red-200 bg-red-50/60'
+                                    : isHighPrio
+                                      ? 'border-amber-200 bg-amber-50/40'
+                                      : 'border-gray-100 hover:border-gray-200'
+                                }`}>
+                                  {(isOverdue || isHighPrio) && (
+                                    <span className={`absolute left-0 top-2 bottom-2 w-1 rounded-r ${isOverdue ? 'bg-red-500' : 'bg-amber-400'}`} />
+                                  )}
+                                  <button onClick={() => handleToggleTask(task.id, task.status)} className="flex-shrink-0 ml-1" title="Markera som klar">
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isOverdue ? 'border-red-400 hover:border-red-500' : isHighPrio ? 'border-amber-400 hover:border-amber-500' : 'border-gray-300 hover:border-primary-400'}`} />
+                                  </button>
+                                  <button
+                                    onClick={() => { setDealTab('tasks'); setExpandedTaskId(task.id); fetchTaskActivities(task.id) }}
+                                    className="flex-1 text-left min-w-0"
+                                  >
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-sm text-gray-700 truncate">{task.title}</span>
+                                      {isHighPrio && !isOverdue && (
+                                        <span className="text-[9px] font-bold uppercase tracking-wide text-amber-700">Viktig</span>
+                                      )}
+                                    </div>
+                                    {task.due_date && (
+                                      <span className={`text-[11px] flex items-center gap-0.5 mt-0.5 ${isOverdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                                        <Calendar className="w-3 h-3" />
+                                        {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                                        {task.due_time && ` ${task.due_time.slice(0, 5)}`}
+                                        {isOverdue && ' · försenad'}
+                                      </span>
+                                    )}
+                                  </button>
+                                  {initials && (
+                                    <div
+                                      className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                                      style={{ backgroundColor: task.assigned_user?.color || '#3B82F6' }}
+                                      title={task.assigned_user?.name || ''}
+                                    >
+                                      {initials}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                            {sorted.length > 5 && (
+                              <button
+                                type="button"
+                                onClick={() => setDealTab('tasks')}
+                                className="w-full text-left px-3 py-1.5 text-[11px] text-gray-500 hover:text-primary-700 transition-colors"
+                              >
+                                + {sorted.length - 5} till — öppna Uppgifter-fliken
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
+
                     {/* Activity log */}
                     <div>
                       <h4 className="text-xs text-gray-400 uppercase tracking-wider mb-3">Tidslinje</h4>
@@ -2391,31 +2509,17 @@ export default function PipelinePage() {
                 {/* TAB: Uppgifter */}
                 {dealTab === 'tasks' && (
                   <div className="space-y-4">
-                    {/* Snabbval */}
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-xs text-gray-400">
-                        Skapa flera uppgifter snabbt med en mall, eller skriv egen rad nedan.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setShowDealTaskPresetPicker(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700 flex-shrink-0"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        Förvalda uppgifter
-                      </button>
-                    </div>
                     {/* Add task form */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={newTaskTitle}
-                          onChange={e => setNewTaskTitle(e.target.value)}
-                          placeholder="Ny uppgift..."
-                          className="flex-1 px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-primary-400"
-                          onKeyDown={e => { if (e.key === 'Enter') handleAddTask() }}
-                        />
+                      <div className="flex items-start gap-2">
+                        <div className="flex-1">
+                          <SmartTaskTitleInput
+                            value={newTaskTitle}
+                            onChange={setNewTaskTitle}
+                            onSubmit={() => handleAddTask()}
+                            placeholder="Vad behöver göras?"
+                          />
+                        </div>
                         <button
                           onClick={handleAddTask}
                           disabled={!newTaskTitle.trim() || taskSaving}
@@ -2425,6 +2529,15 @@ export default function PipelinePage() {
                           <span className="hidden sm:inline">Lägg till</span>
                         </button>
                       </div>
+                      {newTaskTitle.trim() && (
+                        <textarea
+                          value={newTaskDescription}
+                          onChange={e => setNewTaskDescription(e.target.value)}
+                          placeholder="Beskrivning (valfri)..."
+                          rows={2}
+                          className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none resize-none"
+                        />
+                      )}
                       <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="date"
@@ -2443,6 +2556,16 @@ export default function PipelinePage() {
                             const m = String((i % 4) * 15).padStart(2, '0')
                             return <option key={i} value={`${h}:${m}`}>{h}:{m}</option>
                           })}
+                        </select>
+                        <select
+                          value={newTaskPriority}
+                          onChange={e => setNewTaskPriority(e.target.value as any)}
+                          className="px-2 py-1.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-xs text-gray-500 focus:outline-none focus:border-primary-400 w-24"
+                          title="Prioritet"
+                        >
+                          <option value="low">Låg</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">Hög</option>
                         </select>
                         {teamMembers.length > 0 && (
                           <select

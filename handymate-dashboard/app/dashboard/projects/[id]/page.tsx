@@ -78,6 +78,7 @@ import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
 import TaskPresetPicker from '@/components/TaskPresetPicker'
+import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
@@ -481,7 +482,7 @@ export default function ProjectDetailPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [changes, setChanges] = useState<Change[]>([])
   // Uppgifter kopplade till projektet (synk med /dashboard/tasks)
-  const [projectTasks, setProjectTasks] = useState<Array<{
+  type ProjectTaskRow = {
     id: string
     title: string
     description: string | null
@@ -491,10 +492,14 @@ export default function ProjectDetailPage() {
     due_time: string | null
     assigned_to: string | null
     assigned_user: { id: string; name: string; color: string } | null
-  }>>([])
+  }
+  const [projectTasks, setProjectTasks] = useState<ProjectTaskRow[]>([])
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   const [newTaskTitle, setNewTaskTitle] = useState('')
+  const [newTaskDescription, setNewTaskDescription] = useState('')
   const [newTaskAssignee, setNewTaskAssignee] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState(() => new Date().toISOString().split('T')[0])
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high'>('medium')
   const [savingNewTask, setSavingNewTask] = useState(false)
   const [showTaskPresetPicker, setShowTaskPresetPicker] = useState(false)
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
@@ -861,6 +866,8 @@ export default function ProjectDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: newTaskTitle.trim(),
+          description: newTaskDescription.trim() || null,
+          priority: newTaskPriority,
           project_id: projectId,
           assigned_to: newTaskAssignee || null,
           due_date: newTaskDueDate || null,
@@ -869,7 +876,9 @@ export default function ProjectDetailPage() {
       })
       if (res.ok) {
         setNewTaskTitle('')
+        setNewTaskDescription('')
         setNewTaskAssignee('')
+        setNewTaskPriority('medium')
         // Återställ till idag så nästa task får default-datumet på nytt
         setNewTaskDueDate(new Date().toISOString().split('T')[0])
         fetchProjectTasks()
@@ -2421,30 +2430,27 @@ export default function ProjectDetailPage() {
                   Synkas med <Link href={`/dashboard/tasks`} className="text-primary-700 hover:underline">Mina uppgifter</Link>
                 </p>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400">
-                  {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
-                </span>
-                <button
-                  onClick={() => setShowTaskPresetPicker(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Förvalda uppgifter
-                </button>
-              </div>
+              <span className="text-xs text-gray-400">
+                {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
+              </span>
             </div>
 
             {/* Lägg till ny uppgift */}
             <div className="bg-white border border-[#E2E8F0] rounded-xl p-4 space-y-3">
-              <input
-                type="text"
+              <SmartTaskTitleInput
                 value={newTaskTitle}
-                onChange={e => setNewTaskTitle(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && newTaskTitle.trim()) createProjectTask() }}
-                placeholder="Vad behöver göras?"
-                className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none"
+                onChange={setNewTaskTitle}
+                onSubmit={() => { if (newTaskTitle.trim()) createProjectTask() }}
               />
+              {newTaskTitle.trim() && (
+                <textarea
+                  value={newTaskDescription}
+                  onChange={e => setNewTaskDescription(e.target.value)}
+                  placeholder="Beskrivning (valfri)..."
+                  rows={2}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none resize-none"
+                />
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={newTaskAssignee}
@@ -2462,6 +2468,16 @@ export default function ProjectDetailPage() {
                   onChange={e => setNewTaskDueDate(e.target.value)}
                   className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:border-primary-700 focus:outline-none"
                 />
+                <select
+                  value={newTaskPriority}
+                  onChange={e => setNewTaskPriority(e.target.value as any)}
+                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-lg text-xs focus:border-primary-700 focus:outline-none"
+                  title="Prioritet"
+                >
+                  <option value="low">Låg</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">Hög</option>
+                </select>
                 <button
                   onClick={createProjectTask}
                   disabled={!newTaskTitle.trim() || savingNewTask}
@@ -2492,53 +2508,77 @@ export default function ProjectDetailPage() {
                   .map(task => {
                     const today = new Date().toISOString().split('T')[0]
                     const isOverdue = task.due_date && task.due_date < today && task.status !== 'done'
+                    const isHighPrio = task.priority === 'high' && task.status !== 'done'
+                    const isExpanded = expandedTaskId === task.id
                     return (
-                      <div key={task.id} className="flex items-start gap-3 p-3 hover:bg-[#F8FAFC]">
-                        <button
-                          onClick={() => toggleProjectTask(task.id, task.status)}
-                          className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                            task.status === 'done'
-                              ? 'bg-primary-700 border-primary-700'
-                              : 'border-gray-300 hover:border-primary-700'
-                          }`}
-                          aria-label={task.status === 'done' ? 'Markera ej klar' : 'Markera klar'}
-                        >
-                          {task.status === 'done' && <Check className="w-3 h-3 text-white" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                            {task.title}
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                            {task.due_date && (
-                              <span className={isOverdue ? 'text-red-600 font-medium' : ''}>
-                                {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
-                                {task.due_time && ` ${task.due_time.slice(0, 5)}`}
-                              </span>
-                            )}
-                            {task.assigned_user && (
-                              <span className="flex items-center gap-1">
-                                <span
-                                  className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
-                                  style={{ backgroundColor: task.assigned_user.color || '#64748B' }}
-                                >
-                                  {task.assigned_user.name.charAt(0)}
+                      <div
+                        key={task.id}
+                        className={`relative ${isOverdue ? 'bg-red-50/40' : isHighPrio ? 'bg-amber-50/40' : ''}`}
+                      >
+                        {(isOverdue || isHighPrio) && (
+                          <span className={`absolute left-0 top-0 bottom-0 w-1 ${isOverdue ? 'bg-red-500' : 'bg-amber-400'}`} />
+                        )}
+                        <div className="flex items-start gap-3 p-3 hover:bg-[#F8FAFC] transition-colors">
+                          <button
+                            onClick={() => toggleProjectTask(task.id, task.status)}
+                            className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                              task.status === 'done'
+                                ? 'bg-primary-700 border-primary-700'
+                                : 'border-gray-300 hover:border-primary-700'
+                            }`}
+                            aria-label={task.status === 'done' ? 'Markera ej klar' : 'Markera klar'}
+                          >
+                            {task.status === 'done' && <Check className="w-3 h-3 text-white" />}
+                          </button>
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => task.description && setExpandedTaskId(isExpanded ? null : task.id)}
+                          >
+                            <div className={`text-sm ${task.status === 'done' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                              {task.title}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap text-xs">
+                              {isOverdue && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-red-600">Försenad</span>
+                              )}
+                              {isHighPrio && !isOverdue && (
+                                <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Viktig</span>
+                              )}
+                              {task.due_date && (
+                                <span className={`text-gray-500 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                  {new Date(task.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}
+                                  {task.due_time && ` ${task.due_time.slice(0, 5)}`}
                                 </span>
-                                {task.assigned_user.name}
-                              </span>
-                            )}
-                            {task.priority === 'high' && (
-                              <span className="text-red-600 font-medium">Hög</span>
+                              )}
+                              {task.assigned_user && (
+                                <span className="flex items-center gap-1 text-gray-500">
+                                  <span
+                                    className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] text-white font-bold"
+                                    style={{ backgroundColor: task.assigned_user.color || '#64748B' }}
+                                  >
+                                    {task.assigned_user.name.charAt(0)}
+                                  </span>
+                                  {task.assigned_user.name}
+                                </span>
+                              )}
+                              {task.description && (
+                                <span className="text-[10px] text-gray-400">{isExpanded ? 'dölj ▴' : 'visa beskrivning ▾'}</span>
+                              )}
+                            </div>
+                            {task.description && isExpanded && (
+                              <p className="mt-2 text-xs text-gray-600 whitespace-pre-wrap leading-relaxed bg-gray-50 rounded p-2">
+                                {task.description}
+                              </p>
                             )}
                           </div>
+                          <button
+                            onClick={() => deleteProjectTask(task.id)}
+                            className="p-1 text-gray-300 hover:text-red-600 rounded"
+                            aria-label="Ta bort"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <button
-                          onClick={() => deleteProjectTask(task.id)}
-                          className="p-1 text-gray-300 hover:text-red-600 rounded"
-                          aria-label="Ta bort"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     )
                   })}
