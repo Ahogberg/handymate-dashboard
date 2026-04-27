@@ -954,6 +954,20 @@ export default function PipelinePage() {
     }
   }, [searchParams])
 
+  // Deep-link: ?deal=X → öppna deal-detalj direkt (från dashboardens "Att göra idag")
+  const dealDeepLinkHandled = useRef(false)
+  useEffect(() => {
+    const dealId = searchParams?.get('deal')
+    if (!dealId || dealDeepLinkHandled.current) return
+    if (deals.length === 0) return // vänta på att deals laddats
+    const deal = deals.find(d => d.id === dealId)
+    if (deal) {
+      dealDeepLinkHandled.current = true
+      openDealDetail(deal)
+      window.history.replaceState(null, '', '/dashboard/pipeline')
+    }
+  }, [searchParams, deals])
+
   // ------------------------------------------
   // Deal actions
   // ------------------------------------------

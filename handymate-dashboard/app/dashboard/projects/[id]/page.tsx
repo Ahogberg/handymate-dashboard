@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
   Loader2,
@@ -469,6 +469,7 @@ function SortableMilestoneRow({
 export default function ProjectDetailPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const business = useBusiness()
   const { can, user: currentUser, isOwnerOrAdmin } = useCurrentUser()
   const projectId = (params as any)?.id as string
@@ -542,7 +543,16 @@ export default function ProjectDetailPage() {
 
   // UI state
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<TabKey>('overview')
+  // Initialisera activeTab från ?tab=X — gör att deep-länkar (t.ex. dashboardens
+  // "Att göra"-lista) öppnar rätt flik direkt utan flicker.
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    const allowed: TabKey[] = ['overview', 'team', 'schedule', 'milestones', 'changes', 'time', 'material', 'economy', 'documents', 'log', 'checklists', 'ai_log', 'arbetsorder', 'leverantorer', 'canvas', 'field_reports', 'tasks']
+    if (typeof window !== 'undefined') {
+      const tabParam = new URLSearchParams(window.location.search).get('tab')
+      if (tabParam && (allowed as string[]).includes(tabParam)) return tabParam as TabKey
+    }
+    return 'overview'
+  })
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 

@@ -18,6 +18,12 @@ export async function GET(req: NextRequest) {
   const todayStr = today.toISOString().split('T')[0]
   const tomorrowStr = new Date(today.getTime() + 86400000).toISOString().split('T')[0]
 
+  interface TodoContext {
+    type: 'project' | 'deal'
+    label: string
+    link: string
+  }
+
   interface TodoItem {
     id: string
     type: 'task' | 'booking' | 'work_order' | 'approval' | 'overdue_task' | 'overdue_invoice'
@@ -28,6 +34,7 @@ export async function GET(req: NextRequest) {
     status: 'pending' | 'done'
     link?: string
     icon: string
+    context?: TodoContext
   }
 
   const items: TodoItem[] = []
@@ -43,21 +50,6 @@ export async function GET(req: NextRequest) {
       .order('due_date', { ascending: true })
       .limit(20)
 
-    for (const t of (tasks || [])) {
-      const isOverdue = t.due_date && t.due_date < todayStr
-      items.push({
-        id: `task_${t.id}`,
-        type: isOverdue ? 'overdue_task' : 'task',
-        title: t.title,
-        subtitle: t.due_time ? `Kl ${t.due_time}` : (isOverdue ? 'Förfallen' : 'Idag'),
-        due: t.due_date,
-        priority: isOverdue ? 'high' : (t.priority || 'medium'),
-        status: 'pending',
-        link: t.deal_id ? `/dashboard/pipeline?deal=${t.deal_id}` : t.project_id ? `/dashboard/projects/${t.project_id}` : undefined,
-        icon: isOverdue ? '🔴' : '📋',
-      })
-    }
-
     // 2. Dagens bokningar
     const { data: bookings } = await supabase
       .from('booking')
@@ -69,21 +61,7 @@ export async function GET(req: NextRequest) {
       .order('scheduled_start', { ascending: true })
       .limit(10)
 
-    for (const b of (bookings || [])) {
-      const time = b.scheduled_start ? b.scheduled_start.slice(0, 5) : ''
-      items.push({
-        id: `booking_${b.id}`,
-        type: 'booking',
-        title: b.title || 'Bokning',
-        subtitle: [time, b.customer_name, b.address].filter(Boolean).join(' · '),
-        priority: 'medium',
-        status: b.status === 'completed' ? 'done' : 'pending',
-        link: b.project_id ? `/dashboard/projects/${b.project_id}` : '/dashboard/planning/schedule',
-        icon: '📅',
-      })
-    }
-
-    // 3. Arbetsordrar att slutföra (skickade men ej klara)
+    // 3. Arbetsordrar att slutföra
     const { data: workOrders } = await supabase
       .from('work_orders')
       .select('id, title, order_number, scheduled_date, status, project_id')
@@ -93,7 +71,114 @@ export async function GET(req: NextRequest) {
       .order('scheduled_date', { ascending: true })
       .limit(10)
 
+    // ── Resolva projekt-namn och deal-titlar i ett enda batch ──
+    const projectIdSet = new Set<string>()
+    const dealIdSet = new Set<string>()
+    for (const t of tasks || []) {
+      if (t.project_id) projectIdSet.add(t.project_id)
+      if (t.deal_id) dealIdSet.add(t.deal_id)
+    }
+    for (const b of bookings || []) {
+      if (b.project_id) projectIdSet.add(b.project_id)
+    }
+    for (const wo of workOrders || []) {
+      if (wo.project_id) projectIdSet.add(wo.project_id)
+    }
+
+    const projectMap: Record<string, string> = {}
+    if (projectIdSet.size > 0) {
+      const { data: projects } = await supabase
+        .from('project')
+        .select('id, name')
+        .in('id', Array.from(projectIdSet))
+      for (const p of projects || []) projectMap[p.id] = p.name
+    }
+
+    const dealMap: Record<string, { title: string; deal_number: number | null }> = {}
+    if (dealIdSet.size > 0) {
+      const { data: deals } = await supabase
+        .from('deal')
+        .select('id, title, deal_number')
+        .in('id', Array.from(dealIdSet))
+      for (const d of deals || []) dealMap[d.id] = { title: d.title, deal_number: d.deal_number }
+    }
+
+    // Bygg items
+    for (const t of (tasks || [])) {
+      const isOverdue = t.due_date && t.due_date < todayStr
+      let context: TodoContext | undefined
+      let link: string | undefined
+
+      if (t.deal_id && dealMap[t.deal_id]) {
+        const d = dealMap[t.deal_id]
+        const ref = d.deal_number ? `#${d.deal_number}` : ''
+        context = {
+          type: 'deal',
+          label: `Ärende ${ref}${ref ? ' · ' : ''}${d.title}`.trim(),
+          link: `/dashboard/pipeline?deal=${t.deal_id}`,
+        }
+        link = context.link
+      } else if (t.project_id && projectMap[t.project_id]) {
+        context = {
+          type: 'project',
+          label: `Projekt · ${projectMap[t.project_id]}`,
+          link: `/dashboard/projects/${t.project_id}?tab=tasks`,
+        }
+        link = context.link
+      } else if (t.deal_id) {
+        link = `/dashboard/pipeline?deal=${t.deal_id}`
+      } else if (t.project_id) {
+        link = `/dashboard/projects/${t.project_id}?tab=tasks`
+      }
+
+      items.push({
+        id: `task_${t.id}`,
+        type: isOverdue ? 'overdue_task' : 'task',
+        title: t.title,
+        subtitle: t.due_time ? `Kl ${t.due_time}` : (isOverdue ? 'Förfallen' : 'Idag'),
+        due: t.due_date,
+        priority: isOverdue ? 'high' : (t.priority || 'medium'),
+        status: 'pending',
+        link,
+        icon: isOverdue ? '🔴' : '📋',
+        context,
+      })
+    }
+
+    for (const b of (bookings || [])) {
+      const time = b.scheduled_start ? b.scheduled_start.slice(0, 5) : ''
+      let context: TodoContext | undefined
+      if (b.project_id && projectMap[b.project_id]) {
+        context = {
+          type: 'project',
+          label: `Projekt · ${projectMap[b.project_id]}`,
+          link: `/dashboard/projects/${b.project_id}`,
+        }
+      }
+
+      items.push({
+        id: `booking_${b.id}`,
+        type: 'booking',
+        title: b.title || 'Bokning',
+        subtitle: [time, b.customer_name, b.address].filter(Boolean).join(' · '),
+        priority: 'medium',
+        status: b.status === 'completed' ? 'done' : 'pending',
+        link: context?.link || (b.project_id ? `/dashboard/projects/${b.project_id}` : '/dashboard/planning/schedule'),
+        icon: '📅',
+        context,
+      })
+    }
+
     for (const wo of (workOrders || [])) {
+      let context: TodoContext | undefined
+      if (wo.project_id && projectMap[wo.project_id]) {
+        context = {
+          type: 'project',
+          label: `Projekt · ${projectMap[wo.project_id]}`,
+          link: `/dashboard/projects/${wo.project_id}`,
+        }
+      }
+
       items.push({
         id: `wo_${wo.id}`,
         type: 'work_order',
@@ -101,8 +186,9 @@ export async function GET(req: NextRequest) {
         subtitle: wo.scheduled_date === todayStr ? 'Idag' : 'Förfallen',
         priority: wo.scheduled_date < todayStr ? 'high' : 'medium',
         status: 'pending',
-        link: wo.project_id ? `/dashboard/projects/${wo.project_id}` : undefined,
+        link: context?.link || (wo.project_id ? `/dashboard/projects/${wo.project_id}` : undefined),
         icon: '🔧',
+        context,
       })
     }
 
@@ -128,7 +214,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 5. Förfallna fakturor (obetalda med förfallodatum passerat)
+    // 5. Förfallna fakturor
     const { data: overdueInvoices } = await supabase
       .from('invoices')
       .select('id, invoice_number, customer_name, total_amount, due_date')

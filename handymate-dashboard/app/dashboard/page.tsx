@@ -111,7 +111,17 @@ export default function DashboardPage() {
     invoiced: number; unpaidCount: number; unpaidAmount: number
     estimatedMargin: number | null; overheadSet: boolean
   } | null>(null)
-  const [todayItems, setTodayItems] = useState<{ id: string; type: string; title: string; subtitle?: string; priority: string; status: string; link?: string; icon: string }[]>([])
+  const [todayItems, setTodayItems] = useState<{
+    id: string
+    type: string
+    title: string
+    subtitle?: string
+    priority: string
+    status: string
+    link?: string
+    icon: string
+    context?: { type: 'project' | 'deal'; label: string; link: string }
+  }[]>([])
   const [todayLoaded, setTodayLoaded] = useState(false)
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
@@ -939,7 +949,18 @@ export default function DashboardPage() {
                   <span className="text-base shrink-0">{item.icon}</span>
                   <div className="min-w-0 flex-1">
                     <p className={`text-sm text-gray-900 truncate ${item.status === 'done' ? 'line-through' : ''}`}>{item.title}</p>
-                    {item.subtitle && <p className="text-xs text-gray-400 truncate">{item.subtitle}</p>}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {item.subtitle && <p className="text-xs text-gray-400 truncate">{item.subtitle}</p>}
+                      {item.context && (
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded inline-flex items-center gap-1 ${
+                          item.context.type === 'project'
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : 'bg-primary-50 text-primary-700'
+                        }`}>
+                          {item.context.type === 'project' ? '📁' : '📋'} {item.context.label}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
                     item.type === 'booking' ? 'bg-blue-50 text-blue-600' :
