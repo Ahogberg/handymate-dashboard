@@ -2,16 +2,13 @@
 
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2 } from 'lucide-react'
+import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 export default function IntegrationsPage() {
   const business = useBusiness()
   const [copied, setCopied] = useState(false)
-  const [googleStatus, setGoogleStatus] = useState<{
-    calendarConnected: boolean
-    gmailConnected: boolean
-  }>({ calendarConnected: false, gmailConnected: false })
+  const [calendarConnected, setCalendarConnected] = useState(false)
   const [widgetEnabled, setWidgetEnabled] = useState(false)
   const [statusLoading, setStatusLoading] = useState(true)
 
@@ -30,11 +27,7 @@ export default function IntegrationsPage() {
       try {
         const googleRes = await fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null)
         if (cancelled) return
-        setGoogleStatus({
-          calendarConnected: !!(googleRes?.connected && googleRes?.syncEnabled),
-          gmailConnected: !!(googleRes?.gmailScopeGranted && googleRes?.gmailSendScopeGranted),
-        })
-        // widget_enabled hämtas via URL-widget-sidan; för nu visa "Ej kopplad" som default
+        setCalendarConnected(!!(googleRes?.connected && googleRes?.syncEnabled))
         setWidgetEnabled(false)
       } catch {
         /* non-blocking */
@@ -53,33 +46,6 @@ export default function IntegrationsPage() {
     )
   }
 
-  const integrations = [
-    {
-      icon: Globe,
-      title: 'Hemsida-widget',
-      description: 'Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt',
-      href: '/dashboard/settings/website-widget',
-      connected: widgetEnabled,
-      color: 'text-primary-700 bg-primary-50',
-    },
-    {
-      icon: Calendar,
-      title: 'Google Calendar',
-      description: 'Synka bokningar med din kalender automatiskt',
-      href: '/dashboard/settings',
-      connected: googleStatus.calendarConnected,
-      color: 'text-blue-600 bg-blue-50',
-    },
-    {
-      icon: Mail,
-      title: 'Gmail',
-      description: 'Importera leads automatiskt från din inkorg',
-      href: '/dashboard/settings',
-      connected: googleStatus.gmailConnected,
-      color: 'text-red-500 bg-red-50',
-    },
-  ]
-
   return (
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-3xl mx-auto">
@@ -96,30 +62,80 @@ export default function IntegrationsPage() {
 
         {/* Integration cards */}
         <div className="space-y-3 mb-8">
-          {integrations.map((item) => (
-            <Link
-              key={item.title}
-              href={item.href}
-              className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
+          {/* Hemsida-widget */}
+          <Link
+            href="/dashboard/settings/website-widget"
+            className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center text-primary-700 bg-primary-50">
+              <Globe className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">Hemsida-widget</span>
+                {!statusLoading && widgetEnabled && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Kopplad</span>
+                )}
+                {!statusLoading && !widgetEnabled && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 truncate">Lägg till en chattwidget på din hemsida så kunder kan kontakta dig direkt</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </Link>
+
+          {/* Google Calendar */}
+          <Link
+            href="/dashboard/settings"
+            className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center text-blue-600 bg-blue-50">
+              <Calendar className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-900">Google Calendar</span>
+                {!statusLoading && calendarConnected && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Kopplad</span>
+                )}
+                {!statusLoading && !calendarConnected && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
+                )}
+              </div>
+              <p className="text-sm text-gray-500 truncate">Synka bokningar automatiskt med din Google Kalender</p>
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Behörighet: Kalender (läsa och skriva bokningar)
+              </p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          </Link>
+
+          {/* E-post — kommer snart (icke-klickbar) */}
+          <div
+            aria-disabled="true"
+            className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] opacity-70 cursor-not-allowed select-none"
+          >
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-400 bg-gray-100">
+              <Mail className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-700">E-post</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium border border-amber-200">
+                  Kommer snart
+                </span>
+              </div>
+              <p className="text-sm text-gray-500 truncate">Automatisk hantering av inkommande kundmail — aktiveras snart</p>
+            </div>
+            <span
+              aria-hidden="true"
+              className="text-xs font-medium text-gray-400 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 flex-shrink-0"
             >
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${item.color}`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium text-gray-900">{item.title}</span>
-                  {!statusLoading && item.connected && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Kopplad</span>
-                  )}
-                  {!statusLoading && !item.connected && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-500 truncate">{item.description}</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            </Link>
-          ))}
+              Inaktiv
+            </span>
+          </div>
         </div>
 
         {/* Embed code section */}
