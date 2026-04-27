@@ -222,6 +222,9 @@ export async function PUT(request: NextRequest) {
   if (body.due_time !== undefined) updates.due_time = body.due_time
   if (body.assigned_to !== undefined) updates.assigned_to = body.assigned_to
   if (body.visibility !== undefined) updates.visibility = body.visibility
+  if (body.project_id !== undefined) updates.project_id = body.project_id || null
+  if (body.customer_id !== undefined) updates.customer_id = body.customer_id || null
+  if (body.deal_id !== undefined) updates.deal_id = body.deal_id || null
 
   const { data, error } = await supabase
     .from('task')

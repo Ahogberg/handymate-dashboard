@@ -65,6 +65,10 @@ export default function TasksPage() {
   const [formAssignee, setFormAssignee] = useState('')
   const [formStatus, setFormStatus] = useState<'pending' | 'in_progress' | 'done'>('pending')
   const [formVisibility, setFormVisibility] = useState<'private' | 'team' | 'project'>('team')
+  const [formProjectId, setFormProjectId] = useState<string>('')
+
+  // Aktiva projekt för dropdown
+  const [projectOptions, setProjectOptions] = useState<Array<{ id: string; name: string }>>([])
 
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ show: true, message, type })
@@ -95,8 +99,23 @@ export default function TasksPage() {
     } catch { /* ignore */ }
   }, [])
 
+  const fetchProjectOptions = useCallback(async () => {
+    try {
+      const res = await fetch('/api/projects?status=active')
+      if (res.ok) {
+        const data = await res.json()
+        const list = (data.projects || data.data || []).map((p: any) => ({
+          id: p.id || p.project_id,
+          name: p.name || p.title || 'Projekt',
+        })).filter((p: any) => p.id)
+        setProjectOptions(list)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => { fetchTasks() }, [fetchTasks])
   useEffect(() => { fetchTeam() }, [fetchTeam])
+  useEffect(() => { fetchProjectOptions() }, [fetchProjectOptions])
 
   const today = new Date().toISOString().split('T')[0]
   const weekEnd = (() => {
@@ -147,6 +166,7 @@ export default function TasksPage() {
     setFormAssignee('')
     setFormStatus('pending')
     setFormVisibility('team')
+    setFormProjectId('')
     setEditTask(null)
     setShowCreate(true)
   }
@@ -160,6 +180,7 @@ export default function TasksPage() {
     setFormAssignee(task.assigned_to || '')
     setFormStatus(task.status)
     setFormVisibility(task.visibility)
+    setFormProjectId(task.project_id || '')
     setEditTask(task)
     setShowCreate(true)
   }
@@ -182,6 +203,7 @@ export default function TasksPage() {
             assigned_to: formAssignee || null,
             status: formStatus,
             visibility: formVisibility,
+            project_id: formProjectId || null,
           }),
         })
         if (!res.ok) throw new Error()
@@ -198,6 +220,7 @@ export default function TasksPage() {
             due_time: formDueTime || null,
             assigned_to: formAssignee || null,
             visibility: formVisibility,
+            project_id: formProjectId || null,
           }),
         })
         if (!res.ok) throw new Error()
@@ -377,6 +400,19 @@ export default function TasksPage() {
                           {task.assigned_user.name}
                         </span>
                       )}
+                      {task.project_id && (() => {
+                        const proj = projectOptions.find(p => p.id === task.project_id)
+                        if (!proj) return null
+                        return (
+                          <a
+                            href={`/dashboard/projects/${task.project_id}`}
+                            onClick={e => e.stopPropagation()}
+                            className="flex items-center gap-1 text-primary-700 hover:underline"
+                          >
+                            📁 {proj.name}
+                          </a>
+                        )
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -474,6 +510,26 @@ export default function TasksPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+              {/* Koppla till projekt — valfritt */}
+              <div>
+                <label className="text-xs text-[#64748B] font-medium mb-1 block">Koppla till projekt (valfritt)</label>
+                <select
+                  value={formProjectId}
+                  onChange={e => {
+                    setFormProjectId(e.target.value)
+                    // Sätt automatiskt synlighet=projekt om man kopplar till ett projekt
+                    if (e.target.value && formVisibility === 'private') {
+                      setFormVisibility('project')
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none"
+                >
+                  <option value="">Inget projekt</option>
+                  {projectOptions.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
               </div>
               {editTask && (
                 <div className="grid grid-cols-2 gap-3">
