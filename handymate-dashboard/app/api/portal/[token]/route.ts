@@ -28,7 +28,12 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     // Get business info
     const { data: business } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, google_review_url, assigned_phone_number')
+      .select(`
+        business_name, contact_name, contact_email, phone_number,
+        google_review_url, assigned_phone_number,
+        address, org_number, f_skatt_registered, working_hours,
+        accent_color, logo_url, swish_number, bankgiro
+      `)
       .eq('business_id', customer.business_id)
       .single()
 
@@ -105,7 +110,16 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
         contactName: business?.contact_name || '',
         email: business?.contact_email || '',
         phone: business?.phone_number || '',
-        googleReviewUrl: business?.google_review_url || null
+        googleReviewUrl: business?.google_review_url || null,
+        // Utökade fält för Claude Design redesign
+        accentColor: business?.accent_color || null,
+        logoUrl: business?.logo_url || null,
+        address: business?.address || null,
+        orgNumber: business?.org_number || null,
+        fSkatt: !!business?.f_skatt_registered,
+        workingHours: business?.working_hours || null,
+        swish: business?.swish_number || null,
+        bankgiro: business?.bankgiro || null,
       },
       unreadMessages: unreadCount || 0
     })

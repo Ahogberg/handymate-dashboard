@@ -3,10 +3,50 @@
  * Extraherade från page.tsx vid komponent-splitten — INGEN logik-ändring.
  */
 
+export interface WorkingHoursDay {
+  active: boolean
+  start: string
+  end: string
+}
+
 export interface PortalData {
   customer: { name: string; email: string; phone: string; customerId: string }
-  business: { name: string; contactName: string; email: string; phone: string; googleReviewUrl?: string | null }
+  business: {
+    name: string
+    contactName: string
+    email: string
+    phone: string
+    googleReviewUrl?: string | null
+    // Utökade fält för Claude Design redesign
+    accentColor?: string | null
+    logoUrl?: string | null
+    address?: string | null
+    orgNumber?: string | null
+    fSkatt?: boolean
+    workingHours?: Record<string, WorkingHoursDay> | null
+    swish?: string | null
+    bankgiro?: string | null
+  }
   unreadMessages: number
+}
+
+/**
+ * Aggregated activity event för Home-feed.
+ * Genereras av /api/portal/[token]/activity från flera källtabeller.
+ */
+export interface PortalActivity {
+  id: string
+  type: 'photo_uploaded' | 'quote_signed' | 'quote_sent' | 'message_received'
+       | 'invoice_paid' | 'invoice_sent' | 'stage_completed'
+  title: string
+  sub: string
+  // Lucide-icon-namn
+  icon: 'Image' | 'FileSignature' | 'MessageCircle' | 'Receipt' | 'CheckCircle'
+  // Tailwind-färgklass-tokens (string-värden i hex)
+  color: string
+  bg: string
+  created_at: string
+  link?: { route: string }
 }
 
 export interface PortalAta {
