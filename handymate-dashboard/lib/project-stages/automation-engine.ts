@@ -79,7 +79,46 @@ export async function advanceProjectStage(
     .eq('business_id', businessId)
 
   // Trigga automationer
+  // Logga stage-övergången med project_id i context — Flödet-vyns AI-strip
+  // hittar logs via project.customer_id men korrekt project_id-koppling är
+  // viktigt för att rätt aktivitet visas på rätt projekt när en kund har
+  // flera projekt.
+  await logProjectStageEvent(supabase, businessId, project, stageId)
+
   await triggerStageAutomations(projectId, stageId, businessId, project)
+}
+
+async function logProjectStageEvent(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  project: any,
+  stageId: string
+) {
+  try {
+    // Hämta läsbart stage-namn för rule_name
+    const { data: stage } = await supabase
+      .from('project_workflow_stages')
+      .select('name')
+      .eq('id', stageId)
+      .maybeSingle()
+
+    await supabase.from('v3_automation_logs').insert({
+      business_id: businessId,
+      rule_name: `Projekt: ${stage?.name || stageId}`,
+      trigger_type: 'project_stage_change',
+      action_type: 'advance_stage',
+      status: 'completed',
+      agent_id: 'lars', // Projektledaren ansvarar för stage-flödet
+      context: {
+        project_id: project.project_id,
+        customer_id: project.customer_id,
+        stage_id: stageId,
+        project_name: project.name,
+      },
+    })
+  } catch (err) {
+    console.error('[project-stages] log event failed:', err)
+  }
 }
 
 async function triggerStageAutomations(

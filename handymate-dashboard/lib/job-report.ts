@@ -153,6 +153,11 @@ export async function triggerJobReport(
       action_taken: `Jobbrapport förberedd för ${project.name}`,
       success: true,
       agent_id: 'lars',
+      context: {
+        project_id: projectId,
+        customer_id: (customer as any)?.customer_id || null,
+        project_name: project.name,
+      },
     })
   } catch { /* non-blocking */ }
 
@@ -346,6 +351,10 @@ export async function approveJobReport(
       action_taken: `Jobbrapport skickad till ${reportData.customerEmail || 'kund'}`,
       success: true,
       agent_id: 'lars',
+      context: {
+        project_id: reportData.projectId || null,
+        project_name: reportData.projectName,
+      },
     })
 
     return { success: true, pdfUrl }

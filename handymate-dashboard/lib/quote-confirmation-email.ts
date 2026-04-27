@@ -95,6 +95,18 @@ export async function sendQuoteSignedConfirmation(
 
   // Log
   try {
+    // Hitta ev. kopplat projekt (skapas vid quote_accepted) så Flödet-vyn
+    // kan visa den här loggen på rätt projekt-rad istället för bara på kunden.
+    let projectId: string | null = null
+    try {
+      const { data: project } = await supabase
+        .from('project')
+        .select('project_id')
+        .eq('quote_id', quote.quote_id || '')
+        .maybeSingle()
+      projectId = project?.project_id || null
+    } catch { /* non-blocking */ }
+
     await supabase.from('v3_automation_logs').insert({
       business_id: businessId,
       rule_name: 'quote_signed_confirmation',
@@ -103,6 +115,11 @@ export async function sendQuoteSignedConfirmation(
       customer_id: quote.customer_id,
       success: result.success,
       error_message: result.error || null,
+      context: {
+        project_id: projectId,
+        customer_id: quote.customer_id,
+        quote_id: quote.quote_id,
+      },
     })
   } catch { /* non-blocking */ }
 

@@ -100,19 +100,21 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Hämta senaste AI-aktivitet per kund från v3_automation_logs.
-      // Vi joinar via customer_id eftersom project_id sällan är ifyllt i context;
-      // alla automationer är dock alltid kopplade till en kund.
-      const latestByCustomerId: Record<string, {
+      // Hämta senaste AI-aktivitet per projekt från v3_automation_logs.
+      // Prioriterar context.project_id (korrekt en-till-en mapping). Faller
+      // tillbaka till context.customer_id för äldre loggar som saknar
+      // project-koppling (innan v40-patch).
+      type LatestEntry = {
         agent: string
         action: string
         rule_name: string | null
         action_type: string | null
         created_at: string
-      }> = {}
-      if (customerIds.size > 0) {
-        // Hämta senaste loggarna för businessen — filtrera på customer_id klientside
-        // för att undvika PostgREST-syntax-känslighet på jsonb-keys.
+      }
+      const latestByProjectId: Record<string, LatestEntry> = {}
+      const latestByCustomerId: Record<string, LatestEntry> = {}
+
+      if (projectIds.length > 0 || customerIds.size > 0) {
         const { data: logs } = await supabase
           .from('v3_automation_logs')
           .select('agent_id, action_type, rule_name, context, created_at')
@@ -121,23 +123,46 @@ export async function GET(request: NextRequest) {
           .order('created_at', { ascending: false })
           .limit(500)
 
+        const projectIdSet = new Set(projectIds)
+
         for (const log of logs || []) {
-          const cid = (log as any).context?.customer_id
-          if (!cid || !customerIds.has(cid) || latestByCustomerId[cid]) continue
-          latestByCustomerId[cid] = {
-            agent: log.agent_id || 'matte',
-            action: log.rule_name || log.action_type || 'AI-aktivitet',
-            rule_name: log.rule_name || null,
-            action_type: log.action_type || null,
-            created_at: log.created_at,
+          const ctx = (log as any).context || {}
+          const pid = ctx.project_id
+          const cid = ctx.customer_id
+
+          // Prioritera project_id-träffar (korrekt en-till-en)
+          if (pid && projectIdSet.has(pid) && !latestByProjectId[pid]) {
+            latestByProjectId[pid] = {
+              agent: log.agent_id || 'matte',
+              action: log.rule_name || log.action_type || 'AI-aktivitet',
+              rule_name: log.rule_name || null,
+              action_type: log.action_type || null,
+              created_at: log.created_at,
+            }
+          }
+
+          // Spara customer-träffen som fallback
+          if (cid && customerIds.has(cid) && !latestByCustomerId[cid]) {
+            latestByCustomerId[cid] = {
+              agent: log.agent_id || 'matte',
+              action: log.rule_name || log.action_type || 'AI-aktivitet',
+              rule_name: log.rule_name || null,
+              action_type: log.action_type || null,
+              created_at: log.created_at,
+            }
           }
         }
       }
 
       for (const p of projectList) {
         if (!p.deal_id) continue
+        // Prioritera direkt project_id-träff. Faller tillbaka till
+        // customer-baserad träff för bakåtkompatibilitet med äldre loggar.
         const cid = projectIdToCustomerId[p.project_id]
-        const latest = cid ? latestByCustomerId[cid] : null
+        const latest =
+          latestByProjectId[p.project_id] ||
+          (cid ? latestByCustomerId[cid] : null) ||
+          null
         projectByDealId[p.deal_id] = {
           id: p.project_id,
           name: p.name,
