@@ -63,6 +63,7 @@ import TaskPresetPicker from '@/components/TaskPresetPicker'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import { TimelineView } from './components/TimelineView'
 import FlowPipeline from '@/components/pipeline/unified/FlowPipeline'
+import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { PipelineStats as PipelineStatsView } from './components/PipelineStats'
 import { PipelineHeader } from './components/PipelineHeader'
 import { SiteVisitModal } from './components/SiteVisitModal'
@@ -129,6 +130,8 @@ export default function PipelinePage() {
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null)
 
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
+  // ProjectStageModal — projektet vars stage-tidslinje vi visar i en modal
+  const [openProjectStageId, setOpenProjectStageId] = useState<string | null>(null)
   const [detailActivities, setDetailActivities] = useState<Activity[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -1678,7 +1681,7 @@ export default function PipelinePage() {
               deals={filteredDeals}
               stages={stages}
               onDealClick={openDealDetail}
-              onProjectClick={(projectId) => { window.location.href = `/dashboard/projects/${projectId}` }}
+              onProjectClick={(projectId) => setOpenProjectStageId(projectId)}
               density="comfortable"
               split="50-50"
             />
@@ -1735,6 +1738,11 @@ export default function PipelinePage() {
       </div>
 
       <DealModal />
+
+      <ProjectStageModal
+        projectId={openProjectStageId}
+        onClose={() => setOpenProjectStageId(null)}
+      />
 
       <NewDealModal />
 
