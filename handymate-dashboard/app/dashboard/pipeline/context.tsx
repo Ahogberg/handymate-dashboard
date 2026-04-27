@@ -269,11 +269,32 @@ export interface PipelineContextValue {
   scrollContainerRef: React.RefObject<HTMLDivElement>
 
   // ─── New deal-modal triggers ───────────────────────────────────────────
+  showNewDeal: boolean
   setShowNewDeal: Dispatch<SetStateAction<boolean>>
   fetchCustomers: () => Promise<void>
   fetchJobTypes: () => Promise<void>
   fetchLeadSources: () => Promise<void>
   fetchJobTypeOptions: () => Promise<void>
+
+  // ─── NewDealModal-specifik state ───────────────────────────────────────
+  newDealForm: NewDealForm
+  setNewDealForm: Dispatch<SetStateAction<NewDealForm>>
+  newDealSubmitting: boolean
+  newDealFiles: File[]
+  setNewDealFiles: Dispatch<SetStateAction<File[]>>
+  customerSearch: string
+  setCustomerSearch: Dispatch<SetStateAction<string>>
+  showCustomerDropdown: boolean
+  setShowCustomerDropdown: Dispatch<SetStateAction<boolean>>
+  showNewCustomerForm: boolean
+  setShowNewCustomerForm: Dispatch<SetStateAction<boolean>>
+  newCustomerForm: NewCustomerForm
+  setNewCustomerForm: Dispatch<SetStateAction<NewCustomerForm>>
+  newCustomerSubmitting: boolean
+  setNewCustomerSubmitting: Dispatch<SetStateAction<boolean>>
+  setCustomers: Dispatch<SetStateAction<CustomerOption[]>>
+  filteredCustomers: CustomerOption[]
+  createDeal: () => Promise<void>
 
   // ─── Toast ─────────────────────────────────────────────────────────────
   toast: Toast
