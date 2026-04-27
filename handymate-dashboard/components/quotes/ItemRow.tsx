@@ -162,7 +162,7 @@ export default function ItemRow({
       </div>
 
       {/* ── Desktop layout (≥ md) ────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_100px_64px_28px] gap-1 items-center px-2 py-2">
+      <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 items-center px-2 py-2">
 
         {/* Drag handle */}
         <button
@@ -218,7 +218,7 @@ export default function ItemRow({
 
         {/* Category */}
         {isEditable ? (
-          <div className="min-w-0 overflow-hidden">
+          <div className="min-w-0">
             <CategorySelect item={item} allCategories={allCategories} onUpdate={onUpdate}
               isCreatingCategory={!!isCreatingCategory} onCreateCategory={onCreateCategory}
               showNewCategoryInput={showNewCategoryInput} setShowNewCategoryInput={setShowNewCategoryInput}
@@ -230,7 +230,7 @@ export default function ItemRow({
         {isEditable ? (
           <select value={item.rot_rut_type || (item.is_rot_eligible ? 'rot' : item.is_rut_eligible ? 'rut' : '')}
             onChange={(e) => onUpdate(item.id, 'rot_rut_type', e.target.value || null)}
-            className="w-full min-w-0 text-[10px] border border-gray-200 rounded-md px-1 py-1 text-gray-600 bg-white focus:ring-1 focus:ring-primary-600">
+            className="w-full min-w-0 text-xs border border-gray-300 rounded-md px-1.5 py-1.5 text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer">
             <option value="">—</option><option value="rot">ROT</option><option value="rut">RUT</option>
           </select>
         ) : <span />}
@@ -272,10 +272,11 @@ function CategorySelect({
           else if (e.key === 'Escape') { setShowNewCategoryInput(null); setNewCategoryLabel('') }
         }}
         placeholder="Namn..."
-        className="w-full px-1.5 py-1 text-[10px] border border-primary-600 rounded bg-white text-gray-900 focus:outline-none" />
+        className="w-full px-2 py-1.5 text-xs border border-primary-600 rounded-md bg-white text-gray-900 focus:outline-none focus:ring-1 focus:ring-primary-600" />
     )
   }
 
+  const hasValue = !!item.category_slug
   return (
     <select value={item.category_slug ?? ''}
       onChange={(e) => {
@@ -283,8 +284,8 @@ function CategorySelect({
           setShowNewCategoryInput(item.id); setNewCategoryLabel('')
         } else { onUpdate(item.id, 'category_slug', e.target.value || undefined) }
       }}
-      className="w-full min-w-0 px-1 py-1 text-[10px] border border-gray-200 rounded-md bg-white text-gray-500 focus:outline-none focus:border-primary-600">
-      <option value="">Kategori</option>
+      className={`w-full min-w-0 px-1.5 py-1.5 text-xs border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 cursor-pointer ${hasValue ? 'text-gray-900' : 'text-gray-500'}`}>
+      <option value="">Välj kategori…</option>
       <optgroup label="Arbete">
         {allCategories.filter(c => c.slug.startsWith('arbete')).map(c => <option key={c.slug} value={c.slug}>{c.label}</option>)}
       </optgroup>
@@ -294,7 +295,7 @@ function CategorySelect({
       <optgroup label="Övrigt">
         {allCategories.filter(c => !c.slug.startsWith('arbete') && !c.slug.startsWith('material')).map(c => <option key={c.slug} value={c.slug}>{c.label}</option>)}
       </optgroup>
-      {onCreateCategory && <option value="__new__">+ Ny</option>}
+      {onCreateCategory && <option value="__new__">+ Ny kategori…</option>}
     </select>
   )
 }
