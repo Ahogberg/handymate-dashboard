@@ -1309,7 +1309,7 @@ export default function SettingsPage() {
     {
       label: 'Försäljning',
       tabs: [
-        { id: '_link_quote_style', label: 'Offertstil', icon: FileText, href: '/dashboard/settings/quote-style' },
+        { id: '_link_quote_style', label: 'Dokumentstil', icon: FileText, href: '/dashboard/settings/quote-style' },
         { id: '_link_templates', label: 'Offertmallar', icon: FileText, href: '/dashboard/settings/quote-templates' },
         { id: '_link_texts', label: 'Standardtexter', icon: FileText, href: '/dashboard/settings/quote-texts' },
         { id: '_link_pricelist', label: 'Prislista', icon: Package, href: '/dashboard/settings/pricelist' },

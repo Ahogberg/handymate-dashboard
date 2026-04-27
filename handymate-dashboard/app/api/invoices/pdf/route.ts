@@ -14,6 +14,10 @@ import {
   renderFooterGrid,
   wrapInPage,
 } from '@/lib/document-html'
+import {
+  buildInvoiceTemplateData,
+  selectInvoiceTemplate,
+} from '@/lib/invoice-templates'
 
 export const dynamic = 'force-dynamic'
 
@@ -131,7 +135,8 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // HTML view
+    // HTML view via template-systemet — väljer mall från quote_template_style
+    // (samma fält styr offerter, fakturor och påminnelser för konsistent stil).
     const payAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
     const swishQR = await generateSwishQR(
       businessConfig?.swish_number,
@@ -139,7 +144,12 @@ export async function GET(request: NextRequest) {
       invoice.invoice_number,
     )
 
-    const html = generateInvoiceHTML(invoice, businessConfig, ocrNumber, swishQR)
+    // Säkerställ att invoice har ocr_number satt + customer-objekt
+    invoice.ocr_number = ocrNumber
+
+    const templateData = buildInvoiceTemplateData(invoice, businessConfig, swishQR)
+    const renderFn = selectInvoiceTemplate(businessConfig?.quote_template_style)
+    const html = renderFn(templateData)
 
     return new NextResponse(html, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' },
