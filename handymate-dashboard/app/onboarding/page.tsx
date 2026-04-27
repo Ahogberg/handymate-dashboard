@@ -89,15 +89,21 @@ export default function OnboardingPage() {
     }
   }, [router])
 
-  // Save progress till DB (bara om vi har businessId)
+  // Save progress till DB (bara om vi har businessId).
+  // Server-side via /api/onboarding PUT (service-role bypassar RLS).
+  // `config`-objektet skriver whitelisted business_config-kolumner direkt.
   const saveProgress = useCallback(
-    async (s: number, extraData?: Record<string, unknown>) => {
+    async (
+      s: number,
+      extraData?: Record<string, unknown>,
+      config?: Record<string, unknown>,
+    ) => {
       if (!data.businessId) return
       try {
         await fetch('/api/onboarding', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ step: s, data: extraData || {} }),
+          body: JSON.stringify({ step: s, data: extraData || {}, config: config || {} }),
         })
       } catch {
         // Silent — onboarding fortsätter ändå, kan resume senare
@@ -110,49 +116,28 @@ export default function OnboardingPage() {
     const newStep = Math.min(step + 1, TOTAL_STEPS - 1)
     setStep(newStep)
 
-    // Spara form-data till business_config + onboarding_step
     if (data.businessId && newStep > 0) {
-      await saveProgress(newStep, sanitizeForSave(data))
+      // Bygg config-payload baserat på vilket steg vi LÄMNAR
+      const config: Record<string, unknown> = {}
 
-      // För step 3 (specialties + hours + price) — skriv DIREKT till business_config-kolumner
-      if (step === 2 && data.businessId) {
-        try {
-          const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
-          const supabase = createClientComponentClient()
-          const workingHours = buildWorkingHours(data)
-          await supabase
-            .from('business_config')
-            .update({
-              specialties: data.specialties || [],
-              working_hours: workingHours,
-              hourly_rate_min: data.priceMin ?? null,
-              hourly_rate_max: data.priceMax ?? null,
-              default_hourly_rate: data.priceMax
-                ? Math.round((data.priceMin! + data.priceMax) / 2)
-                : null,
-            })
-            .eq('business_id', data.businessId)
-        } catch {
-          // silent
-        }
+      if (step === 2) {
+        // Lämnar Step3HowYouWork — spara specialiteter + arbetstider + pris
+        config.specialties = data.specialties || []
+        config.working_hours = buildWorkingHours(data)
+        config.hourly_rate_min = data.priceMin ?? null
+        config.hourly_rate_max = data.priceMax ?? null
+        config.default_hourly_rate = data.priceMax
+          ? Math.round(((data.priceMin || 0) + data.priceMax) / 2)
+          : null
       }
 
-      // Step 4 (phone) — skriv assigned_phone_number
-      if (step === 3 && data.businessId && data.lisaNumber) {
-        try {
-          const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
-          const supabase = createClientComponentClient()
-          await supabase
-            .from('business_config')
-            .update({
-              assigned_phone_number: data.lisaNumber.replace(/\s/g, ''),
-              phone_setup_type: data.phoneMode === 'forward' ? 'keep_existing' : 'new_number',
-            })
-            .eq('business_id', data.businessId)
-        } catch {
-          // silent
-        }
+      if (step === 3 && data.lisaNumber) {
+        // Lämnar Step4PhoneNumber — spara telefonkoppling
+        config.assigned_phone_number = data.lisaNumber.replace(/\s/g, '')
+        config.phone_setup_type = data.phoneMode === 'forward' ? 'keep_existing' : 'new_number'
       }
+
+      await saveProgress(newStep, sanitizeForSave(data), config)
     }
   }, [step, data, saveProgress])
 
@@ -162,19 +147,24 @@ export default function OnboardingPage() {
 
   const finish = useCallback(async () => {
     if (data.businessId) {
+      // Server-side finalize via /api/onboarding POST (befintlig endpoint
+      // sätter onboarding_step + onboarding_completed_at + seedar defaults).
+      // Vi lägger till welcome_tour_seen via PUT med config-payload.
       try {
-        const { createClientComponentClient } = await import('@supabase/auth-helpers-nextjs')
-        const supabase = createClientComponentClient()
-        await supabase
-          .from('business_config')
-          .update({
-            onboarding_step: 10, // Compat med befintlig "klar"-konvention
-            onboarding_completed_at: new Date().toISOString(),
-            welcome_tour_seen: new Date().toISOString(),
-          })
-          .eq('business_id', data.businessId)
+        await fetch('/api/onboarding', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        })
+        await fetch('/api/onboarding', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            config: { welcome_tour_seen: new Date().toISOString() },
+          }),
+        })
       } catch {
-        // silent
+        // silent — användaren landar på dashboard ändå
       }
     }
     router.push('/dashboard')

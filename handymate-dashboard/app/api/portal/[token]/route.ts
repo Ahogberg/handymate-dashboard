@@ -109,7 +109,11 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
         name: business?.business_name || '',
         contactName: business?.contact_name || '',
         email: business?.contact_email || '',
-        phone: business?.phone_number || '',
+        // Kund-facing nummer: assigned_phone_number (46elks-numret som Lisa
+        // svarar på) prio, fall back till phone_number om inget assignat.
+        // phone_number i business_config är OFTA ägarens privata mobil
+        // (vidarekopplings-mål) och ska INTE visas för kunder.
+        phone: business?.assigned_phone_number || business?.phone_number || '',
         googleReviewUrl: business?.google_review_url || null,
         // Utökade fält för Claude Design redesign
         accentColor: business?.accent_color || null,

@@ -65,7 +65,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { step, data: stepData } = body
+    const { step, data: stepData, config } = body
 
     const supabase = getServerSupabase()
 
@@ -86,6 +86,25 @@ export async function PUT(request: NextRequest) {
 
       const existing = (current?.onboarding_data as Record<string, unknown>) || {}
       updates.onboarding_data = { ...existing, ...stepData }
+    }
+
+    // Direct business_config column writes (whitelisted för säkerhet).
+    // Bypassar RLS via server-role klient — fixar tysta save-fail från
+    // client-side onboarding.
+    if (config && typeof config === 'object') {
+      const ALLOWED_COLUMNS = [
+        'specialties',
+        'working_hours',
+        'hourly_rate_min',
+        'hourly_rate_max',
+        'default_hourly_rate',
+        'assigned_phone_number',
+        'phone_setup_type',
+        'welcome_tour_seen',
+      ] as const
+      for (const col of ALLOWED_COLUMNS) {
+        if (col in config) updates[col] = (config as Record<string, unknown>)[col]
+      }
     }
 
     if (Object.keys(updates).length === 0) {
