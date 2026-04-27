@@ -84,8 +84,8 @@ const NAV: NavItem[] = [
   {
     type: 'group', key: 'jobs', label: 'Jobb', icon: Briefcase,
     children: [
-      { label: 'Projekt', href: '/dashboard/projects' },
       { label: 'Offerter', href: '/dashboard/quotes' },
+      { label: 'Projekt', href: '/dashboard/projects' },
       { label: 'Fakturor', href: '/dashboard/invoices' },
       { label: 'Dokument', href: '/dashboard/documents' },
     ],
