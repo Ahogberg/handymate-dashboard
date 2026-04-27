@@ -57,3 +57,53 @@ export async function getNextLeadNumber(
 ): Promise<string> {
   return getNextNumber(supabase, businessId, 'lead', 'L')
 }
+
+/**
+ * Nästa ärende-nummer (NNNN, utan prefix). Delas mellan deal och project så
+ * att en deal #1003 alltid blir P-1003 när den vinner och konverteras.
+ *
+ * Använder samma räknare som getNextProjectNumber ('project') — bara att
+ * dealen tilldelas det rena heltalet (deal_number är INTEGER) medan projektet
+ * får prefix 'P-'.
+ */
+export async function getNextCaseNumber(
+  supabase: SupabaseClient,
+  businessId: string
+): Promise<number> {
+  const { data, error } = await supabase.rpc('increment_counter', {
+    p_business_id: businessId,
+    p_counter_type: 'project',
+  })
+
+  if (error) {
+    console.error('[numbering] getNextCaseNumber error:', error.message)
+    // Fallback: timestamp-baserat 4-siffrigt nummer om RPC saknas
+    return parseInt(Date.now().toString().slice(-4), 10) || 1001
+  }
+
+  return data
+}
+
+/**
+ * Säkerställ att räknaren ligger på MINST minValue. Sänker aldrig värdet.
+ * Används när ett projekt skapas med ett specifikt nummer från en deal —
+ * räknaren synkas så att framtida fristående projekt inte krockar.
+ *
+ * Kräver bump_counter-RPC (sql/v39_align_case_numbering.sql). Loggar
+ * felet men kraschar inte om RPC:n saknas.
+ */
+export async function bumpCounter(
+  supabase: SupabaseClient,
+  businessId: string,
+  counterType: 'customer' | 'project' | 'lead',
+  minValue: number
+): Promise<void> {
+  const { error } = await supabase.rpc('bump_counter', {
+    p_business_id: businessId,
+    p_counter_type: counterType,
+    p_min_value: minValue,
+  })
+  if (error) {
+    console.warn(`[numbering] bumpCounter ${counterType}=${minValue} failed:`, error.message)
+  }
+}

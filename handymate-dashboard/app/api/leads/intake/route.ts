@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getNextLeadNumber } from '@/lib/numbering'
+import { getNextLeadNumber, getNextCaseNumber } from '@/lib/numbering'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -184,16 +184,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (firstPipelineStage) {
-        const { data: maxDeal } = await supabase
-          .from('deal')
-          .select('deal_number')
-          .eq('business_id', business.business_id)
-          .not('deal_number', 'is', null)
-          .order('deal_number', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        const nextNumber = (maxDeal?.deal_number || 1000) + 1
+        const nextNumber = await getNextCaseNumber(supabase, business.business_id)
 
         await supabase.from('deal').insert({
           business_id: business.business_id,

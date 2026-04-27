@@ -111,18 +111,43 @@ async function handleQuoteAccepted(dealId: string, businessId: string) {
       .single()
 
     if (!existingProject) {
-      // Create project
+      // Hämta offerttitel som fallback om dealen saknar titel
+      let quoteTitle: string | null = null
+      if (deal.quote_id) {
+        const { data: q } = await supabase
+          .from('quotes')
+          .select('title')
+          .eq('quote_id', deal.quote_id)
+          .single()
+        quoteTitle = q?.title ?? null
+      }
+
+      // Projektnumret matchar deal-numret så att hantverkaren ser samma
+      // ärende-id i säljtratten och i projektlistan (deal #1003 → P-1003).
+      const projectNumber = deal.deal_number ? `P-${deal.deal_number}` : null
+      const projectName = deal.title || quoteTitle || 'Projekt'
+
       await supabase.from('project').insert({
         project_id: 'proj_' + Math.random().toString(36).substring(2, 14),
         business_id: businessId,
         customer_id: deal.customer_id,
         deal_id: dealId,
         quote_id: deal.quote_id,
-        name: deal.title,
+        project_number: projectNumber,
+        name: projectName,
         description: deal.description,
         budget_amount: deal.value,
         status: 'active',
       })
+
+      // Synka räknaren så framtida fristående projekt inte återanvänder samma nummer
+      if (deal.deal_number) {
+        await supabase.rpc('bump_counter', {
+          p_business_id: businessId,
+          p_counter_type: 'project',
+          p_min_value: deal.deal_number,
+        })
+      }
     }
 
     // Move deal to 'won'

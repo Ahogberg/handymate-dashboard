@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getNextProjectNumber } from '@/lib/numbering'
+import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 
 /**
  * GET - Lista projekt för ett företag
@@ -138,6 +138,12 @@ export async function POST(request: NextRequest) {
       end_date: body.end_date || null
     }
 
+    // Spåra ev. deal som projektet kommer från (via offert eller direkt) —
+    // används för att projektnumret ska matcha deal-numret.
+    let dealNumber: number | null = null
+    let dealTitle: string | null = null
+    let dealIdForLink: string | null = null
+
     // Create from quote
     if (body.from_quote_id) {
       const { data: quote, error: quoteError } = await supabase
@@ -153,7 +159,25 @@ export async function POST(request: NextRequest) {
 
       projectData.quote_id = quote.quote_id
       projectData.customer_id = quote.customer_id
-      projectData.name = projectData.name || quote.title || `Projekt från offert`
+
+      // Hämta dealen som offerten tillhör (via quotes.deal_id) — så projektet
+      // ärver samma ärende-nummer och kan falla tillbaka på deal-titeln.
+      if (quote.deal_id) {
+        const { data: deal } = await supabase
+          .from('deal')
+          .select('id, deal_number, title')
+          .eq('id', quote.deal_id)
+          .eq('business_id', businessId)
+          .maybeSingle()
+        if (deal) {
+          dealNumber = deal.deal_number ?? null
+          dealTitle = deal.title ?? null
+          dealIdForLink = deal.id
+        }
+      }
+
+      // Titel-prio: 1) explicit i body, 2) offerttitel, 3) deal-titel, 4) fallback
+      projectData.name = projectData.name || quote.title || dealTitle || `Projekt från offert`
 
       // Calculate budget from quote
       const items = quote.items || []
@@ -176,14 +200,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Direktkoppling till deal (om anroparen skickar from_deal_id)
+    if (body.from_deal_id && !dealIdForLink) {
+      const { data: deal } = await supabase
+        .from('deal')
+        .select('id, deal_number, title, customer_id, description, value')
+        .eq('id', body.from_deal_id)
+        .eq('business_id', businessId)
+        .maybeSingle()
+      if (deal) {
+        dealNumber = deal.deal_number ?? null
+        dealTitle = deal.title ?? null
+        dealIdForLink = deal.id
+        projectData.customer_id = projectData.customer_id || deal.customer_id || null
+        projectData.name = projectData.name || deal.title || `Projekt`
+        projectData.description = projectData.description || deal.description || null
+        projectData.budget_amount = projectData.budget_amount || deal.value || null
+      }
+    }
+
+    if (dealIdForLink) {
+      projectData.deal_id = dealIdForLink
+    }
+
     if (!projectData.name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
 
-    // Tilldela projektnummer (P-XXXX) — helt non-blocking
+    // Tilldela projektnummer. Om projektet kommer från en deal: använd dealens
+    // nummer (P-{deal_number}) så att hantverkaren ser samma ärende-id i hela
+    // flödet. Annars: dra nästa nummer ur den delade case-räknaren.
     let projectNumber: string | null = null
     try {
-      projectNumber = await getNextProjectNumber(supabase, businessId)
+      if (dealNumber) {
+        projectNumber = `P-${dealNumber}`
+        // Synka räknaren — får aldrig ge ut samma nummer igen
+        await bumpCounter(supabase, businessId, 'project', dealNumber)
+      } else {
+        projectNumber = await getNextProjectNumber(supabase, businessId)
+      }
       projectData.project_number = projectNumber
     } catch {
       // Kolumnen kanske inte finns — skippa

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { getStageBySlug } from '@/lib/pipeline'
+import { getNextCaseNumber } from '@/lib/numbering'
 
 /**
  * GET - Lista deals för ett företag
@@ -89,17 +90,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Inga pipeline-steg hittades' }, { status: 404 })
     }
 
-    // Get next deal number for this business
-    const { data: maxDeal } = await supabase
-      .from('deal')
-      .select('deal_number')
-      .eq('business_id', business.business_id)
-      .not('deal_number', 'is', null)
-      .order('deal_number', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const nextNumber = (maxDeal?.deal_number || 1000) + 1
+    // Hämta nästa ärende-nummer från delad räknare. Samma räknare används av
+    // projects, så när dealen vinner och konverteras blir project_number = "P-{N}"
+    // med samma N — deal #1003 → projekt P-1003.
+    const nextNumber = await getNextCaseNumber(supabase, business.business_id)
 
     // Insert deal
     const { data: deal, error: insertError } = await supabase
