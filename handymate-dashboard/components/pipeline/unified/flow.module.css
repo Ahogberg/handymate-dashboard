@@ -6,8 +6,11 @@
   position: relative;
   overflow: hidden;
 }
-.body[data-split="40-60"] { grid-template-columns: 40% 1fr; }
-.body[data-split="50-50"] { grid-template-columns: 50% 1fr; }
+/* minmax(0, ...) krävs eftersom kanban-kolumnerna har min-width: 900px
+ * (för horisontell scroll). Utan minmax(0) expanderar grid-tracken till
+ * min-content och säljtratten äter höger panel. */
+.body[data-split="40-60"] { grid-template-columns: minmax(0, 40fr) minmax(0, 60fr); }
+.body[data-split="50-50"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 
 /* ─── Sales pane ─── */
 .salesPane {
