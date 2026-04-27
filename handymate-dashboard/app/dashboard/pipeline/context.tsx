@@ -243,6 +243,11 @@ export interface PipelineContextValue {
   draggingDealId: string | null
   dragOverStageId: string | null
   setDragOverStageId: Dispatch<SetStateAction<string | null>>
+  handleDragStart: (e: React.DragEvent, dealId: string) => void
+  handleDragEnd: () => void
+  handleDragOver: (e: React.DragEvent, stageId: string) => void
+  handleDragLeave: (e: React.DragEvent) => void
+  handleDrop: (e: React.DragEvent, stage: Stage) => void
 
   // ─── Filter ────────────────────────────────────────────────────────────
   filterSearch: string
