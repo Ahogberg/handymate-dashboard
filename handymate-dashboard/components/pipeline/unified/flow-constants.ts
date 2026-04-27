@@ -74,3 +74,40 @@ export function daysFromNow(isoDate: string | null | undefined): number | null {
   target.setHours(0, 0, 0, 0)
   return Math.round((target.getTime() - now.getTime()) / 86400000)
 }
+
+/** Agentmeta — namn, roll, färg och avatar-emoji per backoffice-agent */
+export interface FlowAgentMeta {
+  name: string
+  role: string
+  icon: string
+  color: string
+}
+
+export const FLOW_AGENTS: Record<string, FlowAgentMeta> = {
+  matte:  { name: 'Matte',  role: 'Chefsassistent',  icon: '🎩', color: '#0F766E' },
+  karin:  { name: 'Karin',  role: 'Ekonom',          icon: '💰', color: '#0369A1' },
+  hanna:  { name: 'Hanna',  role: 'Marknadschef',    icon: '⭐', color: '#059669' },
+  daniel: { name: 'Daniel', role: 'Säljare',         icon: '🤝', color: '#B45309' },
+  lars:   { name: 'Lars',   role: 'Projektledare',   icon: '🔨', color: '#7C3AED' },
+}
+
+export function agentMeta(agentId: string | null | undefined): FlowAgentMeta {
+  if (!agentId) return FLOW_AGENTS.matte
+  return FLOW_AGENTS[agentId.toLowerCase()] || FLOW_AGENTS.matte
+}
+
+/** "2t sedan", "20min sedan", "idag 09:14" — relative timestamp på svenska */
+export function relativeTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const then = new Date(iso).getTime()
+  const now = Date.now()
+  const diffMs = now - then
+  const min = Math.floor(diffMs / 60000)
+  if (min < 1) return 'just nu'
+  if (min < 60) return `${min}min sedan`
+  const hours = Math.floor(diffMs / 3600000)
+  if (hours < 24) return `${hours}t sedan`
+  const days = Math.floor(diffMs / 86400000)
+  if (days < 7) return `${days}d sedan`
+  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+}

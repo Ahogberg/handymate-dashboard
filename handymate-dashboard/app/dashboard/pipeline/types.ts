@@ -31,6 +31,13 @@ export interface DealProjectSummary {
     icon: string
     position: number
   } | null
+  latest_automation?: {
+    agent: string
+    action: string
+    rule_name: string | null
+    action_type: string | null
+    created_at: string
+  } | null
 }
 
 export interface Deal {

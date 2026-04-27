@@ -10,6 +10,8 @@ import {
   fmtCompact,
   daysFromNow,
   getStageById,
+  agentMeta,
+  relativeTime,
   type FlowSystemStage,
 } from './flow-constants'
 import { timeAgo } from '@/app/dashboard/pipeline/helpers'
@@ -460,12 +462,17 @@ function ProjectRow({
 
       <StageBars currentStageId={currentStage.id} density={density} />
 
+      {/* AI-aktivitet (live från v3_automation_logs via customer_id) */}
+      {project.latest_automation && (
+        <AiActivityStrip latest={project.latest_automation} />
+      )}
+
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onClick() }}
         style={{
           background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-          color: '#0f766e', fontSize: 11, fontWeight: 600, marginTop: 2,
+          color: '#0f766e', fontSize: 11, fontWeight: 600, marginTop: 8,
           textAlign: 'left',
         }}
       >
@@ -473,6 +480,31 @@ function ProjectRow({
       </button>
 
       {expanded && <ProjectExpandDetail currentStageId={currentStage.id} />}
+    </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// AiActivityStrip — visar senaste AI-aktivitet (agent-avatar + action + tid)
+// ────────────────────────────────────────────────────────────────────────────
+
+function AiActivityStrip({
+  latest,
+}: {
+  latest: NonNullable<NonNullable<Deal['project']>['latest_automation']>
+}) {
+  const agent = agentMeta(latest.agent)
+  return (
+    <div className={styles.aiStrip} style={{ ['--ai-color' as any]: agent.color, marginTop: 8 }}>
+      <div className={styles.aiAv} style={{ background: agent.color }}>{agent.icon}</div>
+      <div className={styles.aiText}>
+        <div>
+          <span className={styles.aiName}>{agent.name}</span>
+          <span className={styles.aiRole}>· {agent.role}</span>
+        </div>
+        <div className={styles.aiAction}>{latest.action}</div>
+      </div>
+      <div className={styles.aiWhen}>{relativeTime(latest.created_at)}</div>
     </div>
   )
 }

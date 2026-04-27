@@ -84,8 +84,60 @@ export async function GET(request: NextRequest) {
         for (const s of stages || []) stageMeta[s.id] = s as any
       }
 
+      // Hämta projektens kund-id (för att joina senaste AI-aktivitet via customer)
+      const projectIdToCustomerId: Record<string, string> = {}
+      const customerIds = new Set<string>()
+      if (projectIds.length > 0) {
+        const { data: projectCustomers } = await supabase
+          .from('project')
+          .select('project_id, customer_id')
+          .in('project_id', projectIds)
+        for (const pc of projectCustomers || []) {
+          if (pc.customer_id) {
+            projectIdToCustomerId[pc.project_id] = pc.customer_id
+            customerIds.add(pc.customer_id)
+          }
+        }
+      }
+
+      // Hämta senaste AI-aktivitet per kund från v3_automation_logs.
+      // Vi joinar via customer_id eftersom project_id sällan är ifyllt i context;
+      // alla automationer är dock alltid kopplade till en kund.
+      const latestByCustomerId: Record<string, {
+        agent: string
+        action: string
+        rule_name: string | null
+        action_type: string | null
+        created_at: string
+      }> = {}
+      if (customerIds.size > 0) {
+        // Hämta senaste loggarna för businessen — filtrera på customer_id klientside
+        // för att undvika PostgREST-syntax-känslighet på jsonb-keys.
+        const { data: logs } = await supabase
+          .from('v3_automation_logs')
+          .select('agent_id, action_type, rule_name, context, created_at')
+          .eq('business_id', business.business_id)
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(500)
+
+        for (const log of logs || []) {
+          const cid = (log as any).context?.customer_id
+          if (!cid || !customerIds.has(cid) || latestByCustomerId[cid]) continue
+          latestByCustomerId[cid] = {
+            agent: log.agent_id || 'matte',
+            action: log.rule_name || log.action_type || 'AI-aktivitet',
+            rule_name: log.rule_name || null,
+            action_type: log.action_type || null,
+            created_at: log.created_at,
+          }
+        }
+      }
+
       for (const p of projectList) {
         if (!p.deal_id) continue
+        const cid = projectIdToCustomerId[p.project_id]
+        const latest = cid ? latestByCustomerId[cid] : null
         projectByDealId[p.deal_id] = {
           id: p.project_id,
           name: p.name,
@@ -98,6 +150,7 @@ export async function GET(request: NextRequest) {
           current_workflow_stage_id: p.current_workflow_stage_id || null,
           workflow_stage_entered_at: p.workflow_stage_entered_at || null,
           current_stage: p.current_workflow_stage_id ? stageMeta[p.current_workflow_stage_id] || null : null,
+          latest_automation: latest || null,
         }
       }
     }
