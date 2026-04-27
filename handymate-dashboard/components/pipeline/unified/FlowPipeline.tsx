@@ -42,7 +42,7 @@ export default function FlowPipeline({
   onDealClick,
   onProjectClick,
   density = 'comfortable',
-  split = '40-60',
+  split = '50-50',
 }: FlowPipelineProps) {
   // Filtrera bort lost-stage från unified-vyn — de visas i sin egen sidebar
   const activeStages = useMemo(() => stages.filter(s => !s.is_lost), [stages])

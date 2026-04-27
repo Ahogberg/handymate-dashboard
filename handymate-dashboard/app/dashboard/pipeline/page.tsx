@@ -70,6 +70,7 @@ import { LossModal } from './components/LossModal'
 import { QuickSmsModal } from './components/QuickSmsModal'
 import { StageSettingsModal } from './components/StageSettingsModal'
 import { NewDealModal } from './components/NewDealModal'
+import { DealCard } from './components/DealCard'
 import { CopyId } from '@/components/CopyId'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
 import type {
@@ -1678,7 +1679,7 @@ export default function PipelinePage() {
               onDealClick={openDealDetail}
               onProjectClick={(projectId) => { window.location.href = `/dashboard/projects/${projectId}` }}
               density="comfortable"
-              split="40-60"
+              split="50-50"
             />
           ) : pipelineView === 'timeline' ? (
             <TimelineView
@@ -1712,8 +1713,7 @@ export default function PipelinePage() {
                   <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {stageDeals.length === 0 && <div className="flex items-center justify-center py-8 text-gray-300 text-xs">{isDropTarget ? 'Släpp här' : 'Inga deals'}</div>}
                     {stageDeals.map(deal => (
-                      <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                        onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
+                      <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id} />
                     ))}
                     {stage.id === 'won' && (
                       <a href="/dashboard/projects" className="flex items-center justify-center gap-1.5 py-3 mt-1 text-xs text-primary-700 hover:text-primary-700 hover:bg-primary-50 rounded-lg transition-colors">
@@ -1745,8 +1745,7 @@ export default function PipelinePage() {
                     </div>
                     <div className="flex-1 overflow-y-auto p-2 space-y-2">
                       {dealsForStage(lostStage.id).map(deal => (
-                        <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                          onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
+                        <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id} />
                       ))}
                     </div>
                   </>
@@ -1776,8 +1775,7 @@ export default function PipelinePage() {
                 </div>
                 {dealsForStage(stages[mobileStageIndex].id).length === 0 && <div className="flex items-center justify-center py-12 text-gray-400 text-sm">Inga deals i detta steg</div>}
                 {dealsForStage(stages[mobileStageIndex].id).map(deal => (
-                  <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id}
-                    onDragStart={handleDragStart} onDragEnd={handleDragEnd} onClick={() => openDealDetail(deal)} onQuickSms={handleQuickSms} onOpenTasks={handleOpenTasks} teamMembers={teamMembers} />
+                  <DealCard key={deal.id} deal={deal} isDragging={draggingDealId === deal.id} />
                 ))}
               </div>
             )}
@@ -2838,6 +2836,5 @@ export default function PipelinePage() {
       />
     </div>
     </PipelineProvider>
-    </div>
   )
 }
