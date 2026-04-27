@@ -153,6 +153,17 @@ export async function GET(request: NextRequest) {
             related_id: p.invoice_id,
             status: 'sent',
           })
+          // Komplettera SMS:et med ett portal-mail (kunden får båda kanalerna)
+          if (p.customer_id) {
+            try {
+              const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+              await sendPortalNotification(review.business_id, p.customer_id, 'review_request', {
+                context: { project_name: p.project_name || null },
+              })
+            } catch (notifErr) {
+              console.error('[maintenance] review portal-notif failed:', notifErr)
+            }
+          }
         } else {
           await supabase.from('pending_approvals').update({ status: 'expired' }).eq('id', review.id)
         }

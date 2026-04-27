@@ -573,6 +573,17 @@ ${suffix}`
       console.error('fireEvent quote_sent error (non-blocking):', eventErr)
     }
 
+    // Portal-notifikation (1h-dedup hanteras internt; offerter skickas oftast
+    // bara en gång så det här är säkert även parallellt med den primära mailen)
+    try {
+      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+      await sendPortalNotification(business.business_id, quote.customer_id, 'quote_sent', {
+        context: { title: quote.title, total: quote.total },
+      })
+    } catch (notifErr) {
+      console.error('Portal notification quote_sent error (non-blocking):', notifErr)
+    }
+
     // Golden Path: flytta deal till "Offert skickad" automatiskt
     try {
       const { data: linkedDeal } = await supabase

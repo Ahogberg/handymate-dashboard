@@ -281,6 +281,20 @@ export async function POST(request: NextRequest) {
       } catch (commErr) {
         console.error('Communication trigger error (non-blocking):', commErr)
       }
+
+      // Portal-notifikation
+      try {
+        const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+        await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_sent', {
+          context: {
+            amount: invoice.total_amount || invoice.total || invoice.amount,
+            due_date: invoice.due_date || null,
+            invoice_number: invoice.invoice_number,
+          },
+        })
+      } catch (notifErr) {
+        console.error('Portal notification invoice_sent error (non-blocking):', notifErr)
+      }
     }
 
     return NextResponse.json({

@@ -61,6 +61,16 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Notifiera kunden via portal-notifikation (anti-spam dedup hanteras internt)
+    try {
+      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+      await sendPortalNotification(business.business_id, customerId, 'new_message', {
+        context: { preview: message.trim() },
+      })
+    } catch (notifErr) {
+      console.error('Portal notification error (non-blocking):', notifErr)
+    }
+
     return NextResponse.json({ success: true, message: data })
   } catch (error: any) {
     console.error('Reply to portal message error:', error)

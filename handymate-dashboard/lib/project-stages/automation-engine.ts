@@ -86,6 +86,29 @@ export async function advanceProjectStage(
   await logProjectStageEvent(supabase, businessId, project, stageId)
 
   await triggerStageAutomations(projectId, stageId, businessId, project)
+
+  // Portal-notifikation: project_update för meningsfulla stage-byten.
+  // Skippa för INVOICE_PAID (egen review_request-notif) och REVIEW_RECEIVED
+  // (slut på flödet, ingen anledning att maila kunden).
+  if (project.customer_id && stageId !== SYSTEM_STAGES.REVIEW_RECEIVED && stageId !== SYSTEM_STAGES.INVOICE_PAID) {
+    try {
+      const { data: stage } = await supabase
+        .from('project_workflow_stages')
+        .select('name')
+        .eq('id', stageId)
+        .maybeSingle()
+
+      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+      await sendPortalNotification(businessId, project.customer_id, 'project_update', {
+        context: {
+          project_name: project.name,
+          stage_name: stage?.name || stageId,
+        },
+      })
+    } catch (notifErr) {
+      console.error('[project-stages] portal notification project_update failed:', notifErr)
+    }
+  }
 }
 
 async function logProjectStageEvent(

@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Insert photos if provided
+  let photoCount = 0
   if (body.photo_urls && Array.isArray(body.photo_urls)) {
     for (const url of body.photo_urls) {
       await supabase.from('field_report_photos').insert({
@@ -74,6 +75,19 @@ export async function POST(request: NextRequest) {
         url,
         type: 'after',
       })
+      photoCount++
+    }
+  }
+
+  // Portal-notifikation: nya bilder upplagda
+  if (photoCount > 0 && body.customer_id) {
+    try {
+      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+      await sendPortalNotification(business.business_id, body.customer_id, 'photos_added', {
+        context: { count: photoCount },
+      })
+    } catch (notifErr) {
+      console.error('Portal notification photos_added error (non-blocking):', notifErr)
     }
   }
 

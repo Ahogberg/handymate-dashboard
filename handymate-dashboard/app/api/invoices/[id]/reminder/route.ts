@@ -211,6 +211,20 @@ export async function POST(
       }, { status: 400 })
     }
 
+    // Portal-notifikation om förfallen faktura
+    try {
+      const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+      await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_overdue', {
+        context: {
+          amount: totalWithFees || invoice.total_amount || invoice.total,
+          invoice_number: invoice.invoice_number,
+          reminder_count: newCount,
+        },
+      })
+    } catch (notifErr) {
+      console.error('Portal notification invoice_overdue error (non-blocking):', notifErr)
+    }
+
     return NextResponse.json({
       success: true,
       smsSent,
