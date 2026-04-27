@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     if (dealIds.length > 0) {
       const { data: projects } = await supabase
         .from('project')
-        .select('project_id, deal_id, name, status, start_date, end_date, progress_percent, budget_amount')
+        .select('project_id, deal_id, name, status, start_date, end_date, progress_percent, budget_amount, current_workflow_stage_id, workflow_stage_entered_at')
         .eq('business_id', business.business_id)
         .in('deal_id', dealIds)
 
@@ -73,6 +73,17 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Hämta stage-metadata för alla unika stage-id
+      const stageIds = Array.from(new Set(projectList.map((p: any) => p.current_workflow_stage_id).filter(Boolean)))
+      const stageMeta: Record<string, { id: string; name: string; color: string; icon: string; position: number }> = {}
+      if (stageIds.length > 0) {
+        const { data: stages } = await supabase
+          .from('project_workflow_stages')
+          .select('id, name, color, icon, position')
+          .in('id', stageIds)
+        for (const s of stages || []) stageMeta[s.id] = s as any
+      }
+
       for (const p of projectList) {
         if (!p.deal_id) continue
         projectByDealId[p.deal_id] = {
@@ -84,6 +95,9 @@ export async function GET(request: NextRequest) {
           progress_percent: p.progress_percent ?? 0,
           budget_sek: p.budget_amount ?? null,
           spent_sek: Math.round(spentByProjectId[p.project_id] || 0),
+          current_workflow_stage_id: p.current_workflow_stage_id || null,
+          workflow_stage_entered_at: p.workflow_stage_entered_at || null,
+          current_stage: p.current_workflow_stage_id ? stageMeta[p.current_workflow_stage_id] || null : null,
         }
       }
     }
