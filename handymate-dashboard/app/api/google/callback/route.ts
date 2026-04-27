@@ -88,10 +88,10 @@ export async function GET(request: NextRequest) {
     }
 
     if (existing) {
-      // gmail_scope_granted is defined in gmail_integration.sql — always include it
+      // Endast kalenderscope begärs — Gmail kräver dyr säkerhetsaudit
       const { error: updateErr } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, gmail_scope_granted: true, gmail_send_scope_granted: true })
+        .update({ ...coreFields, gmail_scope_granted: false, gmail_send_scope_granted: false })
         .eq('id', existing.id)
 
       if (updateErr) return errorRedirect('Kunde inte uppdatera anslutningen: ' + updateErr.message)
@@ -105,8 +105,8 @@ export async function GET(request: NextRequest) {
           business_user_id: state.user_id,
           provider: 'google',
           ...coreFields,
-          gmail_scope_granted: true,
-          gmail_send_scope_granted: true,
+          gmail_scope_granted: false,
+          gmail_send_scope_granted: false,
         })
 
       if (insertErr) return errorRedirect('Kunde inte spara anslutningen: ' + insertErr.message)
