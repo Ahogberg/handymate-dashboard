@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import {
+  syncBookingToCalendar,
+  updateBookingInCalendar,
+  deleteBookingFromCalendar,
+} from '@/lib/google-calendar-sync'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -94,6 +99,7 @@ export async function POST(request: NextRequest) {
     }
 
     const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
+    const combinedNotes = [service_type, notes].filter(Boolean).join(' — ') || null
 
     const { data: booking, error } = await supabase
       .from('booking')
@@ -104,7 +110,7 @@ export async function POST(request: NextRequest) {
         scheduled_start,
         scheduled_end: scheduled_end || null,
         status: 'confirmed',
-        notes: [service_type, notes].filter(Boolean).join(' — ') || null,
+        notes: combinedNotes,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -112,15 +118,52 @@ export async function POST(request: NextRequest) {
 
     if (error) throw error
 
+    // Hämta kundnamn för dispatch + calendar (en gång)
+    let customerName: string | null = null
+    if (customer_id) {
+      const { data: cust } = await supabase
+        .from('customer')
+        .select('name')
+        .eq('customer_id', customer_id)
+        .maybeSingle()
+      customerName = cust?.name || null
+    }
+
+    // Google Calendar sync (non-blocking)
+    try {
+      const result = await syncBookingToCalendar(
+        supabase,
+        business.business_id,
+        business.user_id,
+        {
+          booking_id: bookingId,
+          scheduled_start,
+          scheduled_end: scheduled_end || null,
+          notes: combinedNotes,
+          customer_name: customerName,
+        }
+      )
+
+      if (result) {
+        await supabase
+          .from('booking')
+          .update({
+            google_event_id: result.eventId,
+            google_calendar_id: result.calendarId,
+          })
+          .eq('booking_id', bookingId)
+
+        // Reflektera i returnerad booking så frontend ser sync-status direkt
+        booking.google_event_id = result.eventId
+        booking.google_calendar_id = result.calendarId
+      }
+    } catch (syncErr) {
+      console.error('Calendar sync error (non-blocking):', syncErr)
+    }
+
     // Smart dispatch — föreslå tekniker (non-blocking)
     try {
       const { suggestDispatch } = await import('@/lib/dispatch')
-      // Hämta kundnamn för kontextvisning
-      let customerName: string | null = null
-      if (customer_id) {
-        const { data: cust } = await supabase.from('customer').select('name').eq('customer_id', customer_id).maybeSingle()
-        customerName = cust?.name || null
-      }
       await suggestDispatch({
         businessId: business.business_id,
         jobTitle: service_type || notes || 'Bokning',
@@ -178,6 +221,53 @@ export async function PUT(request: NextRequest) {
 
     if (error) throw error
 
+    // Sync ändringar till Google Calendar (non-blocking)
+    if (booking.google_event_id && booking.google_calendar_id) {
+      try {
+        // Hämta kundnamn för uppdaterad event-titel
+        let customerName: string | null = null
+        if (booking.customer_id) {
+          const { data: cust } = await supabase
+            .from('customer')
+            .select('name')
+            .eq('customer_id', booking.customer_id)
+            .maybeSingle()
+          customerName = cust?.name || null
+        }
+
+        // Vid status='cancelled' → ta bort från Google Calendar
+        if (body.status === 'cancelled') {
+          await deleteBookingFromCalendar(
+            supabase,
+            business.business_id,
+            business.user_id,
+            booking.google_event_id,
+            booking.google_calendar_id
+          )
+          await supabase
+            .from('booking')
+            .update({ google_event_id: null, google_calendar_id: null })
+            .eq('booking_id', booking_id)
+        } else {
+          await updateBookingInCalendar(
+            supabase,
+            business.business_id,
+            business.user_id,
+            booking.google_event_id,
+            booking.google_calendar_id,
+            {
+              scheduled_start: booking.scheduled_start,
+              scheduled_end: booking.scheduled_end,
+              notes: booking.notes,
+              customer_name: customerName,
+            }
+          )
+        }
+      } catch (syncErr) {
+        console.error('Calendar update error (non-blocking):', syncErr)
+      }
+    }
+
     return NextResponse.json({ booking })
   } catch (error: any) {
     console.error('Update booking error:', error)
@@ -202,6 +292,14 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Missing bookingId' }, { status: 400 })
     }
 
+    // Hämta bokningen först så vi vet om Google-event behöver tas bort
+    const { data: existing } = await supabase
+      .from('booking')
+      .select('google_event_id, google_calendar_id')
+      .eq('booking_id', bookingId)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
     const { error } = await supabase
       .from('booking')
       .delete()
@@ -209,6 +307,21 @@ export async function DELETE(request: NextRequest) {
       .eq('business_id', business.business_id)
 
     if (error) throw error
+
+    // Sync borttagning till Google Calendar (non-blocking)
+    if (existing?.google_event_id && existing?.google_calendar_id) {
+      try {
+        await deleteBookingFromCalendar(
+          supabase,
+          business.business_id,
+          business.user_id,
+          existing.google_event_id,
+          existing.google_calendar_id
+        )
+      } catch (syncErr) {
+        console.error('Calendar delete error (non-blocking):', syncErr)
+      }
+    }
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
