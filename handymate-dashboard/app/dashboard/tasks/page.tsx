@@ -6,6 +6,7 @@ import {
   Calendar, User, Trash2, X, Loader2, ChevronDown, Edit3,
   Users, FolderKanban, ArrowUpRight,
 } from 'lucide-react'
+import { todayDateStr, nowTimeStr } from '@/lib/datetime-defaults'
 
 interface Task {
   id: string
@@ -60,8 +61,9 @@ export default function TasksPage() {
   const [formTitle, setFormTitle] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [formPriority, setFormPriority] = useState<'low' | 'medium' | 'high'>('medium')
-  const [formDueDate, setFormDueDate] = useState('')
-  const [formDueTime, setFormDueTime] = useState('')
+  // Default till idag/nu så hantverkaren slipper klicka för att fylla i tid
+  const [formDueDate, setFormDueDate] = useState(todayDateStr())
+  const [formDueTime, setFormDueTime] = useState(nowTimeStr())
   const [formAssignee, setFormAssignee] = useState('')
   const [formStatus, setFormStatus] = useState<'pending' | 'in_progress' | 'done'>('pending')
   const [formVisibility, setFormVisibility] = useState<'private' | 'team' | 'project'>('team')
@@ -161,8 +163,8 @@ export default function TasksPage() {
     setFormTitle('')
     setFormDesc('')
     setFormPriority('medium')
-    setFormDueDate('')
-    setFormDueTime('')
+    setFormDueDate(todayDateStr())
+    setFormDueTime(nowTimeStr())
     setFormAssignee('')
     setFormStatus('pending')
     setFormVisibility('team')

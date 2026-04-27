@@ -201,7 +201,7 @@ export default function CustomerDetailPage() {
   // Tasks
   const [tasks, setTasks] = useState<Task[]>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState(() => new Date().toISOString().split('T')[0])
   const [taskSaving, setTaskSaving] = useState(false)
 
   // Timeline is now handled by CustomerTimeline component
@@ -383,7 +383,8 @@ export default function CustomerDetailPage() {
       })
       if (!res.ok) throw new Error()
       setNewTaskTitle('')
-      setNewTaskDueDate('')
+      // Återställ till idag så nästa task får default-datumet
+      setNewTaskDueDate(new Date().toISOString().split('T')[0])
       fetchTasks()
     } catch {
       // error handling

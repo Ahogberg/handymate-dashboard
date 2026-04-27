@@ -58,6 +58,8 @@ import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
+import { todayDateStr, nowTimeStr } from '@/lib/datetime-defaults'
+import TaskPresetPicker from '@/components/TaskPresetPicker'
 import { TimelineView } from '@/components/pipeline/TimelineView'
 import { CopyId } from '@/components/CopyId'
 import { DealTimeline } from '@/components/pipeline/DealTimeline'
@@ -407,9 +409,10 @@ export default function PipelinePage() {
 
   // Deal tasks
   const [dealTasks, setDealTasks] = useState<Task[]>([])
+  const [showDealTaskPresetPicker, setShowDealTaskPresetPicker] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
-  const [newTaskDueDate, setNewTaskDueDate] = useState('')
-  const [newTaskDueTime, setNewTaskDueTime] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState(todayDateStr())
+  const [newTaskDueTime, setNewTaskDueTime] = useState(nowTimeStr())
   const [newTaskAssignee, setNewTaskAssignee] = useState('')
   const [taskSaving, setTaskSaving] = useState(false)
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
@@ -707,6 +710,27 @@ export default function PipelinePage() {
     }
   }, [])
 
+  // Skapa flera uppgifter på dealen samtidigt (från preset-picker)
+  const createDealTaskBatch = useCallback(async (titles: string[]) => {
+    if (!selectedDeal) return
+    await Promise.all(
+      titles.map(title =>
+        fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            deal_id: selectedDeal.id,
+            customer_id: selectedDeal.customer_id || null,
+            visibility: 'team',
+          }),
+        }).catch(() => null)
+      )
+    )
+    fetchDealTasks(selectedDeal.id)
+    showToast(`${titles.length} ${titles.length === 1 ? 'uppgift' : 'uppgifter'} skapad${titles.length === 1 ? '' : 'a'}`, 'success')
+  }, [selectedDeal, fetchDealTasks])
+
   const fetchTaskActivities = useCallback(async (taskId: string) => {
     try {
       const res = await fetch(`/api/tasks?id=${taskId}&include_activities=true`)
@@ -736,8 +760,8 @@ export default function PipelinePage() {
       })
       if (!res.ok) throw new Error()
       setNewTaskTitle('')
-      setNewTaskDueDate('')
-      setNewTaskDueTime('')
+      setNewTaskDueDate(todayDateStr())
+      setNewTaskDueTime(nowTimeStr())
       setNewTaskAssignee('')
       fetchDealTasks(selectedDeal.id)
       showToast('Uppgift skapad', 'success')
@@ -1414,8 +1438,8 @@ export default function PipelinePage() {
     setDealTasks([])
     setNewNoteContent('')
     setNewTaskTitle('')
-    setNewTaskDueDate('')
-    setNewTaskDueTime('')
+    setNewTaskDueDate(todayDateStr())
+    setNewTaskDueTime(nowTimeStr())
     setNewTaskAssignee('')
     setExpandedTaskId(null)
     setTaskActivities([])
@@ -2367,6 +2391,20 @@ export default function PipelinePage() {
                 {/* TAB: Uppgifter */}
                 {dealTab === 'tasks' && (
                   <div className="space-y-4">
+                    {/* Snabbval */}
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs text-gray-400">
+                        Skapa flera uppgifter snabbt med en mall, eller skriv egen rad nedan.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setShowDealTaskPresetPicker(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700 flex-shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Förvalda uppgifter
+                      </button>
+                    </div>
                     {/* Add task form */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -3413,6 +3451,14 @@ export default function PipelinePage() {
           </div>
         </div>
       )}
+
+      {/* Task preset picker — öppnas från Uppgifter-fliken i deal-modalen */}
+      <TaskPresetPicker
+        open={showDealTaskPresetPicker}
+        onClose={() => setShowDealTaskPresetPicker(false)}
+        onCreate={createDealTaskBatch}
+        contextLabel={selectedDeal ? `Ärende ${selectedDeal.deal_number ? `#${selectedDeal.deal_number}` : ''} · ${selectedDeal.title}`.trim() : undefined}
+      />
     </div>
   )
 }

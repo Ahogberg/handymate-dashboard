@@ -77,6 +77,7 @@ import { useCurrentUser } from '@/lib/CurrentUserContext'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import { SelectedProduct } from '@/lib/suppliers/types'
 import { DEFAULT_TASKS, TASK_CATEGORIES } from '@/lib/task-defaults'
+import TaskPresetPicker from '@/components/TaskPresetPicker'
 import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
@@ -493,8 +494,9 @@ export default function ProjectDetailPage() {
   }>>([])
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskAssignee, setNewTaskAssignee] = useState('')
-  const [newTaskDueDate, setNewTaskDueDate] = useState('')
+  const [newTaskDueDate, setNewTaskDueDate] = useState(() => new Date().toISOString().split('T')[0])
   const [savingNewTask, setSavingNewTask] = useState(false)
+  const [showTaskPresetPicker, setShowTaskPresetPicker] = useState(false)
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [materials, setMaterials] = useState<ProjectMaterial[]>([])
@@ -865,7 +867,8 @@ export default function ProjectDetailPage() {
       if (res.ok) {
         setNewTaskTitle('')
         setNewTaskAssignee('')
-        setNewTaskDueDate('')
+        // Återställ till idag så nästa task får default-datumet på nytt
+        setNewTaskDueDate(new Date().toISOString().split('T')[0])
         fetchProjectTasks()
       } else {
         showToast('Kunde inte skapa uppgift', 'error')
@@ -894,6 +897,25 @@ export default function ProjectDetailPage() {
       const res = await fetch(`/api/tasks?id=${taskId}`, { method: 'DELETE' })
       if (res.ok) fetchProjectTasks()
     } catch { /* ignore */ }
+  }
+
+  async function createProjectTaskBatch(titles: string[]) {
+    // Skapar valda uppgifter parallellt — alla får project_id + visibility=project
+    await Promise.all(
+      titles.map(title =>
+        fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            project_id: projectId,
+            visibility: 'project',
+          }),
+        }).catch(() => null)
+      )
+    )
+    fetchProjectTasks()
+    showToast(`${titles.length} ${titles.length === 1 ? 'uppgift' : 'uppgifter'} skapad${titles.length === 1 ? '' : 'a'}`, 'success')
   }
 
   async function fetchAiLogs() {
@@ -2344,16 +2366,25 @@ export default function ProjectDetailPage() {
         {/* === TAB: Uppgifter === */}
         {activeTab === 'tasks' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Uppgifter</h2>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Synkas med <Link href={`/dashboard/tasks`} className="text-primary-700 hover:underline">Mina uppgifter</Link>
                 </p>
               </div>
-              <span className="text-xs text-gray-400">
-                {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">
+                  {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
+                </span>
+                <button
+                  onClick={() => setShowTaskPresetPicker(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-gray-700 hover:border-primary-300 hover:text-primary-700"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Förvalda uppgifter
+                </button>
+              </div>
             </div>
 
             {/* Lägg till ny uppgift */}
@@ -4257,6 +4288,14 @@ export default function ProjectDetailPage() {
           onClose={() => setShowInvoiceModal(false)}
         />
       )}
+
+      {/* Task preset picker — öppnas från Uppgifter-fliken */}
+      <TaskPresetPicker
+        open={showTaskPresetPicker}
+        onClose={() => setShowTaskPresetPicker(false)}
+        onCreate={createProjectTaskBatch}
+        contextLabel={project?.name ? `Projekt · ${project.name}` : undefined}
+      />
     </div>
   )
 }
