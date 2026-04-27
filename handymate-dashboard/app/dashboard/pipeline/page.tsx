@@ -90,6 +90,7 @@ import {
   getTriggeredByLabel,
   getTriggeredByStyle,
 } from './helpers'
+import { PipelineProvider, type PipelineContextValue } from './context'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -1441,7 +1442,136 @@ export default function PipelinePage() {
     )
   }
 
+  // Bygg context-värdet — passthrough av befintlig state + handlers så
+  // utbrutna komponenter (DealModal, DealCard, modaler) kan läsa/skriva
+  // utan att vi prop-drillar 36+ värden per nivå.
+  const pipelineContextValue: PipelineContextValue = {
+    business,
+    stages,
+    deals,
+    filteredDeals,
+    customers,
+    teamMembers,
+    jobTypeOptions,
+    leadSourceOptions,
+    jobTypes,
+
+    selectedDeal,
+    setSelectedDeal,
+    dealTab,
+    setDealTab,
+    editingTitle,
+    setEditingTitle,
+    editTitleValue,
+    setEditTitleValue,
+    editingValue,
+    setEditingValue,
+    editValueInput,
+    setEditValueInput,
+    editingPriority,
+    setEditingPriority,
+    detailActivities,
+    detailLoading,
+
+    dealDocuments,
+    dealUploading,
+    dealUploadCategory,
+    setDealUploadCategory,
+
+    dealNotes,
+    newNoteContent,
+    setNewNoteContent,
+    editingNoteId,
+    setEditingNoteId,
+    editNoteContent,
+    setEditNoteContent,
+    noteSaving,
+
+    dealEmailThreads,
+    dealEmailLoading,
+    dealExpandedThread,
+    setDealExpandedThread,
+    dealThreadMessages,
+    dealThreadLoading,
+
+    dealTasks,
+    showDealTaskPresetPicker,
+    setShowDealTaskPresetPicker,
+    newTaskTitle,
+    setNewTaskTitle,
+    newTaskDescription,
+    setNewTaskDescription,
+    newTaskPriority,
+    setNewTaskPriority,
+    newTaskDueDate,
+    setNewTaskDueDate,
+    newTaskDueTime,
+    setNewTaskDueTime,
+    newTaskAssignee,
+    setNewTaskAssignee,
+    taskSaving,
+    expandedTaskId,
+    setExpandedTaskId,
+    taskActivities,
+
+    linkCustomerSearch,
+    setLinkCustomerSearch,
+    showLinkCustomer,
+    setShowLinkCustomer,
+
+    customerTags,
+    lastContact,
+
+    setShowSiteVisit,
+    setSiteVisitForm,
+    setQuickSmsTarget,
+    setQuickSmsText,
+    setLossDealId,
+    setShowLossModal,
+    setNextStepPrompt,
+
+    pipelineView,
+    setPipelineView,
+    draggingDealId,
+    dragOverStageId,
+    setDragOverStageId,
+
+    toast,
+    showToast,
+
+    openDealDetail,
+    closeDealDetail,
+    moveDealAction,
+    updateDealField,
+    markDealLost,
+    undoActivity,
+    handleQuickSms,
+    handleOpenTasks,
+
+    handleDealFileUpload,
+    fetchDealEmails,
+    fetchDealThreadMessages,
+
+    handleAddNote,
+    handleUpdateNote,
+    handleDeleteNote,
+
+    handleAddTask,
+    handleToggleTask,
+    handleDeleteTask,
+    fetchTaskActivities,
+    fetchDealTasks,
+    createDealTaskBatch,
+
+    handleLinkCustomer,
+
+    getStageForDeal,
+    dealsForStage,
+    stageValue,
+  }
+
   return (
+    <PipelineProvider value={pipelineContextValue}>
     <div className="min-h-screen bg-[#F8FAFC] relative">
       <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
         <div className="absolute top-1/4 -left-32 w-96 h-96 bg-primary-50 rounded-full blur-[128px]" />
@@ -3358,6 +3488,7 @@ export default function PipelinePage() {
         contextLabel={selectedDeal ? `Ärende ${selectedDeal.deal_number ? `#${selectedDeal.deal_number}` : ''} · ${selectedDeal.title}`.trim() : undefined}
       />
     </div>
+    </PipelineProvider>
   )
 }
 
