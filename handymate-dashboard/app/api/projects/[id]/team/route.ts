@@ -143,6 +143,86 @@ export async function POST(
 }
 
 /**
+ * PATCH /api/projects/[id]/team - Uppdatera roll på befintlig tilldelning.
+ *
+ * Sätt role='lead' på en användare → görs samtidigt om alla andra till
+ * 'member' så det bara finns en projektledare per projekt.
+ *
+ * Body: { businessUserId, role: 'lead' | 'member' }
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'see_all_projects')) {
+      return NextResponse.json({ error: 'Otillräcklig behörighet' }, { status: 403 })
+    }
+
+    const supabase = getServerSupabase()
+    const projectId = params.id
+    const body = await request.json()
+    const { businessUserId, role } = body
+
+    if (!businessUserId || !['lead', 'member'].includes(role)) {
+      return NextResponse.json({ error: 'businessUserId + role (lead|member) krävs' }, { status: 400 })
+    }
+
+    // Verifiera att projektet tillhör businessen
+    const { data: project } = await supabase
+      .from('project')
+      .select('project_id')
+      .eq('project_id', projectId)
+      .eq('business_id', business.business_id)
+      .single()
+
+    if (!project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    // Om ny lead utses → degradera befintlig lead först
+    if (role === 'lead') {
+      await supabase
+        .from('project_assignment')
+        .update({ role: 'member' })
+        .eq('project_id', projectId)
+        .eq('business_id', business.business_id)
+        .eq('role', 'lead')
+        .neq('business_user_id', businessUserId)
+    }
+
+    const { data: assignment, error } = await supabase
+      .from('project_assignment')
+      .update({ role })
+      .eq('project_id', projectId)
+      .eq('business_user_id', businessUserId)
+      .eq('business_id', business.business_id)
+      .select()
+      .single()
+
+    if (error) throw error
+    if (!assignment) {
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    return NextResponse.json({ assignment })
+
+  } catch (error: any) {
+    if (error instanceof AuthError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    console.error('Update project team role error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+/**
  * DELETE /api/projects/[id]/team - Ta bort tilldelning
  * Query param: userId (business_user_id)
  */

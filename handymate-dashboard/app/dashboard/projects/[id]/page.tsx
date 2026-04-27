@@ -511,6 +511,9 @@ export default function ProjectDetailPage() {
   const [allTeamMembers, setAllTeamMembers] = useState<TeamMemberOption[]>([])
   const [assignLoading, setAssignLoading] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
+  // Multi-select: valda medlemmar + ev. utsedd ansvarig
+  const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set())
+  const [pickerLeadId, setPickerLeadId] = useState<string | null>(null)
 
   // Schedule state
   const [projectSchedule, setProjectSchedule] = useState<ScheduleEntry[]>([])
@@ -1261,6 +1264,51 @@ export default function ProjectDetailPage() {
       showToast(err.message || 'Kunde inte tilldela', 'error')
     } finally {
       setAssignLoading(false)
+    }
+  }
+
+  const handleAssignBatch = async (memberIds: string[], leadId: string | null) => {
+    if (memberIds.length === 0) return
+    setAssignLoading(true)
+    try {
+      // Skapa alla tilldelningar parallellt
+      const results = await Promise.allSettled(
+        memberIds.map(id =>
+          fetch(`/api/projects/${projectId}/team`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ businessUserId: id, role: id === leadId ? 'lead' : 'member' }),
+          }).then(r => { if (!r.ok) throw new Error(); return r })
+        )
+      )
+      const ok = results.filter(r => r.status === 'fulfilled').length
+      const failed = memberIds.length - ok
+      if (failed > 0) showToast(`${ok} tillagda, ${failed} misslyckades`, 'error')
+      else showToast(`${ok} ${ok === 1 ? 'medlem tillagd' : 'medlemmar tillagda'}`, 'success')
+      setShowAddMember(false)
+      fetchProjectTeam()
+    } catch (err: any) {
+      showToast(err.message || 'Kunde inte tilldela', 'error')
+    } finally {
+      setAssignLoading(false)
+    }
+  }
+
+  const handleSetLead = async (businessUserId: string, makeLeader: boolean) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/team`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ businessUserId, role: makeLeader ? 'lead' : 'member' }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Kunde inte uppdatera roll')
+      }
+      showToast(makeLeader ? 'Markerad som ansvarig' : 'Roll borttagen', 'success')
+      fetchProjectTeam()
+    } catch (err: any) {
+      showToast(err.message || 'Kunde inte uppdatera', 'error')
     }
   }
 
@@ -2832,42 +2880,122 @@ export default function ProjectDetailPage() {
               {can('see_all_projects') && (
                 <div className="relative">
                   <button
-                    onClick={() => setShowAddMember(!showAddMember)}
+                    onClick={() => {
+                      // Återställ val varje gång panelen öppnas
+                      setPickerSelectedIds(new Set())
+                      setPickerLeadId(null)
+                      setShowAddMember(!showAddMember)
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-xl text-white text-sm font-medium hover:opacity-90"
                   >
                     <UserPlus className="w-4 h-4" />
-                    Lagg till
+                    Lägg till
                   </button>
-                  {showAddMember && (
-                    <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[#E2E8F0] rounded-xl shadow-xl z-30 overflow-hidden">
-                      {allTeamMembers
-                        .filter(m => !projectTeam.some(a => a.business_user_id === m.id))
-                        .map(member => (
-                          <button
-                            key={member.id}
-                            onClick={() => handleAssignMember(member.id)}
-                            disabled={assignLoading}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-100 transition-all disabled:opacity-50"
-                          >
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: member.color }}
-                            >
-                              <span className="text-gray-900 text-xs font-bold">
-                                {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
-                              </span>
+                  {showAddMember && (() => {
+                    const available = allTeamMembers.filter(m => !projectTeam.some(a => a.business_user_id === m.id))
+                    const hasExistingLead = projectTeam.some(a => a.role === 'lead')
+                    return (
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-[#E2E8F0] rounded-xl shadow-xl z-30 overflow-hidden flex flex-col">
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Välj personer</p>
+                          <p className="text-[11px] text-gray-400 mt-0.5">Kryssa i flera och tilldela alla på en gång</p>
+                        </div>
+                        {available.length === 0 ? (
+                          <p className="px-4 py-6 text-sm text-gray-400 text-center">Alla teammedlemmar är redan tillagda</p>
+                        ) : (
+                          <div className="max-h-72 overflow-y-auto">
+                            {available.map(member => {
+                              const checked = pickerSelectedIds.has(member.id)
+                              const isLeadCandidate = pickerLeadId === member.id
+                              return (
+                                <div
+                                  key={member.id}
+                                  className={`flex items-center gap-3 px-4 py-2.5 transition-colors ${
+                                    checked ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const next = new Set(pickerSelectedIds)
+                                      if (checked) {
+                                        next.delete(member.id)
+                                        if (pickerLeadId === member.id) setPickerLeadId(null)
+                                      } else {
+                                        next.add(member.id)
+                                      }
+                                      setPickerSelectedIds(next)
+                                    }}
+                                    className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                      checked ? 'bg-primary-700 border-primary-700' : 'border-gray-300 hover:border-primary-400'
+                                    }`}
+                                    aria-label={checked ? 'Avmarkera' : 'Markera'}
+                                  >
+                                    {checked && (
+                                      <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                        <path d="M2 6l3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                  <div
+                                    className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: member.color }}
+                                  >
+                                    <span className="text-gray-900 text-xs font-bold">
+                                      {member.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm text-gray-900 truncate">{member.name}</p>
+                                    <p className="text-xs text-gray-400 truncate">{member.title || member.role}</p>
+                                  </div>
+                                  {checked && !hasExistingLead && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPickerLeadId(isLeadCandidate ? null : member.id)}
+                                      className={`text-[10px] font-medium px-2 py-1 rounded-full transition-colors flex-shrink-0 ${
+                                        isLeadCandidate
+                                          ? 'bg-amber-100 text-amber-700'
+                                          : 'bg-gray-100 text-gray-500 hover:bg-amber-50 hover:text-amber-700'
+                                      }`}
+                                      title="Markera som ansvarig"
+                                    >
+                                      ★ Ansvarig
+                                    </button>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {available.length > 0 && (
+                          <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between gap-2">
+                            <span className="text-xs text-gray-500">
+                              {pickerSelectedIds.size} {pickerSelectedIds.size === 1 ? 'vald' : 'valda'}
+                              {pickerLeadId && ' · ★'}
+                            </span>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowAddMember(false)}
+                                className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                Avbryt
+                              </button>
+                              <button
+                                type="button"
+                                disabled={pickerSelectedIds.size === 0 || assignLoading}
+                                onClick={() => handleAssignBatch(Array.from(pickerSelectedIds), pickerLeadId)}
+                                className="px-3 py-1.5 bg-primary-700 text-white text-xs font-medium rounded-lg hover:opacity-90 disabled:opacity-40"
+                              >
+                                {assignLoading ? 'Tilldelar...' : `Tilldela ${pickerSelectedIds.size > 0 ? `(${pickerSelectedIds.size})` : ''}`}
+                              </button>
                             </div>
-                            <div className="min-w-0">
-                              <p className="text-sm text-gray-900 truncate">{member.name}</p>
-                              <p className="text-xs text-gray-400 truncate">{member.title || member.role}</p>
-                            </div>
-                          </button>
-                        ))}
-                      {allTeamMembers.filter(m => !projectTeam.some(a => a.business_user_id === m.id)).length === 0 && (
-                        <p className="px-4 py-3 text-sm text-gray-400">Alla teammedlemmar ar redan tillagda</p>
-                      )}
-                    </div>
-                  )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
                 </div>
               )}
             </div>
@@ -2880,7 +3008,15 @@ export default function ProjectDetailPage() {
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-gray-200">
-                {projectTeam.map(assignment => (
+                {[...projectTeam]
+                  .sort((a, b) => {
+                    if (a.role === 'lead' && b.role !== 'lead') return -1
+                    if (a.role !== 'lead' && b.role === 'lead') return 1
+                    return 0
+                  })
+                  .map(assignment => {
+                  const isLead = assignment.role === 'lead'
+                  return (
                   <div key={assignment.id} className="p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
@@ -2895,20 +3031,39 @@ export default function ProjectDetailPage() {
                         <p className="text-gray-900 font-medium">{assignment.business_user.name}</p>
                         <p className="text-xs text-gray-400">{assignment.business_user.title || assignment.business_user.role}</p>
                       </div>
-                      <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500 border border-gray-300">
-                        {assignment.role === 'lead' ? 'Ansvarig' : 'Medlem'}
+                      <span className={`px-2 py-0.5 text-xs rounded-full border ${
+                        isLead
+                          ? 'bg-amber-50 text-amber-700 border-amber-200 font-medium'
+                          : 'bg-gray-100 text-gray-500 border-gray-300'
+                      }`}>
+                        {isLead ? '★ Ansvarig' : 'Medlem'}
                       </span>
                     </div>
                     {can('see_all_projects') && (
-                      <button
-                        onClick={() => handleRemoveMember(assignment.business_user_id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleSetLead(assignment.business_user_id, !isLead)}
+                          className={`px-2.5 py-1.5 text-xs rounded-lg transition-all font-medium ${
+                            isLead
+                              ? 'text-amber-700 hover:bg-amber-50'
+                              : 'text-gray-400 hover:text-amber-700 hover:bg-amber-50'
+                          }`}
+                          title={isLead ? 'Ta bort som ansvarig' : 'Gör till ansvarig'}
+                        >
+                          {isLead ? '☆ Ta bort ansvarig' : '★ Gör ansvarig'}
+                        </button>
+                        <button
+                          onClick={() => handleRemoveMember(assignment.business_user_id)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-500/10 rounded-lg transition-all"
+                          title="Ta bort från projektet"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     )}
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>
