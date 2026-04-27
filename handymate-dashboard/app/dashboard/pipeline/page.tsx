@@ -62,6 +62,7 @@ import { todayDateStr, nowTimeStr } from '@/lib/datetime-defaults'
 import TaskPresetPicker from '@/components/TaskPresetPicker'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import { TimelineView } from './components/TimelineView'
+import FlowPipeline from '@/components/pipeline/unified/FlowPipeline'
 import { PipelineStats as PipelineStatsView } from './components/PipelineStats'
 import { PipelineHeader } from './components/PipelineHeader'
 import { SiteVisitModal } from './components/SiteVisitModal'
@@ -1519,11 +1520,42 @@ export default function PipelinePage() {
     siteVisitSaving,
     siteVisitTeam,
     bookSiteVisit,
+
+    quickSmsTarget,
     setQuickSmsTarget,
+    quickSmsText,
     setQuickSmsText,
-    setLossDealId,
+    quickSmsSending,
+    sendQuickSms,
+
+    showLossModal,
     setShowLossModal,
+    lossDealId,
+    setLossDealId,
+    lossReason,
+    setLossReason,
+    lossReasonDetail,
+    setLossReasonDetail,
+    confirmLossReason,
+
+    nextStepPrompt,
     setNextStepPrompt,
+    nextStepTask,
+    setNextStepTask,
+    nextStepSaving,
+    createNextStepTask,
+
+    showStageSettings,
+    setShowStageSettings,
+    stageEdits,
+    setStageEdits,
+    newStageName,
+    setNewStageName,
+    stageSaving,
+    saveStageEdits,
+    addNewStage,
+    deleteStage,
+    moveStageOrder,
 
     pipelineView,
     setPipelineView,
@@ -1608,9 +1640,18 @@ export default function PipelinePage() {
           setMobileStageIndex={setMobileStageIndex}
         />
 
-        {/* Kanban / Timeline */}
+        {/* Kanban / Timeline / Flödet */}
         <div className="flex-1 overflow-hidden">
-          {pipelineView === 'timeline' ? (
+          {pipelineView === 'flow' ? (
+            <FlowPipeline
+              deals={filteredDeals}
+              stages={stages}
+              onDealClick={openDealDetail}
+              onProjectClick={(projectId) => { window.location.href = `/dashboard/projects/${projectId}` }}
+              density="comfortable"
+              split="40-60"
+            />
+          ) : pipelineView === 'timeline' ? (
             <TimelineView
               deals={filteredDeals as any}
               stages={stages}

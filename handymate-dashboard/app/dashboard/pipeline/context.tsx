@@ -201,15 +201,45 @@ export interface PipelineContextValue {
   siteVisitSaving: boolean
   siteVisitTeam: SiteVisitTeamMember[]
   bookSiteVisit: () => Promise<void>
+  quickSmsTarget: QuickSmsTarget | null
   setQuickSmsTarget: Dispatch<SetStateAction<QuickSmsTarget | null>>
+  quickSmsText: string
   setQuickSmsText: Dispatch<SetStateAction<string>>
-  setLossDealId: Dispatch<SetStateAction<string | null>>
+  quickSmsSending: boolean
+  sendQuickSms: () => Promise<void>
+
+  showLossModal: boolean
   setShowLossModal: Dispatch<SetStateAction<boolean>>
+  lossDealId: string | null
+  setLossDealId: Dispatch<SetStateAction<string | null>>
+  lossReason: string
+  setLossReason: Dispatch<SetStateAction<string>>
+  lossReasonDetail: string
+  setLossReasonDetail: Dispatch<SetStateAction<string>>
+  confirmLossReason: () => Promise<void>
+
+  nextStepPrompt: NextStepPrompt | null
   setNextStepPrompt: Dispatch<SetStateAction<NextStepPrompt | null>>
+  nextStepTask: string
+  setNextStepTask: Dispatch<SetStateAction<string>>
+  nextStepSaving: boolean
+  createNextStepTask: () => Promise<void>
+
+  showStageSettings: boolean
+  setShowStageSettings: Dispatch<SetStateAction<boolean>>
+  stageEdits: Record<string, { name: string; color: string }>
+  setStageEdits: Dispatch<SetStateAction<Record<string, { name: string; color: string }>>>
+  newStageName: string
+  setNewStageName: Dispatch<SetStateAction<string>>
+  stageSaving: boolean
+  saveStageEdits: () => Promise<void>
+  addNewStage: () => Promise<void>
+  deleteStage: (stageId: string) => Promise<void>
+  moveStageOrder: (stageId: string, direction: 'up' | 'down') => Promise<void>
 
   // ─── View toggle, filter, drag-drop ────────────────────────────────────
-  pipelineView: 'kanban' | 'timeline'
-  setPipelineView: Dispatch<SetStateAction<'kanban' | 'timeline'>>
+  pipelineView: 'kanban' | 'timeline' | 'flow'
+  setPipelineView: Dispatch<SetStateAction<'kanban' | 'timeline' | 'flow'>>
   draggingDealId: string | null
   dragOverStageId: string | null
   setDragOverStageId: Dispatch<SetStateAction<string | null>>

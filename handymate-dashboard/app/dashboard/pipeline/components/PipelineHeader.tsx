@@ -66,8 +66,14 @@ export function PipelineHeader({ stats, mobileStageIndex, setMobileStageIndex }:
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Kanban / Tidslinje toggle */}
+            {/* Flödet / Kanban / Tidslinje toggle */}
             <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setPipelineView('flow')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'flow' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                Flödet
+              </button>
               <button
                 onClick={() => setPipelineView('kanban')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'kanban' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
