@@ -2854,119 +2854,8 @@ export default function SettingsPage() {
                     </ul>
                   </div>
 
-                  {/* Gmail integration toggle */}
-                  <div className="p-4 bg-gray-50 rounded-xl">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Mail className="w-5 h-5 text-gray-500" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">Visa kundmail</p>
-                          <p className="text-xs text-gray-400">
-                            {googleStatus?.gmailScopeGranted
-                              ? 'Visa Gmail-konversationer i kundkort'
-                              : 'Koppla om Google för att aktivera e-post'}
-                          </p>
-                        </div>
-                      </div>
-                      {googleStatus?.gmailScopeGranted ? (
-                        <button
-                          onClick={() => handleToggleGmailSync(!googleStatus?.gmailSyncEnabled)}
-                          className={`relative w-11 h-6 rounded-full transition-colors ${
-                            googleStatus?.gmailSyncEnabled ? 'bg-primary-700' : 'bg-gray-300'
-                          }`}
-                        >
-                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                            googleStatus?.gmailSyncEnabled ? 'translate-x-5' : ''
-                          }`} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={handleConnectGoogle}
-                          className="px-3 py-1.5 text-xs font-medium text-secondary-700 bg-primary-50 border border-[#E2E8F0] rounded-lg hover:bg-primary-100 transition-colors"
-                        >
-                          Koppla om
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Gmail lead import */}
-                  {googleStatus?.gmailScopeGranted && (
-                    <div className="p-4 bg-gray-50 rounded-xl space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Bot className="w-5 h-5 text-gray-500" />
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">AI Lead-import från Gmail</p>
-                            <p className="text-xs text-gray-400">Läs inkommande mail, hitta leads automatiskt</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={async () => {
-                            const next = !gmailLeadEnabled
-                            setGmailLeadEnabled(next)
-                            const authHeaders = await getAuthHeaders()
-                            fetch('/api/settings/gmail-lead', {
-                              method: 'PUT',
-                              headers: { 'Content-Type': 'application/json', ...authHeaders },
-                              body: JSON.stringify({
-                                enabled: next,
-                                approved_senders: gmailLeadApprovedSenders,
-                                blocked_senders: gmailLeadBlockedSenders,
-                              }),
-                            }).then(() => showToast(next ? 'Lead-import aktiverad' : 'Lead-import inaktiverad', 'success'))
-                              .catch(() => showToast('Fel vid sparning', 'error'))
-                          }}
-                          className={`relative w-11 h-6 rounded-full transition-colors ${gmailLeadEnabled ? 'bg-primary-700' : 'bg-gray-300'}`}
-                        >
-                          <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${gmailLeadEnabled ? 'translate-x-5' : ''}`} />
-                        </button>
-                      </div>
-
-                      {gmailLeadEnabled && (
-                        <div className="space-y-2 pt-1 border-t border-gray-200">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Godkända avsändare (valfritt)
-                            </label>
-                            <input
-                              type="text"
-                              value={gmailLeadApprovedSenders}
-                              onChange={(e) => setGmailLeadApprovedSenders(e.target.value)}
-                              placeholder="t.ex. blocket.se, hemnet.se, @gmail.com"
-                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
-                            />
-                            <p className="text-xs text-gray-400 mt-0.5">Kommaseparerade domäner/e-poster som alltid är leads</p>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Blockerade avsändare (valfritt)
-                            </label>
-                            <input
-                              type="text"
-                              value={gmailLeadBlockedSenders}
-                              onChange={(e) => setGmailLeadBlockedSenders(e.target.value)}
-                              placeholder="t.ex. noreply@, newsletter@"
-                              className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:ring-1 focus:ring-primary-600 focus:border-primary-600"
-                            />
-                          </div>
-                          <button
-                            onClick={handleSaveGmailLeadSettings}
-                            disabled={gmailLeadSaving}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-primary-700 text-white rounded-lg hover:bg-primary-800 disabled:opacity-50"
-                          >
-                            {gmailLeadSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
-                            Spara filter
-                          </button>
-                          {gmailLeadLastImport && (
-                            <p className="text-xs text-gray-400">
-                              Senaste import: {new Date(gmailLeadLastImport).toLocaleString('sv-SE')}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Gmail-integration är pausad — feature flyttad till "kommer snart"
+                      i Inställningar → Integrationer. Kalender-synk fortsätter som normalt. */}
 
                   {/* Disconnect */}
                   <button
@@ -3016,7 +2905,7 @@ export default function SettingsPage() {
             {/* Email info */}
             <div className="bg-primary-50 border border-[#E2E8F0] rounded-xl p-4">
               <p className="text-sm text-primary-700">
-                <strong>Om e-post:</strong> Utgående e-post skickas via Handymate (Resend). Med Gmail-koppling kan du se inkommande kundmail direkt i kundkortet.
+                <strong>Om e-post:</strong> Utgående e-post (offerter, fakturor, bekräftelser) skickas via Handymate. Hantering av inkommande kundmail kommer snart.
               </p>
             </div>
 
