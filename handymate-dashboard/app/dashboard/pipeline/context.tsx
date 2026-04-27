@@ -272,6 +272,10 @@ export interface PipelineContextValue {
   toggleHideEmpty: () => void
   scrollPipeline: (dir: 'left' | 'right') => void
   scrollContainerRef: React.RefObject<HTMLDivElement>
+  mobileStageIndex: number
+  setMobileStageIndex: Dispatch<SetStateAction<number>>
+  lostExpanded: boolean
+  setLostExpanded: Dispatch<SetStateAction<boolean>>
 
   // ─── New deal-modal triggers ───────────────────────────────────────────
   showNewDeal: boolean
