@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
  * GET - Hämta tidsrapporter för ett företag
@@ -116,6 +117,7 @@ export async function POST(request: NextRequest) {
       end_time,
       duration_minutes,
       description,
+      internal_notes,
       hourly_rate,
       is_billable
     } = body
@@ -181,6 +183,7 @@ export async function POST(request: NextRequest) {
         end_time: end_time || null,
         duration_minutes,
         description: description || null,
+        internal_notes: internal_notes || null,
         hourly_rate: effectiveRate,
         is_billable: is_billable ?? true
       })
@@ -244,16 +247,26 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'entry_id krävs' }, { status: 400 })
     }
 
-    // Block update if invoiced
+    // Block update if invoiced eller approved (admin/owner får ändra approved)
     const { data: existing } = await supabase
       .from('time_entry')
-      .select('invoiced')
+      .select('invoiced, approval_status, business_user_id')
       .eq('time_entry_id', entry_id)
       .eq('business_id', business.business_id)
       .single()
 
     if (existing?.invoiced) {
       return NextResponse.json({ error: 'Kan inte ändra fakturerade tidposter' }, { status: 400 })
+    }
+
+    if (existing?.approval_status === 'approved') {
+      const currentUser = await getCurrentUser(request)
+      if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+        return NextResponse.json(
+          { error: 'Tiden är godkänd och kan inte ändras. Kontakta din chef om något är fel.' },
+          { status: 403 }
+        )
+      }
     }
 
     const { data, error } = await supabase
@@ -297,16 +310,26 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'entryId krävs' }, { status: 400 })
     }
 
-    // Block delete if invoiced
+    // Block delete if invoiced eller approved (admin/owner får ta bort approved)
     const { data: existing } = await supabase
       .from('time_entry')
-      .select('invoiced')
+      .select('invoiced, approval_status')
       .eq('time_entry_id', entryId)
       .eq('business_id', business.business_id)
       .single()
 
     if (existing?.invoiced) {
       return NextResponse.json({ error: 'Kan inte ta bort fakturerade tidposter' }, { status: 400 })
+    }
+
+    if (existing?.approval_status === 'approved') {
+      const currentUser = await getCurrentUser(request)
+      if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+        return NextResponse.json(
+          { error: 'Tiden är godkänd och kan inte tas bort. Kontakta din chef om något är fel.' },
+          { status: 403 }
+        )
+      }
     }
 
     const { error } = await supabase

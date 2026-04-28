@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Lock, EyeOff } from 'lucide-react'
 
 interface TimeEntryModalProps {
   show: boolean
   onClose: () => void
   editing: boolean
+  /** Sätt till true för att låsa formuläret — anställd öppnar en godkänd post. */
+  locked?: boolean
   formData: {
     customer_id: string
     booking_id: string
@@ -14,6 +16,7 @@ interface TimeEntryModalProps {
     project_id: string
     work_category: string
     description: string
+    internal_notes?: string
     work_date: string
     start_time: string
     end_time: string
@@ -73,12 +76,13 @@ function computeDuration(start: string, end: string): { hours: number; minutes: 
 }
 
 export default function TimeEntryModal({
-  show, onClose, editing, formData, setFormData,
+  show, onClose, editing, locked, formData, setFormData,
   customers, bookings, projects, workTypes, teamMembers,
   isOwnerOrAdmin, formPersonId, setFormPersonId, currentUserId,
   saving, onSave, onBookingChange, onWorkTypeChange,
 }: TimeEntryModalProps) {
   const [showMore, setShowMore] = useState(false)
+  const [showInternalNote, setShowInternalNote] = useState(!!formData.internal_notes)
   const [activeQuick, setActiveQuick] = useState<string | null>(null)
 
   if (!show) return null
@@ -272,6 +276,16 @@ export default function TimeEntryModal({
           </select>
         </div>
 
+        {/* Locked banner */}
+        {locked && (
+          <div className="mb-4 px-3 py-2 rounded-lg bg-amber-50 border-thin border-amber-200 text-amber-700 text-[12px] flex items-start gap-2">
+            <Lock className="w-4 h-4 mt-[1px] flex-shrink-0" />
+            <span>
+              Tiden är godkänd och kan inte ändras. Kontakta din chef om något är fel.
+            </span>
+          </div>
+        )}
+
         {/* Beskrivning */}
         <div className="mb-4">
           <label className={labelClass}>
@@ -282,11 +296,40 @@ export default function TimeEntryModal({
             onChange={e => setFormData((prev: any) => ({ ...prev, description: e.target.value }))}
             placeholder="Vad har du gjort? T.ex. ”Demonterat kakel i badrum, började bila”"
             rows={3}
-            className={`${inputClass} resize-y min-h-[72px] leading-relaxed`}
+            disabled={locked}
+            className={`${inputClass} resize-y min-h-[72px] leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed`}
           />
           <p className="text-[11px] text-[#94A3B8] mt-1">
-            Visas på fakturarad om tiden faktureras till kund — håll det neutralt och beskrivande.
+            Beskrivning visas på fakturan till kund — håll det neutralt och beskrivande.
           </p>
+
+          {/* Intern not — toggle + textarea */}
+          {!showInternalNote ? (
+            <button
+              type="button"
+              onClick={() => setShowInternalNote(true)}
+              disabled={locked}
+              className="mt-[6px] inline-flex items-center gap-[6px] text-[12px] text-[#0F766E] hover:text-[#0D9488] bg-transparent border-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <EyeOff className="w-[14px] h-[14px]" />
+              + Intern anteckning (visas inte för kund)
+            </button>
+          ) : (
+            <div className="mt-3">
+              <label className="flex items-center gap-[6px] text-[12px] text-[#64748B] mb-[5px]">
+                <EyeOff className="w-[14px] h-[14px] text-[#94A3B8]" />
+                Intern anteckning <span className="text-[11px] text-[#CBD5E1]">(syns endast för dig och teamet)</span>
+              </label>
+              <textarea
+                value={formData.internal_notes || ''}
+                onChange={e => setFormData((prev: any) => ({ ...prev, internal_notes: e.target.value }))}
+                placeholder="t.ex. ”Behövde köra hem efter material — extra restid”"
+                rows={2}
+                disabled={locked}
+                className={`${inputClass} resize-y min-h-[56px] leading-relaxed disabled:opacity-60 disabled:cursor-not-allowed`}
+              />
+            </div>
+          )}
         </div>
 
         {/* Fakturerbar */}
@@ -394,11 +437,11 @@ export default function TimeEntryModal({
           </button>
           <button
             onClick={onSave}
-            disabled={saving}
+            disabled={saving || locked}
             className="flex-1 py-[11px] bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            {editing ? 'Spara' : 'Spara'}
+            Spara
           </button>
         </div>
 
