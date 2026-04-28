@@ -129,7 +129,8 @@ export async function saveFortnoxTokens(
   const updateData: Record<string, unknown> = {
     fortnox_access_token: tokens.access_token,
     fortnox_refresh_token: tokens.refresh_token,
-    fortnox_token_expires_at: expiresAt
+    fortnox_token_expires_at: expiresAt,
+    fortnox_connected: true,
   }
 
   // Set connected_at only on first connection
@@ -166,7 +167,8 @@ export async function clearFortnoxConnection(businessId: string): Promise<void> 
       fortnox_refresh_token: null,
       fortnox_token_expires_at: null,
       fortnox_connected_at: null,
-      fortnox_company_name: null
+      fortnox_company_name: null,
+      fortnox_connected: false,
     })
     .eq('business_id', businessId)
 
@@ -209,7 +211,8 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
 }
 
 /**
- * Make an authenticated request to Fortnox API
+ * Make an authenticated request to Fortnox API.
+ * Loggar alla anrop till fortnox_api_log för debugging.
  */
 export async function fortnoxRequest<T = unknown>(
   businessId: string,
@@ -217,9 +220,19 @@ export async function fortnoxRequest<T = unknown>(
   endpoint: string,
   data?: unknown
 ): Promise<T> {
+  const { logFortnoxApi } = await import('@/lib/fortnox/api-log')
+  const startTime = Date.now()
+
   const accessToken = await refreshTokenIfNeeded(businessId)
 
   if (!accessToken) {
+    await logFortnoxApi({
+      business_id: businessId,
+      endpoint,
+      method,
+      error_message: 'Fortnox not connected or token refresh failed',
+      duration_ms: Date.now() - startTime,
+    })
     throw new Error('Fortnox not connected or token refresh failed')
   }
 
@@ -240,21 +253,45 @@ export async function fortnoxRequest<T = unknown>(
     options.body = JSON.stringify(data)
   }
 
-  const response = await fetch(url, options)
+  let response: Response
+  try {
+    response = await fetch(url, options)
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Network error'
+    await logFortnoxApi({
+      business_id: businessId,
+      endpoint,
+      method,
+      request_payload: data,
+      error_message: msg,
+      duration_ms: Date.now() - startTime,
+    })
+    throw err
+  }
+
+  const text = await response.text()
+  let parsed: unknown = null
+  if (text) {
+    try { parsed = JSON.parse(text) } catch { parsed = text }
+  }
+
+  await logFortnoxApi({
+    business_id: businessId,
+    endpoint,
+    method,
+    status_code: response.status,
+    request_payload: data,
+    response_payload: response.ok ? parsed : null,
+    error_message: response.ok ? null : (typeof parsed === 'string' ? parsed : (parsed ? JSON.stringify(parsed).slice(0, 1000) : `HTTP ${response.status}`)),
+    duration_ms: Date.now() - startTime,
+  })
 
   if (!response.ok) {
-    const errorText = await response.text()
-    console.error(`Fortnox API error (${endpoint}):`, errorText)
+    console.error(`Fortnox API error (${endpoint}):`, text)
     throw new Error(`Fortnox API error: ${response.status}`)
   }
 
-  // Some endpoints return empty response
-  const text = await response.text()
-  if (!text) {
-    return {} as T
-  }
-
-  return JSON.parse(text)
+  return (parsed ?? ({} as T)) as T
 }
 
 /**

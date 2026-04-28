@@ -64,6 +64,10 @@
     {
       "path": "/api/cron/monthly-review",
       "schedule": "0 7 1 * *"
+    },
+    {
+      "path": "/api/cron/fortnox-sync",
+      "schedule": "0 */2 * * *"
     }
   ]
 }

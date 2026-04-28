@@ -77,6 +77,11 @@ interface Invoice {
   original_invoice_id?: string | null
   credit_reason?: string | null
   ocr_number?: string | null
+  fortnox_invoice_number?: string | null
+  fortnox_document_number?: string | null
+  fortnox_synced_at?: string | null
+  fortnox_sync_error?: string | null
+  rot_application_status?: string | null
   customer?: {
     customer_id: string
     name: string
@@ -110,6 +115,8 @@ export default function InvoiceDetailPage() {
     paid_amount: 0
   })
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [fortnoxConnected, setFortnoxConnected] = useState(false)
+  const [sendingViaFortnox, setSendingViaFortnox] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
   const [showCreditModal, setShowCreditModal] = useState(false)
   const [creditReason, setCreditReason] = useState('')
@@ -122,7 +129,39 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     fetchInvoice()
     fetchReminders()
+    fetchFortnoxStatus()
   }, [invoiceId])
+
+  async function fetchFortnoxStatus() {
+    try {
+      const res = await fetch('/api/integrations/fortnox/status')
+      if (res.ok) {
+        const data = await res.json()
+        setFortnoxConnected(!!data.connected)
+      }
+    } catch { /* non-blocking */ }
+  }
+
+  const handleSendViaFortnox = async () => {
+    setSendingViaFortnox(true)
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/send-via-fortnox`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const result = await response.json()
+      if (response.ok && result.success) {
+        showToast(result.message || 'Skickad till Fortnox!', 'success')
+        fetchInvoice()
+      } else {
+        showToast(result.message || result.error || 'Kunde inte skicka via Fortnox', 'error')
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Något gick fel', 'error')
+    } finally {
+      setSendingViaFortnox(false)
+    }
+  }
 
   useEffect(() => {
     if (invoice) {
@@ -663,6 +702,23 @@ export default function InvoiceDetailPage() {
               <p className="text-sm text-gray-500 mt-1">
                 Skapad {new Date(invoice.invoice_date).toLocaleDateString('sv-SE')}
               </p>
+              {/* Fortnox-badge */}
+              {invoice.fortnox_invoice_number ? (
+                <div className="text-xs text-emerald-700 mt-1 flex items-center gap-1">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  Fortnox-nr: <strong>{invoice.fortnox_invoice_number}</strong>
+                  {invoice.fortnox_synced_at && (
+                    <span className="text-gray-400">· synkad {new Date(invoice.fortnox_synced_at).toLocaleDateString('sv-SE')}</span>
+                  )}
+                </div>
+              ) : fortnoxConnected && invoice.status === 'draft' ? (
+                <div className="text-xs text-gray-400 mt-1">Skickas via Fortnox</div>
+              ) : null}
+              {invoice.fortnox_sync_error && (
+                <div className="text-xs text-red-600 mt-1">
+                  Fortnox-fel: {invoice.fortnox_sync_error}
+                </div>
+              )}
             </div>
           </div>
 
@@ -731,6 +787,20 @@ export default function InvoiceDetailPage() {
                       <Send className="w-4 h-4" />
                       Båda
                     </button>
+                    {fortnoxConnected && (
+                      <>
+                        <div className="my-1 border-t border-[#E2E8F0]" />
+                        <button
+                          onClick={handleSendViaFortnox}
+                          disabled={sendingViaFortnox}
+                          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg disabled:opacity-50"
+                          title="Skapa fakturan i Fortnox och markera som skickad"
+                        >
+                          {sendingViaFortnox ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                          Via Fortnox
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

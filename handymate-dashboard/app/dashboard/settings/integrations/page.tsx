@@ -2,15 +2,36 @@
 
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { ArrowLeft, Globe, Calendar, Mail, Code, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
+
+interface FortnoxStatus {
+  connected: boolean
+  company_name: string | null
+  connected_at: string | null
+  last_synced_at: string | null
+}
+
+function relativeTime(iso: string | null): string {
+  if (!iso) return 'aldrig'
+  const ms = Date.now() - new Date(iso).getTime()
+  if (ms < 60_000) return 'nyss'
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)} min sedan`
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)} h sedan`
+  return new Date(iso).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+}
 
 export default function IntegrationsPage() {
   const business = useBusiness()
+  const searchParams = useSearchParams()
   const [copied, setCopied] = useState(false)
   const [calendarConnected, setCalendarConnected] = useState(false)
   const [widgetEnabled, setWidgetEnabled] = useState(false)
   const [statusLoading, setStatusLoading] = useState(true)
+  const [fortnox, setFortnox] = useState<FortnoxStatus | null>(null)
+  const [fortnoxAction, setFortnoxAction] = useState<'syncing' | 'disconnecting' | null>(null)
+  const [fortnoxToast, setFortnoxToast] = useState<string | null>(null)
 
   const embedCode = `<script src="https://app.handymate.se/embed.js" data-key="HM-${business.business_id?.slice(0, 8) || 'abc123'}"></script>`
 
@@ -20,12 +41,25 @@ export default function IntegrationsPage() {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const refreshFortnox = useCallback(async () => {
+    try {
+      const res = await fetch('/api/integrations/fortnox/status')
+      if (res.ok) {
+        const data = await res.json()
+        setFortnox(data)
+      }
+    } catch { /* non-blocking */ }
+  }, [])
+
   useEffect(() => {
     if (!business.business_id) return
     let cancelled = false
     ;(async () => {
       try {
-        const googleRes = await fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null)
+        const [googleRes] = await Promise.all([
+          fetch('/api/google/status').then(r => r.ok ? r.json() : null).catch(() => null),
+          refreshFortnox(),
+        ])
         if (cancelled) return
         setCalendarConnected(!!(googleRes?.connected && googleRes?.syncEnabled))
         setWidgetEnabled(false)
@@ -36,7 +70,56 @@ export default function IntegrationsPage() {
       }
     })()
     return () => { cancelled = true }
-  }, [business.business_id])
+  }, [business.business_id, refreshFortnox])
+
+  // Visa toast vid OAuth-callback
+  useEffect(() => {
+    const status = searchParams?.get('fortnox')
+    if (status === 'connected') {
+      setFortnoxToast('Fortnox kopplad!')
+      setTimeout(() => setFortnoxToast(null), 4000)
+    } else if (status === 'error') {
+      const msg = searchParams?.get('message') || 'Något gick fel'
+      setFortnoxToast(`Fortnox: ${msg}`)
+      setTimeout(() => setFortnoxToast(null), 6000)
+    }
+  }, [searchParams])
+
+  async function handleFortnoxSyncNow() {
+    setFortnoxAction('syncing')
+    try {
+      const res = await fetch('/api/integrations/fortnox/sync-now', { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setFortnoxToast(
+          `Synkat: ${data.checked} fakturor kontrollerade, ${data.marked_paid} markerade som betalda${data.marked_overdue ? `, ${data.marked_overdue} förfallna` : ''}`
+        )
+      } else {
+        setFortnoxToast(`Synk misslyckades: ${data.error || 'okänt fel'}`)
+      }
+      await refreshFortnox()
+    } catch (err: any) {
+      setFortnoxToast(`Synk misslyckades: ${err.message || 'okänt fel'}`)
+    } finally {
+      setFortnoxAction(null)
+      setTimeout(() => setFortnoxToast(null), 5000)
+    }
+  }
+
+  async function handleFortnoxDisconnect() {
+    if (!confirm('Koppla från Fortnox? Tokens raderas men kund/faktura-kopplingar finns kvar.')) return
+    setFortnoxAction('disconnecting')
+    try {
+      await fetch('/api/integrations/fortnox/disconnect', { method: 'POST' })
+      await refreshFortnox()
+      setFortnoxToast('Fortnox frånkopplad')
+    } catch (err: any) {
+      setFortnoxToast(`Misslyckades: ${err.message}`)
+    } finally {
+      setFortnoxAction(null)
+      setTimeout(() => setFortnoxToast(null), 4000)
+    }
+  }
 
   if (!business.business_id) {
     return (
@@ -111,6 +194,71 @@ export default function IntegrationsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </Link>
+
+          {/* Fortnox */}
+          <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
+            <div className="flex items-center gap-4 p-4">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center text-emerald-700 bg-emerald-50">
+                <Receipt className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-gray-900">Fortnox</span>
+                  {fortnox?.connected ? (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                      Ansluten{fortnox.company_name ? ` · ${fortnox.company_name}` : ''}
+                    </span>
+                  ) : (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">Ej kopplad</span>
+                  )}
+                </div>
+                {fortnox?.connected ? (
+                  <p className="text-sm text-gray-500 truncate">
+                    Senast synkad: {relativeTime(fortnox.last_synced_at)}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500 truncate">
+                    Synka fakturor och bokföring automatiskt
+                  </p>
+                )}
+              </div>
+              {!fortnox?.connected ? (
+                <a
+                  href="/api/integrations/fortnox/connect"
+                  className="text-xs font-medium text-white bg-[#0F766E] hover:bg-[#0D9488] px-4 py-2 rounded-lg flex-shrink-0"
+                >
+                  Koppla Fortnox
+                </a>
+              ) : (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={handleFortnoxSyncNow}
+                    disabled={fortnoxAction !== null}
+                    className="flex items-center gap-1.5 text-xs font-medium text-[#0F766E] border border-[#E2E8F0] hover:border-[#0F766E] px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  >
+                    {fortnoxAction === 'syncing' ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3.5 h-3.5" />
+                    )}
+                    Synka nu
+                  </button>
+                  <button
+                    onClick={handleFortnoxDisconnect}
+                    disabled={fortnoxAction !== null}
+                    className="text-xs text-gray-500 hover:text-red-600 px-2 py-1.5 disabled:opacity-50"
+                  >
+                    Koppla från
+                  </button>
+                </div>
+              )}
+            </div>
+            {fortnoxToast && (
+              <div className="px-4 py-2 bg-[#F0FDFA] border-t border-[#CCFBF1] text-xs text-[#0F766E]">
+                {fortnoxToast}
+              </div>
+            )}
+          </div>
 
           {/* E-post — kommer snart (icke-klickbar) */}
           <div
