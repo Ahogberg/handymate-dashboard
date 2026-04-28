@@ -321,16 +321,20 @@ if (action === 'login') {
     // ==================== FORGOT PASSWORD ====================
     if (action === 'forgot_password') {
       const { email } = data
-
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'}/auth/callback?next=/reset-password`
-      })
-
-      if (error) {
-        console.error('Reset password error:', error)
+      if (!email) {
+        return NextResponse.json({ error: 'Ange din e-post' }, { status: 400 })
       }
 
-      // Returnera alltid success för säkerhet
+      // Skicka via egen mall (Resend) istället för Supabases default —
+      // Handymate-branding, ljust tema, kontroll över deliverability.
+      const { sendPasswordResetEmail } = await import('@/lib/auth/password-reset-email')
+      const result = await sendPasswordResetEmail(email)
+
+      if (!result.success && !result.silent_skip) {
+        console.error('[forgot_password] failed:', result.error)
+      }
+
+      // Returnera alltid success för säkerhet — avslöja inte registrerade konton.
       return NextResponse.json({ success: true })
     }
 
