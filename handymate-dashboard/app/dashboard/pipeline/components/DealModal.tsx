@@ -168,54 +168,129 @@ export function DealModal() {
 
   return (
     <>
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={closeDealDetail} />
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40" onClick={closeDealDetail} />
+          <div className="fixed inset-0 z-50 flex items-stretch sm:items-center justify-center p-0 sm:p-6">
+            <div
+              className="bg-white w-full max-w-3xl max-h-[100vh] sm:max-h-[90vh] flex flex-col rounded-none sm:rounded-2xl shadow-none sm:shadow-xl border-0 sm:border sm:border-slate-200"
+              onClick={e => e.stopPropagation()}
+            >
               {/* Modal Header */}
-              <div className="flex-shrink-0 px-6 pt-5 pb-0">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {(() => { const stage = getStageForDeal(selectedDeal); return stage ? (<span className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0 bg-primary-700 text-white">{stage.name}</span>) : null })()}
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getPriorityBadgeStyle(selectedDeal.priority)}`}>{getPriorityLabel(selectedDeal.priority)}</span>
-                    {/* Flytta till dropdown */}
-                    <div className="relative ml-auto flex-shrink-0">
+              <div className="flex-shrink-0 px-5 sm:px-6 pt-4 sm:pt-5 pb-0 border-b border-slate-200">
+                {/* Top row: title (left) + stage pill (middle) + amount + close (right) */}
+                <div className="flex items-start gap-3 mb-3">
+                  {/* Vänster: ärendenummer + titel */}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-mono font-semibold text-primary-700 mb-1 tracking-tight">
+                      #{selectedDeal.deal_number || selectedDeal.id.slice(0, 6)}
+                    </div>
+                    {editingTitle ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={editTitleValue}
+                          onChange={e => setEditTitleValue(e.target.value)}
+                          className="flex-1 bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-slate-900 text-lg font-bold focus:outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                          autoFocus
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              updateDealField(selectedDeal.id, 'title', editTitleValue)
+                              setEditingTitle(false)
+                            }
+                            if (e.key === 'Escape') {
+                              setEditTitleValue(selectedDeal.title)
+                              setEditingTitle(false)
+                            }
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            updateDealField(selectedDeal.id, 'title', editTitleValue)
+                            setEditingTitle(false)
+                          }}
+                          className="p-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+                          title="Spara"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }}
+                        className="group flex items-center gap-2 text-left w-full min-w-0"
+                      >
+                        <h2 className="text-lg sm:text-xl font-bold text-slate-900 truncate leading-tight tracking-tight">
+                          {selectedDeal.title}
+                        </h2>
+                        <Edit3 className="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      </button>
+                    )}
+                    {selectedDeal.description && (
+                      <p className="text-[13px] text-slate-500 mt-1 line-clamp-2">{selectedDeal.description}</p>
+                    )}
+                  </div>
+
+                  {/* Höger: stage-pill + belopp + close */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Stage pill — klickbar dropdown för stage-byte */}
+                    <div className="relative hidden sm:block">
                       <select
                         value={selectedDeal.stage_id}
                         onChange={e => {
                           const target = stages.find(s => s.id === e.target.value)
                           if (target) moveDealAction(selectedDeal.id, target.slug)
                         }}
-                        className="appearance-none pl-2 pr-6 py-0.5 rounded-lg text-xs font-medium border border-[#E2E8F0] bg-white text-gray-600 hover:border-primary-300 cursor-pointer focus:outline-none focus:border-primary-400"
+                        className="appearance-none pl-3 pr-7 py-1 rounded-full text-xs font-semibold border border-primary-200 bg-primary-50 text-primary-700 hover:border-primary-400 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-100"
                       >
                         {stages.map(s => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
-                      <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <ChevronDown className="w-3 h-3 text-primary-700 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      {editingTitle ? (
-                        <div className="flex items-center gap-2">
-                          <input type="text" value={editTitleValue} onChange={e => setEditTitleValue(e.target.value)}
-                            className="flex-1 bg-gray-50 border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 font-bold focus:outline-none focus:border-primary-400" autoFocus
-                            onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }; if (e.key === 'Escape') { setEditTitleValue(selectedDeal.title); setEditingTitle(false) } }} />
-                          <button onClick={() => { updateDealField(selectedDeal.id, 'title', editTitleValue); setEditingTitle(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-4 h-4" /></button>
-                        </div>
-                      ) : (
-                        <button onClick={() => { setEditTitleValue(selectedDeal.title); setEditingTitle(true) }} className="group flex items-center gap-2 text-left w-full min-w-0">
-                          <span className="text-sm font-mono text-primary-700 flex-shrink-0">#{selectedDeal.deal_number || selectedDeal.id.slice(0, 6)}</span>
-                          <h2 className="text-lg font-bold text-gray-900 truncate">{selectedDeal.title}</h2>
-                          <Edit3 className="w-3.5 h-3.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <button onClick={closeDealDetail} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-900 transition-colors ml-3 flex-shrink-0"><X className="w-5 h-5" /></button>
-                </div>
-                {selectedDeal.description && <p className="text-sm text-gray-500 mb-4 -mt-1">{selectedDeal.description}</p>}
 
-                {/* Tabs */}
-                <div className="flex gap-0 border-b border-gray-200 -mx-6 px-6">
+                    {/* Belopp */}
+                    {selectedDeal.value != null && selectedDeal.value > 0 && (
+                      <span className="hidden sm:inline-flex text-sm font-semibold text-slate-900 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg">
+                        {formatValue(selectedDeal.value)}
+                      </span>
+                    )}
+
+                    <button
+                      onClick={closeDealDetail}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-900 transition-colors"
+                      title="Stäng"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Mobile: stage dropdown + amount visas nedanför titeln eftersom de inte ryms i top-row */}
+                <div className="flex sm:hidden items-center gap-2 mb-3">
+                  <div className="relative flex-1">
+                    <select
+                      value={selectedDeal.stage_id}
+                      onChange={e => {
+                        const target = stages.find(s => s.id === e.target.value)
+                        if (target) moveDealAction(selectedDeal.id, target.slug)
+                      }}
+                      className="w-full appearance-none pl-3 pr-7 py-1.5 rounded-full text-xs font-semibold border border-primary-200 bg-primary-50 text-primary-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-100"
+                    >
+                      {stages.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="w-3 h-3 text-primary-700 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+                  {selectedDeal.value != null && selectedDeal.value > 0 && (
+                    <span className="inline-flex text-xs font-semibold text-slate-900 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg flex-shrink-0">
+                      {formatValue(selectedDeal.value)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Tabs — underline-style */}
+                <div className="flex gap-0 -mx-5 sm:-mx-6 px-5 sm:px-6 overflow-x-auto scrollbar-hide">
                   {([
                     { key: 'general' as const, label: 'Allmänt', icon: FolderKanban },
                     { key: 'tasks' as const, label: 'Uppgifter', icon: CheckSquare, count: dealTasks.filter(t => t.status !== 'done').length },
@@ -226,18 +301,20 @@ export function DealModal() {
                     <button
                       key={tab.key}
                       onClick={() => setDealTab(tab.key)}
-                      className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                      className={`flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-[13px] sm:text-sm font-medium border-b-2 transition-colors flex-shrink-0 -mb-px ${
                         dealTab === tab.key
-                          ? 'border-primary-700 text-sky-700'
-                          : 'border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300'
+                          ? 'border-primary-700 text-primary-700'
+                          : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                       }`}
                     >
                       <tab.icon className="w-4 h-4" />
-                      <span className="hidden sm:inline">{tab.label}</span>
+                      <span>{tab.label}</span>
                       {tab.count !== undefined && tab.count > 0 && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                          dealTab === tab.key ? 'bg-primary-100 text-sky-700' : 'bg-gray-100 text-gray-500'
-                        }`}>{tab.count}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                          dealTab === tab.key ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {tab.count}
+                        </span>
                       )}
                     </button>
                   ))}
@@ -259,7 +336,7 @@ export function DealModal() {
                             <input type="number" value={editValueInput} onChange={e => setEditValueInput(e.target.value)}
                               className="w-28 bg-white border border-[#E2E8F0] rounded-lg px-3 py-1.5 text-gray-900 text-sm text-right focus:outline-none focus:border-primary-400" autoFocus
                               onKeyDown={e => { if (e.key === 'Enter') { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }; if (e.key === 'Escape') { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(false) } }} />
-                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-primary-50 text-sky-700 hover:bg-primary-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { updateDealField(selectedDeal.id, 'value', editValueInput ? parseFloat(editValueInput) : null); setEditingValue(false) }} className="p-1.5 rounded-lg bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"><Save className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <button onClick={() => { setEditValueInput(selectedDeal.value?.toString() || ''); setEditingValue(true) }} className="group flex items-center gap-1.5 text-gray-900 font-semibold text-sm">
@@ -287,7 +364,7 @@ export function DealModal() {
                       <div className="rounded-lg border border-[#E2E8F0] bg-gray-50/50 p-4 space-y-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Target className="w-4 h-4 text-sky-700" />
+                            <Target className="w-4 h-4 text-primary-700" />
                             <span className="text-sm font-medium text-gray-900">Lead-kvalificering</span>
                           </div>
                           <div className="flex items-center gap-2">
@@ -368,7 +445,7 @@ export function DealModal() {
                         {!showLinkCustomer ? (
                           <button
                             onClick={() => { setShowLinkCustomer(true); fetchCustomers() }}
-                            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-sky-700 transition-colors"
+                            className="w-full flex items-center justify-center gap-2 py-2 text-sm text-gray-500 hover:text-primary-700 transition-colors"
                           >
                             <User className="w-4 h-4" />
                             Koppla kund till denna deal
@@ -423,7 +500,7 @@ export function DealModal() {
                             <span className="text-xs text-gray-400 uppercase tracking-wider">Kund</span>
                             {selectedDeal.customer.customer_type && (
                               <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${
-                                selectedDeal.customer.customer_type === 'company' ? 'bg-primary-50 text-sky-700 border-primary-200' :
+                                selectedDeal.customer.customer_type === 'company' ? 'bg-primary-50 text-primary-700 border-primary-200' :
                                 selectedDeal.customer.customer_type === 'brf' ? 'bg-purple-50 text-purple-600 border-purple-200' :
                                 'bg-gray-100 text-gray-500 border-gray-200'
                               }`}>
@@ -456,7 +533,7 @@ export function DealModal() {
                         </div>
                         <Link
                           href={`/dashboard/customers/${selectedDeal.customer.customer_id}`}
-                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-sky-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                          className="flex items-center justify-between px-4 py-2.5 bg-gray-100/80 border-t border-gray-200 text-sm text-primary-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                         >
                           <span className="font-medium">Visa kundkort</span>
                           <ChevronRight className="w-4 h-4" />
@@ -923,13 +1000,13 @@ export function DealModal() {
                         <option value="photo">Foto</option>
                         <option value="other">Övrigt</option>
                       </select>
-                      <label className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-sky-700 font-medium hover:bg-primary-100 cursor-pointer transition-colors">
+                      <label className="flex items-center gap-1.5 px-4 py-2 bg-primary-50 border border-[#E2E8F0] rounded-lg text-sm text-primary-700 font-medium hover:bg-primary-100 cursor-pointer transition-colors">
                         {dealUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                         {dealUploading ? 'Laddar upp...' : 'Ladda upp fil'}
                         <input type="file" className="hidden" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" onChange={handleDealFileUpload} disabled={dealUploading} />
                       </label>
                       {selectedDeal.customer_id && (
-                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-sky-700 hover:text-primary-700">
+                        <Link href={`/dashboard/customers/${selectedDeal.customer_id}?tab=documents`} className="ml-auto text-xs text-primary-700 hover:text-primary-700">
                           Visa alla i kundkort
                         </Link>
                       )}
@@ -959,7 +1036,7 @@ export function DealModal() {
                                 <span>{new Date(doc.uploaded_at).toLocaleDateString('sv-SE')}</span>
                               </div>
                             </div>
-                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-primary-50 transition-colors" title="Öppna">
+                            <a href={doc.file_url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-colors" title="Öppna">
                               <Download className="w-4 h-4" />
                             </a>
                           </div>
@@ -1024,7 +1101,7 @@ export function DealModal() {
                                     {timeAgo(note.created_at)}
                                   </span>
                                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-sky-700 rounded-lg hover:bg-primary-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
+                                    <button onClick={() => { setEditingNoteId(note.id); setEditNoteContent(note.content) }} className="p-1.5 text-gray-400 hover:text-primary-700 rounded-lg hover:bg-primary-50 transition-colors" title="Redigera"><Edit3 className="w-3.5 h-3.5" /></button>
                                     <button onClick={() => handleDeleteNote(note.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors" title="Ta bort"><Trash2 className="w-3.5 h-3.5" /></button>
                                   </div>
                                 </div>
