@@ -28,15 +28,23 @@ export function getUnitLabel(unit: string): string {
   }
 }
 
+/**
+ * Statusfärg för offerter — följer designsystemets semantiska palett:
+ *   slate  = neutral/utkast,
+ *   amber  = pending/väntar (skickad),
+ *   blue   = information (öppnad — kunden tittar),
+ *   green  = lyckat (accepterad),
+ *   red    = fel (nekad/utgången).
+ */
 export function getStatusStyle(status: string): string {
   switch (status) {
-    case 'draft': return 'bg-gray-100 text-gray-500 border-gray-300'
-    case 'sent': return 'bg-blue-100 text-blue-600 border-blue-300'
-    case 'opened': return 'bg-amber-100 text-amber-600 border-amber-300'
-    case 'accepted': return 'bg-emerald-100 text-emerald-600 border-emerald-300'
-    case 'declined': return 'bg-red-100 text-red-600 border-red-500/30'
-    case 'expired': return 'bg-gray-100 text-gray-400 border-gray-300'
-    default: return 'bg-gray-100 text-gray-500 border-gray-300'
+    case 'draft':    return 'bg-slate-100 text-slate-600'
+    case 'sent':     return 'bg-amber-50 text-amber-700'
+    case 'opened':   return 'bg-blue-50 text-blue-700'
+    case 'accepted': return 'bg-green-50 text-green-700'
+    case 'declined': return 'bg-red-50 text-red-700'
+    case 'expired':  return 'bg-red-50 text-red-700'
+    default:         return 'bg-slate-100 text-slate-600'
   }
 }
 

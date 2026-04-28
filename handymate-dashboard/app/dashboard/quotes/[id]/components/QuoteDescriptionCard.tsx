@@ -1,6 +1,5 @@
 'use client'
 
-import { FileText } from 'lucide-react'
 import type { Quote } from '../types'
 
 interface QuoteDescriptionCardProps {
@@ -9,8 +8,7 @@ interface QuoteDescriptionCardProps {
 
 /**
  * Renderar beskrivning + inledningstext + avslutningstext som tre separata
- * kort. Komponenten visar bara fält som faktiskt har innehåll — saknas allt
- * tre returneras null.
+ * kort (eyebrow-rubrik + body i DM Sans). Saknas allt tre returneras null.
  */
 export function QuoteDescriptionCard({ quote }: QuoteDescriptionCardProps) {
   if (!quote.description && !quote.introduction_text && !quote.conclusion_text) {
@@ -20,34 +18,37 @@ export function QuoteDescriptionCard({ quote }: QuoteDescriptionCardProps) {
   return (
     <>
       {quote.description && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-amber-400" />
-            Beskrivning
-          </h2>
-          <p className="text-gray-700">{quote.description}</p>
-        </div>
+        <TextCard label="Beskrivning" body={quote.description} preserveWhitespace={false} />
       )}
-
       {quote.introduction_text && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary-600" />
-            Inledning
-          </h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{quote.introduction_text}</p>
-        </div>
+        <TextCard label="Inledning" body={quote.introduction_text} preserveWhitespace />
       )}
-
       {quote.conclusion_text && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-gray-400" />
-            Avslutning
-          </h2>
-          <p className="text-gray-700 whitespace-pre-wrap">{quote.conclusion_text}</p>
-        </div>
+        <TextCard label="Avslutning" body={quote.conclusion_text} preserveWhitespace />
       )}
     </>
+  )
+}
+
+function TextCard({
+  label,
+  body,
+  preserveWhitespace,
+}: {
+  label: string
+  body: string
+  preserveWhitespace: boolean
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">{label}</p>
+      <p
+        className={`text-sm text-slate-700 leading-relaxed font-body ${
+          preserveWhitespace ? 'whitespace-pre-wrap' : ''
+        }`}
+      >
+        {body}
+      </p>
+    </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Clock } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { formatDate } from '../helpers'
 import type { Quote } from '../types'
 
@@ -8,62 +8,111 @@ interface QuoteStatusTimelineProps {
   quote: Quote
 }
 
+type StepStatus = 'done' | 'current' | 'upcoming' | 'declined'
+
+interface Step {
+  label: string
+  date: string | null | undefined
+  status: StepStatus
+}
+
+/**
+ * Vertikal status-timeline (samma mönster som ProjectStageModal):
+ *  - Skapad → Skickad → Öppnad → Signerad → Utgår
+ *  - Done-stages: green-check + datum
+ *  - Current: pulsande ring runt teal-cirkel
+ *  - Upcoming: streckad cirkel
+ *  - Declined visas som extra rad i red när det gäller
+ */
 export function QuoteStatusTimeline({ quote }: QuoteStatusTimelineProps) {
-  const steps: Array<{ label: string; date: string | null | undefined; done: boolean; isDeadline?: boolean }> = [
-    { label: 'Skapad', date: quote.created_at, done: true },
-    { label: 'Skickad', date: quote.sent_at, done: !!quote.sent_at },
-    { label: 'Öppnad', date: quote.opened_at, done: !!quote.opened_at },
-    {
-      label: quote.signed_at ? `Signerad av ${quote.signed_by_name}` : 'Signerad',
-      date: quote.signed_at,
-      done: !!quote.signed_at,
-    },
-    { label: 'Utgår', date: quote.valid_until, done: false, isDeadline: true },
-  ]
+  // Bygg steg-listan baserat på quote-status
+  const steps: Step[] = []
+  steps.push({
+    label: 'Skapad',
+    date: quote.created_at,
+    status: 'done',
+  })
+  steps.push({
+    label: 'Skickad',
+    date: quote.sent_at,
+    status: quote.sent_at ? 'done' : quote.status === 'draft' ? 'current' : 'upcoming',
+  })
+  steps.push({
+    label: 'Öppnad',
+    date: quote.opened_at,
+    status: quote.opened_at ? 'done' : quote.status === 'sent' ? 'current' : 'upcoming',
+  })
+  steps.push({
+    label: quote.signed_at ? `Signerad av ${quote.signed_by_name}` : 'Signerad',
+    date: quote.signed_at,
+    status: quote.signed_at ? 'done' : quote.status === 'opened' ? 'current' : 'upcoming',
+  })
+  steps.push({
+    label: 'Utgår',
+    date: quote.valid_until,
+    status: 'upcoming',
+  })
+
+  if (quote.declined_at) {
+    steps.push({ label: 'Nekad', date: quote.declined_at, status: 'declined' })
+  }
 
   return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-      <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <Clock className="w-5 h-5 text-primary-700" />
-        Status
-      </h2>
-      <div className="relative space-y-0">
-        {/* Connector line */}
-        <div className="absolute left-[7px] top-3 bottom-3 w-0.5 bg-gray-200" />
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4">Status-historik</p>
+      <ol className="relative space-y-1">
         {steps.map((step, i) => (
-          <div key={i} className="relative flex items-start gap-3 py-2">
-            <div
-              className={`relative z-10 w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                step.done
-                  ? 'bg-primary-600 border-primary-600'
-                  : step.isDeadline
-                    ? 'bg-white border-gray-300'
-                    : 'bg-white border-gray-300'
-              }`}
-            >
-              {step.done && (
-                <svg className="w-full h-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <span className={`text-sm ${step.done ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>{step.label}</span>
-              {step.date && <span className="text-xs text-gray-400 ml-2">{formatDate(step.date)}</span>}
-              {!step.date && !step.isDeadline && <span className="text-xs text-gray-300 ml-2">—</span>}
-            </div>
-          </div>
+          <TimelineRow key={i} step={step} isLast={i === steps.length - 1} />
         ))}
-        {quote.declined_at && (
-          <div className="relative flex items-start gap-3 py-2">
-            <div className="relative z-10 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-red-500 flex-shrink-0 mt-0.5" />
-            <div>
-              <span className="text-sm text-red-600 font-medium">Nekad</span>
-              <span className="text-xs text-gray-400 ml-2">{formatDate(quote.declined_at)}</span>
-            </div>
+      </ol>
+    </div>
+  )
+}
+
+function TimelineRow({ step, isLast }: { step: Step; isLast: boolean }) {
+  const isDone = step.status === 'done'
+  const isCurrent = step.status === 'current'
+  const isDeclined = step.status === 'declined'
+
+  return (
+    <li className="relative flex items-start gap-3 py-1.5">
+      {/* Connector line under bubble (utom för sista raden) */}
+      {!isLast && <span className="absolute left-[11px] top-7 bottom-0 w-px bg-slate-200" aria-hidden />}
+
+      {/* Marker */}
+      <div className="relative z-10 mt-0.5 flex-shrink-0">
+        {isDone ? (
+          <div className="w-[22px] h-[22px] rounded-full bg-green-600 flex items-center justify-center">
+            <Check className="w-3 h-3 text-white" strokeWidth={3} />
           </div>
+        ) : isCurrent ? (
+          <div className="w-[22px] h-[22px] rounded-full bg-primary-700 ring-4 ring-primary-100 animate-pulse" />
+        ) : isDeclined ? (
+          <div className="w-[22px] h-[22px] rounded-full bg-red-600" />
+        ) : (
+          <div className="w-[22px] h-[22px] rounded-full bg-white border-2 border-dashed border-slate-300" />
         )}
       </div>
-    </div>
+
+      {/* Innehåll */}
+      <div className="flex-1 min-w-0 pt-0.5">
+        <p
+          className={`text-sm ${
+            isDone || isCurrent
+              ? 'text-slate-900 font-medium'
+              : isDeclined
+                ? 'text-red-700 font-semibold'
+                : 'text-slate-500'
+          }`}
+        >
+          {step.label}
+        </p>
+        {step.date ? (
+          <p className="text-xs text-slate-400 mt-0.5 font-mono">{formatDate(step.date)}</p>
+        ) : (
+          <p className="text-xs text-slate-300 mt-0.5">—</p>
+        )}
+      </div>
+    </li>
   )
 }

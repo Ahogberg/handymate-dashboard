@@ -1,6 +1,7 @@
 'use client'
 
-import { AlertTriangle, ClipboardList, CreditCard } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle, ClipboardList, CreditCard, FileText, Plus } from 'lucide-react'
 import { formatCurrency, getUnitLabel } from '../helpers'
 import type { Quote, QuoteItem } from '../types'
 
@@ -9,75 +10,82 @@ interface QuoteSpecificationTableProps {
 }
 
 /**
- * Renderar offertens specifikation (rader/poster) — tre olika varianter:
- * 1. Strukturerade items från quote_items (heading/item/text/subtotal/discount)
- * 2. Legacy items från quote.items[] med type: labor/material/service
+ * Specifikation enligt offert-mall:n (Modern):
+ * - Tabell-header med tunn border-top och uppercase eyebrow-labels
+ * - Höger-justerade tal med tabular-nums
+ * - Subtle zebrar via hover, dividers mellan rader
+ * - ROT/RUT-badges enligt designsystemets pill-mönster
  *
- * Följs av tilläggssektioner: ej inkluderat, ÄTA-villkor, betalningsplan.
- * Specifikationen renderas alltid; tilläggen bara när data finns.
+ * Empty state: "Lägg till första raden →" med länk till edit-vyn.
  */
 export function QuoteSpecificationTable({ quote }: QuoteSpecificationTableProps) {
   const hasStructuredItems = quote.quote_items && quote.quote_items.length > 0
+  const hasLegacyItems = !hasStructuredItems && (quote.items || []).length > 0
+  const isEmpty = !hasStructuredItems && !hasLegacyItems
 
   return (
     <>
       {/* Items */}
-      <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Specifikation</h2>
-        {hasStructuredItems
-          ? renderStructuredItems(quote.quote_items!, quote)
-          : renderLegacyItems(quote.items || [])}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-4">Specifikation</p>
+        {hasStructuredItems ? (
+          renderStructuredItems(quote.quote_items!, quote)
+        ) : hasLegacyItems ? (
+          renderLegacyItems(quote.items || [])
+        ) : (
+          <EmptySpecification quoteId={quote.quote_id} />
+        )}
       </div>
 
       {/* Ej inkluderat */}
       {quote.not_included && (
-        <div className="bg-red-50 rounded-xl border border-red-200 p-4 sm:p-6">
-          <h2 className="font-semibold text-red-800 mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
-            Ej inkluderat
-          </h2>
-          <p className="text-red-700 whitespace-pre-wrap text-sm">{quote.not_included}</p>
-        </div>
+        <InfoCard
+          icon={<AlertTriangle className="w-4 h-4" />}
+          tone="red"
+          label="Ej inkluderat"
+          body={quote.not_included}
+        />
       )}
 
       {/* ÄTA-villkor */}
       {quote.ata_terms && (
-        <div className="bg-amber-50 rounded-xl border border-amber-200 p-4 sm:p-6">
-          <h2 className="font-semibold text-amber-800 mb-3 flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-amber-500" />
-            ÄTA-villkor
-          </h2>
-          <p className="text-amber-700 whitespace-pre-wrap text-sm">{quote.ata_terms}</p>
-        </div>
+        <InfoCard
+          icon={<ClipboardList className="w-4 h-4" />}
+          tone="amber"
+          label="ÄTA-villkor"
+          body={quote.ata_terms}
+        />
       )}
 
       {/* Payment plan */}
       {quote.payment_plan && quote.payment_plan.length > 0 && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-primary-600" />
-            Betalningsplan
-          </h2>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+              <CreditCard className="w-4.5 h-4.5" />
+            </div>
+            <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight">Betalningsplan</h2>
+          </div>
           {quote.payment_terms_text && (
-            <p className="text-gray-500 text-sm mb-4">{quote.payment_terms_text}</p>
+            <p className="text-sm text-slate-500 mb-4 leading-relaxed">{quote.payment_terms_text}</p>
           )}
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-1">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2 pr-4 text-gray-500 font-medium">Delbetaling</th>
-                  <th className="text-right py-2 px-4 text-gray-500 font-medium">Andel</th>
-                  <th className="text-right py-2 px-4 text-gray-500 font-medium">Belopp</th>
-                  <th className="text-left py-2 pl-4 text-gray-500 font-medium">Förfaller</th>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2 pr-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Delbetalning</th>
+                  <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Andel</th>
+                  <th className="text-right py-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Belopp</th>
+                  <th className="text-left py-2 pl-4 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Förfaller</th>
                 </tr>
               </thead>
               <tbody>
                 {quote.payment_plan.map((entry, idx) => (
-                  <tr key={idx} className="border-b border-gray-100 last:border-0">
-                    <td className="py-2.5 pr-4 text-gray-900">{entry.label}</td>
-                    <td className="py-2.5 px-4 text-right text-gray-600">{entry.percent}%</td>
-                    <td className="py-2.5 px-4 text-right text-gray-900 font-medium">{formatCurrency(entry.amount)}</td>
-                    <td className="py-2.5 pl-4 text-gray-500">{entry.due_description}</td>
+                  <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
+                    <td className="py-2.5 pr-4 text-slate-900">{entry.label}</td>
+                    <td className="py-2.5 px-4 text-right tabular-nums text-slate-600">{entry.percent}%</td>
+                    <td className="py-2.5 px-4 text-right tabular-nums font-medium text-slate-900">{formatCurrency(entry.amount)}</td>
+                    <td className="py-2.5 pl-4 text-slate-500">{entry.due_description}</td>
                   </tr>
                 ))}
               </tbody>
@@ -89,20 +97,65 @@ export function QuoteSpecificationTable({ quote }: QuoteSpecificationTableProps)
   )
 }
 
+function EmptySpecification({ quoteId }: { quoteId: string }) {
+  return (
+    <div className="border border-dashed border-slate-200 rounded-xl py-10 px-6 text-center">
+      <FileText className="w-9 h-9 text-slate-300 mx-auto mb-3" strokeWidth={1.5} />
+      <p className="text-sm text-slate-500 mb-3">Inga rader ännu</p>
+      <Link
+        href={`/dashboard/quotes/${quoteId}/edit`}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary-700 hover:text-primary-600"
+      >
+        <Plus className="w-3.5 h-3.5" />
+        Lägg till första raden
+      </Link>
+    </div>
+  )
+}
+
+function InfoCard({
+  icon,
+  tone,
+  label,
+  body,
+}: {
+  icon: React.ReactNode
+  tone: 'red' | 'amber'
+  label: string
+  body: string
+}) {
+  const styles =
+    tone === 'red'
+      ? { wrap: 'bg-red-50 border-red-200', accent: 'text-red-700', body: 'text-red-700' }
+      : { wrap: 'bg-amber-50 border-amber-200', accent: 'text-amber-700', body: 'text-amber-700' }
+
+  return (
+    <div className={`rounded-2xl border p-5 sm:p-6 ${styles.wrap}`}>
+      <p className={`text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-2 ${styles.accent}`}>
+        {icon}
+        {label}
+      </p>
+      <p className={`text-sm whitespace-pre-wrap leading-relaxed font-body ${styles.body}`}>{body}</p>
+    </div>
+  )
+}
+
 function renderStructuredItems(items: QuoteItem[], quote: Quote) {
   const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order)
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {sorted.map(item => {
         switch (item.item_type) {
           case 'heading':
             return (
               <div
                 key={item.id}
-                className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-4 py-2.5 mt-3 first:mt-0"
+                className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5 mt-3 first:mt-0"
               >
-                <p className="font-semibold text-primary-800 text-sm">{item.description}</p>
+                <p className="font-heading font-bold text-sm text-slate-900 tracking-tight uppercase">
+                  {item.description}
+                </p>
               </div>
             )
 
@@ -110,24 +163,24 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
             return (
               <div
                 key={item.id}
-                className="flex justify-between items-center py-2.5 px-2 border-b border-gray-100"
+                className="flex justify-between items-start gap-4 py-3 px-2 border-b border-slate-100 hover:bg-slate-50/40 -mx-2 rounded transition-colors"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-gray-900">{item.description}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm text-slate-900 font-body">{item.description}</p>
                     {item.is_rot_eligible && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700 rounded">
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-green-50 text-green-700 rounded-full uppercase tracking-wider">
                         ROT
                       </span>
                     )}
                     {item.is_rut_eligible && (
-                      <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold bg-purple-100 text-purple-700 rounded">
+                      <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-semibold bg-amber-50 text-amber-700 rounded-full uppercase tracking-wider">
                         RUT
                       </span>
                     )}
                   </div>
                   {(quote.show_quantities !== false || quote.show_unit_prices !== false) && (
-                    <p className="text-sm text-gray-400">
+                    <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
                       {quote.show_quantities !== false && (
                         <>
                           {item.quantity} {getUnitLabel(item.unit)}
@@ -138,7 +191,7 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
                     </p>
                   )}
                 </div>
-                <p className="text-gray-900 font-medium ml-4 whitespace-nowrap">
+                <p className="font-heading text-sm font-semibold text-slate-900 whitespace-nowrap tabular-nums">
                   {formatCurrency(item.total)}
                 </p>
               </div>
@@ -147,7 +200,7 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
           case 'text':
             return (
               <div key={item.id} className="py-2 px-2">
-                <p className="text-gray-500 italic text-sm">{item.description}</p>
+                <p className="text-sm text-slate-500 italic font-body">{item.description}</p>
               </div>
             )
 
@@ -155,10 +208,14 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
             return (
               <div
                 key={item.id}
-                className="flex justify-between items-center py-2.5 px-2 border-t border-gray-300 bg-gray-50 rounded"
+                className="flex justify-between items-center gap-4 py-3 px-3 border-t border-slate-300 bg-slate-50 rounded-lg mt-2"
               >
-                <p className="font-semibold text-gray-900">{item.description || 'Delsumma'}</p>
-                <p className="font-semibold text-gray-900">{formatCurrency(item.total)}</p>
+                <p className="font-heading text-sm font-bold text-slate-900 tracking-tight">
+                  {item.description || 'Delsumma'}
+                </p>
+                <p className="font-heading text-sm font-bold text-slate-900 tabular-nums">
+                  {formatCurrency(item.total)}
+                </p>
               </div>
             )
 
@@ -166,10 +223,12 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
             return (
               <div
                 key={item.id}
-                className="flex justify-between items-center py-2.5 px-2 border-b border-gray-100"
+                className="flex justify-between items-center gap-4 py-3 px-2 border-b border-slate-100"
               >
-                <p className="text-emerald-600">{item.description}</p>
-                <p className="text-emerald-600 font-medium">-{formatCurrency(Math.abs(item.total))}</p>
+                <p className="text-sm text-green-700 font-medium">{item.description}</p>
+                <p className="font-heading text-sm font-semibold text-green-700 tabular-nums">
+                  -{formatCurrency(Math.abs(item.total))}
+                </p>
               </div>
             )
 
@@ -182,70 +241,41 @@ function renderStructuredItems(items: QuoteItem[], quote: Quote) {
 }
 
 function renderLegacyItems(items: any[]) {
+  const groups: Array<{ key: string; label: string; items: any[] }> = [
+    { key: 'labor', label: 'Arbete', items: items.filter((i: any) => i.type === 'labor') },
+    { key: 'material', label: 'Material', items: items.filter((i: any) => i.type === 'material') },
+    { key: 'service', label: 'Tjänster', items: items.filter((i: any) => i.type === 'service') },
+  ]
+
   return (
-    <>
-      {/* Labor */}
-      {items.filter((i: any) => i.type === 'labor').length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-primary-600 mb-2">Arbete</h3>
-          <div className="space-y-2">
-            {items
-              .filter((i: any) => i.type === 'labor')
-              .map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <div>
-                    <p className="text-gray-900">{item.name}</p>
-                    <p className="text-sm text-gray-400">
-                      {item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}
-                    </p>
+    <div className="space-y-5">
+      {groups
+        .filter(g => g.items.length > 0)
+        .map(g => (
+          <div key={g.key}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">{g.label}</h3>
+            <div className="space-y-0.5">
+              {g.items.map((item: any, idx: number) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-start gap-4 py-3 px-2 border-b border-slate-100 hover:bg-slate-50/40 -mx-2 rounded transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-900 font-body">{item.name}</p>
+                    {item.unit_price != null && (
+                      <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
+                        {item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
+                  <p className="font-heading text-sm font-semibold text-slate-900 whitespace-nowrap tabular-nums">
+                    {formatCurrency(item.total)}
+                  </p>
                 </div>
               ))}
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Materials */}
-      {items.filter((i: any) => i.type === 'material').length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-medium text-emerald-600 mb-2">Material</h3>
-          <div className="space-y-2">
-            {items
-              .filter((i: any) => i.type === 'material')
-              .map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <div>
-                    <p className="text-gray-900">{item.name}</p>
-                    <p className="text-sm text-gray-400">
-                      {item.quantity} {getUnitLabel(item.unit)} × {formatCurrency(item.unit_price)}
-                    </p>
-                  </div>
-                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-
-      {/* Services */}
-      {items.filter((i: any) => i.type === 'service').length > 0 && (
-        <div>
-          <h3 className="text-sm font-medium text-amber-400 mb-2">Tjänster</h3>
-          <div className="space-y-2">
-            {items
-              .filter((i: any) => i.type === 'service')
-              .map((item: any, idx: number) => (
-                <div key={idx} className="flex justify-between items-center py-2 border-b border-gray-200">
-                  <div>
-                    <p className="text-gray-900">{item.name}</p>
-                  </div>
-                  <p className="text-gray-900 font-medium">{formatCurrency(item.total)}</p>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
-    </>
+        ))}
+    </div>
   )
 }

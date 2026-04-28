@@ -356,33 +356,28 @@ export default function QuoteDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-sky-700 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   if (!quote) {
     return (
-      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Offerten hittades inte</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-500">Offerten hittades inte</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
-      </div>
-
+    <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
       {toast.show && (
         <div
-          className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
+          className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border text-sm font-medium ${
             toast.type === 'success'
-              ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
-              : 'bg-red-100 border-red-500/30 text-red-600'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-red-50 border-red-200 text-red-700'
           }`}
         >
           {toast.message}
@@ -450,36 +445,36 @@ export default function QuoteDetailPage() {
       {/* Save as Template Modal */}
       {showSaveTemplate && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowSaveTemplate(false)}
         >
           <div
-            className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-md p-6"
+            className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Spara som mall</h3>
-            <div className="mb-4">
-              <label className="block text-sm text-gray-500 mb-1">Mallnamn</label>
+            <h3 className="font-heading text-lg font-bold text-slate-900 mb-4 tracking-tight">Spara som mall</h3>
+            <div className="mb-5">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Mallnamn</label>
               <input
                 type="text"
                 value={templateName}
                 onChange={e => setTemplateName(e.target.value)}
                 placeholder="T.ex. Byte elcentral"
                 autoFocus
-                className="w-full px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
               />
             </div>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowSaveTemplate(false)}
-                className="flex-1 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
+                className="flex-1 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-colors"
               >
                 Avbryt
               </button>
               <button
                 onClick={saveAsTemplate}
                 disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 disabled:opacity-50 rounded-xl text-white text-sm font-semibold transition-colors"
               >
                 {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
               </button>

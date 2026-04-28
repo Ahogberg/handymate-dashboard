@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckCircle, Link2, PenTool } from 'lucide-react'
+import { CheckCircle, Clock, Link2, PenTool } from 'lucide-react'
 import { formatDate } from '../helpers'
 import type { Quote } from '../types'
 
@@ -11,60 +11,88 @@ interface QuoteSignatureCardProps {
 }
 
 /**
- * Visar e-signaturens status som ett av tre kort:
- * 1. Signerat: e-signaturkort + signaturbild
- * 2. Skickat (väntar): signeringslänk-kort med kopiera-knapp
- * 3. Ej skickat: returnerar null (ingenting att visa ännu)
+ * E-signaturens status som ett av tre kort:
+ * 1. Signerad: green-50 bg, check-ikon, datum + namn + signaturbild
+ * 2. Väntar (sent/opened): amber-50 bg, clock-ikon + signeringslänk
+ * 3. Ej skickat (draft): slate-50 bg, "Ej skickat än"
  */
 export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink }: QuoteSignatureCardProps) {
-  return (
-    <>
-      {/* Signature Info */}
-      {quote.signature_data && (
-        <div className="bg-white rounded-xl border border-emerald-200 p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <PenTool className="w-5 h-5 text-emerald-600" />
-            E-signerad
-          </h2>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-gray-900">{quote.signed_by_name}</p>
-              <p className="text-xs text-gray-500">{quote.signed_at && formatDate(quote.signed_at)}</p>
-            </div>
+  // 1. Signerad
+  if (quote.signature_data) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center flex-shrink-0">
+            <CheckCircle className="w-4.5 h-4.5" />
           </div>
-          {quote.signature_data && (
-            <div className="bg-gray-50 rounded-lg p-2">
-              <img src={quote.signature_data} alt="Signatur" className="max-h-16 mx-auto" />
-            </div>
-          )}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wider text-green-700">E-signerad</p>
+            <p className="text-sm font-semibold text-slate-900 truncate">{quote.signed_by_name}</p>
+            {quote.signed_at && (
+              <p className="text-xs text-slate-500 mt-0.5">{formatDate(quote.signed_at)}</p>
+            )}
+          </div>
         </div>
-      )}
+        <div className="bg-white rounded-lg border border-green-200/60 p-3">
+          <img src={quote.signature_data} alt="Signatur" className="max-h-16 mx-auto" />
+        </div>
+      </div>
+    )
+  }
 
-      {/* Signing link */}
-      {quote.sign_token && ['sent', 'opened'].includes(quote.status) && (
-        <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-          <h2 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <Link2 className="w-5 h-5 text-primary-700" />
+  // 2. Väntar (skickad eller öppnad)
+  if (quote.sign_token && ['sent', 'opened'].includes(quote.status)) {
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-9 h-9 rounded-full bg-amber-600 text-white flex items-center justify-center flex-shrink-0">
+            <Clock className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Väntar på signering</p>
+            <p className="text-sm font-semibold text-slate-900">Kunden har inte signerat än</p>
+          </div>
+        </div>
+
+        <div className="mt-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
+            <Link2 className="w-3 h-3" />
             Signeringslänk
-          </h2>
-          <div className="flex items-center gap-2 bg-gray-50 border border-[#E2E8F0] rounded-lg p-2">
-            <span className="text-xs text-gray-500 truncate flex-1">
+          </p>
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
+            <span className="text-xs text-slate-600 truncate flex-1 font-mono">
               {portalUrl
-                ? portalUrl.replace(/^https?:\/\//, '').slice(0, 48) + '...'
-                : `app.handymate.se/quote/${quote.sign_token.slice(0, 8)}...`}
+                ? portalUrl.replace(/^https?:\/\//, '').slice(0, 48) + '…'
+                : `app.handymate.se/quote/${quote.sign_token.slice(0, 8)}…`}
             </span>
             <button
               onClick={onCopySignLink}
-              className="flex-shrink-0 px-2.5 py-1 bg-primary-700 text-white text-xs rounded-md font-medium"
+              className="flex-shrink-0 px-3 py-1 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-md transition-colors"
             >
               Kopiera
             </button>
           </div>
         </div>
-      )}
-    </>
-  )
+      </div>
+    )
+  }
+
+  // 3. Ej skickat än (draft)
+  if (quote.status === 'draft') {
+    return (
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 sm:p-6">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center flex-shrink-0">
+            <PenTool className="w-4.5 h-4.5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Signering</p>
+            <p className="text-sm font-medium text-slate-700">Ej skickat än</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
