@@ -185,7 +185,70 @@ export async function GET(request: NextRequest) {
       project: projectByDealId[d.id] || null,
     }))
 
-    return NextResponse.json({ deals: enrichedDeals })
+    // Hämta även "orphan projects" — aktiva projekt UTAN deal_id (manuellt
+    // skapade eller äldre projekt). De ska också synas i Flödet-vyns
+    // högerpanel även om de inte har en kopplad deal.
+    const { data: orphanProjectsRaw } = await supabase
+      .from('project')
+      .select('project_id, customer_id, name, status, start_date, end_date, progress_percent, budget_amount, current_workflow_stage_id, workflow_stage_entered_at')
+      .eq('business_id', business.business_id)
+      .is('deal_id', null)
+      .in('status', ['active', 'planning', 'in_progress'])
+
+    const orphanProjects = await Promise.all(
+      (orphanProjectsRaw || []).map(async (p: any) => {
+        // Spent (samma logik som deal-projekten)
+        const { data: timeEntries } = await supabase
+          .from('time_entry')
+          .select('duration_minutes, hourly_rate')
+          .eq('project_id', p.project_id)
+        const spent = (timeEntries || []).reduce((s: number, t: any) => {
+          const hours = (t.duration_minutes || 0) / 60
+          return s + hours * (t.hourly_rate || 0)
+        }, 0)
+
+        // Stage-meta
+        let currentStage = null
+        if (p.current_workflow_stage_id) {
+          const { data: stage } = await supabase
+            .from('project_workflow_stages')
+            .select('id, name, color, icon, position')
+            .eq('id', p.current_workflow_stage_id)
+            .maybeSingle()
+          currentStage = stage || null
+        }
+
+        // Hämta kundnamn för UI
+        let customerName: string | null = null
+        if (p.customer_id) {
+          const { data: c } = await supabase
+            .from('customer')
+            .select('name')
+            .eq('customer_id', p.customer_id)
+            .maybeSingle()
+          customerName = c?.name || null
+        }
+
+        return {
+          id: p.project_id,
+          name: p.name,
+          status: p.status,
+          customer_id: p.customer_id,
+          customer_name: customerName,
+          start_date: p.start_date,
+          end_date: p.end_date,
+          progress_percent: p.progress_percent ?? 0,
+          budget_sek: p.budget_amount ?? null,
+          spent_sek: Math.round(spent),
+          current_workflow_stage_id: p.current_workflow_stage_id || null,
+          workflow_stage_entered_at: p.workflow_stage_entered_at || null,
+          current_stage: currentStage,
+          latest_automation: null,
+        }
+      })
+    )
+
+    return NextResponse.json({ deals: enrichedDeals, orphanProjects })
   } catch (error: any) {
     console.error('Get deals error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

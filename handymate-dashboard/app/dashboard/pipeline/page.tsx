@@ -122,6 +122,7 @@ export default function PipelinePage() {
 
   const [stages, setStages] = useState<Stage[]>([])
   const [deals, setDeals] = useState<Deal[]>([])
+  const [orphanProjects, setOrphanProjects] = useState<NonNullable<Deal['project']>[]>([])
   const [stats, setStats] = useState<PipelineStats | null>(null)
   const [aiActivities, setAiActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
@@ -285,14 +286,34 @@ export default function PipelinePage() {
 
   const fetchPipeline = useCallback(async () => {
     try {
-      const res = await fetch(`/api/pipeline?business_id=${business.business_id}`)
-      if (!res.ok) throw new Error('Failed to fetch pipeline')
-      const data = await res.json()
+      // Parallell fetch: `/api/pipeline` ger stages + stats + grupperade deals,
+      // `/api/pipeline/deals` ger samma deals BERIKADE med project (deal.project)
+      // samt orphanProjects (aktiva projekt utan deal_id) — båda används av Flödet.
+      const [pipelineRes, dealsRes] = await Promise.all([
+        fetch(`/api/pipeline?business_id=${business.business_id}`),
+        fetch(`/api/pipeline/deals?business_id=${business.business_id}`),
+      ])
+      if (!pipelineRes.ok) throw new Error('Failed to fetch pipeline')
+      const data = await pipelineRes.json()
       setStages((data.stages || []).sort((a: Stage, b: Stage) => a.sort_order - b.sort_order))
-      const groupedDeals = data.deals || {}
-      const flatDeals: Deal[] = Object.values(groupedDeals).flat() as Deal[]
-      setDeals(flatDeals)
       setStats(data.stats || null)
+
+      // Default: deals från `/api/pipeline` (utan project). Om `/api/pipeline/deals`
+      // svarade OK byter vi mot de berikade dealsen så `deal.project` är satt.
+      let flatDeals: Deal[] = Object.values(data.deals || {}).flat() as Deal[]
+      if (dealsRes.ok) {
+        const dealsData = await dealsRes.json()
+        const enriched: Deal[] = Array.isArray(dealsData.deals) ? dealsData.deals : []
+        if (enriched.length > 0) {
+          // Merge: behåll customer/category från /api/pipeline (kommer inte från
+          // /api/pipeline/deals) men ta project från berikningen.
+          const projectByDealId: Record<string, any> = {}
+          for (const d of enriched) projectByDealId[d.id] = (d as any).project || null
+          flatDeals = flatDeals.map(d => ({ ...d, project: projectByDealId[d.id] || null }))
+        }
+        setOrphanProjects(Array.isArray(dealsData.orphanProjects) ? dealsData.orphanProjects : [])
+      }
+      setDeals(flatDeals)
     } catch {
       showToast('Kunde inte ladda pipeline', 'error')
     }
@@ -1679,6 +1700,7 @@ export default function PipelinePage() {
           {pipelineView === 'flow' ? (
             <FlowPipeline
               deals={filteredDeals}
+              orphanProjects={orphanProjects}
               stages={stages}
               onDealClick={openDealDetail}
               onProjectClick={(projectId) => setOpenProjectStageId(projectId)}

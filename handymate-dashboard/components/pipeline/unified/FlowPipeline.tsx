@@ -24,6 +24,12 @@ import styles from './flow.module.css'
 interface FlowPipelineProps {
   /** Alla deals med berikat project-objekt från /api/pipeline/deals */
   deals: Deal[]
+  /**
+   * Aktiva projekt UTAN deal_id — manuellt skapade eller äldre projekt
+   * som inte gått via "Vunnen offert"-flödet. Visas också i höger panel
+   * tillsammans med deal-kopplade projekt.
+   */
+  orphanProjects?: NonNullable<Deal['project']>[]
   /** Pipeline stages (Ny förfrågan, Kontaktad osv) — säljtrattens kolumner */
   stages: Stage[]
   /** Klick på deal-kort öppnar detail-modalen */
@@ -38,6 +44,7 @@ interface FlowPipelineProps {
 
 export default function FlowPipeline({
   deals,
+  orphanProjects = [],
   stages,
   onDealClick,
   onProjectClick,
@@ -53,12 +60,14 @@ export default function FlowPipeline({
     return deals.filter(d => !lostStageIds.has(d.stage_id))
   }, [deals, stages])
 
-  // Projekt = alla deals med ett kopplat project-objekt (även "Vunnen"-stagade)
+  // Projekt = alla deals med ett kopplat project + alla orphan-projekt utan deal
   const allProjects = useMemo(() => {
-    return deals
-      .map(d => ({ deal: d, project: d.project }))
-      .filter((x): x is { deal: Deal; project: NonNullable<Deal['project']> } => x.project != null)
-  }, [deals])
+    const fromDeals = deals
+      .map(d => ({ deal: d as Deal | null, project: d.project }))
+      .filter((x): x is { deal: Deal | null; project: NonNullable<Deal['project']> } => x.project != null)
+    const fromOrphans = orphanProjects.map(project => ({ deal: null as Deal | null, project }))
+    return [...fromDeals, ...fromOrphans]
+  }, [deals, orphanProjects])
 
   // Stage-filter på höger panel
   const [stageFilter, setStageFilter] = useState<string | null>(null)
@@ -284,7 +293,7 @@ function ProjectExecutionPane({
   onProjectClick,
   density,
 }: {
-  projects: Array<{ deal: Deal; project: NonNullable<Deal['project']> }>
+  projects: Array<{ deal: Deal | null; project: NonNullable<Deal['project']> }>
   allProjectsCount: number
   stageFilter: string | null
   onStageFilter: (id: string | null) => void
@@ -396,13 +405,17 @@ function ProjectRow({
   onClick,
   density,
 }: {
-  deal: Deal
+  /** Null när projektet saknar koppling till en deal (manuellt skapat). */
+  deal: Deal | null
   project: NonNullable<Deal['project']>
   onClick: () => void
   density: 'comfortable' | 'compact'
 }) {
   const [expanded, setExpanded] = useState(false)
-  const cat = categoryMeta(deal.category)
+  const cat = categoryMeta(deal?.category)
+  // Kund-namn: deal.customer.name → project.customer_name (orphan) → fallback
+  const customerName = deal?.customer?.name || (project as any).customer_name || null
+  const category = deal?.category || null
   const currentStage = getStageById(project.current_workflow_stage_id) ||
     (project.current_stage ? FLOW_SYSTEM_STAGES.find(s => s.id === project.current_stage?.id) : undefined) ||
     FLOW_SYSTEM_STAGES[0]
@@ -430,12 +443,12 @@ function ProjectRow({
         <div className={styles.projectInfo}>
           <div className={styles.projectInfoName}>{project.name}</div>
           <div className={styles.projectInfoSub}>
-            {deal.customer?.name && <span>{deal.customer.name}</span>}
-            {deal.category && (
+            {customerName && <span>{customerName}</span>}
+            {category && (
               <>
                 <span className={styles.projectInfoSub + ' sep'} style={{ color: '#94a3b8' }}>·</span>
                 <span className={styles.projectInfoCat} style={{ background: cat.bg, color: cat.color }}>
-                  {cat.icon} {deal.category}
+                  {cat.icon} {category}
                 </span>
               </>
             )}
