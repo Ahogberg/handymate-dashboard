@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { AlertTriangle, ClipboardList, CreditCard, FileText, Plus } from 'lucide-react'
+import { ClipboardList, CreditCard, FileText, MinusCircle, Plus } from 'lucide-react'
 import { formatCurrency, getUnitLabel } from '../helpers'
 import type { Quote, QuoteItem } from '../types'
 
@@ -39,20 +39,18 @@ export function QuoteSpecificationTable({ quote }: QuoteSpecificationTableProps)
 
       {/* Ej inkluderat */}
       {quote.not_included && (
-        <InfoCard
-          icon={<AlertTriangle className="w-4 h-4" />}
-          tone="red"
-          label="Ej inkluderat"
+        <ContentCard
+          icon={<MinusCircle className="w-4.5 h-4.5" />}
+          title="Ej inkluderat"
           body={quote.not_included}
         />
       )}
 
       {/* ÄTA-villkor */}
       {quote.ata_terms && (
-        <InfoCard
-          icon={<ClipboardList className="w-4 h-4" />}
-          tone="amber"
-          label="ÄTA-villkor"
+        <ContentCard
+          icon={<ClipboardList className="w-4.5 h-4.5" />}
+          title="ÄTA-villkor"
           body={quote.ata_terms}
         />
       )}
@@ -113,29 +111,29 @@ function EmptySpecification({ quoteId }: { quoteId: string }) {
   )
 }
 
-function InfoCard({
+/**
+ * Neutralt innehållskort för text-sektioner (Ej inkluderat, ÄTA-villkor).
+ * Tidigare tonad i rött/gult som varningsboxar — vilket gav fel signal till
+ * kunden eftersom innehållet är information, inte fel.
+ */
+function ContentCard({
   icon,
-  tone,
-  label,
+  title,
   body,
 }: {
   icon: React.ReactNode
-  tone: 'red' | 'amber'
-  label: string
+  title: string
   body: string
 }) {
-  const styles =
-    tone === 'red'
-      ? { wrap: 'bg-red-50 border-red-200', accent: 'text-red-700', body: 'text-red-700' }
-      : { wrap: 'bg-amber-50 border-amber-200', accent: 'text-amber-700', body: 'text-amber-700' }
-
   return (
-    <div className={`rounded-2xl border p-5 sm:p-6 ${styles.wrap}`}>
-      <p className={`text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-2 ${styles.accent}`}>
-        {icon}
-        {label}
-      </p>
-      <p className={`text-sm whitespace-pre-wrap leading-relaxed font-body ${styles.body}`}>{body}</p>
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+          {icon}
+        </div>
+        <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight">{title}</h2>
+      </div>
+      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed font-body">{body}</p>
     </div>
   )
 }
