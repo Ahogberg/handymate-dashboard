@@ -211,6 +211,27 @@ export async function PUT(
           }
         }
       } catch { /* non-blocking */ }
+
+      // Project workflow stage advance baserat på milstones-status:
+      //   - första klar (av flera) → ps-04 MILESTONE_REACHED
+      //   - alla klara             → ps-05 FINAL_INSPECTION
+      // Om bara EN milstone finns hoppar vi rakt till ps-05 (delmål-fasen
+      // saknar mening då). advanceProjectStage är idempotent — försöker vi
+      // sätta samma stage som projektet redan är på händer inget.
+      try {
+        const completed = (allMilestones || []).filter((m: any) => m.status === 'completed').length
+        const total = allMilestones?.length || 0
+        if (total > 0) {
+          const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+          if (completed === total) {
+            await advanceProjectStage(params.id, SYSTEM_STAGES.FINAL_INSPECTION, business.business_id)
+          } else if (completed === 1 && total > 1) {
+            await advanceProjectStage(params.id, SYSTEM_STAGES.MILESTONE_REACHED, business.business_id)
+          }
+        }
+      } catch (err) {
+        console.error('[milestones] advanceProjectStage failed:', err)
+      }
     }
 
     return NextResponse.json({ milestone })

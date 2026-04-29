@@ -179,6 +179,31 @@ export async function POST(request: NextRequest) {
       console.error('Dispatch suggestion error (non-blocking):', dispatchErr)
     }
 
+    // Project workflow stage: 'Startmöte bokat' när första bokningen skapas
+    // mot ett projekt där kunden just har signerat kontrakt (stage ps-01).
+    // Booking saknar direkt project_id — vi joinar via customer_id och letar
+    // efter ett projekt i CONTRACT_SIGNED-fasen.
+    if (customer_id) {
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+        const { data: pendingProjects } = await supabase
+          .from('project')
+          .select('project_id, current_workflow_stage_id, created_at')
+          .eq('business_id', business.business_id)
+          .eq('customer_id', customer_id)
+          .eq('current_workflow_stage_id', SYSTEM_STAGES.CONTRACT_SIGNED)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        const project = pendingProjects?.[0]
+        if (project) {
+          await advanceProjectStage(project.project_id, SYSTEM_STAGES.MEETING_BOOKED, business.business_id)
+        }
+      } catch (err) {
+        console.error('[bookings] advanceProjectStage MEETING_BOOKED failed:', err)
+      }
+    }
+
     return NextResponse.json({ booking })
   } catch (error: any) {
     console.error('Create booking error:', error)

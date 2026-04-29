@@ -113,6 +113,20 @@ export async function PATCH(
         })
       } catch { /* non-blocking */ }
 
+      // Project workflow stage: 'Faktura betald' (ps-07)
+      try {
+        const { advanceProjectStage, SYSTEM_STAGES, findProjectForEntity } = await import('@/lib/project-stages/automation-engine')
+        const project = await findProjectForEntity({
+          businessId: business.business_id,
+          invoiceId,
+        })
+        if (project) {
+          await advanceProjectStage(project.project_id, SYSTEM_STAGES.INVOICE_PAID, business.business_id)
+        }
+      } catch (err) {
+        console.error('[invoice status] advanceProjectStage INVOICE_PAID failed:', err)
+      }
+
       // Golden Path: tack-SMS + recensionsförfrågan efter betalning
       try {
         const customerPhone = (invoice as any)?.customer?.phone_number
