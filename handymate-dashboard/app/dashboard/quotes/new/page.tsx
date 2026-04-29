@@ -1,73 +1,49 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import {
-  Sparkles,
-  Loader2,
-  ChevronDown,
-  Camera,
-  Upload,
-  X,
-  Eye,
-  Paperclip,
-  Trash2,
-  Maximize2,
-  Minimize2,
-} from 'lucide-react'
+import { Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
-import Link from 'next/link'
 import ProductSearchModal from '@/components/ProductSearchModal'
-import AddressAutocomplete from '@/components/AddressAutocomplete'
-import { SelectedProduct } from '@/lib/suppliers/types'
-import TemplateSelector from '@/components/quotes/TemplateSelector'
-import QuotePreview from '@/components/quotes/QuotePreview'
+import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
-import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
-import ModernCanvas from '@/components/quotes/editable/ModernCanvas'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
-import ItemRow from '@/components/quotes/ItemRow'
+import { generateItemId, recalculateItems } from '@/lib/quote-calculations'
+import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable'
-import {
-  QuoteItem,
-  PaymentPlanEntry,
-  QuoteStandardText,
-  QuoteTemplate,
-  DetailLevel,
+  type DetailLevel,
+  type PaymentPlanEntry,
+  type QuoteItem,
+  type QuoteStandardText,
+  type QuoteTemplate,
 } from '@/lib/types/quote'
-import {
-  calculateQuoteTotals,
-  generateItemId,
-  createDefaultItem,
-  recalculateItems,
-  calculatePaymentPlan,
-  validatePaymentPlan,
-} from '@/lib/quote-calculations'
-import {
-  SYSTEM_CATEGORIES,
-  getAllCategories,
-  getCategoryRotRut,
-  type CustomCategory,
-} from '@/lib/constants/categories'
 
-// ---------------------------------------------------------------------------
-// Local types
-// ---------------------------------------------------------------------------
+import { useQuoteCalculations } from '../_shared/useQuoteCalculations'
+import { useQuoteItems } from '../_shared/useQuoteItems'
+import { usePriceListLookup } from '../_shared/usePriceListLookup'
+
+// Återanvända komponenter från edit-sprinten
+import { QuoteEditRotSection } from '../[id]/edit/components/QuoteEditRotSection'
+import { QuoteEditStandardTextsSection } from '../[id]/edit/components/QuoteEditStandardTextsSection'
+import { QuoteEditPaymentPlanSection } from '../[id]/edit/components/QuoteEditPaymentPlanSection'
+import { QuoteEditDisplaySettingsSection } from '../[id]/edit/components/QuoteEditDisplaySettingsSection'
+import { QuoteEditTotalsSection } from '../[id]/edit/components/QuoteEditTotalsSection'
+import { QuoteEditMobilePreviewModal } from '../[id]/edit/components/QuoteEditMobilePreviewModal'
+import { QuoteEditSaveTemplateModal } from '../[id]/edit/components/QuoteEditSaveTemplateModal'
+
+// Nya komponenter unika för new-vyn
+import { QuoteNewHeader } from './components/QuoteNewHeader'
+import { QuoteNewAIHelper } from './components/QuoteNewAIHelper'
+import { QuoteNewCustomerSection } from './components/QuoteNewCustomerSection'
+import { QuoteNewItemsSection } from './components/QuoteNewItemsSection'
+import { QuoteNewAttachmentsCard } from './components/QuoteNewAttachmentsCard'
+import { QuoteNewTemplatePanel } from './components/QuoteNewTemplatePanel'
+import { QuoteNewPreviewPanel } from './components/QuoteNewPreviewPanel'
+import { QuoteNewPriceWarningsBanner } from './components/QuoteNewPriceWarningsBanner'
+
+// ─── Types ───────────────────────────────────────────────────────────
 
 interface Customer {
   customer_id: string
@@ -77,14 +53,6 @@ interface Customer {
   address_line: string
   personal_number?: string
   property_designation?: string
-}
-
-interface PriceItem {
-  id: string
-  category: string
-  name: string
-  unit: string
-  unit_price: number
 }
 
 interface PricingSettings {
@@ -100,20 +68,7 @@ interface PricingSettings {
   warranty_years: number
 }
 
-const UNIT_OPTIONS = [
-  { value: 'st', label: 'st' },
-  { value: 'tim', label: 'tim' },
-  { value: 'm', label: 'm' },
-  { value: 'm2', label: 'm²' },
-  { value: 'lm', label: 'lm' },
-  { value: 'kg', label: 'kg' },
-  { value: 'pauschal', label: 'pauschal' },
-]
-
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+// ─── Helpers ─────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('sv-SE', {
@@ -123,7 +78,17 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-/** Convert legacy AI/template items (type: labor/material/service) to new QuoteItem format */
+function normalizeUnit(unit: string): string {
+  const map: Record<string, string> = {
+    hour: 'tim',
+    timmar: 'tim',
+    h: 'tim',
+    piece: 'st',
+    styck: 'st',
+  }
+  return map[unit.toLowerCase()] || unit
+}
+
 function convertLegacyItems(
   legacyItems: Array<{
     id: string
@@ -134,7 +99,7 @@ function convertLegacyItems(
     unit: string
     unit_price: number
     total: number
-  }>
+  }>,
 ): QuoteItem[] {
   return legacyItems.map((item, idx) => ({
     id: generateItemId(),
@@ -150,73 +115,8 @@ function convertLegacyItems(
   }))
 }
 
-/** Normalize legacy unit values to the new set */
-function normalizeUnit(unit: string): string {
-  const map: Record<string, string> = {
-    hour: 'tim',
-    timmar: 'tim',
-    h: 'tim',
-    piece: 'st',
-    styck: 'st',
-  }
-  return map[unit.toLowerCase()] || unit
-}
-
-// ---------------------------------------------------------------------------
-// Standard Text Picker (inline dropdown)
-// ---------------------------------------------------------------------------
-
-function StandardTextPicker({
-  texts,
-  onSelect,
-}: {
-  texts: QuoteStandardText[]
-  onSelect: (content: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  if (texts.length === 0) return null
-
-  return (
-    <div className="relative inline-block">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="text-xs text-sky-700 hover:text-primary-800 transition-colors"
-      >
-        Välj standardtext
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-6 z-20 bg-white border border-[#E2E8F0] rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
-            {texts.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => {
-                  onSelect(t.content)
-                  setOpen(false)
-                }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
-              >
-                <span className="font-medium">{t.name}</span>
-                {t.is_default && (
-                  <span className="ml-1 text-[10px] text-sky-700 bg-primary-50 px-1 rounded">
-                    standard
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN COMPONENT
+// MAIN COMPONENT — orchestrator
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function NewQuotePage() {
@@ -225,18 +125,17 @@ export default function NewQuotePage() {
   const business = useBusiness()
   const toast = useToast()
 
-  // ─── Loading / global state ─────────────────────────────────────────────────
+  // ─── Loading / global state ─────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
-  const [priceList, setPriceList] = useState<PriceItem[]>([])
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
 
-  // ─── Standard texts (loaded from API) ──────────────────────────────────────
+  // ─── Standard texts ────────────────────────────────────────────────
   const [allStandardTexts, setAllStandardTexts] = useState<QuoteStandardText[]>([])
 
-  // ─── AI state ────────────────────────────────────────────────────────────────
+  // ─── AI state ──────────────────────────────────────────────────────
   const [sourceImageBase64, setSourceImageBase64] = useState<string | null>(null)
   const [sourceTranscript, setSourceTranscript] = useState<string | null>(null)
   const [aiGenerated, setAiGenerated] = useState(false)
@@ -247,11 +146,9 @@ export default function NewQuotePage() {
   const [showAiHelper, setShowAiHelper] = useState(false)
   const [aiPriceWarning, setAiPriceWarning] = useState<{ message: string; link: string } | null>(null)
   const [aiPhotoCount, setAiPhotoCount] = useState(0)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
   const MAX_PHOTOS = 5
 
-  // ─── Form state ────────────────────────────────────────────────────────────
+  // ─── Form state ────────────────────────────────────────────────────
   const [selectedCustomer, setSelectedCustomer] = useState<string>('')
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -261,12 +158,16 @@ export default function NewQuotePage() {
 
   // Customer price list info
   const [customerPriceListInfo, setCustomerPriceListInfo] = useState<{
-    name: string; segment?: string; contractType?: string;
-    hourlyRate?: number; materialMarkup?: number; calloutFee?: number;
-    items?: { name: string; unit: string; price: number; category_slug?: string; is_rot_eligible?: boolean; is_rut_eligible?: boolean }[];
+    name: string
+    segment?: string
+    contractType?: string
+    hourlyRate?: number
+    materialMarkup?: number
+    calloutFee?: number
+    items?: { name: string; unit: string; price: number; category_slug?: string; is_rot_eligible?: boolean; is_rut_eligible?: boolean }[]
   } | null>(null)
 
-  // ROT/RUT personal data
+  // ROT/RUT
   const [personnummer, setPersonnummer] = useState('')
   const [fastighetsbeteckning, setFastighetsbeteckning] = useState('')
 
@@ -289,6 +190,7 @@ export default function NewQuotePage() {
   const [detailLevel, setDetailLevel] = useState<DetailLevel>('detailed')
   const [showUnitPrices, setShowUnitPrices] = useState(true)
   const [showQuantities, setShowQuantities] = useState(true)
+  const [showCategorySubtotals, setShowCategorySubtotals] = useState(false)
 
   // Template save modal
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
@@ -296,14 +198,12 @@ export default function NewQuotePage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | undefined>(undefined)
 
-  // Visuell stil — overridar business default per offert. null = använd default.
+  // Visuell stil
   const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
   const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
 
-  // Grossist search modal
+  // Modals & search
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
-
-  // Product search modal
   const [showProductSearch, setShowProductSearch] = useState(false)
   const [productSearchQuery, setProductSearchQuery] = useState('')
   const [productSearchResults, setProductSearchResults] = useState<any[]>([])
@@ -313,37 +213,64 @@ export default function NewQuotePage() {
   const [showStandardTexts, setShowStandardTexts] = useState(false)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
-  const [showCategorySubtotals, setShowCategorySubtotals] = useState(false)
 
-  // Custom categories
-  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([])
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null) // item id for inline creation
+  // Custom categories — inline create
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
   const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
-  // Attachments (documents linked to quote)
+  // Attachments
   const [attachments, setAttachments] = useState<{ name: string; url: string; size?: number }[]>([])
   const [priceWarnings, setPriceWarnings] = useState<Array<{ product_name: string; quote_price: number; normal_price: number; supplier_name: string; difference_pct: number }>>([])
   const [priceAlts, setPriceAlts] = useState<Array<{ product_name: string; cheaper_supplier: string; cheaper_price: number; savings_pct: number }>>([])
   const [uploadingFile, setUploadingFile] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Text section expand states
-  const [expandedTexts, setExpandedTexts] = useState<Record<string, boolean>>({})
-
-  // Advanced row type dropdown
-  const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
-
-  // Template panel in sidebar
+  // Template panel + preview
   const [showTemplatePanel, setShowTemplatePanel] = useState(false)
-
-  // Preview panel in sidebar + mobile modal
-  // Default öppen — mallen är huvudfokuset på sidan
   const [showPreviewPanel, setShowPreviewPanel] = useState(true)
   const [showPreviewModal, setShowPreviewModal] = useState(false)
-  // 'live' = inline-redigerbar React-mall, 'design' = iframe (slutdesign), 'compact' = React-preview
   const [previewMode, setPreviewMode] = useState<'live' | 'design' | 'compact'>('live')
+  const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
+  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ─── Derived: standard texts grouped by type ──────────────────────────────
+  // ─── Shared hooks ──────────────────────────────────────────────────
+  const {
+    priceList,
+    customCategories,
+    hydrated: priceListHydrated,
+  } = usePriceListLookup(business.business_id)
+
+  // Custom categories är lokalt state eftersom vi tillåter inline-skapande;
+  // initieras från hook-resultatet när det finns
+  const [localCustomCategories, setLocalCustomCategories] = useState<CustomCategory[]>([])
+  useEffect(() => {
+    if (priceListHydrated) setLocalCustomCategories(customCategories)
+  }, [priceListHydrated, customCategories])
+
+  const allCategories = useMemo(
+    () => getAllCategories(localCustomCategories),
+    [localCustomCategories],
+  )
+
+  const vatRate = pricingSettings?.vat_rate ?? 25
+  const { recalculated, totals, calculatedPaymentPlan, paymentPlanValid } = useQuoteCalculations(
+    items,
+    discountPercent,
+    vatRate,
+    paymentPlan,
+  )
+
+  const {
+    addItem,
+    updateItem,
+    removeItem,
+    moveItem,
+    dndSensors,
+    handleDragEnd,
+    addFromGrossist,
+    addFromPriceList,
+  } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
+
+  // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
     const map: Record<string, QuoteStandardText[]> = {
       introduction: [],
@@ -353,65 +280,46 @@ export default function NewQuotePage() {
       payment_terms: [],
     }
     for (const t of allStandardTexts) {
-      if (map[t.text_type]) {
-        map[t.text_type].push(t)
-      }
+      if (map[t.text_type]) map[t.text_type].push(t)
     }
     return map
   }, [allStandardTexts])
 
-  // ─── Derived: all categories (system + custom) ───────────────────────────
-  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories])
+  const hasRotItems = items.some(i => i.is_rot_eligible)
+  const hasRutItems = items.some(i => i.is_rut_eligible)
 
-  // Create a custom category inline
+  const selectedCustomerObj = useMemo(
+    () => customers.find(c => c.customer_id === selectedCustomer) || null,
+    [customers, selectedCustomer],
+  )
+
+  // ─── Custom category creation (new-vyn unique) ────────────────────
   async function createCustomCategory(label: string, itemId: string) {
-    const slug = 'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
-    const { data, error } = await supabase.from('custom_quote_categories').insert({
-      business_id: business.business_id,
-      slug,
-      label,
-      rot_eligible: false,
-      rut_eligible: false,
-    }).select('*').single()
+    const slug =
+      'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
+    const { data, error } = await supabase
+      .from('custom_quote_categories')
+      .insert({
+        business_id: business.business_id,
+        slug,
+        label,
+        rot_eligible: false,
+        rut_eligible: false,
+      })
+      .select('*')
+      .single()
     if (error) {
       toast.error('Kunde inte skapa kategori')
       return
     }
-    const newCat: CustomCategory = data as CustomCategory
-    setCustomCategories(prev => [...prev, newCat])
+    const newCat = data as CustomCategory
+    setLocalCustomCategories(prev => [...prev, newCat])
     updateItem(itemId, 'category_slug', newCat.slug)
     setShowNewCategoryInput(null)
     setNewCategoryLabel('')
   }
 
-  // ─── Derived: totals ──────────────────────────────────────────────────────
-  const vatRate = pricingSettings?.vat_rate ?? 25
-  const recalculated = useMemo(() => recalculateItems(items), [items])
-  const totals = useMemo(
-    () => calculateQuoteTotals(recalculated, discountPercent, vatRate),
-    [recalculated, discountPercent, vatRate]
-  )
-
-  // Does any item have ROT or RUT?
-  const hasRotItems = items.some((i) => i.is_rot_eligible)
-  const hasRutItems = items.some((i) => i.is_rut_eligible)
-
-  // Payment plan with amounts
-  const calculatedPaymentPlan = useMemo(
-    () => calculatePaymentPlan(totals.total, paymentPlan),
-    [totals.total, paymentPlan]
-  )
-  const paymentPlanValid = validatePaymentPlan(paymentPlan)
-
-  // ─── Preview data (debounced) ──────────────────────────────────────────────
-  const [debouncedPreviewData, setDebouncedPreviewData] = useState<QuotePreviewData | null>(null)
-  const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const selectedCustomerObj = useMemo(
-    () => customers.find(c => c.customer_id === selectedCustomer) || null,
-    [customers, selectedCustomer]
-  )
-
+  // ─── Debounced QuotePreview data ─────────────────────────────────
   useEffect(() => {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
     previewTimerRef.current = setTimeout(() => {
@@ -435,17 +343,20 @@ export default function NewQuotePage() {
         showUnitPrices,
         showQuantities,
         showCategorySubtotals,
-        customCategories,
+        customCategories: localCustomCategories,
       })
     }, 300)
-    return () => { if (previewTimerRef.current) clearTimeout(previewTimerRef.current) }
-  }, [title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
-      introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
-      referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
-      showCategorySubtotals, customCategories])
+    return () => {
+      if (previewTimerRef.current) clearTimeout(previewTimerRef.current)
+    }
+  }, [
+    title, selectedCustomerObj, validDays, items, discountPercent, vatRate,
+    introductionText, conclusionText, notIncluded, ataTerms, paymentPlan,
+    referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices, showQuantities,
+    showCategorySubtotals, localCustomCategories,
+  ])
 
-  // Payload till TemplatePreviewFrame — matchar samma form som /api/quotes POST-bodyn
-  // så slutdesignen i previewn är identisk med vad mallen renderar i mailet/PDF:en.
+  // ─── TemplatePreviewFrame payload ────────────────────────────────
   const dealIdFromQuery = searchParams?.get('deal_id') || searchParams?.get('lead_id') || null
   const templatePreviewPayload: TemplatePreviewPayload = useMemo(() => {
     const validUntil = new Date()
@@ -496,7 +407,7 @@ export default function NewQuotePage() {
     templateStyle, dealIdFromQuery,
   ])
 
-  // Client-side QuoteTemplateData för live-canvas (samma shape som backend genererar)
+  // ─── Live ModernCanvas data ──────────────────────────────────────
   const liveTemplateData: QuoteTemplateData = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
@@ -505,8 +416,8 @@ export default function NewQuotePage() {
     const subtotalExVat = subtotalRaw - discountAmount
     const vatAmount = subtotalExVat * (vatRate / 100)
     const totalIncVat = subtotalExVat + vatAmount
-
-    const formatDate = (d: Date) => d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
+    const formatDate = (d: Date) =>
+      d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 
     return {
       business: {
@@ -568,16 +479,66 @@ export default function NewQuotePage() {
     }
   }, [business, selectedCustomerObj, title, items, validDays, discountPercent, vatRate, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
+
+  const liveHandlers = useMemo(
+    () => ({
+      onTitleChange: setTitle,
+      onIntroChange: setIntroductionText,
+      onCustomerNameChange: undefined,
+      onPaymentTermsChange: setPaymentTermsText,
+      onItemChange: (idx: number, updated: any) => {
+        const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
+        const target = itemRows[idx]
+        if (!target) return
+        setItems(prev =>
+          prev.map(it =>
+            it.id === target.id
+              ? {
+                  ...it,
+                  description: updated.name,
+                  quantity: updated.quantity,
+                  unit_price: updated.unitPrice,
+                  total: updated.total,
+                }
+              : it,
+          ),
+        )
+      },
+      onItemAdd: () => {
+        const newItem: QuoteItem = {
+          id: 'tmp_' + Math.random().toString(36).slice(2, 10),
+          item_type: 'item',
+          description: '',
+          quantity: 1,
+          unit: 'st',
+          unit_price: 0,
+          total: 0,
+          is_rot_eligible: false,
+          is_rut_eligible: false,
+          sort_order: items.length,
+        }
+        setItems(prev => [...prev, newItem])
+      },
+      onItemRemove: (idx: number) => {
+        const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
+        const target = itemRows[idx]
+        if (!target) return
+        setItems(prev => prev.filter(it => it.id !== target.id))
+      },
+    }),
+    [items],
+  )
+
+  // ═══════════════════════════════════════════════════════════════════
   // Data fetching
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
 
   useEffect(() => {
     if (!business.business_id) return
     fetchData()
     fetchStandardTexts()
 
-    // Check query params
     const transcript = searchParams?.get('transcript')
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
     const prefillTitle = searchParams?.get('title')
@@ -587,50 +548,27 @@ export default function NewQuotePage() {
       setAiTextInput(transcript)
       setShowAiHelper(true)
     }
-    if (customerId) {
-      setSelectedCustomer(customerId)
-    }
-    if (prefillTitle) {
-      setTitle(prefillTitle)
-    }
-
-    // Auto-set reference person from business config
-    if (!referencePerson && business.contact_name) {
-      setReferencePerson(business.contact_name)
-    }
-
-    // Auto-attach documents from deal/lead
-    if (dealId && customerId) {
-      fetchDealDocuments(customerId)
-    }
+    if (customerId) setSelectedCustomer(customerId)
+    if (prefillTitle) setTitle(prefillTitle)
+    if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
+    if (dealId && customerId) fetchDealDocuments(customerId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id])
 
   async function fetchData() {
-    const [customersApiRes, priceListRes, settingsRes, customCatRes] = await Promise.all([
+    const [customersApiRes, settingsRes] = await Promise.all([
       fetch('/api/customers').then(r => r.json()),
-      supabase
-        .from('price_list')
-        .select('*')
-        .eq('business_id', business.business_id)
-        .eq('is_active', true),
       supabase
         .from('business_config')
         .select('pricing_settings, quote_template_style')
         .eq('business_id', business.business_id)
         .single(),
-      supabase
-        .from('custom_quote_categories')
-        .select('*')
-        .eq('business_id', business.business_id)
-        .order('created_at'),
     ])
 
     if (!customersApiRes || customersApiRes.error) {
       console.error('[NewQuote] Kunde inte hämta kunder:', customersApiRes?.error)
     }
     setCustomers(customersApiRes?.customers || [])
-    setPriceList(priceListRes.data || [])
-    setCustomCategories((customCatRes.data as CustomCategory[]) || [])
     const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
     if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {
       setBusinessDefaultStyle(defaultStyle)
@@ -647,7 +585,7 @@ export default function NewQuotePage() {
         rut_percent: 50,
         payment_terms: 30,
         warranty_years: 2,
-      }
+      },
     )
     setLoading(false)
   }
@@ -660,12 +598,11 @@ export default function NewQuotePage() {
       const texts: QuoteStandardText[] = data.texts || []
       setAllStandardTexts(texts)
 
-      // Pre-populate default texts
-      const defaultIntro = texts.find((t) => t.text_type === 'introduction' && t.is_default)
-      const defaultConclusion = texts.find((t) => t.text_type === 'conclusion' && t.is_default)
-      const defaultNotIncluded = texts.find((t) => t.text_type === 'not_included' && t.is_default)
-      const defaultAta = texts.find((t) => t.text_type === 'ata_terms' && t.is_default)
-      const defaultPayment = texts.find((t) => t.text_type === 'payment_terms' && t.is_default)
+      const defaultIntro = texts.find(t => t.text_type === 'introduction' && t.is_default)
+      const defaultConclusion = texts.find(t => t.text_type === 'conclusion' && t.is_default)
+      const defaultNotIncluded = texts.find(t => t.text_type === 'not_included' && t.is_default)
+      const defaultAta = texts.find(t => t.text_type === 'ata_terms' && t.is_default)
+      const defaultPayment = texts.find(t => t.text_type === 'payment_terms' && t.is_default)
 
       if (defaultIntro) setIntroductionText(defaultIntro.content)
       if (defaultConclusion) setConclusionText(defaultConclusion.content)
@@ -673,11 +610,10 @@ export default function NewQuotePage() {
       if (defaultAta) setAtaTerms(defaultAta.content)
       if (defaultPayment) setPaymentTermsText(defaultPayment.content)
     } catch {
-      // silent – standard texts are optional
+      // silent
     }
   }
 
-  // Fetch documents attached to a deal/customer for auto-attach
   async function fetchDealDocuments(customerId: string) {
     try {
       const res = await fetch(`/api/customers/${customerId}/documents`)
@@ -688,15 +624,13 @@ export default function NewQuotePage() {
         url: d.file_url,
         size: d.file_size || 0,
       }))
-      if (docs.length > 0) {
-        setAttachments(docs)
-      }
+      if (docs.length > 0) setAttachments(docs)
     } catch {
-      // silent — documents are optional
+      // silent
     }
   }
 
-  // Upload attachment file
+  // ─── Attachment upload ───────────────────────────────────────────
   async function handleFileUpload(file: File) {
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Filen är för stor (max 10 MB)')
@@ -707,23 +641,16 @@ export default function NewQuotePage() {
       const timestamp = Date.now()
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
       const filePath = `${business.business_id}/quotes/drafts/${timestamp}_${safeName}`
-
       const arrayBuffer = await file.arrayBuffer()
       const { error: uploadError } = await supabase.storage
         .from('customer-documents')
         .upload(filePath, arrayBuffer, { contentType: file.type, upsert: false })
-
       if (uploadError) throw uploadError
-
-      const { data: urlData } = supabase.storage
-        .from('customer-documents')
-        .getPublicUrl(filePath)
-
-      setAttachments(prev => [...prev, {
-        name: file.name,
-        url: urlData.publicUrl,
-        size: file.size,
-      }])
+      const { data: urlData } = supabase.storage.from('customer-documents').getPublicUrl(filePath)
+      setAttachments(prev => [
+        ...prev,
+        { name: file.name, url: urlData.publicUrl, size: file.size },
+      ])
     } catch (err) {
       console.error('Upload failed:', err)
       toast.error('Kunde inte ladda upp filen')
@@ -731,128 +658,141 @@ export default function NewQuotePage() {
     setUploadingFile(false)
   }
 
-  // Supplier price comparison (debounced)
+  // ─── Supplier price comparison (debounced) ───────────────────────
   useEffect(() => {
     const materialItems = items.filter(i => i.item_type === 'item' && i.unit_price > 0)
-    if (materialItems.length === 0) { setPriceWarnings([]); setPriceAlts([]); return }
+    if (materialItems.length === 0) {
+      setPriceWarnings([])
+      setPriceAlts([])
+      return
+    }
     const timer = setTimeout(() => {
       fetch('/api/suppliers/compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: materialItems.map(i => ({ description: i.description, unit_price: i.unit_price, unit: i.unit })) }),
-      }).then(r => r.json()).then(data => {
-        setPriceWarnings(data.warnings || [])
-        setPriceAlts(data.alternatives || [])
-      }).catch(() => {})
+        body: JSON.stringify({
+          items: materialItems.map(i => ({ description: i.description, unit_price: i.unit_price, unit: i.unit })),
+        }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          setPriceWarnings(data.warnings || [])
+          setPriceAlts(data.alternatives || [])
+        })
+        .catch(() => {})
     }, 2000)
     return () => clearTimeout(timer)
   }, [items])
 
-  // Auto-fill personnummer / fastighetsbeteckning + price list when customer selected
+  // ─── Auto-fill personal data + price list on customer change ─────
   useEffect(() => {
     if (!selectedCustomer) {
       setCustomerPriceListInfo(null)
       return
     }
-    const customer = customers.find((c) => c.customer_id === selectedCustomer)
+    const customer = customers.find(c => c.customer_id === selectedCustomer)
     if (!customer) return
 
-    // Sync kör — auto-fill fält direkt
     if (customer.personal_number && !personnummer) setPersonnummer(customer.personal_number)
     if (customer.property_designation && !fastighetsbeteckning)
       setFastighetsbeteckning(customer.property_designation)
-    // Also pre-fill project address from customer address if empty
     if (customer.address_line && !projectAddress) setProjectAddress(customer.address_line)
-    // Pre-fill customer reference from customer name
     if (customer.name && !customerReference) setCustomerReference(customer.name)
 
-    // Fetch customer's price list — direkt koppling ELLER via kundsegment
     ;(async () => {
-    const cust = customer as any
-    let priceListId = cust.price_list_id
+      const cust = customer as any
+      let priceListId = cust.price_list_id
 
-    // Om ingen direkt prislista → sök via kundsegment
-    if (!priceListId && cust.segment_id) {
-      try {
-        const segRes = await supabase
-          .from('price_lists_v2')
-          .select('id')
-          .eq('business_id', business.business_id)
-          .eq('segment_id', cust.segment_id)
-          .limit(1)
-          .maybeSingle()
-        if (segRes.data?.id) priceListId = segRes.data.id
-      } catch { /* non-blocking */ }
-    }
+      if (!priceListId && cust.segment_id) {
+        try {
+          const segRes = await supabase
+            .from('price_lists_v2')
+            .select('id')
+            .eq('business_id', business.business_id)
+            .eq('segment_id', cust.segment_id)
+            .limit(1)
+            .maybeSingle()
+          if (segRes.data?.id) priceListId = segRes.data.id
+        } catch {}
+      }
 
-    // Om fortfarande ingen → sök default-prislista
-    if (!priceListId) {
-      try {
-        const defRes = await supabase
-          .from('price_lists_v2')
-          .select('id')
-          .eq('business_id', business.business_id)
-          .eq('is_default', true)
-          .limit(1)
-          .maybeSingle()
-        if (defRes.data?.id) priceListId = defRes.data.id
-      } catch { /* non-blocking */ }
-    }
+      if (!priceListId) {
+        try {
+          const defRes = await supabase
+            .from('price_lists_v2')
+            .select('id')
+            .eq('business_id', business.business_id)
+            .eq('is_default', true)
+            .limit(1)
+            .maybeSingle()
+          if (defRes.data?.id) priceListId = defRes.data.id
+        } catch {}
+      }
 
-    if (priceListId) {
-      fetch(`/api/pricing/price-lists/${priceListId}`)
-        .then(r => r.json())
-        .then(data => {
-          if (data.priceList) {
-            const pl = data.priceList
-            setCustomerPriceListInfo({
-              name: pl.name,
-              segment: pl.segment?.name,
-              contractType: pl.contract_type?.name,
-              hourlyRate: pl.hourly_rate_normal,
-              materialMarkup: pl.material_markup_pct,
-              calloutFee: pl.callout_fee,
-              items: (pl.items || []).map((it: any) => ({
-                name: it.name,
-                unit: it.unit,
-                price: it.price,
-                category_slug: it.category_slug,
-                is_rot_eligible: it.is_rot_eligible,
-                is_rut_eligible: it.is_rut_eligible,
-              })),
-            })
-
-            // Override pricing settings with customer-specific rates
-            if (pl.hourly_rate_normal || pl.callout_fee) {
-              setPricingSettings(prev => ({
-                ...(prev || { hourly_rate: 650, callout_fee: 495, minimum_hours: 1, vat_rate: 25, rot_enabled: true, rot_percent: 30, rut_enabled: false, rut_percent: 50, payment_terms: 30, warranty_years: 2 }),
-                hourly_rate: pl.hourly_rate_normal || prev?.hourly_rate || 650,
-                callout_fee: pl.callout_fee ?? prev?.callout_fee ?? 495,
-              }))
+      if (priceListId) {
+        fetch(`/api/pricing/price-lists/${priceListId}`)
+          .then(r => r.json())
+          .then(data => {
+            if (data.priceList) {
+              const pl = data.priceList
+              setCustomerPriceListInfo({
+                name: pl.name,
+                segment: pl.segment?.name,
+                contractType: pl.contract_type?.name,
+                hourlyRate: pl.hourly_rate_normal,
+                materialMarkup: pl.material_markup_pct,
+                calloutFee: pl.callout_fee,
+                items: (pl.items || []).map((it: any) => ({
+                  name: it.name,
+                  unit: it.unit,
+                  price: it.price,
+                  category_slug: it.category_slug,
+                  is_rot_eligible: it.is_rot_eligible,
+                  is_rut_eligible: it.is_rut_eligible,
+                })),
+              })
+              if (pl.hourly_rate_normal || pl.callout_fee) {
+                setPricingSettings(prev => ({
+                  ...(prev || {
+                    hourly_rate: 650,
+                    callout_fee: 495,
+                    minimum_hours: 1,
+                    vat_rate: 25,
+                    rot_enabled: true,
+                    rot_percent: 30,
+                    rut_enabled: false,
+                    rut_percent: 50,
+                    payment_terms: 30,
+                    warranty_years: 2,
+                  }),
+                  hourly_rate: pl.hourly_rate_normal || prev?.hourly_rate || 650,
+                  callout_fee: pl.callout_fee ?? prev?.callout_fee ?? 495,
+                }))
+              }
             }
-          }
-        })
-        .catch(() => { /* non-blocking */ })
-    } else {
-      setCustomerPriceListInfo(null)
-    }
+          })
+          .catch(() => {})
+      } else {
+        setCustomerPriceListInfo(null)
+      }
     })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer])
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // AI helpers — photo & text
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
+  // AI helpers
+  // ═══════════════════════════════════════════════════════════════════
 
   function applyAiResult(quote: any) {
     setTitle(quote.jobTitle || '')
     setDescription(quote.jobDescription || '')
     const converted = convertLegacyItems(quote.items || [])
     if (quote.suggestedDeductionType === 'rot') {
-      converted.forEach((item) => {
+      converted.forEach(item => {
         if (item.unit === 'tim') item.is_rot_eligible = true
       })
     } else if (quote.suggestedDeductionType === 'rut') {
-      converted.forEach((item) => {
+      converted.forEach(item => {
         if (item.unit === 'tim') item.is_rut_eligible = true
       })
     }
@@ -869,7 +809,7 @@ export default function NewQuotePage() {
       return
     }
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = e => {
       const dataUrl = e.target?.result as string
       setPhotos(prev => [...prev, dataUrl])
     }
@@ -915,12 +855,10 @@ export default function NewQuotePage() {
   async function generateFromText(text?: string) {
     const inputText = text || aiTextInput
     if (!inputText.trim()) return
-
     setGenerating(true)
     try {
       const body: Record<string, string> = { textDescription: inputText }
       if (sourceImageBase64) body.imageBase64 = sourceImageBase64
-
       const response = await fetch('/api/quotes/ai-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -940,17 +878,15 @@ export default function NewQuotePage() {
     setGenerating(false)
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   // Template handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
 
-  /** Handle new-format template from /api/quote-templates */
   function handleNewTemplateSelect(template: QuoteTemplate) {
     setTitle(template.name)
     setDescription(template.description || '')
     setTemplateId(template.id)
 
-    // Items
     if (template.default_items && template.default_items.length > 0) {
       const cloned: QuoteItem[] = template.default_items.map((item, idx) => ({
         ...item,
@@ -961,20 +897,17 @@ export default function NewQuotePage() {
       setItems(cloned)
     }
 
-    // Payment plan
     if (template.default_payment_plan && template.default_payment_plan.length > 0) {
       setPaymentPlan(template.default_payment_plan)
       setShowPaymentPlan(true)
     }
 
-    // Standard texts
     if (template.introduction_text) setIntroductionText(template.introduction_text)
     if (template.conclusion_text) setConclusionText(template.conclusion_text)
     if (template.not_included) setNotIncluded(template.not_included)
     if (template.ata_terms) setAtaTerms(template.ata_terms)
     if (template.payment_terms_text) setPaymentTermsText(template.payment_terms_text)
 
-    // Display settings
     setDetailLevel(template.detail_level || 'detailed')
     setShowUnitPrices(template.show_unit_prices ?? true)
     setShowQuantities(template.show_quantities ?? true)
@@ -983,9 +916,7 @@ export default function NewQuotePage() {
     toast.success(`Mall "${template.name}" tillämpad`)
   }
 
-  /** Handle legacy template (from existing TemplateSelector) */
   function handleTemplateSelect(template: any) {
-    // Check if this is a new-format template (has default_items array)
     if (template.default_items && Array.isArray(template.default_items) && template.default_items.length > 0) {
       handleNewTemplateSelect(template as QuoteTemplate)
       return
@@ -994,11 +925,9 @@ export default function NewQuotePage() {
     setTitle(template.name)
     setDescription(template.description || '')
 
-    // Use rich items JSONB if available (existing legacy format)
     if (template.items && Array.isArray(template.items) && template.items.length > 0) {
       setItems(convertLegacyItems(template.items))
     } else {
-      // Fallback: old format with estimated_hours + materials array
       const newItems: QuoteItem[] = []
       const hourlyRate = pricingSettings?.hourly_rate || 650
 
@@ -1038,17 +967,15 @@ export default function NewQuotePage() {
     }
 
     if (template.rot_rut_type === 'rot' || template.rot_rut_type === 'rut') {
-      // Mark labor items as eligible
-      setItems((prev) =>
-        prev.map((item) => ({
+      setItems(prev =>
+        prev.map(item => ({
           ...item,
           is_rot_eligible: template.rot_rut_type === 'rot' && item.unit === 'tim',
           is_rut_eligible: template.rot_rut_type === 'rut' && item.unit === 'tim',
-        }))
+        })),
       )
     }
 
-    // Increment usage count (fire-and-forget)
     fetch('/api/quotes/templates', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1059,143 +986,9 @@ export default function NewQuotePage() {
     toast.success(`Mall "${template.name}" tillämpad`)
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Item editor handlers
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const addItem = useCallback(
-    (type: QuoteItem['item_type']) => {
-      const sortOrder = items.length
-      const newItem = createDefaultItem(type, sortOrder)
-      if (type === 'item' && pricingSettings) {
-        newItem.unit_price = 0
-        newItem.quantity = 1
-      }
-      setItems((prev) => [...prev, newItem])
-    },
-    [items.length, pricingSettings]
-  )
-
-  const updateItem = useCallback((id: string, field: keyof QuoteItem, value: any) => {
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item
-        const updated = { ...item, [field]: value }
-        // Recalc line total for normal items and discounts
-        if (updated.item_type === 'item') {
-          updated.total = updated.quantity * updated.unit_price
-        } else if (updated.item_type === 'discount') {
-          updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
-        }
-        // Category auto-detection: set ROT/RUT based on category
-        if (field === 'category_slug' && value) {
-          const catRotRut = getCategoryRotRut(value, customCategories)
-          if (catRotRut.rot) {
-            updated.is_rot_eligible = true
-            updated.is_rut_eligible = false
-            updated.rot_rut_type = 'rot'
-          } else if (catRotRut.rut) {
-            updated.is_rot_eligible = false
-            updated.is_rut_eligible = true
-            updated.rot_rut_type = 'rut'
-          }
-        }
-        // Sync rot_rut_type with boolean flags
-        if (field === 'rot_rut_type') {
-          updated.is_rot_eligible = value === 'rot'
-          updated.is_rut_eligible = value === 'rut'
-        } else if (field === 'is_rot_eligible' && value === true) {
-          updated.is_rut_eligible = false
-          updated.rot_rut_type = 'rot'
-        } else if (field === 'is_rut_eligible' && value === true) {
-          updated.is_rot_eligible = false
-          updated.rot_rut_type = 'rut'
-        } else if ((field === 'is_rot_eligible' || field === 'is_rut_eligible') && value === false) {
-          if (!updated.is_rot_eligible && !updated.is_rut_eligible) {
-            updated.rot_rut_type = null
-          }
-        }
-        return updated
-      })
-    )
-  }, [customCategories])
-
-  const removeItem = useCallback((id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id))
-  }, [])
-
-  const moveItem = useCallback((index: number, direction: 'up' | 'down') => {
-    setItems((prev) => {
-      const newArr = [...prev]
-      const targetIdx = direction === 'up' ? index - 1 : index + 1
-      if (targetIdx < 0 || targetIdx >= newArr.length) return prev
-      ;[newArr[index], newArr[targetIdx]] = [newArr[targetIdx], newArr[index]]
-      return newArr.map((item, i) => ({ ...item, sort_order: i }))
-    })
-  }, [])
-
-  // Drag-and-drop sensors
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
-    useSensor(KeyboardSensor)
-  )
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    setItems((prev) => {
-      const oldIndex = prev.findIndex((i) => i.id === active.id)
-      const newIndex = prev.findIndex((i) => i.id === over.id)
-      if (oldIndex === -1 || newIndex === -1) return prev
-      const newArr = [...prev]
-      const [moved] = newArr.splice(oldIndex, 1)
-      newArr.splice(newIndex, 0, moved)
-      return newArr.map((item, i) => ({ ...item, sort_order: i }))
-    })
-  }, [])
-
-  const addFromGrossist = useCallback((product: SelectedProduct) => {
-    const newItem: QuoteItem = {
-      id: generateItemId(),
-      item_type: 'item',
-      description: product.name,
-      article_number: product.sku,
-      quantity: 1,
-      unit: normalizeUnit(product.unit),
-      unit_price: product.sell_price,
-      cost_price: product.purchase_price,
-      total: product.sell_price,
-      is_rot_eligible: false,
-      is_rut_eligible: false,
-      sort_order: 0,
-    }
-    setItems((prev) => {
-      newItem.sort_order = prev.length
-      return [...prev, newItem]
-    })
-    setShowGrossistSearch(false)
-  }, [])
-
-  const addFromPriceList = useCallback((priceItem: PriceItem) => {
-    const qty = (priceItem as any).default_quantity || 1
-    const newItem: QuoteItem = {
-      id: generateItemId(),
-      item_type: 'item',
-      description: priceItem.name,
-      quantity: qty,
-      unit: normalizeUnit(priceItem.unit),
-      unit_price: priceItem.unit_price,
-      total: priceItem.unit_price * qty,
-      is_rot_eligible: priceItem.category === 'labor',
-      is_rut_eligible: false,
-      sort_order: 0,
-    }
-    setItems((prev) => {
-      newItem.sort_order = prev.length
-      return [...prev, newItem]
-    })
-  }, [])
+  // ═══════════════════════════════════════════════════════════════════
+  // Product search (new-vyn unique)
+  // ═══════════════════════════════════════════════════════════════════
 
   const addFromProduct = useCallback((product: any) => {
     const newItem: QuoteItem = {
@@ -1212,7 +1005,7 @@ export default function NewQuotePage() {
       is_rut_eligible: product.rut_eligible || false,
       sort_order: 0,
     }
-    setItems((prev) => {
+    setItems(prev => {
       newItem.sort_order = prev.length
       return [...prev, newItem]
     })
@@ -1223,7 +1016,6 @@ export default function NewQuotePage() {
   const searchProducts = useCallback(async (query: string) => {
     setProductSearchQuery(query)
     if (!query.trim()) {
-      // Show favorites by default
       setProductSearchLoading(true)
       try {
         const res = await fetch('/api/products?favorites=true')
@@ -1231,8 +1023,10 @@ export default function NewQuotePage() {
           const data = await res.json()
           setProductSearchResults(data.products || [])
         }
-      } catch { /* ignore */ }
-      finally { setProductSearchLoading(false) }
+      } catch {}
+      finally {
+        setProductSearchLoading(false)
+      }
       return
     }
     setProductSearchLoading(true)
@@ -1242,41 +1036,37 @@ export default function NewQuotePage() {
         const data = await res.json()
         setProductSearchResults(data.products || [])
       }
-    } catch { /* ignore */ }
-    finally { setProductSearchLoading(false) }
+    } catch {}
+    finally {
+      setProductSearchLoading(false)
+    }
   }, [])
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   // Payment plan handlers
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
 
   function addPaymentPlanEntry() {
-    setPaymentPlan((prev) => [
-      ...prev,
-      { label: '', percent: 0, amount: 0, due_description: '' },
-    ])
+    setPaymentPlan(prev => [...prev, { label: '', percent: 0, amount: 0, due_description: '' }])
   }
 
   function updatePaymentPlanEntry(index: number, field: keyof PaymentPlanEntry, value: any) {
-    setPaymentPlan((prev) =>
-      prev.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry))
-    )
+    setPaymentPlan(prev => prev.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry)))
   }
 
   function removePaymentPlanEntry(index: number) {
-    setPaymentPlan((prev) => prev.filter((_, i) => i !== index))
+    setPaymentPlan(prev => prev.filter((_, i) => i !== index))
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   // Save
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
 
   const saveQuote = async (send: boolean = false) => {
     if (send && !selectedCustomer) {
       toast.warning('Välj en kund först för att skicka offerten')
       return
     }
-
     if (paymentPlan.length > 0 && !paymentPlanValid) {
       toast.warning('Betalningsplanens procentsatser måste summera till 100%')
       return
@@ -1284,10 +1074,7 @@ export default function NewQuotePage() {
 
     setSaving(true)
     try {
-      const finalItems = recalculateItems(items).map((item, idx) => ({
-        ...item,
-        sort_order: idx,
-      }))
+      const finalItems = recalculateItems(items).map((item, idx) => ({ ...item, sort_order: idx }))
 
       const res = await fetch('/api/quotes', {
         method: 'POST',
@@ -1312,14 +1099,14 @@ export default function NewQuotePage() {
           detail_level: detailLevel,
           show_unit_prices: showUnitPrices,
           show_quantities: showQuantities,
-          personnummer: (hasRotItems || hasRutItems) ? personnummer || null : null,
+          personnummer: hasRotItems || hasRutItems ? personnummer || null : null,
           fastighetsbeteckning: hasRotItems ? fastighetsbeteckning || null : null,
           valid_days: validDays,
           ai_generated: aiGenerated || false,
           ai_confidence: aiConfidence || null,
           source_transcript: sourceTranscript || null,
           template_id: templateId || null,
-          template_style: templateStyle, // null = använd business default
+          template_style: templateStyle,
           attachments: attachments.length > 0 ? attachments : [],
           deal_id: searchParams?.get('deal_id') || searchParams?.get('lead_id') || null,
         }),
@@ -1329,9 +1116,10 @@ export default function NewQuotePage() {
         toast.error(data.error || 'Kunde inte spara offerten')
       } else {
         toast.success(send ? 'Offert sparad — öppnar skicka-vy' : 'Offert sparad som utkast')
-        router.push(send
-          ? `/dashboard/quotes/${data.quote.quote_id}?send=true`
-          : `/dashboard/quotes/${data.quote.quote_id}`
+        router.push(
+          send
+            ? `/dashboard/quotes/${data.quote.quote_id}?send=true`
+            : `/dashboard/quotes/${data.quote.quote_id}`,
         )
       }
     } catch (err) {
@@ -1344,7 +1132,6 @@ export default function NewQuotePage() {
   async function saveAsTemplate() {
     if (!templateName.trim()) return
     setSavingTemplate(true)
-
     try {
       await fetch('/api/quote-templates', {
         method: 'POST',
@@ -1376,9 +1163,9 @@ export default function NewQuotePage() {
     setSavingTemplate(false)
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
   // Render
-  // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════
 
   if (loading) {
     return (
@@ -1391,706 +1178,144 @@ export default function NewQuotePage() {
   return (
     <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-[1600px] mx-auto">
-        {/* ── Header ──────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center">
-            <Link
-              href="/dashboard/quotes"
-              className="text-[13px] text-[#64748B] hover:text-[#1E293B] transition-colors"
-            >
-              ← Offerter
-            </Link>
-            <span className="text-[18px] font-medium text-[#1E293B] ml-3">Ny offert</span>
-            {aiGenerated && (
-              <span className="ml-2.5 text-[11px] bg-[#CCFBF1] text-[#0F766E] px-2.5 py-0.5 rounded-full">
-                AI-genererad{aiConfidence ? ` · ${aiConfidence}% säkerhet` : ''}
-              </span>
-            )}
-            {aiPriceWarning && (
-              <a href={aiPriceWarning.link} className="ml-2 text-[11px] bg-amber-50 text-amber-700 px-2.5 py-0.5 rounded-full hover:bg-amber-100 transition-colors">
-                {aiPriceWarning.message.length > 40 ? 'Priser saknas — uppdatera prislista →' : aiPriceWarning.message}
-              </a>
-            )}
-            {aiPhotoCount > 1 && (
-              <span className="ml-2 text-[11px] text-gray-400">
-                Baserad på {aiPhotoCount} foton
-              </span>
-            )}
-          </div>
-        </div>
+        <QuoteNewHeader
+          aiGenerated={aiGenerated}
+          aiConfidence={aiConfidence}
+          aiPriceWarning={aiPriceWarning}
+          aiPhotoCount={aiPhotoCount}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(540px,40%)] gap-5 items-start">
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* Left Column — Form                                       */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ── Left Column ───────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
-            {/* ── AI-hjälp ──────────────────────────────────────────── */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-5">
-              <button
-                type="button"
-                onClick={() => setShowAiHelper(!showAiHelper)}
-                className="w-full flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#0F766E]" />
-                  <span className="text-[13px] font-medium text-[#1E293B]">AI-hjälp</span>
-                  <span className="text-[11px] text-[#94A3B8]">Fota eller beskriv jobbet</span>
-                </div>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showAiHelper ? 'rotate-180' : ''}`} />
-              </button>
+            <QuoteNewAIHelper
+              open={showAiHelper}
+              setOpen={setShowAiHelper}
+              generating={generating}
+              photos={photos}
+              maxPhotos={MAX_PHOTOS}
+              onPhotoFile={handlePhotoFile}
+              onRemovePhoto={removePhoto}
+              photoDescription={photoDescription}
+              setPhotoDescription={setPhotoDescription}
+              onAnalyzePhoto={analyzePhoto}
+              aiTextInput={aiTextInput}
+              setAiTextInput={setAiTextInput}
+              onGenerateFromText={() => generateFromText()}
+            />
 
-              {showAiHelper && (
-                <div className="mt-4 space-y-4">
-                  {/* Photo capture */}
-                  <div>
-                    <p className="text-[12px] text-[#64748B] mb-2">Fota jobbet — AI analyserar och fyller i rader</p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        ref={cameraInputRef}
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handlePhotoFile(file)
-                        }}
-                      />
-                      <input
-                        ref={photoInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) handlePhotoFile(file)
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => cameraInputRef.current?.click()}
-                        disabled={generating}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
-                      >
-                        <Camera className="w-4 h-4" />
-                        Kamera
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => photoInputRef.current?.click()}
-                        disabled={generating}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
-                      >
-                        <Upload className="w-4 h-4" />
-                        Ladda upp
-                      </button>
-                    </div>
+            <QuoteNewCustomerSection
+              customers={customers}
+              selectedCustomer={selectedCustomer}
+              setSelectedCustomer={setSelectedCustomer}
+              validDays={validDays}
+              setValidDays={setValidDays}
+              title={title}
+              setTitle={setTitle}
+              description={description}
+              setDescription={setDescription}
+              customerPriceListInfo={customerPriceListInfo}
+              items={items}
+              setItems={setItems}
+            />
 
-                    {/* Photo grid */}
-                    {photos.length > 0 && (
-                      <div className="mt-3 space-y-3">
-                        <div className="grid grid-cols-5 gap-2">
-                          {photos.map((photo, i) => (
-                            <div key={i} className="relative aspect-square rounded-lg overflow-hidden border-thin border-[#E2E8F0]">
-                              <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-                              <button
-                                type="button"
-                                onClick={() => removePhoto(i)}
-                                className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70"
-                              >
-                                <X className="w-3 h-3 text-white" />
-                              </button>
-                            </div>
-                          ))}
-                          {photos.length < MAX_PHOTOS && (
-                            <label className="aspect-square border-thin border-dashed border-[#CBD5E1] rounded-lg flex items-center justify-center cursor-pointer hover:border-[#0F766E] transition-colors text-[#CBD5E1] hover:text-[#0F766E] text-xl">
-                              +
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePhotoFile(f); e.target.value = '' }} />
-                            </label>
-                          )}
-                        </div>
-                        <textarea
-                          value={photoDescription}
-                          onChange={e => setPhotoDescription(e.target.value)}
-                          placeholder="Beskriv jobbet (valfritt) — t.ex. mått, materialönskemål, speciella förutsättningar"
-                          rows={2}
-                          className="w-full px-3 py-2 text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-y"
-                        />
-                        <button
-                          type="button"
-                          onClick={analyzePhoto}
-                          disabled={generating}
-                          className="flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
-                        >
-                          {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                          {generating ? 'Analyserar...' : `Analysera ${photos.length} foto${photos.length > 1 ? 'n' : ''}`}
-                        </button>
-                      </div>
-                    )}
-                  </div>
+            <QuoteNewItemsSection
+              items={items}
+              recalculated={recalculated}
+              allCategories={allCategories}
+              customCategories={localCustomCategories}
+              priceList={priceList}
+              dndSensors={dndSensors}
+              onDragEnd={handleDragEnd}
+              onAddItem={addItem}
+              onUpdateItem={updateItem}
+              onRemoveItem={removeItem}
+              onMoveItem={moveItem}
+              onAddFromPriceList={addFromPriceList}
+              onOpenGrossistSearch={() => setShowGrossistSearch(true)}
+              onOpenProductSearch={() => {
+                setShowProductSearch(true)
+                searchProducts('')
+              }}
+              onCreateCategory={createCustomCategory}
+              showNewCategoryInput={showNewCategoryInput}
+              setShowNewCategoryInput={setShowNewCategoryInput}
+              newCategoryLabel={newCategoryLabel}
+              setNewCategoryLabel={setNewCategoryLabel}
+            />
 
-                  {/* Divider */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-px bg-[#E2E8F0]" />
-                    <span className="text-[11px] text-[#CBD5E1]">eller</span>
-                    <div className="flex-1 h-px bg-[#E2E8F0]" />
-                  </div>
+            <QuoteEditRotSection
+              items={items}
+              setItems={setItems}
+              hasRotItems={hasRotItems}
+              personnummer={personnummer}
+              setPersonnummer={setPersonnummer}
+              fastighetsbeteckning={fastighetsbeteckning}
+              setFastighetsbeteckning={setFastighetsbeteckning}
+            />
 
-                  {/* Text description */}
-                  <div>
-                    <p className="text-[12px] text-[#64748B] mb-1">Beskriv jobbet — AI genererar offertrader</p>
-                    <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-3 py-2 mb-2">
-                      <p className="text-[11px] text-primary-700 font-medium mb-1">Tips för bästa resultat:</p>
-                      <ul className="text-[11px] text-primary-700 space-y-0.5 list-disc list-inside">
-                        <li>Ange rum/plats (kök, badrum, fasad)</li>
-                        <li>Beskriv yta eller antal (15 m², 3 uttag)</li>
-                        <li>Nämn material om du vet (klinker, gips, LED)</li>
-                        <li>Beskriv vad som ska göras (byta, installera, renovera)</li>
-                      </ul>
-                    </div>
-                    <textarea
-                      value={aiTextInput}
-                      onChange={(e) => setAiTextInput(e.target.value)}
-                      placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
-                      rows={3}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 resize-y"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => generateFromText()}
-                      disabled={generating || !aiTextInput.trim()}
-                      className="mt-2 flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
-                    >
-                      {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                      {generating ? 'Genererar...' : 'Generera offertförslag'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            <QuoteEditStandardTextsSection
+              open={showStandardTexts}
+              setOpen={setShowStandardTexts}
+              textsByType={textsByType}
+              referencePerson={referencePerson}
+              setReferencePerson={setReferencePerson}
+              customerReference={customerReference}
+              setCustomerReference={setCustomerReference}
+              projectAddress={projectAddress}
+              setProjectAddress={setProjectAddress}
+              introductionText={introductionText}
+              setIntroductionText={setIntroductionText}
+              conclusionText={conclusionText}
+              setConclusionText={setConclusionText}
+              notIncluded={notIncluded}
+              setNotIncluded={setNotIncluded}
+              ataTerms={ataTerms}
+              setAtaTerms={setAtaTerms}
+              paymentTermsText={paymentTermsText}
+              setPaymentTermsText={setPaymentTermsText}
+            />
 
-            {/* ── Kund ──────────────────────────────────────────────── */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Kund</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="block text-[12px] text-[#64748B] mb-1">Kund *</label>
-                  <select
-                    value={selectedCustomer}
-                    onChange={(e) => setSelectedCustomer(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 appearance-auto"
-                  >
-                    <option value="">Välj kund...</option>
-                    {customers.map((c) => (
-                      <option key={c.customer_id} value={c.customer_id}>
-                        {c.name} — {c.phone_number}
-                      </option>
-                    ))}
-                  </select>
-                  {customerPriceListInfo && (
-                    <div className="mt-2 bg-primary-50 border border-[#E2E8F0] rounded-lg p-2.5 space-y-1.5">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-primary-700">📋</span>
-                        <span className="text-primary-800">
-                          Prislista: <strong>{customerPriceListInfo.name}</strong>
-                          {customerPriceListInfo.segment && ` · ${customerPriceListInfo.segment}`}
-                          {customerPriceListInfo.contractType && ` · ${customerPriceListInfo.contractType}`}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-[11px] text-primary-700">
-                        {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate} kr</span> : null}
-                        {customerPriceListInfo.materialMarkup ? <span>Materialpåslag: {customerPriceListInfo.materialMarkup}%</span> : null}
-                        {customerPriceListInfo.calloutFee ? <span>Utryckningsavgift: {customerPriceListInfo.calloutFee} kr</span> : null}
-                      </div>
-                      {customerPriceListInfo.items && customerPriceListInfo.items.length > 0 && items.length === 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newItems = customerPriceListInfo.items!.map((plItem, idx) => ({
-                              ...createDefaultItem('item', idx),
-                              description: plItem.name,
-                              unit: plItem.unit || 'st',
-                              unit_price: plItem.price,
-                              quantity: 1,
-                              total: plItem.price,
-                              category_slug: plItem.category_slug || undefined,
-                              is_rot_eligible: plItem.is_rot_eligible || false,
-                              is_rut_eligible: plItem.is_rut_eligible || false,
-                            }))
-                            setItems(newItems as any)
-                          }}
-                          className="text-[11px] text-primary-700 hover:text-primary-800 font-medium underline underline-offset-2"
-                        >
-                          Lägg till {customerPriceListInfo.items.length} poster från prislistan
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-[12px] text-[#64748B] mb-1">Giltighetstid</label>
-                  <select
-                    value={validDays}
-                    onChange={(e) => setValidDays(parseInt(e.target.value))}
-                    className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value={14}>14 dagar</option>
-                    <option value={30}>30 dagar</option>
-                    <option value={60}>60 dagar</option>
-                    <option value={90}>90 dagar</option>
-                  </select>
-                </div>
-              </div>
-              <div className="mb-3">
-                <label className="block text-[12px] text-[#64748B] mb-1">Titel</label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="T.ex. Elinstallation kök"
-                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] text-[#64748B] mb-1">
-                  Beskrivning <span className="text-[11px] text-[#CBD5E1]">(valfri)</span>
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Kort beskrivning av jobbet..."
-                  rows={2}
-                  className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y"
-                />
-              </div>
-            </div>
+            <QuoteNewAttachmentsCard
+              attachments={attachments}
+              setAttachments={setAttachments}
+              uploadingFile={uploadingFile}
+              onFileUpload={handleFileUpload}
+            />
 
-            {/* ── Offertrader ────────────────────────────────────────── */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Offertrader</div>
+            <QuoteEditPaymentPlanSection
+              open={showPaymentPlan}
+              setOpen={setShowPaymentPlan}
+              paymentPlan={paymentPlan}
+              calculatedPaymentPlan={calculatedPaymentPlan}
+              paymentPlanValid={paymentPlanValid}
+              onAddEntry={addPaymentPlanEntry}
+              onUpdateEntry={updatePaymentPlanEntry}
+              onRemoveEntry={removePaymentPlanEntry}
+              formatCurrency={formatCurrency}
+            />
 
-              {/* Table header (desktop) */}
-              {items.length > 0 && (
-                <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 px-2 pb-2 border-b border-gray-200 mb-1">
-                  <span />
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Typ</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500">Beskrivning</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Antal</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Enhet</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-right">Pris</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-right">Summa</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">Kategori</span>
-                  <span className="text-[10px] font-medium tracking-wider uppercase text-gray-500 text-center">ROT</span>
-                  <span />
-                </div>
-              )}
-
-              {items.length === 0 ? (
-                <div className="text-center py-8 text-[#CBD5E1] text-[13px]">
-                  <p>Inga rader ännu. Lägg till poster nedan eller använd AI-hjälp.</p>
-                </div>
-              ) : (
-                <DndContext sensors={dndSensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-1">
-                      {items.map((item, index) => (
-                        <ItemRow
-                          key={item.id}
-                          item={item}
-                          index={index}
-                          total={items.length}
-                          recalculatedTotal={recalculated[index]?.total ?? item.total}
-                          onUpdate={updateItem}
-                          onRemove={removeItem}
-                          onMove={moveItem}
-                          allCategories={allCategories}
-                          onCreateCategory={createCustomCategory}
-                          showNewCategoryInput={showNewCategoryInput}
-                          setShowNewCategoryInput={setShowNewCategoryInput}
-                          newCategoryLabel={newCategoryLabel}
-                          setNewCategoryLabel={setNewCategoryLabel}
-                        />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-              )}
-
-              {/* Add row button */}
-              <div className="flex items-center gap-4 pt-2.5">
-                <button
-                  onClick={() => addItem('item')}
-                  className="flex items-center gap-2 text-[13px] text-[#0F766E] bg-transparent border-none cursor-pointer"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#0F766E" strokeWidth="1"/><path d="M8 5v6M5 8h6" stroke="#0F766E" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                  Lägg till rad
-                </button>
-
-                <button
-                  onClick={() => { setShowProductSearch(true); searchProducts('') }}
-                  className="flex items-center gap-1.5 text-[13px] text-[#64748B] hover:text-[#0F766E] transition-colors bg-transparent border-none cursor-pointer"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                  Sök produkt
-                </button>
-
-                {/* Advanced types dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowAdvancedTypes(!showAdvancedTypes)}
-                    className="text-[12px] text-[#94A3B8] hover:text-[#64748B] transition-colors"
-                  >
-                    Fler alternativ ▾
-                  </button>
-                  {showAdvancedTypes && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setShowAdvancedTypes(false)} />
-                      <div className="absolute left-0 top-6 z-20 bg-white border-thin border-[#E2E8F0] rounded-lg shadow-lg w-44 overflow-hidden">
-                        <button onClick={() => { addItem('heading'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Rubrik</button>
-                        <button onClick={() => { addItem('text'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Fritext</button>
-                        <button onClick={() => { addItem('subtotal'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Delsumma</button>
-                        <button onClick={() => { addItem('discount'); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Rabatt</button>
-                        <button onClick={() => { setShowGrossistSearch(true); setShowAdvancedTypes(false) }} className="w-full text-left px-3 py-2 text-[13px] text-[#1E293B] hover:bg-[#F8FAFC]">Sök grossist</button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick add from price list */}
-              {priceList.length > 0 ? (
-                <div className="mt-4 pt-4 border-t border-thin border-[#E2E8F0]">
-                  <p className="text-[12px] text-[#CBD5E1] mb-2">Snabbval från prislista:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {priceList.slice(0, 8).map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => addFromPriceList(item)}
-                        className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#64748B] text-[12px] hover:border-[#0F766E] hover:text-[#0F766E] bg-transparent transition-colors"
-                      >
-                        {item.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 pt-4 border-t border-thin border-[#E2E8F0]">
-                  <p className="text-[12px] text-[#94A3B8]">Du har inga sparade artiklar än.</p>
-                  <a href="/dashboard/settings/my-prices" target="_blank" rel="noopener"
-                    className="text-[12px] text-[#0F766E] hover:underline mt-1 inline-block">
-                    + Bygg din prislista →
-                  </a>
-                  <p className="text-[10px] text-[#CBD5E1] mt-0.5">Öppnas i ny flik</p>
-                </div>
-              )}
-            </div>
-
-            {/* ── ROT-avdrag ────────────────────────────────────────── */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-              <div
-                className="flex items-center justify-between cursor-pointer"
-                onClick={() => {
-                  // Toggle ROT: if any items are ROT-eligible, turn all off; otherwise turn labor items on
-                  if (hasRotItems) {
-                    setItems(prev => prev.map(item => ({ ...item, is_rot_eligible: false })))
-                  } else {
-                    setItems(prev => prev.map(item => ({
-                      ...item,
-                      is_rot_eligible: item.item_type === 'item' && item.unit === 'tim',
-                    })))
-                  }
-                }}
-              >
-                <span className="text-[13px] text-[#1E293B]">ROT-avdrag</span>
-                <div className={`w-9 h-5 rounded-full relative transition-colors ${hasRotItems ? 'bg-[#0F766E]' : 'bg-[#CBD5E1]'}`}>
-                  <div className={`absolute w-3.5 h-3.5 bg-white rounded-full top-[3px] transition-all ${hasRotItems ? 'left-[19px]' : 'left-[3px]'}`} />
-                </div>
-              </div>
-              {hasRotItems && (
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[12px] text-[#64748B] mb-1">Personnummer</label>
-                    <input
-                      type="text"
-                      value={personnummer}
-                      onChange={(e) => setPersonnummer(e.target.value)}
-                      placeholder="YYYYMMDD-XXXX"
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] text-[#64748B] mb-1">Fastighetsbeteckning</label>
-                    <input
-                      type="text"
-                      value={fastighetsbeteckning}
-                      onChange={(e) => setFastighetsbeteckning(e.target.value)}
-                      placeholder="T.ex. Stockholm Söder 1:23"
-                      className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                    />
-                  </div>
-                  <p className="text-[12px] text-[#0F766E] sm:col-span-2">
-                    Kunden betalar 70% — Skatteverket betalar resterande 30% direkt till dig.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* ── Collapsible sections ─────────────────────────────── */}
-
-            {/* References */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
-              <button
-                type="button"
-                onClick={() => setShowStandardTexts(!showStandardTexts)}
-                className="w-full flex items-center justify-between px-7 py-4 text-left"
-              >
-                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Referenser och texter</span>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showStandardTexts ? 'rotate-180' : ''}`} />
-              </button>
-              {showStandardTexts && (
-                <div className="px-7 pb-6 space-y-4">
-                  {/* Reference fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[12px] text-[#64748B] mb-1">Er referens</label>
-                      <input
-                        type="text"
-                        value={referencePerson}
-                        onChange={(e) => setReferencePerson(e.target.value)}
-                        placeholder="Namn"
-                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] text-[#64748B] mb-1">Kundens referens</label>
-                      <input
-                        type="text"
-                        value={customerReference}
-                        onChange={(e) => setCustomerReference(e.target.value)}
-                        placeholder="Referensnummer"
-                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] text-[#64748B] mb-1">Arbetsplatsadress</label>
-                      <AddressAutocomplete
-                        value={projectAddress}
-                        onChange={setProjectAddress}
-                        onSelect={(r) => setProjectAddress(r.full_address)}
-                        placeholder="Sök adress..."
-                        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Standard texts */}
-                  <div className="border-t border-thin border-[#E2E8F0] pt-4 space-y-3">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[12px] text-[#64748B]">Inledningstext</label>
-                        <StandardTextPicker texts={textsByType.introduction} onSelect={setIntroductionText} />
-                      </div>
-                      <textarea value={introductionText} onChange={(e) => setIntroductionText(e.target.value)} placeholder="Hälsningsfras och inledning..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[12px] text-[#64748B]">Avslutningstext</label>
-                        <StandardTextPicker texts={textsByType.conclusion} onSelect={setConclusionText} />
-                      </div>
-                      <textarea value={conclusionText} onChange={(e) => setConclusionText(e.target.value)} placeholder="Avslutande text..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[12px] text-[#64748B]">Ej inkluderat</label>
-                        <StandardTextPicker texts={textsByType.not_included} onSelect={setNotIncluded} />
-                      </div>
-                      <textarea value={notIncluded} onChange={(e) => setNotIncluded(e.target.value)} placeholder="Vad ingår inte..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[12px] text-[#64748B]">ÄTA-villkor</label>
-                        <StandardTextPicker texts={textsByType.ata_terms} onSelect={setAtaTerms} />
-                      </div>
-                      <textarea value={ataTerms} onChange={(e) => setAtaTerms(e.target.value)} placeholder="Ändrings- och tilläggsarbeten..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[12px] text-[#64748B]">Betalningsvillkor</label>
-                        <StandardTextPicker texts={textsByType.payment_terms} onSelect={setPaymentTermsText} />
-                      </div>
-                      <textarea value={paymentTermsText} onChange={(e) => setPaymentTermsText(e.target.value)} placeholder="Betalningsvillkor..." rows={2} className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y" />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* ── Bifogade dokument ─────────────────────────────── */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Bifogade dokument</div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingFile}
-                  className="flex items-center gap-1.5 text-[12px] text-[#0F766E] hover:text-primary-800 disabled:opacity-50"
-                >
-                  {uploadingFile ? <Loader2 className="w-3 h-3 animate-spin" /> : <Paperclip className="w-3 h-3" />}
-                  Bifoga fil
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0]
-                    if (file) handleFileUpload(file)
-                    e.target.value = ''
-                  }}
-                />
-              </div>
-              {attachments.length === 0 ? (
-                <p className="text-[12px] text-gray-400">Inga bifogade filer</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {attachments.map((att, i) => (
-                    <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="text-[12px] text-primary-700 hover:underline truncate">
-                          {att.name}
-                        </a>
-                        {att.size ? <span className="text-[10px] text-gray-400 shrink-0">{(att.size / 1024).toFixed(0)} KB</span> : null}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setAttachments(prev => prev.filter((_, idx) => idx !== i))}
-                        className="p-1 text-gray-400 hover:text-red-500"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Payment Plan */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
-              <button
-                type="button"
-                onClick={() => setShowPaymentPlan(!showPaymentPlan)}
-                className="w-full flex items-center justify-between px-7 py-4 text-left"
-              >
-                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">
-                  Betalningsplan
-                  {paymentPlan.length > 0 && ` (${paymentPlan.length})`}
-                </span>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showPaymentPlan ? 'rotate-180' : ''}`} />
-              </button>
-              {showPaymentPlan && (
-                <div className="px-7 pb-6">
-                  {paymentPlan.length === 0 ? (
-                    <p className="text-[12px] text-[#94A3B8] mb-3">Ingen betalningsplan. Lägg till delbetalningar nedan.</p>
-                  ) : (
-                    <div className="space-y-3 mb-4">
-                      {calculatedPaymentPlan.map((entry, idx) => (
-                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_80px_100px_1fr_32px] gap-2 items-center bg-[#F8FAFC] rounded-lg p-3">
-                          <input type="text" value={entry.label} onChange={(e) => updatePaymentPlanEntry(idx, 'label', e.target.value)} placeholder="T.ex. Vid start" className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] bg-white focus:outline-none focus:border-[#0F766E]" />
-                          <div className="flex items-center gap-1">
-                            <input type="number" value={entry.percent} onChange={(e) => updatePaymentPlanEntry(idx, 'percent', parseFloat(e.target.value) || 0)} className="w-full px-2 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] text-right bg-white focus:outline-none focus:border-[#0F766E]" />
-                            <span className="text-[#94A3B8] text-[13px]">%</span>
-                          </div>
-                          <span className="text-[13px] text-[#1E293B] font-medium text-right">{formatCurrency(entry.amount)}</span>
-                          <input type="text" value={entry.due_description} onChange={(e) => updatePaymentPlanEntry(idx, 'due_description', e.target.value)} placeholder="Förfallodatum/villkor" className="px-3 py-1.5 border-thin border-[#E2E8F0] rounded-lg text-[#1E293B] text-[13px] bg-white focus:outline-none focus:border-[#0F766E]" />
-                          <button onClick={() => removePaymentPlanEntry(idx)} className="w-7 h-7 border-thin border-[#E2E8F0] rounded-md bg-transparent text-[#CBD5E1] hover:text-red-500 flex items-center justify-center text-[16px]">×</button>
-                        </div>
-                      ))}
-                      {!paymentPlanValid && (
-                        <p className="text-[12px] text-red-500">
-                          Procentsatserna summerar till {paymentPlan.reduce((s, e) => s + e.percent, 0).toFixed(0)}% (ska vara 100%)
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <button
-                    onClick={addPaymentPlanEntry}
-                    className="flex items-center gap-2 text-[13px] text-[#0F766E] bg-transparent border-none cursor-pointer"
-                  >
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#0F766E" strokeWidth="1"/><path d="M8 5v6M5 8h6" stroke="#0F766E" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                    Lägg till delbetalning
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Display Settings */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
-              <button
-                type="button"
-                onClick={() => setShowDisplaySettings(!showDisplaySettings)}
-                className="w-full flex items-center justify-between px-7 py-4 text-left"
-              >
-                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Visningsinställningar</span>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showDisplaySettings ? 'rotate-180' : ''}`} />
-              </button>
-              {showDisplaySettings && (
-                <div className="px-7 pb-6 space-y-4">
-                  <div>
-                    <label className="block text-[12px] text-[#64748B] mb-1">Detaljnivå</label>
-                    <select
-                      value={detailLevel}
-                      onChange={(e) => setDetailLevel(e.target.value as DetailLevel)}
-                      className="w-full sm:w-64 px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-                    >
-                      <option value="detailed">Detaljerad (alla rader)</option>
-                      <option value="subtotals_only">Endast delsummor</option>
-                      <option value="total_only">Endast totalsumma</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-wrap gap-6">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={showUnitPrices} onChange={(e) => setShowUnitPrices(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
-                      <span className="text-[13px] text-[#64748B]">Visa à-priser</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={showQuantities} onChange={(e) => setShowQuantities(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
-                      <span className="text-[13px] text-[#64748B]">Visa antal</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={showCategorySubtotals} onChange={(e) => setShowCategorySubtotals(e.target.checked)} className="w-4 h-4 rounded border-[#E2E8F0] text-[#0F766E] focus:ring-[#0F766E]" />
-                      <span className="text-[13px] text-[#64748B]">Visa delsummor per kategori</span>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
+            <QuoteEditDisplaySettingsSection
+              open={showDisplaySettings}
+              setOpen={setShowDisplaySettings}
+              detailLevel={detailLevel}
+              setDetailLevel={setDetailLevel}
+              showUnitPrices={showUnitPrices}
+              setShowUnitPrices={setShowUnitPrices}
+              showQuantities={showQuantities}
+              setShowQuantities={setShowQuantities}
+              showCategorySubtotals={showCategorySubtotals}
+              setShowCategorySubtotals={setShowCategorySubtotals}
+            />
           </div>
 
-          {/* ══════════════════════════════════════════════════════════ */}
-          {/* Right Column — Live mall + verktyg                       */}
-          {/* ══════════════════════════════════════════════════════════ */}
+          {/* ── Right Column ──────────────────────────────────────── */}
           <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-1">
-            {/* Template panel */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
-              <button
-                type="button"
-                onClick={() => setShowTemplatePanel(!showTemplatePanel)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left"
-              >
-                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Mallar</span>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showTemplatePanel ? 'rotate-180' : ''}`} />
-              </button>
-              {showTemplatePanel && (
-                <div className="px-2 pb-3">
-                  <TemplateSelector
-                    onSelect={handleTemplateSelect}
-                    onBack={() => setShowTemplatePanel(false)}
-                  />
-                </div>
-              )}
-            </div>
+            <QuoteNewTemplatePanel
+              open={showTemplatePanel}
+              setOpen={setShowTemplatePanel}
+              onSelect={handleTemplateSelect}
+            />
 
             {/* Stil-väljare — overridar business default per offert */}
             <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-4">
@@ -2138,227 +1363,32 @@ export default function NewQuotePage() {
               </p>
             </div>
 
-            {/* Preview panel (collapsible) */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl hidden lg:block">
-              <button
-                type="button"
-                onClick={() => setShowPreviewPanel(!showPreviewPanel)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left"
-              >
-                <span className="flex items-center gap-2">
-                  <Eye className="w-3.5 h-3.5 text-[#64748B]" />
-                  <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Förhandsgranska</span>
-                </span>
-                <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${showPreviewPanel ? 'rotate-180' : ''}`} />
-              </button>
-              {showPreviewPanel && (
-                <div className="px-3 pb-3 space-y-2">
-                  {/* Toggle: Live-redigera / Slutdesign / Kompakt */}
-                  <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-                    {(() => {
-                      const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
-                      return (
-                        <button
-                          type="button"
-                          onClick={() => liveAvailable && setPreviewMode('live')}
-                          disabled={!liveAvailable}
-                          className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                            previewMode === 'live' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                          } ${!liveAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
-                          title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering kommer snart för Premium/Friendly'}
-                        >
-                          Live ✏️
-                        </button>
-                      )
-                    })()}
-                    <button
-                      type="button"
-                      onClick={() => setPreviewMode('design')}
-                      className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                        previewMode === 'design' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Slutdesign
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewMode('compact')}
-                      className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                        previewMode === 'compact' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                    >
-                      Kompakt
-                    </button>
-                  </div>
-                  {previewMode === 'live' && (templateStyle || businessDefaultStyle) === 'modern' ? (
-                    <div className="bg-gray-50 rounded-xl overflow-auto border border-[#E2E8F0] h-[calc(100vh-200px)] min-h-[700px] p-4">
-                      <ModernCanvas
-                        data={liveTemplateData}
-                        handlers={{
-                          onTitleChange: setTitle,
-                          onIntroChange: setIntroductionText,
-                          onCustomerNameChange: undefined, // Kund redigeras via formuläret nedan
-                          onPaymentTermsChange: setPaymentTermsText,
-                          onItemChange: (idx, updated) => {
-                            // Hitta motsvarande QuoteItem (filtrerade till 'item') och uppdatera
-                            const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
-                            const target = itemRows[idx]
-                            if (!target) return
-                            setItems(prev => prev.map(it => it.id === target.id
-                              ? {
-                                  ...it,
-                                  description: updated.name,
-                                  quantity: updated.quantity,
-                                  unit_price: updated.unitPrice,
-                                  total: updated.total,
-                                }
-                              : it))
-                          },
-                          onItemAdd: () => {
-                            const newItem: any = {
-                              id: 'tmp_' + Math.random().toString(36).slice(2, 10),
-                              item_type: 'item',
-                              description: '',
-                              quantity: 1,
-                              unit: 'st',
-                              unit_price: 0,
-                              total: 0,
-                              is_rot_eligible: false,
-                              is_rut_eligible: false,
-                              sort_order: items.length,
-                            }
-                            setItems(prev => [...prev, newItem])
-                          },
-                          onItemRemove: (idx) => {
-                            const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
-                            const target = itemRows[idx]
-                            if (!target) return
-                            setItems(prev => prev.filter(it => it.id !== target.id))
-                          },
-                        }}
-                      />
-                    </div>
-                  ) : previewMode === 'design' || (previewMode === 'live' && (templateStyle || businessDefaultStyle) !== 'modern') ? (
-                    <TemplatePreviewFrame
-                      payload={templatePreviewPayload}
-                      className="h-[calc(100vh-200px)] min-h-[700px]"
-                    />
-                  ) : (
-                    debouncedPreviewData && (
-                      <QuotePreview
-                        data={debouncedPreviewData}
-                        businessName={business.business_name}
-                        contactName={business.contact_name}
-                      />
-                    )
-                  )}
-                </div>
-              )}
-            </div>
+            <QuoteNewPreviewPanel
+              open={showPreviewPanel}
+              setOpen={setShowPreviewPanel}
+              previewMode={previewMode}
+              setPreviewMode={setPreviewMode}
+              liveAvailable={liveAvailable}
+              liveTemplateData={liveTemplateData}
+              liveHandlers={liveHandlers}
+              templatePreviewPayload={templatePreviewPayload}
+              debouncedPreviewData={debouncedPreviewData}
+              businessName={business.business_name}
+              contactName={business.contact_name}
+            />
 
-            {/* Summary */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-5">
-              {/* Prisvarningar */}
-              {priceWarnings.length > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 space-y-1.5">
-                  {priceWarnings.map((w, i) => (
-                    <p key={i} className="text-xs text-amber-800">
-                      ⚠️ {w.product_name} är {w.difference_pct}% dyrare än normalpris ({w.quote_price} kr vs {w.normal_price} kr — {w.supplier_name})
-                    </p>
-                  ))}
-                </div>
-              )}
-              {priceAlts.length > 0 && (
-                <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg p-3 mb-4 space-y-1.5">
-                  {priceAlts.map((a, i) => (
-                    <p key={i} className="text-xs text-primary-800">
-                      💡 {a.cheaper_supplier} har {a.product_name} {a.savings_pct}% billigare ({a.cheaper_price} kr)
-                    </p>
-                  ))}
-                </div>
-              )}
+            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
 
-              <div className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569] mb-4">Summering <span className="normal-case">(exkl. moms)</span></div>
+            <QuoteEditTotalsSection
+              totals={totals}
+              vatRate={vatRate}
+              discountPercent={discountPercent}
+              setDiscountPercent={setDiscountPercent}
+              hasRotItems={hasRotItems}
+              hasRutItems={hasRutItems}
+              formatCurrency={formatCurrency}
+            />
 
-              <div className="space-y-1">
-                <div className="flex justify-between py-[5px] text-[13px]">
-                  <span className="text-[#64748B]">Arbete</span>
-                  <span className="text-[#64748B]">{formatCurrency(totals.laborTotal)}</span>
-                </div>
-                <div className="flex justify-between py-[5px] text-[13px]">
-                  <span className="text-[#64748B]">Material</span>
-                  <span className="text-[#64748B]">{formatCurrency(totals.materialTotal)}</span>
-                </div>
-                {totals.serviceTotal > 0 && (
-                  <div className="flex justify-between py-[5px] text-[13px]">
-                    <span className="text-[#64748B]">Tjänster</span>
-                    <span className="text-[#64748B]">{formatCurrency(totals.serviceTotal)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between py-[5px] text-[13px]">
-                  <span className="text-[#64748B]">Moms {vatRate}%</span>
-                  <span className="text-[#64748B]">{formatCurrency(totals.vat)}</span>
-                </div>
-
-                {/* Discount */}
-                {discountPercent > 0 && totals.discountAmount > 0 && (
-                  <div className="flex justify-between py-[5px] text-[13px]">
-                    <span className="text-[#64748B]">Rabatt {discountPercent}%</span>
-                    <span className="text-[#64748B]">−{formatCurrency(totals.discountAmount)}</span>
-                  </div>
-                )}
-
-                {/* ROT line */}
-                {hasRotItems && totals.rotDeduction > 0 && (
-                  <div className="flex justify-between py-[5px] text-[13px] text-[#0F766E]">
-                    <span>ROT-avdrag 30%</span>
-                    <span>−{formatCurrency(totals.rotDeduction)}</span>
-                  </div>
-                )}
-
-                {/* RUT line */}
-                {hasRutItems && totals.rutDeduction > 0 && (
-                  <div className="flex justify-between py-[5px] text-[13px] text-[#0F766E]">
-                    <span>RUT-avdrag 50%</span>
-                    <span>−{formatCurrency(totals.rutDeduction)}</span>
-                  </div>
-                )}
-
-                {/* Total */}
-                <div className="flex justify-between border-t border-thin border-[#E2E8F0] mt-2 pt-3 text-[15px] font-medium text-[#1E293B]">
-                  <span>Totalt <span className="text-[11px] font-normal text-gray-400">inkl. moms</span></span>
-                  <span>{formatCurrency(totals.total)}</span>
-                </div>
-              </div>
-
-              {/* Kund betalar box */}
-              {(hasRotItems || hasRutItems) && (totals.rotDeduction > 0 || totals.rutDeduction > 0) && (
-                <div className="bg-[#CCFBF1] rounded-lg px-4 py-3.5 mt-3 flex justify-between items-center">
-                  <span className="text-[12px] text-[#0F766E]">Kund betalar</span>
-                  <span className="text-[20px] font-medium text-[#0F766E]">
-                    {formatCurrency(hasRotItems ? totals.rotCustomerPays : totals.rutCustomerPays)}
-                  </span>
-                </div>
-              )}
-
-              {/* Discount input (small) */}
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-thin border-[#E2E8F0]">
-                <span className="text-[12px] text-[#94A3B8]">Rabatt</span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    value={discountPercent}
-                    onChange={(e) => setDiscountPercent(parseFloat(e.target.value) || 0)}
-                    className="w-14 px-2 py-1 border-thin border-[#E2E8F0] rounded text-[#1E293B] text-[13px] text-right bg-white focus:outline-none focus:border-[#0F766E]"
-                    min={0}
-                    max={100}
-                  />
-                  <span className="text-[#94A3B8] text-[13px]">%</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action buttons */}
             <button
               onClick={() => saveQuote(true)}
               disabled={saving || !selectedCustomer}
@@ -2375,7 +1405,10 @@ export default function NewQuotePage() {
             </button>
             {items.length > 0 && (
               <button
-                onClick={() => { setTemplateName(title); setShowSaveTemplateModal(true) }}
+                onClick={() => {
+                  setTemplateName(title)
+                  setShowSaveTemplateModal(true)
+                }}
                 className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
               >
                 Spara som mall
@@ -2385,63 +1418,41 @@ export default function NewQuotePage() {
         </div>
       </div>
 
-      {/* ── Mobile preview button (floating) ────────────────────────── */}
-      <button
-        type="button"
-        onClick={() => setShowPreviewModal(true)}
-        className="fixed bottom-6 right-6 z-40 lg:hidden flex items-center gap-2 px-4 py-3 bg-[#0F766E] text-white rounded-full shadow-lg hover:bg-[#0D655D] transition-colors"
-      >
-        <Eye className="w-4 h-4" />
-        <span className="text-sm font-medium">Förhandsgranska</span>
-      </button>
+      {/* Mobile preview button + modal */}
+      <QuoteEditMobilePreviewModal
+        open={showPreviewModal}
+        setOpen={setShowPreviewModal}
+        data={debouncedPreviewData}
+        businessName={business.business_name}
+        contactName={business.contact_name}
+      />
 
-      {/* ── Mobile preview modal ─────────────────────────────────── */}
-      {showPreviewModal && debouncedPreviewData && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto lg:hidden"
-          onClick={() => setShowPreviewModal(false)}
-        >
-          <div
-            className="bg-[#F8FAFC] rounded-xl w-full max-w-lg relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0]">
-              <span className="text-sm font-medium text-[#1E293B]">Förhandsgranska offert</span>
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(false)}
-                className="p-1 text-[#94A3B8] hover:text-[#1E293B] transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4">
-              <QuotePreview
-                data={debouncedPreviewData}
-                businessName={business.business_name}
-                contactName={business.contact_name}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modals ─────────────────────────────────────────────────── */}
-
-      {/* Grossist search */}
+      {/* Grossist search modal */}
       <ProductSearchModal
         isOpen={showGrossistSearch}
         onClose={() => setShowGrossistSearch(false)}
-        onSelect={addFromGrossist}
+        onSelect={p => {
+          addFromGrossist(p)
+          setShowGrossistSearch(false)
+        }}
         businessId={business.business_id}
       />
 
-      {/* Product search */}
+      {/* Product search modal — new-vyn unique */}
       {showProductSearch && (
-        <div className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4" onClick={() => setShowProductSearch(false)}>
-          <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowProductSearch(false)}
+        >
+          <div
+            className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
             <div className="flex items-center gap-3 px-5 py-4 border-b border-[#E2E8F0]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.3-4.3" />
+              </svg>
               <input
                 type="text"
                 value={productSearchQuery}
@@ -2450,7 +1461,10 @@ export default function NewQuotePage() {
                 autoFocus
                 className="flex-1 text-sm text-[#1E293B] placeholder-[#94A3B8] bg-transparent border-none outline-none"
               />
-              <button onClick={() => setShowProductSearch(false)} className="p-1 text-[#94A3B8] hover:text-[#1E293B]">
+              <button
+                onClick={() => setShowProductSearch(false)}
+                className="p-1 text-[#94A3B8] hover:text-[#1E293B]"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -2498,46 +1512,14 @@ export default function NewQuotePage() {
         </div>
       )}
 
-      {/* Save as Template Modal */}
-      {showSaveTemplateModal && (
-        <div
-          className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowSaveTemplateModal(false)}
-        >
-          <div
-            className="bg-white border-thin border-[#E2E8F0] rounded-xl w-full max-w-md px-8 py-7"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 className="text-[16px] font-medium text-[#1E293B] mb-5">Spara som mall</h3>
-            <div className="mb-5">
-              <label className="block text-[12px] text-[#64748B] mb-1">Mallnamn</label>
-              <input
-                type="text"
-                value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
-                placeholder="T.ex. Byte elcentral"
-                autoFocus
-                className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowSaveTemplateModal(false)}
-                className="px-4 py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer"
-              >
-                Avbryt
-              </button>
-              <button
-                onClick={saveAsTemplate}
-                disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 py-2.5 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
-              >
-                {savingTemplate ? 'Sparar...' : 'Spara'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuoteEditSaveTemplateModal
+        show={showSaveTemplateModal}
+        onClose={() => setShowSaveTemplateModal(false)}
+        templateName={templateName}
+        setTemplateName={setTemplateName}
+        saving={savingTemplate}
+        onSave={saveAsTemplate}
+      />
     </div>
   )
 }
