@@ -5,12 +5,30 @@
   display: grid;
   position: relative;
   overflow: hidden;
+  /* --split-percent (0-100) styrs från React via inline style. Default 50.
+   * minmax(0, ...) krävs eftersom kanban-kolumnerna har min-width: 900px
+   * (för horisontell scroll). Utan minmax(0) expanderar grid-tracken till
+   * min-content och säljtratten äter höger panel. */
+  grid-template-columns: minmax(0, calc(var(--split-percent, 50) * 1%)) minmax(0, 1fr);
 }
-/* minmax(0, ...) krävs eftersom kanban-kolumnerna har min-width: 900px
- * (för horisontell scroll). Utan minmax(0) expanderar grid-tracken till
- * min-content och säljtratten äter höger panel. */
-.body[data-split="40-60"] { grid-template-columns: minmax(0, 40fr) minmax(0, 60fr); }
-.body[data-split="50-50"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+/* När användaren drar dividern: visa resize-cursor över hela vyn och
+ * hindra att text markeras / sidan scrollar (touch-action på dividern). */
+.body[data-dragging="true"] {
+  cursor: ew-resize;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.body[data-dragging="true"] .arrowPulse {
+  animation: none;
+}
+
+/* På smal viewport stackar vi panelerna vertikalt och döljer dividern.
+ * Drag-funktionen är desktop-only. */
+@media (max-width: 640px) {
+  .body {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ─── Sales pane ─── */
 .salesPane {
@@ -200,13 +218,29 @@
   position: absolute;
   top: 0; bottom: 0;
   width: 60px;
-  pointer-events: none;
+  /* Position styrs av samma --split-percent som grid-tracken så seam-linjen
+   * alltid hamnar exakt på gränsen mellan panelerna. */
+  left: calc(var(--split-percent, 50) * 1% - 30px);
   z-index: 5;
   display: flex; align-items: center; justify-content: center;
   flex-direction: column;
+  /* Drag-bar yta: pekare på dividern, men låt inte interna element (label-pillar
+   * + arrow-pulse) sluka klick — de har pointer-events: none längre ner. */
+  pointer-events: auto;
+  cursor: ew-resize;
+  touch-action: none;
 }
-.divider[data-split="40-60"] { left: calc(40% - 30px); }
-.divider[data-split="50-50"] { left: calc(50% - 30px); }
+@media (max-width: 640px) {
+  .divider { display: none; }
+}
+/* Hover-feedback: lyft fram seam-gradienten lite så användaren förstår att
+ * den är interaktiv. */
+.divider:hover .seam {
+  filter: brightness(1.08);
+}
+.divider:hover {
+  --seam-opacity: 0.30;
+}
 
 .dividerSubtle .seam {
   width: 1px; height: 100%;
@@ -259,6 +293,8 @@
   color: #fff;
   box-shadow: 0 0 0 6px rgba(13,148,136,0.12), 0 0 0 12px rgba(13,148,136,0.06), 0 8px 24px -4px rgba(13,148,136,0.4);
   animation: arrowPulse 2s ease-in-out infinite;
+  /* Pulse-pillen är dekorativ — låt drag-handlern på .divider ta klick. */
+  pointer-events: none;
 }
 @keyframes arrowPulse {
   0%, 100% { box-shadow: 0 0 0 6px rgba(13,148,136,0.12), 0 0 0 12px rgba(13,148,136,0.06), 0 8px 24px -4px rgba(13,148,136,0.4); }

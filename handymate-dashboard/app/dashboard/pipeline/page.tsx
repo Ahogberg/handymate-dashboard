@@ -1708,7 +1708,6 @@ export default function PipelinePage() {
               onDealClick={openDealDetail}
               onProjectClick={(projectId) => setOpenProjectStageId(projectId)}
               density="comfortable"
-              split="50-50"
             />
           ) : pipelineView === 'timeline' ? (
             <TimelineView

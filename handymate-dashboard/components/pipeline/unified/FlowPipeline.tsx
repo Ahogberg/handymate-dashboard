@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, Calendar, Check } from 'lucide-react'
 import type { Deal, Stage } from '@/app/dashboard/pipeline/types'
 import {
@@ -38,8 +38,24 @@ interface FlowPipelineProps {
   onProjectClick: (projectId: string) => void
   /** Densitet — påverkar padding på kort */
   density?: 'comfortable' | 'compact'
-  /** 40-60 = standard, 50-50 = mer plats för säljtratten */
-  split?: '40-60' | '50-50'
+  /**
+   * Initial split-procent (säljtrattens andel av bredden, 25-75).
+   * Användaren kan dra dividern för att justera. Värdet sparas i
+   * localStorage och åter-läses vid nästa rendering.
+   */
+  initialSplitPercent?: number
+}
+
+const SPLIT_STORAGE_KEY = 'verksamhetsoversikt.split'
+const SPLIT_MIN = 25
+const SPLIT_MAX = 75
+const SPLIT_DEFAULT = 50
+
+function clampSplit(v: number): number {
+  if (!Number.isFinite(v)) return SPLIT_DEFAULT
+  if (v < SPLIT_MIN) return SPLIT_MIN
+  if (v > SPLIT_MAX) return SPLIT_MAX
+  return v
 }
 
 export default function FlowPipeline({
@@ -49,7 +65,7 @@ export default function FlowPipeline({
   onDealClick,
   onProjectClick,
   density = 'comfortable',
-  split = '50-50',
+  initialSplitPercent = SPLIT_DEFAULT,
 }: FlowPipelineProps) {
   // Filtrera bort lost-stage från unified-vyn — de visas i sin egen sidebar
   const activeStages = useMemo(() => stages.filter(s => !s.is_lost), [stages])
@@ -76,8 +92,62 @@ export default function FlowPipeline({
     return allProjects.filter(p => p.project.current_workflow_stage_id === stageFilter)
   }, [allProjects, stageFilter])
 
+  // Drag-resizable divider — säljtrattens andel av bredden i procent.
+  const [splitPercent, setSplitPercent] = useState<number>(() => clampSplit(initialSplitPercent))
+  const [isDragging, setIsDragging] = useState(false)
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+
+  // Läs senaste sparade split från localStorage en gång vid mount.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = window.localStorage.getItem(SPLIT_STORAGE_KEY)
+      if (stored) {
+        const parsed = parseFloat(stored)
+        if (Number.isFinite(parsed)) setSplitPercent(clampSplit(parsed))
+      }
+    } catch { /* localStorage kan vara avstängt — kör med default */ }
+  }, [])
+
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    // Bara primärknapp / touch / pen — undvik högerklick
+    if (e.button !== 0 && e.pointerType === 'mouse') return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setIsDragging(true)
+  }, [])
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    const rect = bodyRef.current?.getBoundingClientRect()
+    if (!rect || rect.width === 0) return
+    const pct = ((e.clientX - rect.left) / rect.width) * 100
+    setSplitPercent(clampSplit(pct))
+  }, [isDragging])
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return
+    setIsDragging(false)
+    try { e.currentTarget.releasePointerCapture(e.pointerId) } catch { /* ignore */ }
+    try {
+      window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitPercent))
+    } catch { /* ignore */ }
+  }, [isDragging, splitPercent])
+
+  const handleDoubleClick = useCallback(() => {
+    setSplitPercent(SPLIT_DEFAULT)
+    try {
+      window.localStorage.setItem(SPLIT_STORAGE_KEY, String(SPLIT_DEFAULT))
+    } catch { /* ignore */ }
+  }, [])
+
   return (
-    <div className={styles.body} data-split={split}>
+    <div
+      ref={bodyRef}
+      className={styles.body}
+      data-dragging={isDragging || undefined}
+      style={{ ['--split-percent' as any]: splitPercent }}
+    >
       {/* ── VÄNSTER: Säljtratt (Kanban) ─────────────────────── */}
       <SalesPane
         deals={pipelineDeals}
@@ -87,7 +157,12 @@ export default function FlowPipeline({
       />
 
       {/* ── DIVIDER ────────────────────────────────────────── */}
-      <PipelineDivider split={split} />
+      <PipelineDivider
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onDoubleClick={handleDoubleClick}
+      />
 
       {/* ── HÖGER: Aktiva projekt ──────────────────────────── */}
       <ProjectExecutionPane
@@ -254,9 +329,32 @@ function DealCard({
 // PipelineDivider
 // ────────────────────────────────────────────────────────────────────────────
 
-function PipelineDivider({ split }: { split: '40-60' | '50-50' }) {
+interface PipelineDividerProps {
+  onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => void
+  onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => void
+  onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => void
+  onDoubleClick: () => void
+}
+
+function PipelineDivider({
+  onPointerDown,
+  onPointerMove,
+  onPointerUp,
+  onDoubleClick,
+}: PipelineDividerProps) {
   return (
-    <div className={`${styles.divider} ${styles.dividerFeatured}`} data-split={split}>
+    <div
+      className={`${styles.divider} ${styles.dividerFeatured}`}
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Dra för att justera fördelning mellan säljtratt och projekt. Dubbelklicka för att återställa."
+      title="Dra för att ändra storlek · dubbelklicka för 50/50"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onDoubleClick={onDoubleClick}
+    >
       <div className="seam" style={{
         width: 60, height: '100%',
         background:
@@ -264,6 +362,7 @@ function PipelineDivider({ split }: { split: '40-60' | '50-50' }) {
           'linear-gradient(180deg, transparent, rgba(13,148,136,0.18) 20%, rgba(13,148,136,0.18) 80%, transparent)',
         position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
+        pointerEvents: 'none',
       }}>
         <span style={{
           position: 'absolute', left: '50%', top: 0, bottom: 0,
@@ -272,7 +371,7 @@ function PipelineDivider({ split }: { split: '40-60' | '50-50' }) {
           transform: 'translateX(-50%)',
         }} />
       </div>
-      <div className={styles.dividerFeatured + ' ' + styles.divider} style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div className={styles.arrowPulse}>
           <ArrowRight size={18} strokeWidth={2.2} />
         </div>
