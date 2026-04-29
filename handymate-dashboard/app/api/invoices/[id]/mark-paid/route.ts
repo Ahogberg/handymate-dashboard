@@ -87,6 +87,21 @@ export async function POST(
       console.error('[mark-paid] post-payment automations failed:', err)
     )
 
+    // Portal-notifikation: tack-mail till kund (1h-dedup hanteras internt)
+    if (invoice.customer_id) {
+      try {
+        const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+        await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_paid', {
+          context: {
+            amount: invoice.total ?? invoice.total_amount ?? null,
+            invoice_number: invoice.fortnox_invoice_number || invoiceId,
+          },
+        })
+      } catch (notifErr) {
+        console.error('[mark-paid] portal notification invoice_paid failed:', notifErr)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       status: 'paid',

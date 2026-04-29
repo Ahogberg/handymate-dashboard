@@ -127,6 +127,21 @@ export async function PATCH(
         console.error('[invoice status] advanceProjectStage INVOICE_PAID failed:', err)
       }
 
+      // Portal-notifikation: tack för betalning (1h-dedup hanteras internt)
+      if (invoice?.customer_id) {
+        try {
+          const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+          await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_paid', {
+            context: {
+              amount: (invoice as any).total ?? (invoice as any).total_amount ?? null,
+              invoice_number: (invoice as any).invoice_number || invoiceId,
+            },
+          })
+        } catch (notifErr) {
+          console.error('[invoice status] portal notification invoice_paid failed:', notifErr)
+        }
+      }
+
       // Golden Path: tack-SMS + recensionsförfrågan efter betalning
       try {
         const customerPhone = (invoice as any)?.customer?.phone_number

@@ -9,6 +9,7 @@ const VALID_EVENTS: PortalNotificationEvent[] = [
   'new_message',
   'quote_sent',
   'invoice_sent',
+  'invoice_paid',
   'invoice_overdue',
   'project_update',
   'photos_added',

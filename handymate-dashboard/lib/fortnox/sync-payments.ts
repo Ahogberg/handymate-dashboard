@@ -90,6 +90,21 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
       if (isPaid && inv.status !== 'paid') {
         await markInvoicePaid(inv.invoice_id, businessId, inv.customer_id)
         result.marked_paid++
+
+        // Portal-notifikation: tack för betalning
+        if (inv.customer_id) {
+          try {
+            const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+            await sendPortalNotification(businessId, inv.customer_id, 'invoice_paid', {
+              context: {
+                amount: inv.total ?? inv.total_amount ?? null,
+                invoice_number: inv.fortnox_invoice_number || inv.invoice_id,
+              },
+            })
+          } catch (notifErr) {
+            console.error('[fortnox-sync] portal notification invoice_paid failed:', notifErr)
+          }
+        }
       } else if (isOverdue && inv.status !== 'overdue') {
         await markInvoiceOverdue(inv.invoice_id, businessId)
         result.marked_overdue++

@@ -15,6 +15,7 @@ export type PortalNotificationEvent =
   | 'new_message'
   | 'quote_sent'
   | 'invoice_sent'
+  | 'invoice_paid'
   | 'invoice_overdue'
   | 'project_update'
   | 'photos_added'
@@ -48,7 +49,8 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
   subject: (ctx: Record<string, any>, business: string) => string
   heading: string
   body: (ctx: Record<string, any>) => string
-  cta: string
+  /** Statisk knapptext, eller funktion när CTA beror på context. */
+  cta: string | ((ctx: Record<string, any>) => string)
   emoji: string
 }> = {
   new_message: {
@@ -79,6 +81,18 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
     },
     cta: 'Visa faktura',
     emoji: '🧾',
+  },
+  invoice_paid: {
+    subject: (_ctx, _biz) => 'Tack för din betalning',
+    heading: 'Tack för din betalning!',
+    body: (ctx) => {
+      const amount = ctx.amount ? ` av <strong>${formatKr(ctx.amount)}</strong>` : ''
+      return `Tack för din betalning${amount}. Vi uppskattar verkligen ditt förtroende och hoppas du är nöjd med jobbet.`
+    },
+    // Auto-detect: om review_request redan skickats — visa portal-CTA istället
+    // för att undvika att be om recension två gånger.
+    cta: (ctx) => ctx.review_already_sent ? 'Se i din portal' : 'Lämna en recension',
+    emoji: '🙏',
   },
   invoice_overdue: {
     subject: (_ctx, _biz) => `Vänlig påminnelse — fakturan har förfallit`,
@@ -193,8 +207,24 @@ export async function sendPortalNotification(
   const accentColor = isValidHex(business.accent_color) ? business.accent_color : '#0F766E'
   const portalUrl = `${APP_URL}/portal/${customer.portal_token}`
 
+  // Auto-detect: vid invoice_paid, slå upp om en review_request-notis redan
+  // skickats till samma kund — då anpassas CTA från "Lämna en recension" till
+  // "Se i din portal" så vi inte ber om recension två gånger.
+  if (event === 'invoice_paid' && context.review_already_sent === undefined) {
+    try {
+      const { data: priorReview } = await supabase
+        .from('portal_notification_log')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('event', 'review_request')
+        .limit(1)
+      context.review_already_sent = !!(priorReview && priorReview.length > 0)
+    } catch { /* non-blocking — defaultar till false */ }
+  }
+
   const copy = EVENT_COPY[event]
   const subject = copy.subject(context, businessName)
+  const ctaText = typeof copy.cta === 'function' ? copy.cta(context) : copy.cta
   const html = buildEmailHtml({
     accentColor,
     businessName,
@@ -203,8 +233,8 @@ export async function sendPortalNotification(
     heading: copy.heading,
     bodyHtml: copy.body(context),
     emoji: copy.emoji,
-    cta: copy.cta,
-    portalUrl: portalUrl + eventToPortalAnchor(event),
+    cta: ctaText,
+    portalUrl: portalUrl + eventToPortalAnchor(event, context),
   })
 
   // Skicka via Resend
@@ -251,11 +281,12 @@ export async function sendPortalNotification(
 
 /* ----- Helpers ----- */
 
-function eventToPortalAnchor(event: PortalNotificationEvent): string {
+function eventToPortalAnchor(event: PortalNotificationEvent, ctx?: Record<string, any>): string {
   switch (event) {
     case 'new_message': return '?tab=messages'
     case 'quote_sent': return '?tab=quotes'
     case 'invoice_sent':
+    case 'invoice_paid':
     case 'invoice_overdue': return '?tab=invoices'
     case 'photos_added': return '?tab=photos'
     case 'project_update': return '?tab=project'
