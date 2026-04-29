@@ -38,20 +38,21 @@ export function QuoteNewPreviewPanel({
 }: QuoteNewPreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
 
-  function renderPreviewBody(heightCls: string) {
+  function renderPreviewBody(flexFill: boolean) {
+    const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
     if (previewMode === 'live' && liveAvailable) {
       return (
-        <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${heightCls} p-4`}>
+        <div className={`bg-slate-50 rounded-xl overflow-auto border border-slate-200 ${sizeCls} p-4`}>
           <ModernCanvas data={liveTemplateData} handlers={liveHandlers} />
         </div>
       )
     }
     if (previewMode === 'design' || (previewMode === 'live' && !liveAvailable)) {
-      return <TemplatePreviewFrame payload={templatePreviewPayload} className={heightCls} />
+      return <TemplatePreviewFrame payload={templatePreviewPayload} className={sizeCls} />
     }
     return (
       debouncedPreviewData && (
-        <div className={`${heightCls} overflow-auto`}>
+        <div className={`${sizeCls} overflow-auto`}>
           <QuotePreview
             data={debouncedPreviewData}
             businessName={businessName || ''}
@@ -64,7 +65,7 @@ export function QuoteNewPreviewPanel({
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:block">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:flex lg:flex-col h-full">
         <div className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50/50 transition-colors">
           <button
             type="button"
@@ -99,8 +100,8 @@ export function QuoteNewPreviewPanel({
           </button>
         </div>
         {open && (
-          <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3">
-            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+          <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3 flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => liveAvailable && setPreviewMode('live')}
@@ -137,7 +138,7 @@ export function QuoteNewPreviewPanel({
                 Kompakt
               </button>
             </div>
-            {renderPreviewBody('h-[calc(100vh-220px)] min-h-[700px]')}
+            {renderPreviewBody(true)}
           </div>
         )}
       </div>
@@ -163,7 +164,7 @@ export function QuoteNewPreviewPanel({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-hidden p-3">{renderPreviewBody('h-full')}</div>
+            <div className="flex-1 overflow-hidden p-3 flex flex-col">{renderPreviewBody(false)}</div>
           </div>
         </div>
       )}

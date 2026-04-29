@@ -30,7 +30,7 @@ export function QuoteEditPreviewPanel({
 
   return (
     <>
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:block">
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:flex lg:flex-col h-full">
         <div className="w-full flex items-center gap-3 px-5 py-4 hover:bg-slate-50/50 transition-colors">
           <button
             type="button"
@@ -65,8 +65,8 @@ export function QuoteEditPreviewPanel({
           </button>
         </div>
         {open && (
-          <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3">
-            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+          <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3 flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setPreviewMode('design')}
@@ -93,15 +93,17 @@ export function QuoteEditPreviewPanel({
             {previewMode === 'design' ? (
               <TemplatePreviewFrame
                 payload={templatePreviewPayload}
-                className="h-[calc(100vh-220px)] min-h-[700px]"
+                className="flex-1 min-h-0"
               />
             ) : (
               debouncedPreviewData && (
-                <QuotePreview
-                  data={debouncedPreviewData}
-                  businessName={businessName || ''}
-                  contactName={contactName || ''}
-                />
+                <div className="flex-1 min-h-0 overflow-auto">
+                  <QuotePreview
+                    data={debouncedPreviewData}
+                    businessName={businessName || ''}
+                    contactName={contactName || ''}
+                  />
+                </div>
               )
             )}
           </div>

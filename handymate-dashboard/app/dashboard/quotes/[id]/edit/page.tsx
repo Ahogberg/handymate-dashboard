@@ -782,11 +782,30 @@ export default function EditQuotePage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <QuoteEditHeader quoteNumber={quoteNumberRef.current} autoSaveStatus={autoSaveStatus} />
+        <QuoteEditHeader
+          quoteNumber={quoteNumberRef.current}
+          autoSaveStatus={autoSaveStatus}
+          saving={saving}
+          canSend={!!selectedCustomer}
+          hasItems={items.length > 0}
+          onSendQuote={() => saveQuote(true)}
+          onSaveDraft={() => saveQuote(false)}
+          onSaveTemplate={() => {
+            setTemplateName(title)
+            setShowSaveTemplateModal(true)
+          }}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column — Form ─────────────────────────────────── */}
           <div className="flex flex-col gap-4">
+            <QuoteEditTemplatePicker
+              quoteId={quoteId}
+              templateStyle={templateStyle}
+              setTemplateStyle={setTemplateStyle}
+              businessDefaultStyle={businessDefaultStyle}
+            />
+
             <QuoteEditCustomerSection
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -873,27 +892,6 @@ export default function EditQuotePage() {
               showCategorySubtotals={showCategorySubtotals}
               setShowCategorySubtotals={setShowCategorySubtotals}
             />
-          </div>
-
-          {/* ── Right Column — Sidebar ─────────────────────────────── */}
-          <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-1">
-            <QuoteEditTemplatePicker
-              quoteId={quoteId}
-              templateStyle={templateStyle}
-              setTemplateStyle={setTemplateStyle}
-              businessDefaultStyle={businessDefaultStyle}
-            />
-
-            <QuoteEditPreviewPanel
-              open={showPreviewPanel}
-              setOpen={setShowPreviewPanel}
-              previewMode={previewMode}
-              setPreviewMode={setPreviewMode}
-              templatePreviewPayload={templatePreviewPayload}
-              debouncedPreviewData={debouncedPreviewData}
-              businessName={business.business_name}
-              contactName={business.contact_name}
-            />
 
             <QuoteEditTotalsSection
               totals={totals}
@@ -904,31 +902,20 @@ export default function EditQuotePage() {
               hasRutItems={hasRutItems}
               formatCurrency={formatCurrency}
             />
+          </div>
 
-            {/* Action buttons */}
-            <button
-              onClick={() => saveQuote(true)}
-              disabled={saving || !selectedCustomer}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {saving ? 'Sparar…' : 'Skicka offert'}
-            </button>
-            <button
-              onClick={() => saveQuote(false)}
-              disabled={saving}
-              className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
-            >
-              Spara utkast
-            </button>
-            {items.length > 0 && (
-              <button
-                onClick={() => { setTemplateName(title); setShowSaveTemplateModal(true) }}
-                className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors"
-              >
-                Spara som mall
-              </button>
-            )}
+          {/* ── Right Column — Preview-only, fyller viewport ─────── */}
+          <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
+            <QuoteEditPreviewPanel
+              open={showPreviewPanel}
+              setOpen={setShowPreviewPanel}
+              previewMode={previewMode}
+              setPreviewMode={setPreviewMode}
+              templatePreviewPayload={templatePreviewPayload}
+              debouncedPreviewData={debouncedPreviewData}
+              businessName={business.business_name}
+              contactName={business.contact_name}
+            />
           </div>
         </div>
       </div>

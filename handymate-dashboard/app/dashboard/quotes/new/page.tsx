@@ -1196,11 +1196,75 @@ export default function NewQuotePage() {
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}
           aiPhotoCount={aiPhotoCount}
+          saving={saving}
+          canSend={!!selectedCustomer}
+          hasItems={items.length > 0}
+          onSendQuote={() => saveQuote(true)}
+          onSaveDraft={() => saveQuote(false)}
+          onSaveTemplate={() => {
+            setTemplateName(title)
+            setShowSaveTemplateModal(true)
+          }}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column ───────────────────────────────────────── */}
           <div className="flex flex-col gap-4">
+            <QuoteNewTemplatePanel
+              open={showTemplatePanel}
+              setOpen={setShowTemplatePanel}
+              onSelect={handleTemplateSelect}
+            />
+
+            {/* Stil-väljare — overridar business default per offert */}
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Offertstil</p>
+                {templateStyle && (
+                  <button
+                    type="button"
+                    onClick={() => setTemplateStyle(null)}
+                    className="text-xs text-slate-500 hover:text-primary-700 transition-colors"
+                  >
+                    Återställ
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { id: 'modern', label: 'Modern', tagline: 'Ren & tidlös' },
+                  { id: 'premium', label: 'Premium', tagline: 'Påkostad' },
+                  { id: 'friendly', label: 'Friendly', tagline: 'Varm' },
+                ] as const).map(opt => {
+                  const effective = templateStyle || businessDefaultStyle
+                  const isSelected = effective === opt.id
+                  const isDefault = !templateStyle && businessDefaultStyle === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setTemplateStyle(opt.id)}
+                      className={`relative p-3 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-primary-700 bg-primary-50 shadow-sm'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className={`text-xs font-bold tracking-tight ${isSelected ? 'text-primary-700' : 'text-slate-900'}`}>
+                        {opt.label}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{opt.tagline}</div>
+                      {isDefault && (
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-primary-700 mt-1.5">
+                          Standard
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
             <QuoteNewAIHelper
               open={showAiHelper}
               setOpen={setShowAiHelper}
@@ -1318,68 +1382,22 @@ export default function NewQuotePage() {
               showCategorySubtotals={showCategorySubtotals}
               setShowCategorySubtotals={setShowCategorySubtotals}
             />
+
+            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
+
+            <QuoteEditTotalsSection
+              totals={totals}
+              vatRate={vatRate}
+              discountPercent={discountPercent}
+              setDiscountPercent={setDiscountPercent}
+              hasRotItems={hasRotItems}
+              hasRutItems={hasRutItems}
+              formatCurrency={formatCurrency}
+            />
           </div>
 
-          {/* ── Right Column ──────────────────────────────────────── */}
-          <div className="flex flex-col gap-3 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto pr-1">
-            <QuoteNewTemplatePanel
-              open={showTemplatePanel}
-              setOpen={setShowTemplatePanel}
-              onSelect={handleTemplateSelect}
-            />
-
-            {/* Stil-väljare — overridar business default per offert */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-5">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Offertstil</p>
-                {templateStyle && (
-                  <button
-                    type="button"
-                    onClick={() => setTemplateStyle(null)}
-                    className="text-xs text-slate-500 hover:text-primary-700 transition-colors"
-                  >
-                    Återställ
-                  </button>
-                )}
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {([
-                  { id: 'modern', label: 'Modern', tagline: 'Ren & tidlös' },
-                  { id: 'premium', label: 'Premium', tagline: 'Påkostad' },
-                  { id: 'friendly', label: 'Friendly', tagline: 'Varm' },
-                ] as const).map(opt => {
-                  const effective = templateStyle || businessDefaultStyle
-                  const isSelected = effective === opt.id
-                  const isDefault = !templateStyle && businessDefaultStyle === opt.id
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => setTemplateStyle(opt.id)}
-                      className={`relative p-3 rounded-xl border text-left transition-all ${
-                        isSelected
-                          ? 'border-primary-700 bg-primary-50 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className={`text-xs font-bold tracking-tight ${isSelected ? 'text-primary-700' : 'text-slate-900'}`}>
-                        {opt.label}
-                      </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">{opt.tagline}</div>
-                      {isDefault && (
-                        <div className="text-[9px] font-semibold uppercase tracking-wider text-primary-700 mt-1.5">
-                          Standard
-                        </div>
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-              <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
-                Stilen speglas i den färdiga offerten — slutdesignen visas via "Förhandsgranska design" efter sparad offert.
-              </p>
-            </div>
-
+          {/* ── Right Column — Preview-only, fyller viewport ─────── */}
+          <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
             <QuoteNewPreviewPanel
               open={showPreviewPanel}
               setOpen={setShowPreviewPanel}
@@ -1393,45 +1411,6 @@ export default function NewQuotePage() {
               businessName={business.business_name}
               contactName={business.contact_name}
             />
-
-            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
-
-            <QuoteEditTotalsSection
-              totals={totals}
-              vatRate={vatRate}
-              discountPercent={discountPercent}
-              setDiscountPercent={setDiscountPercent}
-              hasRotItems={hasRotItems}
-              hasRutItems={hasRutItems}
-              formatCurrency={formatCurrency}
-            />
-
-            <button
-              onClick={() => saveQuote(true)}
-              disabled={saving || !selectedCustomer}
-              className="w-full inline-flex items-center justify-center gap-2 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
-            >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {saving ? 'Sparar…' : 'Skicka offert'}
-            </button>
-            <button
-              onClick={() => saveQuote(false)}
-              disabled={saving}
-              className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
-            >
-              Spara utkast
-            </button>
-            {items.length > 0 && (
-              <button
-                onClick={() => {
-                  setTemplateName(title)
-                  setShowSaveTemplateModal(true)
-                }}
-                className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors"
-              >
-                Spara som mall
-              </button>
-            )}
           </div>
         </div>
       </div>
