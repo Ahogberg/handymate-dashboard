@@ -243,9 +243,14 @@ export default function PipelinePage() {
   const [newCustomerSubmitting, setNewCustomerSubmitting] = useState(false)
   const [newDealFiles, setNewDealFiles] = useState<File[]>([])
   const [newDealUploading, setNewDealUploading] = useState(false)
-  const [nextStepPrompt, setNextStepPrompt] = useState<{ dealId: string; dealTitle: string; jobType: string } | null>(null)
-  const [nextStepTask, setNextStepTask] = useState('')
-  const [nextStepSaving, setNextStepSaving] = useState(false)
+  // Efter ny deal skapas öppnas TaskPresetPicker automatiskt med dessa context-data.
+  // Tidigare visades NextStepPrompt med en hårdkodad strängsuggestion via
+  // getSuggestedTask() — ersatt av multi-select från task-biblioteket.
+  const [pendingNewDealTasks, setPendingNewDealTasks] = useState<{
+    dealId: string
+    dealTitle: string
+    customerId: string | null
+  } | null>(null)
 
   // View toggle
   const [pipelineView, setPipelineView] = useState<'kanban' | 'timeline' | 'flow'>('flow')
@@ -531,25 +536,58 @@ export default function PipelinePage() {
   }, [])
 
   // Skapa flera uppgifter på dealen samtidigt (från preset-picker)
-  const createDealTaskBatch = useCallback(async (titles: string[]) => {
-    if (!selectedDeal) return
-    await Promise.all(
-      titles.map(title =>
-        fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
+  const createDealTaskBatch = useCallback(async (tasks: import('@/components/TaskPresetPicker').PickedTask[]) => {
+    if (!selectedDeal || tasks.length === 0) return
+    try {
+      const res = await fetch('/api/tasks/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tasks,
+          defaults: {
             deal_id: selectedDeal.id,
             customer_id: selectedDeal.customer_id || null,
             visibility: 'team',
-          }),
-        }).catch(() => null)
-      )
-    )
-    fetchDealTasks(selectedDeal.id)
-    showToast(`${titles.length} ${titles.length === 1 ? 'uppgift' : 'uppgifter'} skapad${titles.length === 1 ? '' : 'a'}`, 'success')
+          },
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const count = (data.created || []).length
+      fetchDealTasks(selectedDeal.id)
+      showToast(`${count} ${count === 1 ? 'uppgift' : 'uppgifter'} skapad${count === 1 ? '' : 'a'}`, 'success')
+    } catch {
+      showToast('Kunde inte skapa uppgifter', 'error')
+    }
   }, [selectedDeal, fetchDealTasks])
+
+  // Skapas direkt efter att en ny deal är committad. Använder samma batch-endpoint
+  // men med pendingNewDealTasks-context (selectedDeal är inte satt än vid creation).
+  const createPendingNewDealTaskBatch = useCallback(async (tasks: import('@/components/TaskPresetPicker').PickedTask[]) => {
+    if (!pendingNewDealTasks || tasks.length === 0) return
+    try {
+      const res = await fetch('/api/tasks/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tasks,
+          defaults: {
+            deal_id: pendingNewDealTasks.dealId,
+            customer_id: pendingNewDealTasks.customerId,
+            visibility: 'team',
+          },
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const count = (data.created || []).length
+      showToast(`${count} ${count === 1 ? 'uppgift' : 'uppgifter'} skapad${count === 1 ? '' : 'a'} på dealen`, 'success')
+    } catch {
+      showToast('Kunde inte skapa uppgifter', 'error')
+    } finally {
+      setPendingNewDealTasks(null)
+    }
+  }, [pendingNewDealTasks])
 
   const fetchTaskActivities = useCallback(async (taskId: string) => {
     try {
@@ -693,38 +731,6 @@ export default function PipelinePage() {
       setLastContact(null)
     }
   }, [])
-
-  function getSuggestedTask(title: string, jobType: string): string {
-    const jt = (jobType || title).toLowerCase()
-    if (jt.includes('bad') || jt.includes('renovering')) return 'Boka besiktning och ta mått'
-    if (jt.includes('el') || jt.includes('installation')) return 'Planera elritning och materialbeställning'
-    if (jt.includes('målning') || jt.includes('måleri')) return 'Uppskatta ytor och beställ färg'
-    if (jt.includes('vvs') || jt.includes('rör')) return 'Boka vattenavstängning och materialcheck'
-    if (jt.includes('snickeri') || jt.includes('bygg')) return 'Boka platsbesök och ta mått'
-    if (jt.includes('saner')) return 'Boka provtagning och miljöanalys'
-    if (jt.includes('tak')) return 'Boka takinspektion och offert'
-    if (jt.includes('golv')) return 'Mäta ytor och beställa golvmaterial'
-    return 'Boka kundmöte och gör behovsanalys'
-  }
-
-  async function createNextStepTask() {
-    if (!nextStepPrompt || !nextStepTask.trim()) return
-    setNextStepSaving(true)
-    try {
-      const res = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: nextStepTask.trim(),
-          deal_id: nextStepPrompt.dealId,
-          visibility: 'team',
-        }),
-      })
-      if (res.ok) showToast('Uppgift skapad!', 'success')
-    } catch { /* ignore */ }
-    setNextStepPrompt(null)
-    setNextStepSaving(false)
-  }
 
   function formatFileSize(bytes: number | null) {
     if (!bytes) return ''
@@ -971,7 +977,7 @@ export default function PipelinePage() {
       }
 
       const createdTitle = newDealForm.title.trim()
-      const createdJobType = newDealForm.job_type || ''
+      const createdCustomerId = newDealForm.customer_id || null
       setShowNewDeal(false)
       setNewDealForm({ title: '', customer_id: '', value: '', priority: 'medium', description: '', job_type: '', source: '', assigned_to: '' })
       setCustomerSearch('')
@@ -979,9 +985,13 @@ export default function PipelinePage() {
       setShowNewCustomerForm(false)
       fetchPipeline()
 
-      const suggestedTask = getSuggestedTask(createdTitle, createdJobType)
-      setNextStepTask(suggestedTask)
-      setNextStepPrompt({ dealId: createdDeal.id, dealTitle: createdTitle, jobType: createdJobType })
+      // Öppna TaskPresetPicker direkt — multi-select av relevanta uppgifter
+      // ur biblioteket istället för en hårdkodad strängsuggestion.
+      setPendingNewDealTasks({
+        dealId: createdDeal.id,
+        dealTitle: createdTitle,
+        customerId: createdCustomerId,
+      })
     } catch {
       showToast('Kunde inte skapa deal', 'error')
     } finally {
@@ -1564,13 +1574,6 @@ export default function PipelinePage() {
     setLossReasonDetail,
     confirmLossReason,
 
-    nextStepPrompt,
-    setNextStepPrompt,
-    nextStepTask,
-    setNextStepTask,
-    nextStepSaving,
-    createNextStepTask,
-
     showStageSettings,
     setShowStageSettings,
     stageEdits,
@@ -1786,39 +1789,20 @@ export default function PipelinePage() {
       <SiteVisitModal />
 
       {/* Next step prompt after deal creation */}
-      {nextStepPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-sm p-6">
-            <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center mx-auto mb-3">
-              <CheckSquare className="w-5 h-5 text-emerald-600" />
-            </div>
-            <h3 className="text-center text-lg font-semibold text-gray-900 mb-1">Lead skapat!</h3>
-            <p className="text-center text-sm text-gray-500 mb-4">Förslag på nästa steg:</p>
-            <input
-              type="text"
-              value={nextStepTask}
-              onChange={e => setNextStepTask(e.target.value)}
-              className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-lg text-sm focus:border-primary-700 focus:outline-none mb-4"
-              placeholder="T.ex. Boka kundmöte..."
-            />
-            <div className="flex gap-3">
-              <button onClick={() => setNextStepPrompt(null)} className="flex-1 px-4 py-2.5 text-sm text-gray-600 border border-[#E2E8F0] rounded-xl hover:bg-gray-50">Hoppa över</button>
-              <button
-                onClick={createNextStepTask}
-                disabled={nextStepSaving || !nextStepTask.trim()}
-                className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-700 hover:bg-primary-800 rounded-xl disabled:opacity-50"
-              >{nextStepSaving ? 'Sparar...' : 'Skapa uppgift'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Task preset picker — öppnas från Uppgifter-fliken i deal-modalen */}
       <TaskPresetPicker
         open={showDealTaskPresetPicker}
         onClose={() => setShowDealTaskPresetPicker(false)}
         onCreate={createDealTaskBatch}
         contextLabel={selectedDeal ? `Ärende ${selectedDeal.deal_number ? `#${selectedDeal.deal_number}` : ''} · ${selectedDeal.title}`.trim() : undefined}
+      />
+
+      {/* Task preset picker — öppnas direkt efter en ny deal skapas */}
+      <TaskPresetPicker
+        open={!!pendingNewDealTasks}
+        onClose={() => setPendingNewDealTasks(null)}
+        onCreate={createPendingNewDealTaskBatch}
+        contextLabel={pendingNewDealTasks ? `Ny deal: ${pendingNewDealTasks.dealTitle}` : undefined}
       />
     </div>
     </PipelineProvider>

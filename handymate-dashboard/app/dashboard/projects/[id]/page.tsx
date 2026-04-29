@@ -911,23 +911,28 @@ export default function ProjectDetailPage() {
     } catch { /* ignore */ }
   }
 
-  async function createProjectTaskBatch(titles: string[]) {
-    // Skapar valda uppgifter parallellt — alla får project_id + visibility=project
-    await Promise.all(
-      titles.map(title =>
-        fetch('/api/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title,
+  async function createProjectTaskBatch(tasks: import('@/components/TaskPresetPicker').PickedTask[]) {
+    if (tasks.length === 0) return
+    try {
+      const res = await fetch('/api/tasks/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tasks,
+          defaults: {
             project_id: projectId,
             visibility: 'project',
-          }),
-        }).catch(() => null)
-      )
-    )
-    fetchProjectTasks()
-    showToast(`${titles.length} ${titles.length === 1 ? 'uppgift' : 'uppgifter'} skapad${titles.length === 1 ? '' : 'a'}`, 'success')
+          },
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const count = (data.created || []).length
+      fetchProjectTasks()
+      showToast(`${count} ${count === 1 ? 'uppgift' : 'uppgifter'} skapad${count === 1 ? '' : 'a'}`, 'success')
+    } catch {
+      showToast('Kunde inte skapa uppgifter', 'error')
+    }
   }
 
   async function fetchAiLogs() {
@@ -2430,9 +2435,18 @@ export default function ProjectDetailPage() {
                   Synkas med <Link href={`/dashboard/tasks`} className="text-primary-700 hover:underline">Mina uppgifter</Link>
                 </p>
               </div>
-              <span className="text-xs text-gray-400">
-                {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">
+                  {projectTasks.filter(t => t.status !== 'done').length} öppna · {projectTasks.filter(t => t.status === 'done').length} klara
+                </span>
+                <button
+                  onClick={() => setShowTaskPresetPicker(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-primary-700 border border-primary-300 rounded-lg hover:bg-primary-50"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Lägg till från bibliotek
+                </button>
+              </div>
             </div>
 
             {/* Lägg till ny uppgift */}

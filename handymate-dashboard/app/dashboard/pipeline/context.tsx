@@ -70,12 +70,6 @@ export interface QuickSmsTarget {
   phone: string
 }
 
-export interface NextStepPrompt {
-  dealId: string
-  dealTitle: string
-  jobType: string
-}
-
 export interface JobTypeOption {
   id: string
   name: string
@@ -218,13 +212,6 @@ export interface PipelineContextValue {
   setLossReasonDetail: Dispatch<SetStateAction<string>>
   confirmLossReason: () => Promise<void>
 
-  nextStepPrompt: NextStepPrompt | null
-  setNextStepPrompt: Dispatch<SetStateAction<NextStepPrompt | null>>
-  nextStepTask: string
-  setNextStepTask: Dispatch<SetStateAction<string>>
-  nextStepSaving: boolean
-  createNextStepTask: () => Promise<void>
-
   showStageSettings: boolean
   setShowStageSettings: Dispatch<SetStateAction<boolean>>
   stageEdits: Record<string, { name: string; color: string }>
@@ -333,7 +320,7 @@ export interface PipelineContextValue {
   handleDeleteTask: (taskId: string) => Promise<void>
   fetchTaskActivities: (taskId: string) => Promise<void>
   fetchDealTasks: (dealId: string) => Promise<void>
-  createDealTaskBatch: (titles: string[]) => Promise<void>
+  createDealTaskBatch: (tasks: import('@/components/TaskPresetPicker').PickedTask[]) => Promise<void>
 
   handleLinkCustomer: (customerId: string) => Promise<void>
 
