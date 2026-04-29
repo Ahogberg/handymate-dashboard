@@ -26,6 +26,7 @@ import { useQuoteCalculations } from '../../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../../_shared/useQuoteItems'
 import { usePriceListLookup } from '../../_shared/usePriceListLookup'
 import { QuoteProductSearchModal } from '../../_shared/QuoteProductSearchModal'
+import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 import { QuoteEditHeader } from './components/QuoteEditHeader'
 import { QuoteEditCustomerSection } from './components/QuoteEditCustomerSection'
@@ -186,6 +187,10 @@ export default function EditQuotePage() {
   // Search modals
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
   const [showProductSearch, setShowProductSearch] = useState(false)
+
+  // Spara-i-prislistan modal — vilken offertrad som ska sparas
+  const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
+  const [savingProduct, setSavingProduct] = useState(false)
 
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
@@ -416,6 +421,7 @@ export default function EditQuotePage() {
           is_rot_eligible: item.is_rot_eligible || false,
           is_rut_eligible: item.is_rut_eligible || false,
           category_slug: item.category_slug || undefined,
+          linked_product_id: item.linked_product_id || undefined,
           sort_order: item.sort_order ?? idx,
         }))
         setItems(loadedItems)
@@ -638,6 +644,50 @@ export default function EditQuotePage() {
   }
 
   // ═══════════════════════════════════════════════════════════════════
+  // Spara i prislistan — POST /api/products + uppdatera linked_product_id
+  // ═══════════════════════════════════════════════════════════════════
+
+  async function saveItemToProducts(payload: ProductSavePayload) {
+    if (!productModalRow) return
+    setSavingProduct(true)
+    try {
+      const res = await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error || 'Kunde inte spara i prislistan')
+      } else {
+        const newId = data.product?.id
+        if (newId) {
+          updateItem(productModalRow.id, 'linked_product_id', newId)
+        }
+        toast.success('Sparad i prislistan')
+        setProductModalRow(null)
+      }
+    } catch (err) {
+      console.error('Save to products failed:', err)
+      toast.error('Kunde inte spara i prislistan')
+    }
+    setSavingProduct(false)
+  }
+
+  function buildProductInitialValues(row: QuoteItem): ProductInitialValues {
+    return {
+      name: row.description,
+      unit: row.unit,
+      sales_price: row.unit_price,
+      purchase_price: row.cost_price ?? null,
+      sku: row.article_number ?? null,
+      category: row.category_slug || 'material_bygg',
+      rot_eligible: row.is_rot_eligible,
+      rut_eligible: row.is_rut_eligible,
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
   // Save
   // ═══════════════════════════════════════════════════════════════════
 
@@ -764,6 +814,7 @@ export default function EditQuotePage() {
               onAddFromPriceList={addFromPriceList}
               onOpenProductSearch={() => setShowProductSearch(true)}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
+              onSaveToProducts={row => setProductModalRow(row)}
             />
 
             <QuoteEditRotSection
@@ -923,6 +974,17 @@ export default function EditQuotePage() {
           setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
         }}
       />
+
+      {productModalRow && (
+        <ProductModal
+          product={null}
+          initialValues={buildProductInitialValues(productModalRow)}
+          title="Spara i prislistan"
+          saving={savingProduct}
+          onSave={saveItemToProducts}
+          onClose={() => setProductModalRow(null)}
+        />
+      )}
 
       <QuoteEditSaveTemplateModal
         show={showSaveTemplateModal}

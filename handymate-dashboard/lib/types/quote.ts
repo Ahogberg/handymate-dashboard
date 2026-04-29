@@ -23,6 +23,9 @@ export interface QuoteItem {
   is_rut_eligible: boolean
   rot_rut_type?: RotRutType
   sort_order: number
+  // Spårar om raden sparats till prislistan ("Spara i prislistan"-flödet).
+  // Tomt = inte sparad. UUID = sparad och kopplad till products.id.
+  linked_product_id?: string | null
 }
 
 export interface QuoteTemplate {

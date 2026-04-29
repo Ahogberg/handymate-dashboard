@@ -1,6 +1,6 @@
 'use client'
 
-import { GripVertical, Trash2 } from 'lucide-react'
+import { Bookmark, BookmarkCheck, GripVertical, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { QuoteItem } from '@/lib/types/quote'
@@ -64,6 +64,12 @@ interface ItemRowProps {
   setShowNewCategoryInput?: (id: string | null) => void
   newCategoryLabel?: string
   setNewCategoryLabel?: (label: string) => void
+  /**
+   * Triggas när användaren klickar bookmark-ikonen för att spara raden i
+   * prislistan. Endast relevant för 'item'-rader. När undefined visas inte
+   * knappen.
+   */
+  onSaveToProducts?: (item: QuoteItem) => void
 }
 
 // ---------------------------------------------------------------------------
@@ -84,6 +90,7 @@ export default function ItemRow({
   setShowNewCategoryInput,
   newCategoryLabel,
   setNewCategoryLabel,
+  onSaveToProducts,
 }: ItemRowProps) {
   const badge = ITEM_TYPE_BADGE[item.item_type]
   const rowStyle = ITEM_TYPE_STYLES[item.item_type]
@@ -91,6 +98,14 @@ export default function ItemRow({
   const showTotal = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'subtotal'
   const displayTotal = item.item_type === 'subtotal' ? recalculatedTotal : item.total
   const isCreatingCategory = showNewCategoryInput === item.id && onCreateCategory
+
+  // "Spara i prislistan" — endast för 'item'-rader med beskrivning,
+  // när orchestrator har wirat upp callback:en
+  const canSaveToProducts =
+    !!onSaveToProducts &&
+    item.item_type === 'item' &&
+    item.description.trim() !== ''
+  const isSavedToProducts = !!item.linked_product_id
 
   const {
     attributes,
@@ -139,6 +154,25 @@ export default function ItemRow({
             className={`flex-1 min-w-0 px-2 py-1.5 bg-white border border-gray-200 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-primary-600 ${
               item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
           />
+          {canSaveToProducts && (
+            <button
+              type="button"
+              onClick={() => onSaveToProducts!(item)}
+              aria-label={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
+              title={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
+              className={`p-1 shrink-0 transition-colors ${
+                isSavedToProducts
+                  ? 'text-primary-700'
+                  : 'text-slate-300 hover:text-primary-700'
+              }`}
+            >
+              {isSavedToProducts ? (
+                <BookmarkCheck className="w-3.5 h-3.5" />
+              ) : (
+                <Bookmark className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
           <button onClick={() => onRemove(item.id)} className="p-1 text-gray-300 hover:text-red-500 shrink-0">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
@@ -166,7 +200,7 @@ export default function ItemRow({
       </div>
 
       {/* ── Desktop layout (≥ md) ────────────────────────────── */}
-      <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 items-center px-2 py-2">
+      <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px_28px] gap-1.5 items-center px-2 py-2">
 
         {/* Drag handle */}
         <button
@@ -242,6 +276,29 @@ export default function ItemRow({
             <option value="">—</option><option value="rot">ROT</option><option value="rut">RUT</option>
           </select>
         ) : <span />}
+
+        {/* Save to products — bookmark, visible on hover (eller alltid om sparad) */}
+        {canSaveToProducts ? (
+          <button
+            type="button"
+            onClick={() => onSaveToProducts!(item)}
+            aria-label={isSavedToProducts ? 'Sparad i prislistan' : 'Spara i prislistan'}
+            title={isSavedToProducts ? 'Sparad i prislistan — klicka för att uppdatera' : 'Spara i prislistan'}
+            className={`p-1 transition-all justify-self-center ${
+              isSavedToProducts
+                ? 'text-primary-700 opacity-100'
+                : 'text-slate-300 hover:text-primary-700 opacity-0 group-hover:opacity-100'
+            }`}
+          >
+            {isSavedToProducts ? (
+              <BookmarkCheck className="w-3.5 h-3.5" />
+            ) : (
+              <Bookmark className="w-3.5 h-3.5" />
+            )}
+          </button>
+        ) : (
+          <span aria-hidden />
+        )}
 
         {/* Delete — visible on hover */}
         <button onClick={() => onRemove(item.id)}

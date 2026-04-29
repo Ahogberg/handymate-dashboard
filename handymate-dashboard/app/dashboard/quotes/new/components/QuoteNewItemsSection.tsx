@@ -37,6 +37,7 @@ interface QuoteNewItemsSectionProps {
   setShowNewCategoryInput: (id: string | null) => void
   newCategoryLabel: string
   setNewCategoryLabel: (s: string) => void
+  onSaveToProducts?: (item: QuoteItem) => void
 }
 
 export function QuoteNewItemsSection({
@@ -58,6 +59,7 @@ export function QuoteNewItemsSection({
   setShowNewCategoryInput,
   newCategoryLabel,
   setNewCategoryLabel,
+  onSaveToProducts,
 }: QuoteNewItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
@@ -67,7 +69,7 @@ export function QuoteNewItemsSection({
 
       {/* Table header (desktop) */}
       {items.length > 0 && (
-        <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 px-2 pb-2 border-b border-slate-200 mb-1">
+        <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px_28px] gap-1.5 px-2 pb-2 border-b border-slate-200 mb-1">
           <span />
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">Typ</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500">Beskrivning</span>
@@ -77,6 +79,7 @@ export function QuoteNewItemsSection({
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-right">Summa</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">Kategori</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">ROT</span>
+          <span />
           <span />
         </div>
       )}
@@ -116,6 +119,7 @@ export function QuoteNewItemsSection({
                   setShowNewCategoryInput={setShowNewCategoryInput}
                   newCategoryLabel={newCategoryLabel}
                   setNewCategoryLabel={setNewCategoryLabel}
+                  onSaveToProducts={onSaveToProducts}
                 />
               ))}
             </div>

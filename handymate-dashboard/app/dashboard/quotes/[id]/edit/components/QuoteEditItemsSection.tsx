@@ -31,6 +31,7 @@ interface QuoteEditItemsSectionProps {
   onAddFromPriceList: (item: PriceItem) => void
   onOpenProductSearch: () => void
   onOpenGrossistSearch: () => void
+  onSaveToProducts?: (item: QuoteItem) => void
 }
 
 export function QuoteEditItemsSection({
@@ -47,6 +48,7 @@ export function QuoteEditItemsSection({
   onAddFromPriceList,
   onOpenProductSearch,
   onOpenGrossistSearch,
+  onSaveToProducts,
 }: QuoteEditItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
@@ -56,7 +58,7 @@ export function QuoteEditItemsSection({
 
       {/* Table header (desktop) */}
       {items.length > 0 && (
-        <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px] gap-1.5 px-2 pb-2 border-b border-slate-200 mb-1">
+        <div className="hidden md:grid md:grid-cols-[24px_56px_1fr_56px_64px_80px_80px_140px_72px_28px_28px] gap-1.5 px-2 pb-2 border-b border-slate-200 mb-1">
           <span />
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">Typ</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500">Beskrivning</span>
@@ -66,6 +68,7 @@ export function QuoteEditItemsSection({
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-right">Summa</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">Kategori</span>
           <span className="text-[10px] font-medium tracking-wider uppercase text-slate-500 text-center">ROT</span>
+          <span />
           <span />
         </div>
       )}
@@ -98,6 +101,7 @@ export function QuoteEditItemsSection({
                   onRemove={onRemoveItem}
                   onMove={onMoveItem}
                   allCategories={allCategories}
+                  onSaveToProducts={onSaveToProducts}
                 />
               ))}
             </div>
