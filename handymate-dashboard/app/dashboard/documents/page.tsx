@@ -458,7 +458,7 @@ export default function DocumentsPage() {
     try {
       const headers = await getAuthHeaders()
       if (file.source === 'customer' && file.customer_id) {
-        const res = await fetch(`/api/customers/${file.customer_id}/documents?docId=${file.id}`, {
+        const res = await fetch(`/api/customers/${file.customer_id}/documents/${file.id}`, {
           method: 'DELETE',
           headers,
         })
@@ -474,6 +474,38 @@ export default function DocumentsPage() {
       showToast('Fil borttagen')
     } catch {
       showToast('Kunde inte ta bort', 'error')
+    }
+  }
+
+  /**
+   * Öppna ett uppladdat dokument via signerad URL från rätt API-endpoint.
+   * Direkta publika storage-URL:er fungerar inte tillförlitligt om bucket
+   * är privat — server-side signerad URL fungerar oavsett bucket-config.
+   */
+  async function openUploadedFile(file: UploadedFile) {
+    try {
+      const headers = await getAuthHeaders()
+      let url: string | null = null
+      if (file.source === 'customer' && file.customer_id) {
+        const res = await fetch(`/api/customers/${file.customer_id}/documents/${file.id}`, { headers })
+        if (res.ok) {
+          const data = await res.json()
+          url = data.url
+        }
+      } else if (file.source === 'project' && file.project_id) {
+        const res = await fetch(`/api/projects/${file.project_id}/documents/${file.id}`, { headers })
+        if (res.ok) {
+          const data = await res.json()
+          url = data.url
+        }
+      }
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      } else {
+        showToast('Kunde inte öppna filen', 'error')
+      }
+    } catch {
+      showToast('Kunde inte öppna filen', 'error')
     }
   }
 
@@ -886,7 +918,7 @@ export default function DocumentsPage() {
                     <div
                       key={`${file.source}-${file.id}`}
                       className="bg-white border border-[#E2E8F0] rounded-xl p-4 hover:border-gray-300 transition-all group cursor-pointer"
-                      onClick={() => { if (file.file_url) window.open(file.file_url, '_blank') }}
+                      onClick={() => openUploadedFile(file)}
                     >
                       <div className="flex items-start gap-4">
                         <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -920,17 +952,14 @@ export default function DocumentsPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                          {file.file_url && (
-                            <a
-                              href={file.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 text-gray-500 hover:text-sky-700 hover:bg-gray-100 rounded-lg transition-all"
-                              title="Öppna fil"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => openUploadedFile(file)}
+                            className="p-2 text-gray-500 hover:text-sky-700 hover:bg-gray-100 rounded-lg transition-all"
+                            title="Öppna fil"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => deleteUploadedFile(file)}
                             className="p-2 text-gray-500 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-all"

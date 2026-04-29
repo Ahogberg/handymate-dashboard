@@ -72,11 +72,14 @@ interface Customer {
 interface CustomerDocument {
   id: string
   file_name: string
-  file_url: string
+  file_url: string | null
   file_type: string | null
   file_size: number | null
   category: string
   uploaded_at: string
+  // Käll-info för att kunna hämta rätt signerad URL via rätt endpoint
+  source: 'customer' | 'project'
+  project_id?: string | null
 }
 
 interface Activity {
@@ -311,30 +314,34 @@ export default function CustomerDetailPage() {
       })
       if (docRes.ok) {
         const docData = await docRes.json()
-        allDocs = docData.documents || []
+        // Tagga som 'customer' så click-handler kan välja rätt endpoint
+        allDocs = (docData.documents || []).map((d: any) => ({ ...d, source: 'customer' as const }))
       }
     } catch { /* Documents table may not exist yet */ }
 
-    // Hämta projektdokument
+    // Hämta projektdokument — project_document har annan kolumn-uppsättning
+    // (name, file_path, mime_type, created_at) än customer_document.
     if (projectIds.length > 0) {
       try {
         const { data: projDocs } = await supabase
           .from('project_document')
-          .select('id, file_name, file_url, file_type, file_size, category, uploaded_at')
+          .select('id, project_id, name, file_path, mime_type, file_size, category, created_at')
           .in('project_id', projectIds)
-          .order('uploaded_at', { ascending: false })
+          .order('created_at', { ascending: false })
 
-        const existingUrls = new Set(allDocs.map(d => d.file_url))
-        for (const pd of projDocs || []) {
-          if (!existingUrls.has(pd.file_url)) {
+        const existingIds = new Set(allDocs.map(d => d.id))
+        for (const pd of (projDocs || []) as any[]) {
+          if (!existingIds.has(pd.id)) {
             allDocs.push({
               id: pd.id,
-              file_name: pd.file_name,
-              file_url: pd.file_url,
-              file_type: pd.file_type,
+              file_name: pd.name,
+              file_url: null, // Hämtas via signerad URL on-demand i click-handler
+              source: 'project',
+              project_id: pd.project_id,
+              file_type: pd.mime_type,
               file_size: pd.file_size,
               category: pd.category || 'project',
-              uploaded_at: pd.uploaded_at,
+              uploaded_at: pd.created_at,
             })
           }
         }
@@ -512,10 +519,41 @@ export default function CustomerDetailPage() {
 
   async function deleteDocument(docId: string) {
     if (!confirm('Ta bort detta dokument?')) return
-    await fetch(`/api/customers/${customerId}/documents?docId=${docId}`, {
-      method: 'DELETE'
-    })
+    const doc = documents.find(d => d.id === docId)
+    const url =
+      doc?.source === 'project' && doc.project_id
+        ? `/api/projects/${doc.project_id}/documents/${docId}`
+        : `/api/customers/${customerId}/documents/${docId}`
+    await fetch(url, { method: 'DELETE' })
     fetchData()
+  }
+
+  /**
+   * Öppna ett dokument — hämta signerad URL via rätt endpoint baserat på källa.
+   * Customer-dokument lagrar publika URL:er som kan 403:a om bucket är privat;
+   * projekt-dokument lagrar bara file_path. Båda mönstrena löses genom att
+   * server genererar 1h signerad URL on-demand.
+   */
+  async function openDocument(doc: CustomerDocument) {
+    const url =
+      doc.source === 'project' && doc.project_id
+        ? `/api/projects/${doc.project_id}/documents/${doc.id}`
+        : `/api/customers/${customerId}/documents/${doc.id}`
+    try {
+      const res = await fetch(url)
+      if (!res.ok) {
+        alert('Kunde inte öppna filen. Försök igen.')
+        return
+      }
+      const data = await res.json()
+      if (data.url) {
+        window.open(data.url, '_blank', 'noopener,noreferrer')
+      } else {
+        alert('Filen hittades inte')
+      }
+    } catch {
+      alert('Kunde inte öppna filen. Försök igen.')
+    }
   }
 
   function formatFileSize(bytes: number | null) {
@@ -1100,15 +1138,14 @@ export default function CustomerDetailPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1">
-                            <a
-                              href={doc.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
+                              onClick={() => openDocument(doc)}
                               className="p-2.5 text-gray-400 hover:text-sky-700 hover:bg-primary-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
                               title="Öppna"
                             >
                               <Download className="w-4 h-4" />
-                            </a>
+                            </button>
                             <button
                               onClick={() => deleteDocument(doc.id)}
                               className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"

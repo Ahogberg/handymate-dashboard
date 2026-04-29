@@ -57,7 +57,10 @@ export async function POST(
     }
 
     const supabase = getServerSupabase()
-    await ensureBucket(supabase, 'project-files')
+    // public: true så att bucket-konfig är konsekvent (matchar customer-documents).
+    // Klient-koden använder signerad URL för säker access oavsett, men
+    // konsekvent config minskar risken för "ibland 403"-buggar.
+    await ensureBucket(supabase, 'project-files', { public: true })
     const projectId = params.id
 
     const formData = await request.formData()
