@@ -1698,7 +1698,7 @@ export default function PipelinePage() {
           setMobileStageIndex={setMobileStageIndex}
         />
 
-        {/* Kanban / Timeline / Flödet */}
+        {/* Översikt / Kanban / Tidslinje */}
         <div className="flex-1 overflow-hidden">
           {pipelineView === 'flow' ? (
             <FlowPipeline

@@ -58,21 +58,21 @@ export function PipelineHeader({ stats, mobileStageIndex, setMobileStageIndex }:
               <FolderKanban className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Pipeline</h1>
+              <h1 className="text-xl font-bold text-gray-900">Verksamhetsöversikt</h1>
               <p className="text-sm text-gray-500 hidden sm:block">
-                {stats ? `${stats.totalDeals} aktiva deals · ${formatValueCompact(stats.totalValue)}` : 'Hantera dina affärer'}
+                {stats ? `${stats.totalDeals} aktiva deals · ${formatValueCompact(stats.totalValue)}` : 'Säljtratt och aktiva projekt på en plats'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Flödet / Kanban / Tidslinje toggle */}
+            {/* Översikt / Kanban / Tidslinje toggle */}
             <div className="hidden sm:flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setPipelineView('flow')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${pipelineView === 'flow' ? 'bg-white text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                Flödet
+                Översikt
               </button>
               <button
                 onClick={() => setPipelineView('kanban')}
