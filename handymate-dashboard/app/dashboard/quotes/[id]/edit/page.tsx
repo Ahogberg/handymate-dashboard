@@ -25,6 +25,7 @@ import {
 import { useQuoteCalculations } from '../../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../../_shared/useQuoteItems'
 import { usePriceListLookup } from '../../_shared/usePriceListLookup'
+import { QuoteProductSearchModal } from '../../_shared/QuoteProductSearchModal'
 
 import { QuoteEditHeader } from './components/QuoteEditHeader'
 import { QuoteEditCustomerSection } from './components/QuoteEditCustomerSection'
@@ -182,8 +183,9 @@ export default function EditQuotePage() {
   const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
   const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
 
-  // Grossist search modal
+  // Search modals
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
+  const [showProductSearch, setShowProductSearch] = useState(false)
 
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
@@ -732,7 +734,7 @@ export default function EditQuotePage() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QuoteEditHeader quoteNumber={quoteNumberRef.current} autoSaveStatus={autoSaveStatus} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(540px,40%)] gap-5 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column — Form ─────────────────────────────────── */}
           <div className="flex flex-col gap-4">
             <QuoteEditCustomerSection
@@ -760,6 +762,7 @@ export default function EditQuotePage() {
               onRemoveItem={removeItem}
               onMoveItem={moveItem}
               onAddFromPriceList={addFromPriceList}
+              onOpenProductSearch={() => setShowProductSearch(true)}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
             />
 
@@ -897,6 +900,28 @@ export default function EditQuotePage() {
           setShowGrossistSearch(false)
         }}
         businessId={business.business_id}
+      />
+
+      <QuoteProductSearchModal
+        open={showProductSearch}
+        onClose={() => setShowProductSearch(false)}
+        onSelect={p => {
+          const newItem: QuoteItem = {
+            id: generateItemId(),
+            item_type: 'item',
+            description: p.name,
+            article_number: p.sku || undefined,
+            quantity: 1,
+            unit: p.unit || 'st',
+            unit_price: p.sales_price,
+            cost_price: p.purchase_price ?? undefined,
+            total: p.sales_price,
+            is_rot_eligible: !!p.rot_eligible,
+            is_rut_eligible: !!p.rut_eligible,
+            sort_order: items.length,
+          }
+          setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
+        }}
       />
 
       <QuoteEditSaveTemplateModal

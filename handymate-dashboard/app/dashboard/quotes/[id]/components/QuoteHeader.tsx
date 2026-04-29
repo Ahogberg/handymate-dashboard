@@ -34,7 +34,6 @@ interface QuoteHeaderProps {
   creatingProject: boolean
   creatingInvoice: boolean
   onOpenSendModal: () => void
-  onPreviewPDF: () => void
   onGeneratePDF: () => void
   onGenerateSignLink: () => void
   onCreateProject: () => void
@@ -70,7 +69,6 @@ export function QuoteHeader({
   creatingProject,
   creatingInvoice,
   onOpenSendModal,
-  onPreviewPDF,
   onGeneratePDF,
   onGenerateSignLink,
   onCreateProject,
@@ -146,7 +144,7 @@ export function QuoteHeader({
             className={GHOST_BTN}
           >
             <Eye className="w-4 h-4" />
-            Förhandsgranska
+            Visa kundvy
           </a>
         )}
         {['draft', 'sent', 'opened'].includes(quote.status) && (
@@ -185,12 +183,8 @@ export function QuoteHeader({
           {creatingVersion ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitBranch className="w-4 h-4" />}
           Ny version
         </button>
-        <button onClick={onPreviewPDF} disabled={generatingPdf} className={GHOST_BTN}>
-          {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Eye className="w-4 h-4" />}
-          Förhandsgranska
-        </button>
         <button onClick={onGeneratePDF} disabled={generatingPdf} className={GHOST_BTN}>
-          <Download className="w-4 h-4" />
+          {generatingPdf ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
           Ladda ner PDF
         </button>
         <button onClick={onSaveTemplate} className={GHOST_BTN}>

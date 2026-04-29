@@ -238,29 +238,6 @@ export default function QuoteDetailPage() {
     setCreatingVersion(false)
   }
 
-  const previewPDF = async () => {
-    if (!quote) return
-    setGeneratingPdf(true)
-    try {
-      const response = await fetch('/api/quotes/pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteId: quote.quote_id }),
-      })
-      if (response.ok) {
-        const blob = await response.blob()
-        const url = window.URL.createObjectURL(blob)
-        window.open(url, '_blank')
-        showToast('PDF öppnad i ny flik', 'success')
-      } else {
-        showToast('Kunde inte generera förhandsgranskning', 'error')
-      }
-    } catch {
-      showToast('Något gick fel', 'error')
-    }
-    setGeneratingPdf(false)
-  }
-
   const createInvoiceFromQuote = async () => {
     if (!quote) return
     setCreatingInvoice(true)
@@ -397,7 +374,6 @@ export default function QuoteDetailPage() {
           creatingProject={creatingProject}
           creatingInvoice={creatingInvoice}
           onOpenSendModal={onOpenSendModal}
-          onPreviewPDF={previewPDF}
           onGeneratePDF={generatePDF}
           onGenerateSignLink={generateSignLink}
           onCreateProject={createProjectFromQuote}

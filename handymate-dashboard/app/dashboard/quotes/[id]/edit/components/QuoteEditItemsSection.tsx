@@ -29,6 +29,7 @@ interface QuoteEditItemsSectionProps {
   onRemoveItem: (id: string) => void
   onMoveItem: (index: number, direction: 'up' | 'down') => void
   onAddFromPriceList: (item: PriceItem) => void
+  onOpenProductSearch: () => void
   onOpenGrossistSearch: () => void
 }
 
@@ -44,6 +45,7 @@ export function QuoteEditItemsSection({
   onRemoveItem,
   onMoveItem,
   onAddFromPriceList,
+  onOpenProductSearch,
   onOpenGrossistSearch,
 }: QuoteEditItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
@@ -103,9 +105,8 @@ export function QuoteEditItemsSection({
         </DndContext>
       )}
 
-      {/* Add row buttons */}
-      {items.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100">
+      {/* Add row buttons — alltid synliga så Sök produkt/grossist är åtkomliga även med tom lista */}
+      <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100">
           <button
             type="button"
             onClick={() => onAddItem('item')}
@@ -117,7 +118,7 @@ export function QuoteEditItemsSection({
 
           <button
             type="button"
-            onClick={onOpenGrossistSearch}
+            onClick={onOpenProductSearch}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 bg-white rounded-lg transition-colors"
           >
             <Search className="w-3.5 h-3.5" />
@@ -155,12 +156,21 @@ export function QuoteEditItemsSection({
                       {opt.label}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onOpenGrossistSearch()
+                      setShowAdvancedTypes(false)
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100"
+                  >
+                    Sök grossist
+                  </button>
                 </div>
               </>
             )}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* Quick add from price list */}
       {priceList.length > 0 ? (

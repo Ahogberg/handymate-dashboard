@@ -27,12 +27,14 @@ export const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
   discount: 'bg-red-50/40',
 }
 
-export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string }> = {
-  item: { label: 'Post', cls: 'bg-primary-50 text-primary-700' },
-  heading: { label: 'Rubrik', cls: 'bg-indigo-50 text-indigo-700' },
-  text: { label: 'Text', cls: 'bg-gray-100 text-gray-600' },
-  subtotal: { label: 'Delsumma', cls: 'bg-gray-200 text-gray-700' },
-  discount: { label: 'Rabatt', cls: 'bg-red-50 text-red-700' },
+// Vanliga 'item'-rader saknar badge — skarp visuell avgränsning ges enbart åt
+// särskilda radtyper (rubrik, fritext, delsumma, rabatt) som påverkar layouten i offerten.
+export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cls: string } | null> = {
+  item: null,
+  heading: { label: 'Rubrik', cls: 'bg-indigo-50 text-indigo-700 border border-indigo-100' },
+  text: { label: 'Fritext', cls: 'bg-slate-100 text-slate-700 border border-slate-200' },
+  subtotal: { label: 'Delsumma', cls: 'bg-slate-200 text-slate-700 border border-slate-300' },
+  discount: { label: 'Rabatt', cls: 'bg-red-50 text-red-700 border border-red-100' },
 }
 
 export function formatCurrency(amount: number) {
@@ -124,9 +126,11 @@ export default function ItemRow({
           >
             <GripVertical className="w-4 h-4" />
           </button>
-          <span className={`shrink-0 px-1.5 py-0.5 text-[9px] rounded font-medium ${badge.cls}`}>
-            {badge.label}
-          </span>
+          {badge && (
+            <span className={`shrink-0 px-1.5 py-0.5 text-[9px] rounded font-semibold uppercase tracking-wider ${badge.cls}`}>
+              {badge.label}
+            </span>
+          )}
           <input
             type="text"
             value={item.description}
@@ -174,10 +178,14 @@ export default function ItemRow({
           <GripVertical className="w-4 h-4" />
         </button>
 
-        {/* Type badge */}
-        <span className={`px-1.5 py-0.5 text-[9px] rounded font-medium text-center truncate ${badge.cls}`}>
-          {badge.label}
-        </span>
+        {/* Type badge — endast för icke-standardrader */}
+        {badge ? (
+          <span className={`px-1.5 py-0.5 text-[9px] rounded font-semibold uppercase tracking-wider text-center truncate ${badge.cls}`}>
+            {badge.label}
+          </span>
+        ) : (
+          <span aria-hidden />
+        )}
 
         {/* Description — takes all remaining space */}
         <input
