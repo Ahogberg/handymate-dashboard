@@ -721,15 +721,15 @@ export default function EditQuotePage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <Loader2 className="w-6 h-6 text-[#0F766E] animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
-      <div className="max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QuoteEditHeader quoteNumber={quoteNumberRef.current} autoSaveStatus={autoSaveStatus} />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(540px,40%)] gap-5 items-start">
@@ -855,21 +855,22 @@ export default function EditQuotePage() {
             <button
               onClick={() => saveQuote(true)}
               disabled={saving || !selectedCustomer}
-              className="w-full py-3 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
             >
-              {saving ? 'Sparar...' : 'Skicka offert'}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {saving ? 'Sparar…' : 'Skicka offert'}
             </button>
             <button
               onClick={() => saveQuote(false)}
               disabled={saving}
-              className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC] disabled:opacity-50"
+              className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
             >
               Spara utkast
             </button>
             {items.length > 0 && (
               <button
                 onClick={() => { setTemplateName(title); setShowSaveTemplateModal(true) }}
-                className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
+                className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors"
               >
                 Spara som mall
               </button>

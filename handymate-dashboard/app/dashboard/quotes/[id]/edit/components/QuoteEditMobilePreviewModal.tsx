@@ -11,11 +11,6 @@ interface QuoteEditMobilePreviewModalProps {
   contactName?: string
 }
 
-/**
- * Floating "Förhandsgranska"-knapp på mobil + modal som öppnas av den.
- * Renderas alltid (knappen är fixed bottom-right på <lg) — modalen visas
- * när `open` är true.
- */
 export function QuoteEditMobilePreviewModal({
   open,
   setOpen,
@@ -28,27 +23,30 @@ export function QuoteEditMobilePreviewModal({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 lg:hidden flex items-center gap-2 px-4 py-3 bg-[#0F766E] text-white rounded-full shadow-lg hover:bg-[#0D655D] transition-colors"
+        className="fixed bottom-6 right-6 z-40 lg:hidden inline-flex items-center gap-2 px-4 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-full shadow-lg transition-colors"
       >
         <Eye className="w-4 h-4" />
-        <span className="text-sm font-medium">Förhandsgranska</span>
+        Förhandsgranska
       </button>
 
       {open && data && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto lg:hidden"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-8 overflow-y-auto lg:hidden"
           onClick={() => setOpen(false)}
         >
           <div
-            className="bg-[#F8FAFC] rounded-xl w-full max-w-lg relative"
+            className="bg-slate-50 rounded-2xl w-full max-w-lg relative shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0]">
-              <span className="text-sm font-medium text-[#1E293B]">Förhandsgranska offert</span>
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-white rounded-t-2xl">
+              <span className="font-heading text-sm font-bold text-slate-900 tracking-tight">
+                Förhandsgranska offert
+              </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="p-1 text-[#94A3B8] hover:text-[#1E293B] transition-colors"
+                className="p-1.5 -m-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label="Stäng"
               >
                 <X className="w-5 h-5" />
               </button>

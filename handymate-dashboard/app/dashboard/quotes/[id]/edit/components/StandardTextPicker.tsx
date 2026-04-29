@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import type { QuoteStandardText } from '@/lib/types/quote'
 
 interface StandardTextPickerProps {
@@ -18,14 +19,15 @@ export function StandardTextPicker({ texts, onSelect }: StandardTextPickerProps)
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="text-xs text-sky-700 hover:text-primary-800 transition-colors"
+        className="inline-flex items-center gap-1 text-xs text-primary-700 hover:text-primary-600 transition-colors"
       >
         Välj standardtext
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-6 z-20 bg-white border border-[#E2E8F0] rounded-lg shadow-lg w-64 max-h-48 overflow-y-auto">
+          <div className="absolute right-0 top-6 z-20 bg-white border border-slate-200 rounded-xl shadow-lg w-64 max-h-48 overflow-y-auto py-1">
             {texts.map(t => (
               <button
                 key={t.id}
@@ -34,11 +36,13 @@ export function StandardTextPicker({ texts, onSelect }: StandardTextPickerProps)
                   onSelect(t.content)
                   setOpen(false)
                 }}
-                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
               >
-                <span className="font-medium">{t.name}</span>
+                <span className="font-medium truncate">{t.name}</span>
                 {t.is_default && (
-                  <span className="ml-1 text-[10px] text-sky-700 bg-primary-50 px-1 rounded">standard</span>
+                  <span className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-primary-700 bg-primary-50 px-1.5 py-0.5 rounded">
+                    Standard
+                  </span>
                 )}
               </button>
             ))}

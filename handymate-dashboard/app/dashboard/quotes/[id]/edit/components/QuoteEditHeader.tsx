@@ -1,6 +1,6 @@
 'use client'
 
-import { Loader2 } from 'lucide-react'
+import { ArrowLeft, Check, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
 interface QuoteEditHeaderProps {
@@ -10,33 +10,56 @@ interface QuoteEditHeaderProps {
 
 export function QuoteEditHeader({ quoteNumber, autoSaveStatus }: QuoteEditHeaderProps) {
   return (
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center">
+    <header className="sticky top-0 z-30 -mx-4 sm:-mx-6 mb-6 px-4 sm:px-6 py-3 bg-slate-50/95 backdrop-blur-sm border-b border-slate-200">
+      <div className="flex items-center gap-3">
         <Link
           href="/dashboard/quotes"
-          className="text-[13px] text-[#64748B] hover:text-[#1E293B] transition-colors"
+          className="p-2 -ml-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+          aria-label="Tillbaka till offertlistan"
         >
-          ← Offerter
+          <ArrowLeft className="w-5 h-5" />
         </Link>
-        <span className="text-[18px] font-medium text-[#1E293B] ml-3">
-          Redigera offert
+        <div className="flex items-baseline gap-2 min-w-0">
+          <h1 className="font-heading text-lg sm:text-xl font-bold text-slate-900 tracking-tight truncate">
+            Redigerar offert
+          </h1>
           {quoteNumber && (
-            <span className="ml-1.5 text-[13px] font-normal text-[#94A3B8]">{quoteNumber}</span>
+            <span className="text-xs font-medium text-slate-500 font-mono">{quoteNumber}</span>
           )}
-        </span>
-        {autoSaveStatus === 'saving' && (
-          <span className="ml-3 text-[11px] text-[#94A3B8] flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Sparar...
-          </span>
-        )}
-        {autoSaveStatus === 'saved' && (
-          <span className="ml-3 text-[11px] text-[#0F766E] flex items-center gap-1">✓ Sparad</span>
-        )}
-        {autoSaveStatus === 'error' && (
-          <span className="ml-3 text-[11px] text-red-500">Kunde inte spara</span>
-        )}
+        </div>
+
+        {/* Auto-save indicator */}
+        <AutoSaveIndicator status={autoSaveStatus} />
       </div>
-    </div>
+    </header>
+  )
+}
+
+function AutoSaveIndicator({ status }: { status: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (status === 'idle') return null
+
+  const cfg = {
+    saving: {
+      icon: <Loader2 className="w-3 h-3 animate-spin" />,
+      label: 'Sparar…',
+      cls: 'text-slate-500',
+    },
+    saved: {
+      icon: <Check className="w-3 h-3" />,
+      label: 'Sparad',
+      cls: 'text-green-700',
+    },
+    error: {
+      icon: null,
+      label: 'Kunde inte spara',
+      cls: 'text-red-600',
+    },
+  }[status]
+
+  return (
+    <span className={`ml-auto text-xs font-medium flex items-center gap-1 ${cfg.cls}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { Sparkles } from 'lucide-react'
 import type { QuoteItem } from '@/lib/types/quote'
 
 interface QuoteEditRotSectionProps {
@@ -12,10 +13,6 @@ interface QuoteEditRotSectionProps {
   setFastighetsbeteckning: (s: string) => void
 }
 
-/**
- * ROT-avdrag-toggle + personnummer/fastighet-fält. Klick på toggle
- * sätter is_rot_eligible på alla rader (eller plockar bort när AV).
- */
 export function QuoteEditRotSection({
   items,
   setItems,
@@ -25,51 +22,78 @@ export function QuoteEditRotSection({
   fastighetsbeteckning,
   setFastighetsbeteckning,
 }: QuoteEditRotSectionProps) {
+  const toggle = () => {
+    if (hasRotItems) {
+      setItems(prev => prev.map(item => ({ ...item, is_rot_eligible: false })))
+    } else {
+      setItems(prev =>
+        prev.map(item => ({
+          ...item,
+          is_rot_eligible: item.item_type === 'item' && item.unit === 'tim',
+        })),
+      )
+    }
+  }
+
   return (
-    <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-6">
-      <div
-        className="flex items-center justify-between cursor-pointer"
-        onClick={() => {
-          if (hasRotItems) {
-            setItems(prev => prev.map(item => ({ ...item, is_rot_eligible: false })))
-          } else {
-            setItems(prev =>
-              prev.map(item => ({
-                ...item,
-                is_rot_eligible: item.item_type === 'item' && item.unit === 'tim',
-              })),
-            )
-          }
-        }}
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between text-left group"
       >
-        <span className="text-[13px] text-[#1E293B]">ROT-avdrag</span>
-        <div className={`w-9 h-5 rounded-full relative transition-colors ${hasRotItems ? 'bg-[#0F766E]' : 'bg-[#CBD5E1]'}`}>
-          <div className={`absolute w-3.5 h-3.5 bg-white rounded-full top-[3px] transition-all ${hasRotItems ? 'left-[19px]' : 'left-[3px]'}`} />
-        </div>
-      </div>
+        <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <Sparkles className={`w-4 h-4 ${hasRotItems ? 'text-primary-700' : 'text-slate-400'}`} />
+          ROT-avdrag
+          {hasRotItems && (
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
+              Aktivt
+            </span>
+          )}
+        </span>
+        {/* Switch */}
+        <span
+          aria-checked={hasRotItems}
+          role="switch"
+          className={`relative inline-flex h-6 w-10 flex-shrink-0 rounded-full transition-colors ${
+            hasRotItems ? 'bg-primary-700' : 'bg-slate-300 group-hover:bg-slate-400'
+          }`}
+        >
+          <span
+            className={`inline-block h-5 w-5 mt-[2px] rounded-full bg-white shadow-sm transition-transform ${
+              hasRotItems ? 'translate-x-[18px]' : 'translate-x-[2px]'
+            }`}
+          />
+        </span>
+      </button>
+
       {hasRotItems && (
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[12px] text-[#64748B] mb-1">Personnummer</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              Personnummer
+            </label>
             <input
               type="text"
               value={personnummer}
               onChange={e => setPersonnummer(e.target.value)}
               placeholder="YYYYMMDD-XXXX"
-              className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-[12px] text-[#64748B] mb-1">Fastighetsbeteckning</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              Fastighetsbeteckning
+            </label>
             <input
               type="text"
               value={fastighetsbeteckning}
               onChange={e => setFastighetsbeteckning(e.target.value)}
               placeholder="T.ex. Stockholm Söder 1:23"
-              className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
             />
           </div>
-          <p className="text-[12px] text-[#0F766E] sm:col-span-2">
+          <p className="text-xs text-primary-700 sm:col-span-2 leading-relaxed">
             Kunden betalar 70% — Skatteverket betalar resterande 30% direkt till dig.
           </p>
         </div>

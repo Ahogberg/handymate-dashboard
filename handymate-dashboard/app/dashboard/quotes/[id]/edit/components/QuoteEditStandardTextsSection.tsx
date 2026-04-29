@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, FileText } from 'lucide-react'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { StandardTextPicker } from './StandardTextPicker'
 import type { QuoteStandardText } from '@/lib/types/quote'
@@ -49,56 +49,58 @@ export function QuoteEditStandardTextsSection({
   setPaymentTermsText,
 }: QuoteEditStandardTextsSectionProps) {
   return (
-    <div className="bg-white border-thin border-[#E2E8F0] rounded-xl">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-7 py-4 text-left"
+        className="w-full flex items-center gap-3 px-5 sm:px-6 py-4 text-left hover:bg-slate-50/50 transition-colors"
       >
-        <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Referenser och texter</span>
-        <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${open ? 'rotate-180' : ''}`} />
+        <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+          <FileText className="w-4.5 h-4.5" />
+        </div>
+        <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">
+          Referenser och texter
+        </h2>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-7 pb-6 space-y-4">
+        <div className="px-5 sm:px-6 pb-6 space-y-4 border-t border-slate-100 pt-5">
           {/* Reference fields */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[12px] text-[#64748B] mb-1">Er referens</label>
+            <Field label="Er referens">
               <input
                 type="text"
                 value={referencePerson}
                 onChange={e => setReferencePerson(e.target.value)}
                 placeholder="Namn"
-                className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                className={INPUT_CLS}
               />
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#64748B] mb-1">Kundens referens</label>
+            </Field>
+            <Field label="Kundens referens">
               <input
                 type="text"
                 value={customerReference}
                 onChange={e => setCustomerReference(e.target.value)}
                 placeholder="Referensnummer"
-                className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                className={INPUT_CLS}
               />
-            </div>
-            <div>
-              <label className="block text-[12px] text-[#64748B] mb-1">Arbetsplatsadress</label>
+            </Field>
+            <Field label="Arbetsplatsadress">
               <AddressAutocomplete
                 value={projectAddress}
                 onChange={setProjectAddress}
                 onSelect={r => setProjectAddress(r.full_address)}
-                placeholder="Sök adress..."
-                className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E]"
+                placeholder="Sök adress…"
+                className={INPUT_CLS}
               />
-            </div>
+            </Field>
           </div>
 
           {/* Standard texts */}
-          <div className="border-t border-thin border-[#E2E8F0] pt-4 space-y-3">
+          <div className="border-t border-slate-100 pt-4 space-y-3">
             <TextField
               label="Inledningstext"
-              placeholder="Hälsningsfras och inledning..."
+              placeholder="Hälsningsfras och inledning…"
               value={introductionText}
               onChange={setIntroductionText}
               picker={textsByType.introduction}
@@ -106,7 +108,7 @@ export function QuoteEditStandardTextsSection({
             />
             <TextField
               label="Avslutningstext"
-              placeholder="Avslutande text..."
+              placeholder="Avslutande text…"
               value={conclusionText}
               onChange={setConclusionText}
               picker={textsByType.conclusion}
@@ -114,7 +116,7 @@ export function QuoteEditStandardTextsSection({
             />
             <TextField
               label="Ej inkluderat"
-              placeholder="Vad ingår inte..."
+              placeholder="Vad ingår inte…"
               value={notIncluded}
               onChange={setNotIncluded}
               picker={textsByType.not_included}
@@ -122,7 +124,7 @@ export function QuoteEditStandardTextsSection({
             />
             <TextField
               label="ÄTA-villkor"
-              placeholder="Ändrings- och tilläggsarbeten..."
+              placeholder="Ändrings- och tilläggsarbeten…"
               value={ataTerms}
               onChange={setAtaTerms}
               picker={textsByType.ata_terms}
@@ -130,7 +132,7 @@ export function QuoteEditStandardTextsSection({
             />
             <TextField
               label="Betalningsvillkor"
-              placeholder="Betalningsvillkor..."
+              placeholder="Betalningsvillkor…"
               value={paymentTermsText}
               onChange={setPaymentTermsText}
               picker={textsByType.payment_terms}
@@ -139,6 +141,18 @@ export function QuoteEditStandardTextsSection({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const INPUT_CLS =
+  'w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors'
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">{label}</label>
+      {children}
     </div>
   )
 }
@@ -160,8 +174,8 @@ function TextField({
 }) {
   return (
     <div>
-      <div className="flex items-center justify-between mb-1">
-        <label className="block text-[12px] text-[#64748B]">{label}</label>
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</label>
         <StandardTextPicker texts={picker} onSelect={onPick} />
       </div>
       <textarea
@@ -169,7 +183,7 @@ function TextField({
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         rows={2}
-        className="w-full px-3 py-[9px] text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] focus:outline-none focus:border-[#0F766E] resize-y"
+        className={`${INPUT_CLS} resize-y leading-relaxed font-body`}
       />
     </div>
   )
