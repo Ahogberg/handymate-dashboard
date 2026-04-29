@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Eye, Maximize2, X } from 'lucide-react'
+import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
 import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 
@@ -27,6 +27,7 @@ export function QuoteEditPreviewPanel({
   contactName,
 }: QuoteEditPreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
+  const [previewPending, setPreviewPending] = useState(false)
 
   return (
     <>
@@ -43,6 +44,12 @@ export function QuoteEditPreviewPanel({
             <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">
               Förhandsgranska
             </h2>
+            {previewMode === 'design' && previewPending && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                Uppdaterar
+              </span>
+            )}
           </button>
           {open && (
             <button
@@ -94,6 +101,7 @@ export function QuoteEditPreviewPanel({
               <TemplatePreviewFrame
                 payload={templatePreviewPayload}
                 className="flex-1 min-h-0"
+                onPendingChange={setPreviewPending}
               />
             ) : (
               debouncedPreviewData && (
@@ -133,7 +141,11 @@ export function QuoteEditPreviewPanel({
             </div>
             <div className="flex-1 overflow-hidden p-3">
               {previewMode === 'design' ? (
-                <TemplatePreviewFrame payload={templatePreviewPayload} className="h-full" />
+                <TemplatePreviewFrame
+                  payload={templatePreviewPayload}
+                  className="h-full"
+                  onPendingChange={setPreviewPending}
+                />
               ) : (
                 debouncedPreviewData && (
                   <div className="h-full overflow-auto">

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, Eye, Maximize2, X } from 'lucide-react'
+import { ChevronDown, Eye, Loader2, Maximize2, X } from 'lucide-react'
 import QuotePreview, { type QuotePreviewData } from '@/components/quotes/QuotePreview'
 import TemplatePreviewFrame, { type TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import ModernCanvas, { type ModernCanvasHandlers } from '@/components/quotes/editable/ModernCanvas'
@@ -37,6 +37,7 @@ export function QuoteNewPreviewPanel({
   contactName,
 }: QuoteNewPreviewPanelProps) {
   const [fullscreen, setFullscreen] = useState(false)
+  const [previewPending, setPreviewPending] = useState(false)
 
   function renderPreviewBody(flexFill: boolean) {
     const sizeCls = flexFill ? 'flex-1 min-h-0' : 'h-full'
@@ -48,7 +49,13 @@ export function QuoteNewPreviewPanel({
       )
     }
     if (previewMode === 'design' || (previewMode === 'live' && !liveAvailable)) {
-      return <TemplatePreviewFrame payload={templatePreviewPayload} className={sizeCls} />
+      return (
+        <TemplatePreviewFrame
+          payload={templatePreviewPayload}
+          className={sizeCls}
+          onPendingChange={setPreviewPending}
+        />
+      )
     }
     return (
       debouncedPreviewData && (
@@ -78,6 +85,12 @@ export function QuoteNewPreviewPanel({
             <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">
               Förhandsgranska
             </h2>
+            {previewMode === 'design' && previewPending && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                Uppdaterar
+              </span>
+            )}
           </button>
           {open && (
             <button

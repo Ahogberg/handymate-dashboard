@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, FileText, Plus, Search } from 'lucide-react'
+import { ChevronDown, FileText, Plus } from 'lucide-react'
 import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import SharedItemRow from '@/components/quotes/ItemRow'
 import type { QuoteItem } from '@/lib/types/quote'
 import type { CustomCategory } from '@/lib/constants/categories'
+import { QuoteAddRowCombo } from '../../../_shared/QuoteAddRowCombo'
+import type { ProductSearchResult } from '../../../_shared/QuoteProductSearchModal'
 
 interface PriceItem {
   id: string
@@ -29,7 +31,8 @@ interface QuoteEditItemsSectionProps {
   onRemoveItem: (id: string) => void
   onMoveItem: (index: number, direction: 'up' | 'down') => void
   onAddFromPriceList: (item: PriceItem) => void
-  onOpenProductSearch: () => void
+  onSelectProduct: (product: ProductSearchResult) => void
+  onAddBlankRow: (description: string) => void
   onOpenGrossistSearch: () => void
   onSaveToProducts?: (item: QuoteItem) => void
 }
@@ -46,7 +49,8 @@ export function QuoteEditItemsSection({
   onRemoveItem,
   onMoveItem,
   onAddFromPriceList,
-  onOpenProductSearch,
+  onSelectProduct,
+  onAddBlankRow,
   onOpenGrossistSearch,
   onSaveToProducts,
 }: QuoteEditItemsSectionProps) {
@@ -109,24 +113,17 @@ export function QuoteEditItemsSection({
         </DndContext>
       )}
 
-      {/* Add row buttons — alltid synliga så Sök produkt/grossist är åtkomliga även med tom lista */}
+      {/* Add row — Combo-input för sök/lägg-till + Lägg till rad-knapp + Fler alternativ */}
       <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100">
+          <QuoteAddRowCombo onSelectProduct={onSelectProduct} onAddBlankRow={onAddBlankRow} />
+
           <button
             type="button"
             onClick={() => onAddItem('item')}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-primary-700 border border-primary-200 hover:bg-primary-50 hover:border-primary-300 bg-white rounded-lg transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
-            Lägg till rad
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenProductSearch}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300 bg-white rounded-lg transition-colors"
-          >
-            <Search className="w-3.5 h-3.5" />
-            Sök produkt
+            Lägg till tom rad
           </button>
 
           <div className="relative">

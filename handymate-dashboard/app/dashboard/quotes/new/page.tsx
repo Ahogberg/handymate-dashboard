@@ -23,7 +23,8 @@ import {
 import { useQuoteCalculations } from '../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../_shared/useQuoteItems'
 import { usePriceListLookup } from '../_shared/usePriceListLookup'
-import { QuoteProductSearchModal, type ProductSearchResult } from '../_shared/QuoteProductSearchModal'
+import type { ProductSearchResult } from '../_shared/QuoteProductSearchModal'
+import { QuoteQuickstartCard, type QuickstartRow } from '../_shared/QuoteQuickstartCard'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 // Återanvända komponenter från edit-sprinten
@@ -206,11 +207,11 @@ export default function NewQuotePage() {
 
   // Modals & search
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
-  const [showProductSearch, setShowProductSearch] = useState(false)
-
   // Spara-i-prislistan modal — vilken offertrad som ska sparas
   const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
   const [savingProduct, setSavingProduct] = useState(false)
+  // Antal sparade produkter — styr om Snabbstart-kortet ska visas
+  const [productsCount, setProductsCount] = useState<number | null>(null)
 
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
@@ -541,6 +542,7 @@ export default function NewQuotePage() {
     if (!business.business_id) return
     fetchData()
     fetchStandardTexts()
+    fetchProductsCount()
 
     const transcript = searchParams?.get('transcript')
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
@@ -614,6 +616,20 @@ export default function NewQuotePage() {
       if (defaultPayment) setPaymentTermsText(defaultPayment.content)
     } catch {
       // silent
+    }
+  }
+
+  async function fetchProductsCount() {
+    try {
+      const res = await fetch('/api/products')
+      if (!res.ok) {
+        setProductsCount(0)
+        return
+      }
+      const data = await res.json()
+      setProductsCount((data.products || []).length)
+    } catch {
+      setProductsCount(0)
     }
   }
 
@@ -1058,6 +1074,26 @@ export default function NewQuotePage() {
     setSavingProduct(false)
   }
 
+  function addQuickstartRow(row: QuickstartRow) {
+    setItems(prev => [
+      ...prev,
+      {
+        id: generateItemId(),
+        item_type: 'item',
+        description: row.name,
+        quantity: 1,
+        unit: row.unit,
+        unit_price: row.sales_price,
+        total: row.sales_price,
+        category_slug: row.category_slug,
+        is_rot_eligible: row.is_rot_eligible,
+        is_rut_eligible: row.is_rut_eligible,
+        rot_rut_type: row.is_rot_eligible ? 'rot' : row.is_rut_eligible ? 'rut' : null,
+        sort_order: prev.length,
+      },
+    ])
+  }
+
   function buildProductInitialValues(row: QuoteItem): ProductInitialValues {
     return {
       name: row.description,
@@ -1265,6 +1301,11 @@ export default function NewQuotePage() {
               </div>
             </div>
 
+            {/* Snabbstart — visas bara när användaren har en tom offert OCH tom prislista */}
+            {items.length === 0 && productsCount === 0 && (
+              <QuoteQuickstartCard onAddRow={addQuickstartRow} />
+            )}
+
             <QuoteNewAIHelper
               open={showAiHelper}
               setOpen={setShowAiHelper}
@@ -1309,8 +1350,25 @@ export default function NewQuotePage() {
               onRemoveItem={removeItem}
               onMoveItem={moveItem}
               onAddFromPriceList={addFromPriceList}
+              onSelectProduct={addFromProduct}
+              onAddBlankRow={description => {
+                setItems(prev => [
+                  ...prev,
+                  {
+                    id: generateItemId(),
+                    item_type: 'item',
+                    description,
+                    quantity: 1,
+                    unit: 'st',
+                    unit_price: 0,
+                    total: 0,
+                    is_rot_eligible: false,
+                    is_rut_eligible: false,
+                    sort_order: prev.length,
+                  },
+                ])
+              }}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-              onOpenProductSearch={() => setShowProductSearch(true)}
               onCreateCategory={createCustomCategory}
               showNewCategoryInput={showNewCategoryInput}
               setShowNewCategoryInput={setShowNewCategoryInput}
@@ -1433,12 +1491,6 @@ export default function NewQuotePage() {
           setShowGrossistSearch(false)
         }}
         businessId={business.business_id}
-      />
-
-      <QuoteProductSearchModal
-        open={showProductSearch}
-        onClose={() => setShowProductSearch(false)}
-        onSelect={addFromProduct}
       />
 
       {productModalRow && (

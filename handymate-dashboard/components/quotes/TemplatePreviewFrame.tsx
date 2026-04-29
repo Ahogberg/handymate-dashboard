@@ -17,6 +17,12 @@ interface Props {
   debounceMs?: number
   /** Höjd på iframe (default: 100% av container) */
   className?: string
+  /**
+   * Triggas när intern status växlar mellan pending (payload ändrad,
+   * väntar på debounce eller fetchar) och idle. Låter förälder visa en
+   * sync-indikator i panelheadern.
+   */
+  onPendingChange?: (pending: boolean) => void
 }
 
 /**
@@ -26,7 +32,7 @@ interface Props {
  * Debouncar payload-ändringar så vi inte hamrar endpointen vid varje knapptryck.
  * Behåller senaste genererade HTML medan ny laddas så previewn inte blinkar.
  */
-export default function TemplatePreviewFrame({ payload, debounceMs = 600, className }: Props) {
+export default function TemplatePreviewFrame({ payload, debounceMs = 600, className, onPendingChange }: Props) {
   const [html, setHtml] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +40,8 @@ export default function TemplatePreviewFrame({ payload, debounceMs = 600, classN
   const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
+    // Notifiera direkt att vi är i pending-state (debounce + fetch-fönster)
+    onPendingChange?.(true)
     const timer = setTimeout(async () => {
       // Avbryt eventuell pågående request
       if (abortRef.current) abortRef.current.abort()
@@ -60,11 +68,15 @@ export default function TemplatePreviewFrame({ payload, debounceMs = 600, classN
           setError(err.message || 'Kunde inte ladda förhandsgranskning')
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false)
+        if (!controller.signal.aborted) {
+          setLoading(false)
+          onPendingChange?.(false)
+        }
       }
     }, debounceMs)
 
     return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload, debounceMs])
 
   // Skriv HTML in i iframe via srcDoc — säkrare än blob URL och inga CORS-bekymmer

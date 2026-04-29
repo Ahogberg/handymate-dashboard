@@ -25,7 +25,7 @@ import {
 import { useQuoteCalculations } from '../../_shared/useQuoteCalculations'
 import { useQuoteItems } from '../../_shared/useQuoteItems'
 import { usePriceListLookup } from '../../_shared/usePriceListLookup'
-import { QuoteProductSearchModal } from '../../_shared/QuoteProductSearchModal'
+import { QuoteQuickstartCard, type QuickstartRow } from '../../_shared/QuoteQuickstartCard'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 import { QuoteEditHeader } from './components/QuoteEditHeader'
@@ -184,13 +184,14 @@ export default function EditQuotePage() {
   const [templateStyle, setTemplateStyle] = useState<'modern' | 'premium' | 'friendly' | null>(null)
   const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
 
-  // Search modals
+  // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
-  const [showProductSearch, setShowProductSearch] = useState(false)
 
   // Spara-i-prislistan modal — vilken offertrad som ska sparas
   const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
   const [savingProduct, setSavingProduct] = useState(false)
+  // Antal sparade produkter — styr om Snabbstart-kortet ska visas
+  const [productsCount, setProductsCount] = useState<number | null>(null)
 
   // Collapsible sections
   const [showStandardTexts, setShowStandardTexts] = useState(false)
@@ -343,6 +344,7 @@ export default function EditQuotePage() {
     fetchData()
     fetchStandardTexts()
     fetchQuote()
+    fetchProductsCount()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id, quoteId])
 
@@ -375,6 +377,20 @@ export default function EditQuotePage() {
         warranty_years: 2,
       },
     )
+  }
+
+  async function fetchProductsCount() {
+    try {
+      const res = await fetch('/api/products')
+      if (!res.ok) {
+        setProductsCount(0)
+        return
+      }
+      const data = await res.json()
+      setProductsCount((data.products || []).length)
+    } catch {
+      setProductsCount(0)
+    }
   }
 
   async function fetchStandardTexts() {
@@ -674,6 +690,26 @@ export default function EditQuotePage() {
     setSavingProduct(false)
   }
 
+  function addQuickstartRow(row: QuickstartRow) {
+    setItems(prev => [
+      ...prev,
+      {
+        id: generateItemId(),
+        item_type: 'item',
+        description: row.name,
+        quantity: 1,
+        unit: row.unit,
+        unit_price: row.sales_price,
+        total: row.sales_price,
+        category_slug: row.category_slug,
+        is_rot_eligible: row.is_rot_eligible,
+        is_rut_eligible: row.is_rut_eligible,
+        rot_rut_type: row.is_rot_eligible ? 'rot' : row.is_rut_eligible ? 'rut' : null,
+        sort_order: prev.length,
+      },
+    ])
+  }
+
   function buildProductInitialValues(row: QuoteItem): ProductInitialValues {
     return {
       name: row.description,
@@ -806,6 +842,11 @@ export default function EditQuotePage() {
               businessDefaultStyle={businessDefaultStyle}
             />
 
+            {/* Snabbstart — visas bara när användaren har en tom offert OCH tom prislista */}
+            {items.length === 0 && productsCount === 0 && (
+              <QuoteQuickstartCard onAddRow={addQuickstartRow} />
+            )}
+
             <QuoteEditCustomerSection
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -831,7 +872,41 @@ export default function EditQuotePage() {
               onRemoveItem={removeItem}
               onMoveItem={moveItem}
               onAddFromPriceList={addFromPriceList}
-              onOpenProductSearch={() => setShowProductSearch(true)}
+              onSelectProduct={p => {
+                const newItem: QuoteItem = {
+                  id: generateItemId(),
+                  item_type: 'item',
+                  description: p.name,
+                  article_number: p.sku || undefined,
+                  quantity: 1,
+                  unit: p.unit || 'st',
+                  unit_price: p.sales_price,
+                  cost_price: p.purchase_price ?? undefined,
+                  total: p.sales_price,
+                  is_rot_eligible: !!p.rot_eligible,
+                  is_rut_eligible: !!p.rut_eligible,
+                  linked_product_id: p.id,
+                  sort_order: items.length,
+                }
+                setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
+              }}
+              onAddBlankRow={description => {
+                setItems(prev => [
+                  ...prev,
+                  {
+                    id: generateItemId(),
+                    item_type: 'item',
+                    description,
+                    quantity: 1,
+                    unit: 'st',
+                    unit_price: 0,
+                    total: 0,
+                    is_rot_eligible: false,
+                    is_rut_eligible: false,
+                    sort_order: prev.length,
+                  },
+                ])
+              }}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
               onSaveToProducts={row => setProductModalRow(row)}
             />
@@ -938,28 +1013,6 @@ export default function EditQuotePage() {
           setShowGrossistSearch(false)
         }}
         businessId={business.business_id}
-      />
-
-      <QuoteProductSearchModal
-        open={showProductSearch}
-        onClose={() => setShowProductSearch(false)}
-        onSelect={p => {
-          const newItem: QuoteItem = {
-            id: generateItemId(),
-            item_type: 'item',
-            description: p.name,
-            article_number: p.sku || undefined,
-            quantity: 1,
-            unit: p.unit || 'st',
-            unit_price: p.sales_price,
-            cost_price: p.purchase_price ?? undefined,
-            total: p.sales_price,
-            is_rot_eligible: !!p.rot_eligible,
-            is_rut_eligible: !!p.rut_eligible,
-            sort_order: items.length,
-          }
-          setItems(prev => [...prev, { ...newItem, sort_order: prev.length }])
-        }}
       />
 
       {productModalRow && (
