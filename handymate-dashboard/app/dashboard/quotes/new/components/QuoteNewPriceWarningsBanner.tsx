@@ -1,5 +1,7 @@
 'use client'
 
+import { AlertTriangle, Lightbulb } from 'lucide-react'
+
 interface PriceWarning {
   product_name: string
   quote_price: number
@@ -30,20 +32,29 @@ export function QuoteNewPriceWarningsBanner({ warnings, alternatives }: QuoteNew
   return (
     <div className="space-y-2">
       {warnings.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1.5">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
           {warnings.map((w, i) => (
-            <p key={i} className="text-xs text-amber-800">
-              ⚠️ {w.product_name} är {w.difference_pct}% dyrare än normalpris ({w.quote_price} kr vs {w.normal_price} kr — {w.supplier_name})
-            </p>
+            <div key={i} className="flex items-start gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-800 leading-relaxed">
+                <strong className="font-semibold">{w.product_name}</strong> är {w.difference_pct}% dyrare än normalpris (
+                <span className="tabular-nums">{w.quote_price} kr</span> vs{' '}
+                <span className="tabular-nums">{w.normal_price} kr</span> — {w.supplier_name})
+              </p>
+            </div>
           ))}
         </div>
       )}
       {alternatives.length > 0 && (
-        <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg p-3 space-y-1.5">
+        <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 space-y-2">
           {alternatives.map((a, i) => (
-            <p key={i} className="text-xs text-primary-800">
-              💡 {a.cheaper_supplier} har {a.product_name} {a.savings_pct}% billigare ({a.cheaper_price} kr)
-            </p>
+            <div key={i} className="flex items-start gap-2">
+              <Lightbulb className="w-3.5 h-3.5 text-primary-700 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-primary-800 leading-relaxed">
+                <strong className="font-semibold">{a.cheaper_supplier}</strong> har {a.product_name} {a.savings_pct}% billigare (
+                <span className="tabular-nums">{a.cheaper_price} kr</span>)
+              </p>
+            </div>
           ))}
         </div>
       )}

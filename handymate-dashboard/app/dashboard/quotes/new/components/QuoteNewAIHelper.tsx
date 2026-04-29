@@ -21,8 +21,8 @@ interface QuoteNewAIHelperProps {
 
 /**
  * AI-helper sektion: foto-uppladdning (kamera + galleri) + textbeskrivning.
- * Användaren kan välja antingen att fota jobbet eller skriva en beskrivning,
- * och AI:n genererar offertrader.
+ * Ligger högst upp i vänsterspalten — det är den primära genvägen för att
+ * skapa en offert snabbt.
  */
 export function QuoteNewAIHelper({
   open,
@@ -43,26 +43,31 @@ export function QuoteNewAIHelper({
   const photoInputRef = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-7 py-5">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between"
+        className="w-full flex items-center gap-3 px-5 sm:px-6 py-4 text-left hover:bg-slate-50/50 transition-colors"
       >
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-[#0F766E]" />
-          <span className="text-[13px] font-medium text-[#1E293B]">AI-hjälp</span>
-          <span className="text-[11px] text-[#94A3B8]">Fota eller beskriv jobbet</span>
+        <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-4.5 h-4.5" />
         </div>
-        <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${open ? 'rotate-180' : ''}`} />
+        <div className="flex-1 min-w-0">
+          <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight">AI-hjälp</h2>
+          <p className="text-xs text-slate-500 mt-0.5">Fota eller beskriv jobbet</p>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="mt-4 space-y-4">
+        <div className="px-5 sm:px-6 pb-6 border-t border-slate-100 pt-5 space-y-5">
           {/* Photo capture */}
           <div>
-            <p className="text-[12px] text-[#64748B] mb-2">Fota jobbet — AI analyserar och fyller i rader</p>
-            <div className="flex items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Fota jobbet
+            </p>
+            <p className="text-sm text-slate-500 mb-3">AI analyserar och fyller i rader</p>
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 ref={cameraInputRef}
                 type="file"
@@ -88,7 +93,7 @@ export function QuoteNewAIHelper({
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
                 disabled={generating}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-50"
               >
                 <Camera className="w-4 h-4" />
                 Kamera
@@ -97,7 +102,7 @@ export function QuoteNewAIHelper({
                 type="button"
                 onClick={() => photoInputRef.current?.click()}
                 disabled={generating}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFC] border-thin border-[#E2E8F0] rounded-lg text-[13px] text-[#1E293B] hover:border-[#0F766E] transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl text-sm font-medium text-slate-700 transition-colors disabled:opacity-50"
               >
                 <Upload className="w-4 h-4" />
                 Ladda upp
@@ -105,22 +110,26 @@ export function QuoteNewAIHelper({
             </div>
 
             {photos.length > 0 && (
-              <div className="mt-3 space-y-3">
+              <div className="mt-4 space-y-3">
                 <div className="grid grid-cols-5 gap-2">
                   {photos.map((photo, i) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden border-thin border-[#E2E8F0]">
+                    <div
+                      key={i}
+                      className="relative aspect-square rounded-xl overflow-hidden border border-slate-200"
+                    >
                       <img src={photo} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => onRemovePhoto(i)}
-                        className="absolute top-1 right-1 w-5 h-5 bg-black/50 rounded-full flex items-center justify-center hover:bg-black/70"
+                        aria-label="Ta bort foto"
+                        className="absolute top-1 right-1 w-5 h-5 bg-slate-900/60 rounded-full inline-flex items-center justify-center hover:bg-slate-900/80 transition-colors"
                       >
                         <X className="w-3 h-3 text-white" />
                       </button>
                     </div>
                   ))}
                   {photos.length < maxPhotos && (
-                    <label className="aspect-square border-thin border-dashed border-[#CBD5E1] rounded-lg flex items-center justify-center cursor-pointer hover:border-[#0F766E] transition-colors text-[#CBD5E1] hover:text-[#0F766E] text-xl">
+                    <label className="aspect-square border border-dashed border-slate-300 rounded-xl inline-flex items-center justify-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors text-slate-400 hover:text-primary-700 text-2xl font-light">
                       +
                       <input
                         type="file"
@@ -140,16 +149,16 @@ export function QuoteNewAIHelper({
                   onChange={e => setPhotoDescription(e.target.value)}
                   placeholder="Beskriv jobbet (valfritt) — t.ex. mått, materialönskemål, speciella förutsättningar"
                   rows={2}
-                  className="w-full px-3 py-2 text-[13px] border-thin border-[#E2E8F0] rounded-lg bg-white text-[#1E293B] placeholder-[#94A3B8] focus:outline-none focus:border-[#0F766E] resize-y"
+                  className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors resize-y leading-relaxed"
                 />
                 <button
                   type="button"
                   onClick={onAnalyzePhoto}
                   disabled={generating}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
                 >
                   {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  {generating ? 'Analyserar...' : `Analysera ${photos.length} foto${photos.length > 1 ? 'n' : ''}`}
+                  {generating ? 'Analyserar…' : `Analysera ${photos.length} foto${photos.length > 1 ? 'n' : ''}`}
                 </button>
               </div>
             )}
@@ -157,17 +166,20 @@ export function QuoteNewAIHelper({
 
           {/* Divider */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 h-px bg-[#E2E8F0]" />
-            <span className="text-[11px] text-[#CBD5E1]">eller</span>
-            <div className="flex-1 h-px bg-[#E2E8F0]" />
+            <div className="flex-1 h-px bg-slate-200" />
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">eller</span>
+            <div className="flex-1 h-px bg-slate-200" />
           </div>
 
           {/* Text description */}
           <div>
-            <p className="text-[12px] text-[#64748B] mb-1">Beskriv jobbet — AI genererar offertrader</p>
-            <div className="bg-primary-50 border border-[#E2E8F0] rounded-lg px-3 py-2 mb-2">
-              <p className="text-[11px] text-primary-700 font-medium mb-1">Tips för bästa resultat:</p>
-              <ul className="text-[11px] text-primary-700 space-y-0.5 list-disc list-inside">
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Beskriv jobbet
+            </p>
+            <p className="text-sm text-slate-500 mb-3">AI genererar offertrader</p>
+            <div className="bg-primary-50 border border-primary-100 rounded-xl px-4 py-3 mb-3">
+              <p className="text-xs font-semibold text-primary-700 mb-1.5">Tips för bästa resultat:</p>
+              <ul className="text-xs text-primary-700 space-y-0.5 list-disc list-inside marker:text-primary-400">
                 <li>Ange rum/plats (kök, badrum, fasad)</li>
                 <li>Beskriv yta eller antal (15 m², 3 uttag)</li>
                 <li>Nämn material om du vet (klinker, gips, LED)</li>
@@ -179,16 +191,16 @@ export function QuoteNewAIHelper({
               onChange={e => setAiTextInput(e.target.value)}
               placeholder="T.ex. 'Byta 3 eluttag i kök, dra ny kabel från elcentral, installera dimmer i vardagsrum'"
               rows={3}
-              className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-primary-600 resize-y"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors resize-y leading-relaxed"
             />
             <button
               type="button"
               onClick={onGenerateFromText}
               disabled={generating || !aiTextInput.trim()}
-              className="mt-2 flex items-center gap-2 px-4 py-2.5 bg-[#0F766E] text-white rounded-lg text-[13px] font-medium hover:opacity-90 disabled:opacity-50"
+              className="mt-3 inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
             >
               {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              {generating ? 'Genererar...' : 'Generera offertförslag'}
+              {generating ? 'Genererar…' : 'Generera offertförslag'}
             </button>
           </div>
         </div>

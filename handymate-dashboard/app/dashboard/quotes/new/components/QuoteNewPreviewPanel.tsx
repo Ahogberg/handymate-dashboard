@@ -36,28 +36,29 @@ export function QuoteNewPreviewPanel({
   contactName,
 }: QuoteNewPreviewPanelProps) {
   return (
-    <div className="bg-white border-thin border-[#E2E8F0] rounded-xl hidden lg:block">
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden hidden lg:block">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-6 py-4 text-left"
+        className="w-full flex items-center gap-3 px-5 py-4 text-left hover:bg-slate-50/50 transition-colors"
       >
-        <span className="flex items-center gap-2">
-          <Eye className="w-3.5 h-3.5 text-[#64748B]" />
-          <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Förhandsgranska</span>
-        </span>
-        <ChevronDown className={`w-4 h-4 text-[#64748B] transition-transform ${open ? 'rotate-180' : ''}`} />
+        <div className="w-9 h-9 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+          <Eye className="w-4.5 h-4.5" />
+        </div>
+        <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">Förhandsgranska</h2>
+        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-3 pb-3 space-y-2">
-          {/* Toggle: Live-redigera / Slutdesign / Kompakt */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+        <div className="px-3 pb-3 space-y-3 border-t border-slate-100 pt-3">
+          <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
             <button
               type="button"
               onClick={() => liveAvailable && setPreviewMode('live')}
               disabled={!liveAvailable}
-              className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                previewMode === 'live' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                previewMode === 'live'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               } ${!liveAvailable ? 'opacity-40 cursor-not-allowed' : ''}`}
               title={liveAvailable ? 'Inline-redigera direkt i mallen' : 'Live-redigering kommer snart för Premium/Friendly'}
             >
@@ -66,8 +67,10 @@ export function QuoteNewPreviewPanel({
             <button
               type="button"
               onClick={() => setPreviewMode('design')}
-              className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                previewMode === 'design' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                previewMode === 'design'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Slutdesign
@@ -75,19 +78,21 @@ export function QuoteNewPreviewPanel({
             <button
               type="button"
               onClick={() => setPreviewMode('compact')}
-              className={`flex-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all ${
-                previewMode === 'compact' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                previewMode === 'compact'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               Kompakt
             </button>
           </div>
           {previewMode === 'live' && liveAvailable ? (
-            <div className="bg-gray-50 rounded-xl overflow-auto border border-[#E2E8F0] h-[calc(100vh-200px)] min-h-[700px] p-4">
+            <div className="bg-slate-50 rounded-xl overflow-auto border border-slate-200 h-[calc(100vh-220px)] min-h-[700px] p-4">
               <ModernCanvas data={liveTemplateData} handlers={liveHandlers} />
             </div>
           ) : previewMode === 'design' || (previewMode === 'live' && !liveAvailable) ? (
-            <TemplatePreviewFrame payload={templatePreviewPayload} className="h-[calc(100vh-200px)] min-h-[700px]" />
+            <TemplatePreviewFrame payload={templatePreviewPayload} className="h-[calc(100vh-220px)] min-h-[700px]" />
           ) : (
             debouncedPreviewData && (
               <QuotePreview

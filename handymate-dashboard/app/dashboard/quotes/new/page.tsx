@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Loader2, X } from 'lucide-react'
+import { Loader2, Search, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -1169,15 +1169,15 @@ export default function NewQuotePage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-primary-700 animate-spin" />
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-primary-700 animate-spin" />
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6 bg-[#F8FAFC] min-h-screen">
-      <div className="max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-slate-50">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4 sm:py-6">
         <QuoteNewHeader
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
@@ -1318,16 +1318,16 @@ export default function NewQuotePage() {
             />
 
             {/* Stil-väljare — overridar business default per offert */}
-            <div className="bg-white border-thin border-[#E2E8F0] rounded-xl px-6 py-4">
+            <div className="bg-white border border-slate-200 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-semibold tracking-[0.08em] uppercase text-[#475569]">Offertstil</span>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Offertstil</p>
                 {templateStyle && (
                   <button
                     type="button"
                     onClick={() => setTemplateStyle(null)}
-                    className="text-[10px] text-[#94A3B8] hover:text-primary-700"
+                    className="text-xs text-slate-500 hover:text-primary-700 transition-colors"
                   >
-                    Återställ till standard
+                    Återställ
                   </button>
                 )}
               </div>
@@ -1345,20 +1345,26 @@ export default function NewQuotePage() {
                       key={opt.id}
                       type="button"
                       onClick={() => setTemplateStyle(opt.id)}
-                      className={`p-2.5 rounded-lg border-2 text-left transition-all ${
+                      className={`relative p-3 rounded-xl border text-left transition-all ${
                         isSelected
-                          ? 'border-primary-600 bg-primary-50'
-                          : 'border-[#E2E8F0] hover:border-primary-300'
+                          ? 'border-primary-700 bg-primary-50 shadow-sm'
+                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                       }`}
                     >
-                      <div className="text-xs font-semibold text-[#1E293B]">{opt.label}</div>
-                      <div className="text-[10px] text-[#94A3B8]">{opt.tagline}</div>
-                      {isDefault && <div className="text-[9px] text-primary-700 mt-0.5">Standard</div>}
+                      <div className={`text-xs font-bold tracking-tight ${isSelected ? 'text-primary-700' : 'text-slate-900'}`}>
+                        {opt.label}
+                      </div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">{opt.tagline}</div>
+                      {isDefault && (
+                        <div className="text-[9px] font-semibold uppercase tracking-wider text-primary-700 mt-1.5">
+                          Standard
+                        </div>
+                      )}
                     </button>
                   )
                 })}
               </div>
-              <p className="text-[10px] text-[#94A3B8] mt-2 leading-relaxed">
+              <p className="text-[10px] text-slate-400 mt-3 leading-relaxed">
                 Stilen speglas i den färdiga offerten — slutdesignen visas via "Förhandsgranska design" efter sparad offert.
               </p>
             </div>
@@ -1392,14 +1398,15 @@ export default function NewQuotePage() {
             <button
               onClick={() => saveQuote(true)}
               disabled={saving || !selectedCustomer}
-              className="w-full py-3 bg-[#0F766E] text-white border-none rounded-lg text-[14px] font-medium cursor-pointer disabled:opacity-50"
+              className="w-full inline-flex items-center justify-center gap-2 py-3 bg-primary-700 hover:bg-primary-600 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
             >
-              {saving ? 'Sparar...' : 'Skicka offert'}
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {saving ? 'Sparar…' : 'Skicka offert'}
             </button>
             <button
               onClick={() => saveQuote(false)}
               disabled={saving}
-              className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC] disabled:opacity-50"
+              className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors disabled:opacity-50"
             >
               Spara utkast
             </button>
@@ -1409,7 +1416,7 @@ export default function NewQuotePage() {
                   setTemplateName(title)
                   setShowSaveTemplateModal(true)
                 }}
-                className="w-full py-2.5 bg-transparent text-[#64748B] border-thin border-[#E2E8F0] rounded-lg text-[13px] cursor-pointer hover:bg-[#F8FAFC]"
+                className="w-full py-2.5 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-xl transition-colors"
               >
                 Spara som mall
               </button>
@@ -1441,37 +1448,35 @@ export default function NewQuotePage() {
       {/* Product search modal — new-vyn unique */}
       {showProductSearch && (
         <div
-          className="fixed inset-0 bg-black/25 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
           onClick={() => setShowProductSearch(false)}
         >
           <div
-            className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[80vh] flex flex-col"
+            className="bg-white border border-slate-200 rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="flex items-center gap-3 px-5 py-4 border-b border-[#E2E8F0]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+              <Search className="w-4.5 h-4.5 text-slate-400" />
               <input
                 type="text"
                 value={productSearchQuery}
                 onChange={e => searchProducts(e.target.value)}
-                placeholder="Sök produkt eller material..."
+                placeholder="Sök produkt eller material…"
                 autoFocus
-                className="flex-1 text-sm text-[#1E293B] placeholder-[#94A3B8] bg-transparent border-none outline-none"
+                className="flex-1 text-sm text-slate-900 placeholder:text-slate-400 bg-transparent border-none outline-none"
               />
               <button
                 onClick={() => setShowProductSearch(false)}
-                className="p-1 text-[#94A3B8] hover:text-[#1E293B]"
+                aria-label="Stäng"
+                className="p-1.5 -m-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
               {productSearchLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <div className="w-5 h-5 border-2 border-[#0F766E] border-t-transparent rounded-full animate-spin" />
+                  <Loader2 className="w-5 h-5 text-primary-700 animate-spin" />
                 </div>
               ) : productSearchResults.length > 0 ? (
                 <div className="space-y-1">
@@ -1479,30 +1484,30 @@ export default function NewQuotePage() {
                     <button
                       key={p.id}
                       onClick={() => addFromProduct(p)}
-                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-[#F8FAFC] transition text-left"
+                      className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-slate-50 transition-colors text-left"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           {p.is_favorite && <span className="text-amber-500 text-xs">★</span>}
-                          <span className="text-sm font-medium text-[#1E293B] truncate">{p.name}</span>
-                          {p.rot_eligible && <span className="px-1.5 py-0.5 text-[10px] bg-emerald-100 text-emerald-600 rounded">ROT</span>}
-                          {p.rut_eligible && <span className="px-1.5 py-0.5 text-[10px] bg-blue-100 text-blue-600 rounded">RUT</span>}
+                          <span className="text-sm font-medium text-slate-900 truncate">{p.name}</span>
+                          {p.rot_eligible && <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">ROT</span>}
+                          {p.rut_eligible && <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-50 text-blue-700 rounded-full border border-blue-100">RUT</span>}
                         </div>
-                        {p.sku && <p className="text-[11px] text-[#94A3B8] truncate">{p.sku}</p>}
+                        {p.sku && <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.sku}</p>}
                       </div>
                       <div className="text-right ml-4 shrink-0">
-                        <span className="text-sm font-medium text-[#1E293B]">{p.sales_price?.toLocaleString('sv-SE')} kr</span>
-                        <span className="text-[11px] text-[#94A3B8] ml-1">/{p.unit}</span>
+                        <span className="text-sm font-semibold text-slate-900 tabular-nums">{p.sales_price?.toLocaleString('sv-SE')} kr</span>
+                        <span className="text-[11px] text-slate-400 ml-1">/{p.unit}</span>
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <p className="text-sm text-[#94A3B8]">
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <p className="text-sm text-slate-500">
                     {productSearchQuery ? 'Inga produkter hittades' : 'Inga favoriter ännu'}
                   </p>
-                  <p className="text-xs text-[#CBD5E1] mt-1">
+                  <p className="text-xs text-slate-400 mt-1">
                     Lägg till produkter under Inställningar → Produkter
                   </p>
                 </div>
