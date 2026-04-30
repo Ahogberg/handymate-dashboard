@@ -13,7 +13,12 @@ import {
   loadThreadMessages,
   toClaudeMessages,
   summarizeIfNeeded,
+  buildUserContentWithImages,
+  type ThreadImage,
 } from '@/lib/agent/thread-messages'
+
+const MAX_IMAGES_PER_MESSAGE = 4
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 export const maxDuration = 30
 
@@ -441,12 +446,39 @@ async function callClaude(opts: {
 // Agent system-prompt — byggs per agent baserat på capabilities
 // ────────────────────────────────────────────────────────────────────────────
 
-function buildAgentSystemPrompt(agent: AgentId, userName: string, businessName: string): string {
+function buildAgentSystemPrompt(
+  agent: AgentId,
+  userName: string,
+  businessName: string,
+  hasImages: boolean
+): string {
   const cap = AGENT_CAPABILITIES[agent]
   if (!cap) return ''
 
   const expertise = cap.expertise.map(e => `- ${e}`).join('\n')
   const outOfScope = cap.out_of_scope.map(e => `- ${e}`).join('\n')
+
+  // Bild-instruktioner — bara Daniel får detaljerade riktlinjer (han äger
+  // bildanalys för offert-underlag). Andra agenter får en kort note om bilder
+  // finns så de inte ignorerar dem.
+  let imageBlock = ''
+  if (hasImages) {
+    if (agent === 'daniel') {
+      imageBlock = `
+
+DU SER BILDER I MEDDELANDET — analysera dem för:
+- Storlek/yta (om mätbart eller uppskattningsbart)
+- Material och kondition
+- Synliga problem eller utmaningar
+- Vad som behöver göras
+
+När du gör en offert eller uppskattning baserat på bilder — var transparent om vad du ser och vad du gissar. Ange osäkerhet ("ser ut att vara ca 6-8 m²"). Om bilden är för otydlig: be om en kompletterande bild eller mått från hantverkaren.`
+    } else {
+      imageBlock = `
+
+OBS: Användaren har bifogat bild(er). Du kan se dem men din specialitet är inte bildanalys för offert. Om frågan kräver detaljerad analys av storlek/material/skick — gör handoff till Daniel.`
+    }
+  }
 
   return `Du är ${cap.name}, AI-assistent i Handymate-teamet hos ${businessName}. Du pratar med hantverkaren ${userName}. Svara kort och konkret på svenska, max 2-3 meningar per svar.
 
@@ -460,7 +492,7 @@ ${outOfScope}
 
 VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — säg inte "Hej, jag är X" till användaren, det säger nästa agent. Skriv en kort context_for_next_agent så nästa agent kan svara direkt utan att fråga om.
 
-Du har också tillgång till verktyg för SMS, godkännanden, fakturor, navigering och offert-utkast. Använd dem bara om frågan ligger inom ditt expertområde.
+Du har också tillgång till verktyg för SMS, godkännanden, fakturor, navigering och offert-utkast. Använd dem bara om frågan ligger inom ditt expertområde.${imageBlock}
 
 Var vänlig, professionell och effektiv. Använd du-tilltal.`
 }
@@ -558,7 +590,7 @@ async function runAgentTurn(opts: {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { messages, context } = body
+    const { messages, context, images: rawImages } = body
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
@@ -572,6 +604,36 @@ export async function POST(request: NextRequest) {
     const customerId: string | null = context?.customerId || null
     const projectId: string | null = context?.projectId || null
     const explicitThreadId: string | null = context?.threadId || null
+
+    // ── Bilder: normalisera + validera ─────────────────────────────────
+    // Klienten kan skicka antingen array av strängar (base64) eller array
+    // av objekt { url?, base64?, media_type? }. Vi normaliserar till
+    // ThreadImage[]. Cap vid 4 bilder per meddelande, 5 MB var.
+    const images: ThreadImage[] = []
+    if (Array.isArray(rawImages)) {
+      const candidates = rawImages.slice(0, MAX_IMAGES_PER_MESSAGE)
+      for (const raw of candidates) {
+        if (!raw) continue
+        if (typeof raw === 'string') {
+          // Räkna ut base64-storlek: bytes ≈ length * 0.75
+          if (raw.length * 0.75 > MAX_IMAGE_BYTES) continue
+          images.push({ base64: raw, media_type: 'image/jpeg' })
+        } else if (typeof raw === 'object') {
+          const item: ThreadImage = {
+            url: typeof raw.url === 'string' ? raw.url : undefined,
+            base64: typeof raw.base64 === 'string' ? raw.base64 : undefined,
+            media_type: typeof raw.media_type === 'string' ? raw.media_type : 'image/jpeg',
+            size_bytes: typeof raw.size_bytes === 'number' ? raw.size_bytes : undefined,
+          }
+          // Validera storlek om vi har base64 eller size_bytes
+          if (item.base64 && item.base64.length * 0.75 > MAX_IMAGE_BYTES) continue
+          if (item.size_bytes && item.size_bytes > MAX_IMAGE_BYTES) continue
+          if (!item.url && !item.base64) continue
+          images.push(item)
+        }
+      }
+    }
+    const hasImages = images.length > 0
 
     if (!businessId) {
       return NextResponse.json(
@@ -590,10 +652,11 @@ export async function POST(request: NextRequest) {
     const userCookie = request.headers.get('cookie')
 
     // ── Thread-state ────────────────────────────────────────────────────
-    // Skapa eller hämta tråd om vi har customer/project context. Utan det
-    // kör vi i "engångsmode" med Matte som default-agent (ingen DB-skrivning).
+    // Skapa eller hämta tråd om vi har customer/project context, eller om
+    // bilder bifogats (auto-routing + audit kräver thread). Utan något av
+    // detta kör vi i "engångsmode" med Matte som default-agent.
     let thread: Awaited<ReturnType<typeof getOrCreateThread>> | null = null
-    if (customerId || projectId || explicitThreadId) {
+    if (customerId || projectId || explicitThreadId || hasImages) {
       try {
         thread = await getOrCreateThread({ businessId, customerId, projectId })
       } catch (err) {
@@ -601,6 +664,29 @@ export async function POST(request: NextRequest) {
       }
     }
     let currentAgent: AgentId = (thread?.current_agent_id as AgentId) || 'matte'
+
+    // ── Auto-routing: bilder + Matte → Daniel ───────────────────────────
+    // Om användaren bifogar bild(er) och vi är hos Matte (default agent)
+    // hoppar vi direkt till Daniel som äger bildanalys för offert-underlag.
+    // Detta hoppar inte över specialist-konversationer — om current redan
+    // är t.ex. Lars eller Karin, lämnas det ifred (de kan själva delegera).
+    if (thread && hasImages && currentAgent === 'matte') {
+      try {
+        const auto = await executeHandoff({
+          thread,
+          fromAgent: 'matte',
+          toAgent: 'daniel',
+          reason: 'användaren bifogade bild(er) för analys',
+          contextSummary: 'Bilder bifogade — Daniel tar över för bildanalys.',
+        })
+        if (auto.ok) {
+          currentAgent = 'daniel'
+          thread.current_agent_id = 'daniel'
+        }
+      } catch (err) {
+        console.error('[matte/chat] auto-route to Daniel failed (non-blocking):', err)
+      }
+    }
 
     // Hämta verklig affärsdata (non-blocking)
     let contextSection = ''
@@ -617,7 +703,9 @@ export async function POST(request: NextRequest) {
     // använd som conversation-historik till Claude. Sammanfatta äldre
     // meddelanden om token-budgeten överskrids.
     // Utan thread: fall tillbaka till payload-historiken (legacy mode).
-    let initialMessages: Array<{ role: 'user' | 'assistant'; content: string }>
+    // content kan vara string ELLER content-blocks-array (för multimodal).
+    type ChatMessage = { role: 'user' | 'assistant'; content: any }
+    let initialMessages: ChatMessage[]
     let historySummary: string | null = thread?.context_summary || null
 
     // Senaste user-meddelandet — det vi ska svara på och spara
@@ -643,31 +731,57 @@ export async function POST(request: NextRequest) {
         initialMessages = []
       }
 
-      // Lägg till det nya user-meddelandet sist (om det inte redan är
-      // sista raden i persisted — undvik duplicate vid re-submit)
-      if (newUserText) {
+      // Lägg till det nya user-meddelandet sist. Med bilder bygger vi
+      // ett multimodal content-block (bilder + text). Utan bilder är det
+      // bara strängen. Dedup-skydd: om sista raden redan är samma user-
+      // text utan bilder, undvik duplicate vid re-submit.
+      if (newUserText || hasImages) {
         const lastInitial = initialMessages[initialMessages.length - 1]
-        if (!lastInitial || lastInitial.role !== 'user' || lastInitial.content !== newUserText) {
-          initialMessages = [...initialMessages, { role: 'user', content: newUserText }]
+        const isDup = !hasImages
+          && lastInitial
+          && lastInitial.role === 'user'
+          && lastInitial.content === newUserText
+        if (!isDup) {
+          const userContent = hasImages
+            ? buildUserContentWithImages(newUserText || '', images)
+            : newUserText
+          initialMessages = [...initialMessages, { role: 'user', content: userContent }]
         }
       }
 
-      // Spara user-meddelandet i thread_message (non-blocking)
-      if (newUserText) {
+      // Spara user-meddelandet i thread_message (non-blocking) — inkl images
+      if (newUserText || hasImages) {
         saveThreadMessage({
           threadId: thread.id,
           businessId,
           role: 'user',
           agent: null,
-          content: newUserText,
+          content: newUserText || '(bild bifogad utan text)',
+          images,
         }).catch(() => {})
       }
     } else {
-      // Legacy: använd payload-historiken (senaste 10)
+      // Legacy: använd payload-historiken (senaste 10). Utan thread sparas
+      // ingenting — bilder skickas direkt till Claude i sista user-msg.
       initialMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
         role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
         content: m.content,
       }))
+      if (hasImages) {
+        // Lägg in bild-blocken på det sista user-meddelandet
+        const last = initialMessages[initialMessages.length - 1]
+        const baseText = last?.role === 'user' ? last.content : ''
+        const userContent = buildUserContentWithImages(typeof baseText === 'string' ? baseText : '', images)
+        if (last?.role === 'user') {
+          // Ersätt sista
+          initialMessages = [
+            ...initialMessages.slice(0, -1),
+            { role: 'user', content: userContent as any },
+          ]
+        } else {
+          initialMessages.push({ role: 'user', content: userContent as any })
+        }
+      }
     }
 
     // ── Outer handoff-loop ──────────────────────────────────────────────
@@ -684,7 +798,7 @@ export async function POST(request: NextRequest) {
       const systemArray: any[] = [
         {
           type: 'text',
-          text: buildAgentSystemPrompt(currentAgent, userName, businessName),
+          text: buildAgentSystemPrompt(currentAgent, userName, businessName, hasImages),
           cache_control: { type: 'ephemeral' },
         },
         { type: 'text', text: contextSection },

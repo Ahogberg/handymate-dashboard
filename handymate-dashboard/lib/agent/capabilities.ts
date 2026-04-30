@@ -91,12 +91,13 @@ export const AGENT_CAPABILITIES: Record<AgentId, AgentCapability> = {
   daniel: {
     id: 'daniel',
     name: 'Daniel',
-    domain: 'Säljare — leads, offerter, ÄTA-tillägg, kund-konvertering.',
+    domain: 'Säljare — leads, offerter, ÄTA-tillägg, kund-konvertering, bildanalys för offert-underlag.',
     expertise: [
       'Skapa och följa upp offerter',
       'Lead-kvalificering och behovsanalys',
       'ÄTA-tillägg och scope-utökningar',
       'Förhandling och prissättningsstrategi',
+      'Bildanalys (Claude Vision) — yta/material/kondition från foton, omfattningsuppskattning för offert',
     ],
     out_of_scope: [
       'Färdig faktura eller betalningsdetaljer — Karin äger',

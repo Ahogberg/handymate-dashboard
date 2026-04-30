@@ -22,6 +22,20 @@ function getSupabase() {
 
 export type MessageRole = 'user' | 'assistant' | 'system'
 
+/**
+ * Bild-metadata sparad på en thread_message-rad. Vi sparar antingen URL
+ * (när uppladdning till storage lyckades) eller base64 (fallback). Båda
+ * stödjs av Claude Vision.
+ */
+export interface ThreadImage {
+  url?: string | null
+  base64?: string
+  media_type?: string
+  size_bytes?: number
+  width?: number
+  height?: number
+}
+
 export interface ThreadMessage {
   id: string
   thread_id: string
@@ -31,6 +45,7 @@ export interface ThreadMessage {
   content: string
   is_handoff_announcement: boolean
   metadata: Record<string, unknown>
+  images: ThreadImage[]
   created_at: string
 }
 
@@ -42,6 +57,7 @@ export interface SaveMessageInput {
   content: string
   isHandoffAnnouncement?: boolean
   metadata?: Record<string, unknown>
+  images?: ThreadImage[]
 }
 
 /**
@@ -86,6 +102,7 @@ export async function saveThreadMessage(input: SaveMessageInput): Promise<void> 
       content: scrubPII(input.content),
       is_handoff_announcement: input.isHandoffAnnouncement ?? false,
       metadata: input.metadata ?? {},
+      images: input.images ?? [],
     })
   } catch (err) {
     console.error('[thread-messages] save failed (non-blocking):', err)
@@ -141,20 +158,80 @@ export function estimateTokens(messages: { content: string }[]): number {
   return Math.ceil(chars / 3.5)
 }
 
+type ClaudeContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; source: { type: 'base64'; media_type: string; data: string } | { type: 'url'; url: string } }
+
+export interface ClaudeMessage {
+  role: 'user' | 'assistant'
+  content: string | ClaudeContentBlock[]
+}
+
 /**
  * Konverterar thread_message-rader till Claude messages-format.
  * Skippar handoff-announcements (kommer ej med från loadThreadMessages
  * default — detta är extra skydd om någon skulle skicka in dem).
+ *
+ * Multimodal: om en rad har images, byggs content som array med
+ * { type: 'image' }-block + ett text-block. Claude Vision stödjer både
+ * URL- och base64-källor — vi föredrar URL (mindre context-overhead) och
+ * faller tillbaka till base64.
  */
-export function toClaudeMessages(
-  rows: ThreadMessage[]
-): Array<{ role: 'user' | 'assistant'; content: string }> {
+export function toClaudeMessages(rows: ThreadMessage[]): ClaudeMessage[] {
   return rows
     .filter(r => !r.is_handoff_announcement && (r.role === 'user' || r.role === 'assistant'))
-    .map(r => ({
-      role: r.role === 'user' ? 'user' as const : 'assistant' as const,
-      content: r.content,
-    }))
+    .map(r => {
+      const role = r.role === 'user' ? ('user' as const) : ('assistant' as const)
+      const images = Array.isArray(r.images) ? r.images : []
+      if (images.length === 0) {
+        return { role, content: r.content }
+      }
+      const blocks: ClaudeContentBlock[] = []
+      for (const img of images) {
+        if (img?.url) {
+          blocks.push({ type: 'image', source: { type: 'url', url: img.url } })
+        } else if (img?.base64) {
+          blocks.push({
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: img.media_type || 'image/jpeg',
+              data: img.base64,
+            },
+          })
+        }
+      }
+      // Text-blocket sist enligt Anthropic-rekommendation (när bilder
+      // finns vill modellen oftast se dem innan instruktionen).
+      blocks.push({ type: 'text', text: r.content || '(ingen text — analysera bilden)' })
+      return { role, content: blocks }
+    })
+}
+
+/**
+ * Bygg ett user-content-block med text + bilder direkt (utan att gå via
+ * en thread_message-rad). Används av chat-endpointet för att inkludera
+ * det aktuella user-meddelandet med dess bilder i sista turen mot Claude.
+ */
+export function buildUserContentWithImages(text: string, images: ThreadImage[]): string | ClaudeContentBlock[] {
+  if (!images || images.length === 0) return text
+  const blocks: ClaudeContentBlock[] = []
+  for (const img of images) {
+    if (img?.url) {
+      blocks.push({ type: 'image', source: { type: 'url', url: img.url } })
+    } else if (img?.base64) {
+      blocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: img.media_type || 'image/jpeg',
+          data: img.base64,
+        },
+      })
+    }
+  }
+  blocks.push({ type: 'text', text: text || '(ingen text — analysera bilden)' })
+  return blocks
 }
 
 /**

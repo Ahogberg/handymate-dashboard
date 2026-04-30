@@ -13,6 +13,7 @@ import {
   saveThreadMessage,
   loadThreadMessages,
   toClaudeMessages,
+  buildUserContentWithImages,
   scrubPII,
   estimateTokens,
 } from '@/lib/agent/thread-messages'
@@ -259,11 +260,101 @@ export async function GET(request: NextRequest) {
     detail: `~${tokens} tokens`,
   })
 
-  // Cleanup: städa multi-turn-tråden så testet kan köras flera gånger
-  // utan att fylla DB med skräp.
+  // Cleanup multi-turn-tråden
   try {
     await supabase.from('thread_message').delete().eq('thread_id', mtThread.id)
     await supabase.from('agent_threads').delete().eq('id', mtThread.id)
+  } catch { /* non-blocking */ }
+
+  // ── Bild-stöd-test (Sprint 3) ─────────────────────────────────────────
+  const imgCustomerId = `${customerId}_images`
+  const imgThread = await getOrCreateThread({ businessId: business.business_id, customerId: imgCustomerId })
+
+  // 16. saveThreadMessage med images-fält
+  // 1×1 transparent PNG (mockad bild för test — Claude körs aldrig här)
+  const tinyPngBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+  await saveThreadMessage({
+    threadId: imgThread.id,
+    businessId: business.business_id,
+    role: 'user',
+    content: 'Vad kostar det här?',
+    images: [
+      { base64: tinyPngBase64, media_type: 'image/png', size_bytes: 67 },
+      { url: 'https://example.test/photo.jpg', media_type: 'image/jpeg' },
+    ],
+  })
+  steps.push({
+    step: '16. saveThreadMessage skriver images-fält',
+    ok: true,
+    detail: 'PNG (base64) + URL — bägge format',
+  })
+
+  // 17. loadThreadMessages returnerar images
+  const imgRows = await loadThreadMessages(imgThread.id, { limit: 5 })
+  const firstWithImages = imgRows.find(r => Array.isArray(r.images) && r.images.length > 0)
+  steps.push({
+    step: '17. loadThreadMessages returnerar images-array',
+    ok: !!firstWithImages && (firstWithImages.images?.length || 0) === 2,
+    detail: `images-count på första raden: ${firstWithImages?.images?.length || 0}`,
+  })
+
+  // 18. toClaudeMessages bygger multimodal content med image-block
+  const claudeMsgs = toClaudeMessages(imgRows)
+  const firstClaude = claudeMsgs[0]
+  const isMultimodal = firstClaude && Array.isArray(firstClaude.content)
+    && firstClaude.content.some((b: any) => b.type === 'image')
+    && firstClaude.content.some((b: any) => b.type === 'text')
+  steps.push({
+    step: '18. toClaudeMessages bygger image+text-content-blocks',
+    ok: !!isMultimodal,
+    detail: isMultimodal
+      ? `${(firstClaude.content as any[]).length} blocks (image + text)`
+      : `content är: ${typeof firstClaude?.content}`,
+  })
+
+  // 19. buildUserContentWithImages utan images returnerar bara strängen
+  const stringOnly = buildUserContentWithImages('Vad kostar det?', [])
+  steps.push({
+    step: '19. buildUserContentWithImages utan images = string',
+    ok: typeof stringOnly === 'string' && stringOnly === 'Vad kostar det?',
+    detail: typeof stringOnly,
+  })
+
+  // 20. URL föredras över base64 när båda finns
+  const both: ReturnType<typeof buildUserContentWithImages> = buildUserContentWithImages('Test', [
+    { url: 'https://example.test/img.jpg', base64: tinyPngBase64, media_type: 'image/jpeg' },
+  ])
+  const urlBlock = Array.isArray(both)
+    ? both.find((b: any) => b.type === 'image')
+    : null
+  steps.push({
+    step: '20. buildUserContentWithImages föredrar URL framför base64',
+    ok: !!urlBlock && (urlBlock as any).source?.type === 'url',
+    detail: `source.type=${(urlBlock as any)?.source?.type}`,
+  })
+
+  // 21. Auto-route: om bild bifogas på en Matte-tråd ska current_agent bli Daniel
+  // Vi simulerar genom att direkt anropa executeHandoff (samma logik som
+  // chat-endpointet) — testar inte hela request-flödet.
+  const autoResult = await executeHandoff({
+    thread: imgThread,
+    fromAgent: 'matte',
+    toAgent: 'daniel',
+    reason: 'användaren bifogade bild(er) för analys',
+    contextSummary: 'Bilder bifogade — Daniel tar över för bildanalys.',
+  })
+  const { data: imgThreadAfter } = await supabase
+    .from('agent_threads').select('current_agent_id').eq('id', imgThread.id).single()
+  steps.push({
+    step: '21. Auto-route Matte→Daniel vid bilder',
+    ok: autoResult.ok && imgThreadAfter?.current_agent_id === 'daniel',
+    detail: `current_agent_id=${imgThreadAfter?.current_agent_id}`,
+  })
+
+  // Cleanup bild-tråden
+  try {
+    await supabase.from('thread_message').delete().eq('thread_id', imgThread.id)
+    await supabase.from('agent_threads').delete().eq('id', imgThread.id)
   } catch { /* non-blocking */ }
 
   const allOk = steps.every(s => s.ok)
