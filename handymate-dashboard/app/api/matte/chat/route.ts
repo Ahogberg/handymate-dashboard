@@ -8,6 +8,12 @@ import {
   touchThread,
   MAX_HANDOFFS_PER_THREAD,
 } from '@/lib/agent/handoff'
+import {
+  saveThreadMessage,
+  loadThreadMessages,
+  toClaudeMessages,
+  summarizeIfNeeded,
+} from '@/lib/agent/thread-messages'
 
 export const maxDuration = 30
 
@@ -606,11 +612,63 @@ export async function POST(request: NextRequest) {
       contextSection = `AKTUELL AFFÄRSSTATUS (${new Date().toLocaleDateString('sv-SE')}): kunde inte laddas just nu.`
     }
 
-    // Initial messages — användarens senaste 10
-    const initialMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
-      role: m.role === 'user' ? 'user' : 'assistant',
-      content: m.content,
-    }))
+    // ── Multi-turn historik ─────────────────────────────────────────────
+    // Med thread: ladda persisterade meddelanden från DB (senaste 20) och
+    // använd som conversation-historik till Claude. Sammanfatta äldre
+    // meddelanden om token-budgeten överskrids.
+    // Utan thread: fall tillbaka till payload-historiken (legacy mode).
+    let initialMessages: Array<{ role: 'user' | 'assistant'; content: string }>
+    let historySummary: string | null = thread?.context_summary || null
+
+    // Senaste user-meddelandet — det vi ska svara på och spara
+    const lastUserMessage = messages
+      .slice()
+      .reverse()
+      .find((m: { role: string; content: string }) => m.role === 'user')
+    const newUserText: string = lastUserMessage?.content || ''
+
+    if (thread) {
+      const persisted = await loadThreadMessages(thread.id, { limit: 20 })
+
+      // Token-management: om historik är för lång, sammanfatta äldre delar
+      if (persisted.length > 0) {
+        const { summary, kept } = await summarizeIfNeeded({
+          threadId: thread.id,
+          rows: persisted,
+          apiKey,
+        })
+        if (summary) historySummary = summary
+        initialMessages = toClaudeMessages(kept)
+      } else {
+        initialMessages = []
+      }
+
+      // Lägg till det nya user-meddelandet sist (om det inte redan är
+      // sista raden i persisted — undvik duplicate vid re-submit)
+      if (newUserText) {
+        const lastInitial = initialMessages[initialMessages.length - 1]
+        if (!lastInitial || lastInitial.role !== 'user' || lastInitial.content !== newUserText) {
+          initialMessages = [...initialMessages, { role: 'user', content: newUserText }]
+        }
+      }
+
+      // Spara user-meddelandet i thread_message (non-blocking)
+      if (newUserText) {
+        saveThreadMessage({
+          threadId: thread.id,
+          businessId,
+          role: 'user',
+          agent: null,
+          content: newUserText,
+        }).catch(() => {})
+      }
+    } else {
+      // Legacy: använd payload-historiken (senaste 10)
+      initialMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
+        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+        content: m.content,
+      }))
+    }
 
     // ── Outer handoff-loop ──────────────────────────────────────────────
     // Maximalt 1 handoff per chat-turn (det räcker i 95% av fallen). Tråden
@@ -623,7 +681,7 @@ export async function POST(request: NextRequest) {
     let outerMessages = initialMessages
 
     while (true) {
-      const systemArray = [
+      const systemArray: any[] = [
         {
           type: 'text',
           text: buildAgentSystemPrompt(currentAgent, userName, businessName),
@@ -631,6 +689,13 @@ export async function POST(request: NextRequest) {
         },
         { type: 'text', text: contextSection },
       ]
+      // Inkludera summary av äldre meddelanden om token-budgeten översteg
+      if (historySummary) {
+        systemArray.push({
+          type: 'text',
+          text: `TIDIGARE I KONVERSATIONEN (sammanfattning):\n${historySummary}`,
+        })
+      }
 
       const turn = await runAgentTurn({
         apiKey,
@@ -647,6 +712,16 @@ export async function POST(request: NextRequest) {
         // Klart: lägg sista textsvaret om det finns
         if (turn.text) {
           responseMessages.push({ agent: currentAgent, content: turn.text })
+          // Persistera assistant-svar (non-blocking)
+          if (thread) {
+            saveThreadMessage({
+              threadId: thread.id,
+              businessId,
+              role: 'assistant',
+              agent: currentAgent,
+              content: turn.text,
+            }).catch(() => {})
+          }
         }
         break
       }
@@ -694,11 +769,25 @@ export async function POST(request: NextRequest) {
       const announcement = buildHandoffAnnouncement(currentAgent, result.current_agent, turn.handoff.reason)
       // Använd ev. text från avgående agent som prefix om hen sa något, annars bara announcement
       const announcementContent = turn.text ? `${turn.text}\n\n${announcement}` : announcement
+      const previousAgent = currentAgent
       responseMessages.push({
-        agent: currentAgent,
+        agent: previousAgent,
         content: announcementContent,
         is_handoff_announcement: true,
       })
+      // Persistera handoff-announcement med flag (skippas i Claude messages-
+      // historik nästa gång, men UI kan hämta dem för audit)
+      if (thread) {
+        saveThreadMessage({
+          threadId: thread.id,
+          businessId,
+          role: 'assistant',
+          agent: previousAgent,
+          content: announcementContent,
+          isHandoffAnnouncement: true,
+          metadata: { to_agent: result.current_agent, reason: turn.handoff.reason },
+        }).catch(() => {})
+      }
 
       // Byt till ny agent + injicera context som user-meddelande för nästa runda
       currentAgent = result.current_agent

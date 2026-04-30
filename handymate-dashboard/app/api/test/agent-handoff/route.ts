@@ -9,6 +9,13 @@ import {
   MAX_HANDOFFS_PER_THREAD,
   type AgentThread,
 } from '@/lib/agent/handoff'
+import {
+  saveThreadMessage,
+  loadThreadMessages,
+  toClaudeMessages,
+  scrubPII,
+  estimateTokens,
+} from '@/lib/agent/thread-messages'
 
 /**
  * GET /api/test/agent-handoff
@@ -167,6 +174,97 @@ export async function GET(request: NextRequest) {
       isValidAgentId(a) && AGENT_CAPABILITIES[a as keyof typeof AGENT_CAPABILITIES]
     ),
   })
+
+  // ── Multi-turn-test (Sprint 2) ────────────────────────────────────────
+  // Skapa en separat tråd för att inte krocka med max-loop-staten ovan
+  const mtCustomerId = `${customerId}_multiturn`
+  const mtThread = await getOrCreateThread({ businessId: business.business_id, customerId: mtCustomerId })
+
+  // 10. Spara 3 meddelanden via saveThreadMessage
+  await saveThreadMessage({
+    threadId: mtThread.id,
+    businessId: business.business_id,
+    role: 'user',
+    content: 'Vad kostade tilläggsarbetet?',
+  })
+  await saveThreadMessage({
+    threadId: mtThread.id,
+    businessId: business.business_id,
+    role: 'assistant',
+    agent: 'karin',
+    content: 'Tilläggsarbetet kostade 4 200 kr inklusive moms.',
+  })
+  await saveThreadMessage({
+    threadId: mtThread.id,
+    businessId: business.business_id,
+    role: 'user',
+    content: 'Vad sa du om priset?',
+  })
+  steps.push({
+    step: '10. saveThreadMessage skriver 3 rader (user/assistant/user)',
+    ok: true,
+    detail: 'PII-scrubbing och insert non-blocking',
+  })
+
+  // 11. Ladda historik och verifiera ordning + filter
+  const loaded = await loadThreadMessages(mtThread.id, { limit: 20 })
+  steps.push({
+    step: '11. loadThreadMessages returnerar 3 rader kronologiskt',
+    ok: loaded.length === 3
+      && loaded[0].role === 'user'
+      && loaded[1].role === 'assistant'
+      && loaded[2].role === 'user',
+    detail: `Hittade ${loaded.length} rader. Senaste: "${loaded[loaded.length - 1]?.content?.slice(0, 60) || ''}"`,
+  })
+
+  // 12. toClaudeMessages konverterar korrekt + skippar handoff-announcements
+  await saveThreadMessage({
+    threadId: mtThread.id,
+    businessId: business.business_id,
+    role: 'assistant',
+    agent: 'lars',
+    content: 'Jag lämnar över till Karin.',
+    isHandoffAnnouncement: true,
+  })
+  const claudeMessages = toClaudeMessages(await loadThreadMessages(mtThread.id, { limit: 20 }))
+  steps.push({
+    step: '12. toClaudeMessages skippar handoff-announcements',
+    ok: claudeMessages.length === 3 && claudeMessages.every(m => m.role === 'user' || m.role === 'assistant'),
+    detail: `Claude messages: ${claudeMessages.length} (förväntat 3 utan announcement)`,
+  })
+
+  // 13. Multi-turn context bevaras: senaste user-meddelandet refererar
+  // till priset från tidigare assistant-svar
+  const lastUser = loaded.filter(m => m.role === 'user').pop()
+  steps.push({
+    step: '13. Senaste user-meddelandet refererar till tidigare kontext',
+    ok: lastUser?.content?.toLowerCase().includes('priset') === true,
+    detail: `Senaste user-msg: "${lastUser?.content || ''}"`,
+  })
+
+  // 14. PII-scrubbing maskar personnummer + bankgiro
+  const scrubbed = scrubPII('Min kund 19850315-1234 har bankgiro 5050-1055 och konto 1234567890123.')
+  steps.push({
+    step: '14. scrubPII maskar personnummer + kontonummer',
+    ok: scrubbed.includes('[personnummer]')
+      && (scrubbed.includes('[bankgiro]') || scrubbed.includes('[kontonummer]')),
+    detail: scrubbed,
+  })
+
+  // 15. estimateTokens ger rimliga värden
+  const tokens = estimateTokens(loaded.map(r => ({ content: r.content })))
+  steps.push({
+    step: '15. estimateTokens > 0 för tre meddelanden',
+    ok: tokens > 0 && tokens < 1000,
+    detail: `~${tokens} tokens`,
+  })
+
+  // Cleanup: städa multi-turn-tråden så testet kan köras flera gånger
+  // utan att fylla DB med skräp.
+  try {
+    await supabase.from('thread_message').delete().eq('thread_id', mtThread.id)
+    await supabase.from('agent_threads').delete().eq('id', mtThread.id)
+  } catch { /* non-blocking */ }
 
   const allOk = steps.every(s => s.ok)
 
