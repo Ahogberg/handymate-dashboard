@@ -80,6 +80,15 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Hämta jobbtyper för business — används för badge-färg/namn på projekt-
+    // listans rader. Frontend joinar lokalt via slug.
+    const { data: jobTypesData } = await supabase
+      .from('job_types')
+      .select('id, name, slug, color, icon')
+      .eq('business_id', businessId)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+
     const enrichedProjects = (projects || []).map((project: any) => {
       const entries = timeData.filter((t: any) => t.project_id === project.project_id)
       const actual_minutes = entries.reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0)
@@ -103,7 +112,10 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ projects: enrichedProjects })
+    return NextResponse.json({
+      projects: enrichedProjects,
+      job_types: jobTypesData || [],
+    })
 
   } catch (error: any) {
     console.error('Get projects error:', error)
@@ -135,7 +147,8 @@ export async function POST(request: NextRequest) {
       budget_hours: body.budget_hours || null,
       budget_amount: body.budget_amount || null,
       start_date: body.start_date || null,
-      end_date: body.end_date || null
+      end_date: body.end_date || null,
+      job_type: body.job_type || null,
     }
 
     // Spåra ev. deal som projektet kommer från (via offert eller direkt) —
@@ -165,7 +178,7 @@ export async function POST(request: NextRequest) {
       if (quote.deal_id) {
         const { data: deal } = await supabase
           .from('deal')
-          .select('id, deal_number, title')
+          .select('id, deal_number, title, job_type')
           .eq('id', quote.deal_id)
           .eq('business_id', businessId)
           .maybeSingle()
@@ -173,6 +186,10 @@ export async function POST(request: NextRequest) {
           dealNumber = deal.deal_number ?? null
           dealTitle = deal.title ?? null
           dealIdForLink = deal.id
+          // Ärva jobbtyp från deal om body inte överrider
+          if (!projectData.job_type && deal.job_type) {
+            projectData.job_type = deal.job_type
+          }
         }
       }
 
@@ -204,7 +221,7 @@ export async function POST(request: NextRequest) {
     if (body.from_deal_id && !dealIdForLink) {
       const { data: deal } = await supabase
         .from('deal')
-        .select('id, deal_number, title, customer_id, description, value')
+        .select('id, deal_number, title, customer_id, description, value, job_type')
         .eq('id', body.from_deal_id)
         .eq('business_id', businessId)
         .maybeSingle()
@@ -216,6 +233,9 @@ export async function POST(request: NextRequest) {
         projectData.name = projectData.name || deal.title || `Projekt`
         projectData.description = projectData.description || deal.description || null
         projectData.budget_amount = projectData.budget_amount || deal.value || null
+        if (!projectData.job_type && deal.job_type) {
+          projectData.job_type = deal.job_type
+        }
       }
     }
 

@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
+import { JobTypeBadge, type JobTypeMeta } from './components/JobTypeBadge'
 
 interface Project {
   project_id: string
@@ -48,6 +49,7 @@ interface Project {
   ai_health_summary: string | null
   ai_auto_created: boolean
   project_number: string | null
+  job_type: string | null
 }
 
 interface Customer {
@@ -64,6 +66,8 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('active')
   const [searchTerm, setSearchTerm] = useState('')
+  const [jobTypes, setJobTypes] = useState<JobTypeMeta[]>([])
+  const [jobTypeFilter, setJobTypeFilter] = useState<string>('') // slug eller '' = alla
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
@@ -72,10 +76,11 @@ export default function ProjectsPage() {
     name: '',
     customer_id: '',
     project_type: 'hourly' as string,
+    job_type: '' as string,
     budget_hours: '',
     budget_amount: '',
     start_date: '',
-    end_date: ''
+    end_date: '',
   })
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; role: string }[]>([])
@@ -117,6 +122,7 @@ export default function ProjectsPage() {
       if (response.ok) {
         const data = await response.json()
         setProjects(data.projects || [])
+        setJobTypes(data.job_types || [])
       }
     } catch (error) {
       console.error('Failed to fetch projects:', error)
@@ -161,11 +167,12 @@ export default function ProjectsPage() {
           name: newProject.name,
           customer_id: newProject.customer_id || null,
           project_type: newProject.project_type,
+          job_type: newProject.job_type || null,
           budget_hours: newProject.budget_hours ? parseFloat(newProject.budget_hours) : null,
           budget_amount: newProject.budget_amount ? parseFloat(newProject.budget_amount) : null,
           start_date: newProject.start_date || null,
-          end_date: newProject.end_date || null
-        })
+          end_date: newProject.end_date || null,
+        }),
       })
 
       if (!response.ok) {
@@ -208,7 +215,7 @@ export default function ProjectsPage() {
       }
 
       setShowCreateModal(false)
-      setNewProject({ name: '', customer_id: '', project_type: 'hourly', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
+      setNewProject({ name: '', customer_id: '', project_type: 'hourly', job_type: '', budget_hours: '', budget_amount: '', start_date: '', end_date: '' })
       setPendingFiles([])
       setSelectedTeam([])
       fetchProjects()
@@ -280,10 +287,13 @@ export default function ProjectsPage() {
     return true
   })
 
-  const filteredProjects = visibleProjects.filter(p =>
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProjects = visibleProjects.filter(p => {
+    const matchesSearch =
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.customer?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesJobType = !jobTypeFilter || p.job_type === jobTypeFilter
+    return matchesSearch && matchesJobType
+  })
 
   // Stats
   const activeCount = projects.filter(p => p.status === 'active' || p.status === 'planning').length
@@ -392,6 +402,40 @@ export default function ProjectsPage() {
           </div>
         </div>
 
+        {/* Filter på jobbtyp — chips. Visas bara om business har jobbtyper */}
+        {jobTypes.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-6">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 mr-1">Jobbtyp:</span>
+            <button
+              onClick={() => setJobTypeFilter('')}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                !jobTypeFilter
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              Alla
+            </button>
+            {jobTypes.map(jt => {
+              const active = jobTypeFilter === jt.slug
+              return (
+                <button
+                  key={jt.slug}
+                  onClick={() => setJobTypeFilter(active ? '' : jt.slug)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border whitespace-nowrap"
+                  style={
+                    active
+                      ? { backgroundColor: jt.color, color: 'white', borderColor: jt.color }
+                      : { backgroundColor: `${jt.color}10`, color: jt.color, borderColor: `${jt.color}40` }
+                  }
+                >
+                  {jt.name}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         {/* Project List */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
           {loading ? (
@@ -414,9 +458,10 @@ export default function ProjectsPage() {
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-mono text-gray-400 flex-shrink-0">{project.project_number || `P-${project.project_id.slice(0, 6)}`}</span>
                         <h3 className="font-semibold text-gray-900 truncate">{project.name}</h3>
+                        <JobTypeBadge slug={project.job_type} jobTypes={jobTypes} />
                         <span className={`inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${getStatusStyle(project.status)}`}>
                           {getStatusText(project.status)}
                         </span>
@@ -589,6 +634,53 @@ export default function ProjectsPage() {
                   <option value="fixed_price">Fast pris</option>
                   <option value="mixed">Blandat</option>
                 </select>
+              </div>
+
+              {/* Jobbtyp — branschtagg som visas som färgad badge på projekt-listan */}
+              <div>
+                <label className="block text-sm text-gray-500 mb-2">
+                  Jobbtyp <span className="text-xs text-gray-400 font-normal">(valfri)</span>
+                </label>
+                {jobTypes.length === 0 ? (
+                  <Link
+                    href="/dashboard/settings/job-types"
+                    className="block px-4 py-3 bg-gray-50 border border-dashed border-[#E2E8F0] rounded-lg text-sm text-gray-500 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                  >
+                    + Lägg till jobbtyper i Inställningar
+                  </Link>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setNewProject({ ...newProject, job_type: '' })}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                        !newProject.job_type
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      Ingen
+                    </button>
+                    {jobTypes.map(jt => {
+                      const active = newProject.job_type === jt.slug
+                      return (
+                        <button
+                          key={jt.slug}
+                          type="button"
+                          onClick={() => setNewProject({ ...newProject, job_type: jt.slug })}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors whitespace-nowrap"
+                          style={
+                            active
+                              ? { backgroundColor: jt.color, color: 'white', borderColor: jt.color }
+                              : { backgroundColor: `${jt.color}10`, color: jt.color, borderColor: `${jt.color}40` }
+                          }
+                        >
+                          {jt.name}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
