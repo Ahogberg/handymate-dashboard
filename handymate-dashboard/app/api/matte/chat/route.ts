@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { AGENT_CAPABILITIES, isValidAgentId, type AgentId } from '@/lib/agent/capabilities'
+import {
+  getOrCreateThread,
+  executeHandoff,
+  buildHandoffAnnouncement,
+  touchThread,
+  MAX_HANDOFFS_PER_THREAD,
+} from '@/lib/agent/handoff'
 
 export const maxDuration = 30
 
@@ -203,6 +211,29 @@ const TOOLS = [
       required: ['title'],
     },
   },
+  {
+    name: 'handoff_to_agent',
+    description: 'Lämna över konversationen till en annan agent när frågan ligger utanför ditt expertområde. Den nya agenten svarar i samma response — användaren ser hela kedjan. Använd ENDAST när en specialist är klart bättre lämpad. Avbryt allt annat när du gör handoff.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target_agent: {
+          type: 'string',
+          description: 'Vilken agent som ska ta över: matte | lars | karin | daniel | hanna | lisa',
+          enum: ['matte', 'lars', 'karin', 'daniel', 'hanna', 'lisa'],
+        },
+        reason: {
+          type: 'string',
+          description: 'Kort förklaring varför du lämnar över (t.ex. "pris-detaljer ligger i Karins område")',
+        },
+        context_for_next_agent: {
+          type: 'string',
+          description: 'Sammanfattning av vad som diskuterats hittills så nästa agent kan svara direkt utan att fråga om.',
+        },
+      },
+      required: ['target_agent', 'reason', 'context_for_next_agent'],
+    },
+  },
 ]
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -401,12 +432,127 @@ async function callClaude(opts: {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// Agent system-prompt — byggs per agent baserat på capabilities
+// ────────────────────────────────────────────────────────────────────────────
+
+function buildAgentSystemPrompt(agent: AgentId, userName: string, businessName: string): string {
+  const cap = AGENT_CAPABILITIES[agent]
+  if (!cap) return ''
+
+  const expertise = cap.expertise.map(e => `- ${e}`).join('\n')
+  const outOfScope = cap.out_of_scope.map(e => `- ${e}`).join('\n')
+
+  return `Du är ${cap.name}, AI-assistent i Handymate-teamet hos ${businessName}. Du pratar med hantverkaren ${userName}. Svara kort och konkret på svenska, max 2-3 meningar per svar.
+
+DITT EXPERTOMRÅDE: ${cap.domain}
+
+VAD DU ÄR EXPERT PÅ:
+${expertise}
+
+SKICKA VIDARE TILL ANDRA AGENTER NÄR:
+${outOfScope}
+
+VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — säg inte "Hej, jag är X" till användaren, det säger nästa agent. Skriv en kort context_for_next_agent så nästa agent kan svara direkt utan att fråga om.
+
+Du har också tillgång till verktyg för SMS, godkännanden, fakturor, navigering och offert-utkast. Använd dem bara om frågan ligger inom ditt expertområde.
+
+Var vänlig, professionell och effektiv. Använd du-tilltal.`
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // POST handler
 // ────────────────────────────────────────────────────────────────────────────
 
+interface AgentTurnResult {
+  text: string
+  action: any
+  /** Satt om Claude använde handoff_to_agent — hanteras i outer loop */
+  handoff: { target_agent: string; reason: string; context_for_next_agent: string } | null
+}
+
+/**
+ * Kör en Claude-runda för en specifik agent. Inkluderar tool-loop och
+ * upptäcker handoff_to_agent-anrop (som signalerar att outer loop ska byta
+ * agent). Om handoff används avbryter vi tool-loopen och returnerar handoff:en
+ * — vi skickar inget tool_result tillbaka till modellen för det anropet.
+ */
+async function runAgentTurn(opts: {
+  apiKey: string
+  agent: AgentId
+  systemArray: any[]
+  initialMessages: any[]
+  businessId: string
+  userCookie: string | null
+}): Promise<AgentTurnResult> {
+  const MAX_TOOL_ITERATIONS = 3
+  let response = await callClaude({
+    apiKey: opts.apiKey,
+    system: opts.systemArray,
+    messages: opts.initialMessages,
+  })
+
+  const toolMessages: any[] = []
+  let finalAction: any = null
+  let iterations = 0
+
+  while (response.stop_reason === 'tool_use' && iterations < MAX_TOOL_ITERATIONS) {
+    iterations++
+    const toolUseBlocks = (response.content || []).filter((b: any) => b.type === 'tool_use')
+
+    // Hitta handoff-anrop FÖRST — det avbryter allt annat
+    const handoffBlock = toolUseBlocks.find((b: any) => b.name === 'handoff_to_agent')
+    if (handoffBlock) {
+      const text = (response.content || [])
+        .filter((b: any) => b.type === 'text')
+        .map((b: any) => b.text)
+        .join('\n')
+        .trim()
+      return {
+        text,
+        action: finalAction,
+        handoff: {
+          target_agent: String(handoffBlock.input?.target_agent || ''),
+          reason: String(handoffBlock.input?.reason || ''),
+          context_for_next_agent: String(handoffBlock.input?.context_for_next_agent || ''),
+        },
+      }
+    }
+
+    // Standard tool-execution för andra tools
+    const toolResults = await Promise.all(
+      toolUseBlocks.map(async (block: any) => {
+        const result = await executeTool(block.name, block.input || {}, opts.businessId, opts.userCookie)
+        if (result.action) finalAction = result.action
+        return { type: 'tool_result', tool_use_id: block.id, content: result.result }
+      })
+    )
+
+    toolMessages.push(
+      { role: 'assistant', content: response.content },
+      { role: 'user', content: toolResults }
+    )
+    const trimmed = toolMessages.slice(-4)
+
+    response = await callClaude({
+      apiKey: opts.apiKey,
+      system: opts.systemArray,
+      messages: [...opts.initialMessages, ...trimmed],
+    })
+  }
+
+  const finalText = (response.content || [])
+    .filter((b: any) => b.type === 'text')
+    .map((b: any) => b.text)
+    .join('\n')
+    .trim()
+
+  return { text: finalText, action: finalAction, handoff: null }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { messages, context } = await request.json()
+    const body = await request.json()
+    const { messages, context } = body
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
@@ -415,6 +561,11 @@ export async function POST(request: NextRequest) {
     const userName = context?.userName || 'hantverkaren'
     const businessName = context?.businessName || 'företaget'
     const businessId = context?.businessId
+    // Optionella thread-params — bakåtkompat: utan dessa beter sig endpoint
+    // som tidigare (Matte tar varje meddelande, ingen thread skapas).
+    const customerId: string | null = context?.customerId || null
+    const projectId: string | null = context?.projectId || null
+    const explicitThreadId: string | null = context?.threadId || null
 
     if (!businessId) {
       return NextResponse.json(
@@ -432,23 +583,18 @@ export async function POST(request: NextRequest) {
 
     const userCookie = request.headers.get('cookie')
 
-    // Statiskt system-prompt — cachas
-    const baseSystemPrompt = `Du är Matte, AI-assistent för hantverkaren ${userName} på ${businessName}. Du kan hjälpa med tidrapportering, offerter, fakturaöversikt och projektuppdateringar. Svara kort och konkret på svenska. Max 2-3 meningar per svar (även efter tool-användning).
-
-Du har tillgång till dessa verktyg:
-- send_sms: Skicka SMS direkt till en kund (bara när hantverkaren explicit ber dig)
-- create_approval: Skapa ett godkännande för känsliga actions (skicka offerter/fakturor — aldrig direkt)
-- send_invoice_reminder: Skicka påminnelse för förfallen faktura (använd invoice_id från affärsstatus)
-- navigate: Navigera hantverkaren till rätt sida i appen
-- create_quote_draft: Skapa ett tomt offert-utkast och öppna redigeringsvyn
-
-VIKTIGT:
-- Använd send_sms BARA om hantverkaren explicit ber dig kontakta en kund
-- För att skicka offerter eller fakturor: använd create_approval — aldrig direkt
-- Bekräfta alltid kort vad du gjort efter ett tool-anrop
-- Använd AKTUELL AFFÄRSSTATUS för att hitta rätt invoice_id, quote_id, kundnamn osv.
-
-Var vänlig, professionell och effektiv. Använd du-tilltal.`
+    // ── Thread-state ────────────────────────────────────────────────────
+    // Skapa eller hämta tråd om vi har customer/project context. Utan det
+    // kör vi i "engångsmode" med Matte som default-agent (ingen DB-skrivning).
+    let thread: Awaited<ReturnType<typeof getOrCreateThread>> | null = null
+    if (customerId || projectId || explicitThreadId) {
+      try {
+        thread = await getOrCreateThread({ businessId, customerId, projectId })
+      } catch (err) {
+        console.error('[matte/chat] thread fetch/create failed (non-blocking):', err)
+      }
+    }
+    let currentAgent: AgentId = (thread?.current_agent_id as AgentId) || 'matte'
 
     // Hämta verklig affärsdata (non-blocking)
     let contextSection = ''
@@ -460,88 +606,140 @@ Var vänlig, professionell och effektiv. Använd du-tilltal.`
       contextSection = `AKTUELL AFFÄRSSTATUS (${new Date().toLocaleDateString('sv-SE')}): kunde inte laddas just nu.`
     }
 
-    const systemArray = [
-      { type: 'text', text: baseSystemPrompt, cache_control: { type: 'ephemeral' } },
-      { type: 'text', text: contextSection },
-    ]
-
     // Initial messages — användarens senaste 10
     const initialMessages = messages.slice(-10).map((m: { role: string; content: string }) => ({
       role: m.role === 'user' ? 'user' : 'assistant',
       content: m.content,
     }))
 
-    // ── Tool-loop ────────────────────────────────────────────────────────
-    const toolMessages: any[] = []
-    let response: any
+    // ── Outer handoff-loop ──────────────────────────────────────────────
+    // Maximalt 1 handoff per chat-turn (det räcker i 95% av fallen). Tråden
+    // kan ackumulera fler handoffs över flera turns — capped vid
+    // MAX_HANDOFFS_PER_THREAD (audit + skydd mot loops).
+    const responseMessages: Array<{ agent: AgentId; content: string; is_handoff_announcement?: boolean }> = []
     let finalAction: any = null
-    let iterations = 0
-    const MAX_ITERATIONS = 3
+    const MAX_PER_TURN_HANDOFFS = 1
+    let handoffsThisTurn = 0
+    let outerMessages = initialMessages
 
-    response = await callClaude({
-      apiKey,
-      system: systemArray,
-      messages: initialMessages,
-    })
+    while (true) {
+      const systemArray = [
+        {
+          type: 'text',
+          text: buildAgentSystemPrompt(currentAgent, userName, businessName),
+          cache_control: { type: 'ephemeral' },
+        },
+        { type: 'text', text: contextSection },
+      ]
 
-    while (response.stop_reason === 'tool_use' && iterations < MAX_ITERATIONS) {
-      iterations++
-
-      const toolUseBlocks = (response.content || []).filter((b: any) => b.type === 'tool_use')
-
-      // Kör alla tool-anrop parallellt
-      const toolResults = await Promise.all(
-        toolUseBlocks.map(async (block: any) => {
-          const result = await executeTool(block.name, block.input || {}, businessId, userCookie)
-          if (result.action) finalAction = result.action
-          return {
-            type: 'tool_result',
-            tool_use_id: block.id,
-            content: result.result,
-          }
-        })
-      )
-
-      toolMessages.push(
-        { role: 'assistant', content: response.content },
-        { role: 'user', content: toolResults }
-      )
-
-      // Behåll initial + senaste 4 (2 par tool_use + tool_result)
-      const trimmedToolMessages = toolMessages.slice(-4)
-
-      response = await callClaude({
+      const turn = await runAgentTurn({
         apiKey,
-        system: systemArray,
-        messages: [...initialMessages, ...trimmedToolMessages],
+        agent: currentAgent,
+        systemArray,
+        initialMessages: outerMessages,
+        businessId,
+        userCookie,
       })
-    }
 
-    // Extrahera text från sista svaret
-    const finalText = (response.content || [])
-      .filter((b: any) => b.type === 'text')
-      .map((b: any) => b.text)
-      .join('\n')
-      .trim()
+      if (turn.action && !finalAction) finalAction = turn.action
 
-    // Backwards compat: parsa även gammalt JSON-action-format om Matte fortfarande använder det
-    let action = finalAction
-    if (!action) {
-      const actionMatch = finalText.match(/\{"action"\s*:\s*"navigate"\s*,\s*"target"\s*:\s*"([^"]+)"\}/)
-      if (actionMatch) {
-        action = { type: 'navigate', target: actionMatch[1] }
+      if (!turn.handoff || handoffsThisTurn >= MAX_PER_TURN_HANDOFFS) {
+        // Klart: lägg sista textsvaret om det finns
+        if (turn.text) {
+          responseMessages.push({ agent: currentAgent, content: turn.text })
+        }
+        break
       }
+
+      // Handoff begärd — verifiera och utför
+      if (!isValidAgentId(turn.handoff.target_agent)) {
+        // Ogiltig target — fall tillbaka till nuvarande agents textsvar
+        if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+        break
+      }
+
+      // Om vi inte har en tråd än men en handoff begärs, skapa en på
+      // (business_id, customer_id) eller fallback (utan customer-koppling).
+      if (!thread) {
+        try {
+          thread = await getOrCreateThread({ businessId, customerId, projectId })
+        } catch { /* om vi inte kan skapa, vägra handoff men returnera textsvar */ }
+        if (!thread) {
+          if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+          break
+        }
+      }
+
+      const result = await executeHandoff({
+        thread,
+        fromAgent: currentAgent,
+        toAgent: turn.handoff.target_agent,
+        reason: turn.handoff.reason,
+        contextSummary: turn.handoff.context_for_next_agent,
+      })
+
+      if (!result.ok) {
+        // Refused (max-loop, not_allowed, etc.) — stanna kvar hos current agent
+        if (turn.text) responseMessages.push({ agent: currentAgent, content: turn.text })
+        if (result.refused_reason === 'max_handoffs_reached') {
+          responseMessages.push({
+            agent: currentAgent,
+            content: `(Max antal handoffs i den här tråden nått — frågan stannar hos ${AGENT_CAPABILITIES[currentAgent]?.name || currentAgent}.)`,
+          })
+        }
+        break
+      }
+
+      // Lägg announcement från avgående agent
+      const announcement = buildHandoffAnnouncement(currentAgent, result.current_agent, turn.handoff.reason)
+      // Använd ev. text från avgående agent som prefix om hen sa något, annars bara announcement
+      const announcementContent = turn.text ? `${turn.text}\n\n${announcement}` : announcement
+      responseMessages.push({
+        agent: currentAgent,
+        content: announcementContent,
+        is_handoff_announcement: true,
+      })
+
+      // Byt till ny agent + injicera context som user-meddelande för nästa runda
+      currentAgent = result.current_agent
+      outerMessages = [
+        ...initialMessages,
+        {
+          role: 'user',
+          content: `[Handoff-kontext: ${turn.handoff.context_for_next_agent}]\n\nSvara kort på frågan ovan.`,
+        },
+      ]
+      handoffsThisTurn++
     }
-    const cleanReply = finalText.replace(/\{"action"\s*:\s*"navigate"[^}]+\}\s*/g, '').trim()
+
+    // Touch-thread så last_message_at uppdateras
+    if (thread) {
+      touchThread(thread.id).catch(() => {})
+    }
+
+    // Bakåtkompat: returnera även `reply` (sista textsvaret) + `action`
+    const lastMessage = responseMessages[responseMessages.length - 1]
+    const reply = lastMessage?.content || 'Klart!'
+    // Strippa eventuell legacy {"action":"navigate"...}-blob
+    const actionMatch = reply.match(/\{"action"\s*:\s*"navigate"\s*,\s*"target"\s*:\s*"([^"]+)"\}/)
+    if (!finalAction && actionMatch) {
+      finalAction = { type: 'navigate', target: actionMatch[1] }
+    }
+    const cleanReply = reply.replace(/\{"action"\s*:\s*"navigate"[^}]+\}\s*/g, '').trim()
 
     return NextResponse.json({
-      reply: cleanReply || 'Klart!',
-      action,
+      messages: responseMessages,
+      current_agent: currentAgent,
+      thread_id: thread?.id || null,
+      // Bakåtkompat med befintliga UI-konsumenter:
+      reply: cleanReply,
+      action: finalAction,
     })
   } catch (error: any) {
     console.error('[matte/chat] Error:', error)
     return NextResponse.json({
       reply: 'Något gick fel — försök igen.',
+      messages: [],
     })
   }
 }
