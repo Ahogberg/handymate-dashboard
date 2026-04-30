@@ -14,6 +14,10 @@ interface CustomersTabsProps {
   onCreateCustomer: () => void
 }
 
+/**
+ * Underline-style tabs (matchar offert-listans tabs). Aktivt tab har
+ * primary-700 underline + ikon + label, inaktivt är slate-500.
+ */
 export function CustomersTabs({
   activeTab,
   setActiveTab,
@@ -23,59 +27,50 @@ export function CustomersTabs({
   onCreateCustomer,
 }: CustomersTabsProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-      <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1">
-        <button
+    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="flex items-center border-b border-slate-200 gap-1 -mb-px">
+        <TabButton
+          active={activeTab === 'customers'}
+          icon={<Users className="w-3.5 h-3.5" />}
+          label="Kundlista"
+          shortLabel="Kunder"
+          count={customerCount}
           onClick={() => setActiveTab('customers')}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
-            activeTab === 'customers' ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          <span className="hidden sm:inline">Kundlista</span>
-          <span className="sm:hidden">Kunder</span>
-          <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-50 rounded-full">{customerCount}</span>
-        </button>
-        <button
+        />
+        <TabButton
+          active={activeTab === 'campaigns'}
+          icon={<Megaphone className="w-3.5 h-3.5" />}
+          label="Kampanjer"
+          count={campaignCount}
           onClick={() => setActiveTab('campaigns')}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
-            activeTab === 'campaigns' ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <Megaphone className="w-4 h-4" />
-          Kampanjer
-          <span className="ml-1 px-1.5 py-0.5 text-xs bg-gray-50 rounded-full">{campaignCount}</span>
-        </button>
-        <button
+        />
+        <TabButton
+          active={activeTab === 'duplicates'}
+          icon={<Merge className="w-3.5 h-3.5" />}
+          label="Dubbletter"
+          shortLabel="Dupl."
           onClick={() => {
             setActiveTab('duplicates')
             onFetchDuplicates()
           }}
-          className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all flex-1 sm:flex-none min-h-[44px] ${
-            activeTab === 'duplicates' ? 'bg-primary-700 text-white' : 'text-gray-500 hover:text-white'
-          }`}
-        >
-          <Merge className="w-4 h-4" />
-          <span className="hidden sm:inline">Dubbletter</span>
-          <span className="sm:hidden">Dupl.</span>
-        </button>
+        />
       </div>
 
       {activeTab === 'customers' && (
-        <div className="flex items-center gap-2 sm:ml-auto">
+        <div className="flex items-center gap-2">
           <Link
             href="/dashboard/customers/import"
-            className="flex items-center justify-center px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg font-medium text-gray-900 hover:bg-gray-200 min-h-[44px]"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors"
           >
-            <Upload className="w-4 h-4 sm:mr-2" />
+            <Upload className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Importera</span>
           </Link>
           <button
             onClick={onCreateCustomer}
-            className="flex items-center justify-center px-4 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
           >
-            <Plus className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Ny kund</span>
+            <Plus className="w-3.5 h-3.5" />
+            Ny kund
           </button>
         </div>
       )}
@@ -83,12 +78,52 @@ export function CustomersTabs({
       {activeTab === 'campaigns' && (
         <Link
           href="/dashboard/campaigns/new"
-          className="sm:ml-auto flex items-center justify-center px-4 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 min-h-[44px]"
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
         >
-          <Plus className="w-4 h-4 mr-2" />
+          <Plus className="w-3.5 h-3.5" />
           Ny kampanj
         </Link>
       )}
     </div>
+  )
+}
+
+function TabButton({
+  active,
+  icon,
+  label,
+  shortLabel,
+  count,
+  onClick,
+}: {
+  active: boolean
+  icon: React.ReactNode
+  label: string
+  shortLabel?: string
+  count?: number
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-3 text-sm font-semibold transition-colors border-b-2 ${
+        active
+          ? 'text-primary-700 border-primary-700'
+          : 'text-slate-500 hover:text-slate-700 border-transparent'
+      }`}
+    >
+      {icon}
+      <span className="hidden sm:inline">{label}</span>
+      {shortLabel && <span className="sm:hidden">{shortLabel}</span>}
+      {typeof count === 'number' && (
+        <span
+          className={`ml-1 px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
+            active ? 'bg-primary-50 text-primary-700' : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          {count}
+        </span>
+      )}
+    </button>
   )
 }

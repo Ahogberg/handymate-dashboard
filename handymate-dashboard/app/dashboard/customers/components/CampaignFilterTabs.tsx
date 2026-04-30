@@ -9,7 +9,7 @@ interface CampaignFilterTabsProps {
 
 export function CampaignFilterTabs({ filter, setFilter }: CampaignFilterTabsProps) {
   return (
-    <div className="flex bg-white border border-[#E2E8F0] rounded-xl p-1 overflow-x-auto">
+    <div className="inline-flex items-center bg-white border border-slate-200 rounded-xl p-1">
       {[
         { id: 'all' as const, label: 'Alla' },
         { id: 'draft' as const, label: 'Utkast' },
@@ -18,8 +18,8 @@ export function CampaignFilterTabs({ filter, setFilter }: CampaignFilterTabsProp
         <button
           key={f.id}
           onClick={() => setFilter(f.id)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap min-h-[40px] ${
-            filter === f.id ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-900'
+          className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+            filter === f.id ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           {f.label}

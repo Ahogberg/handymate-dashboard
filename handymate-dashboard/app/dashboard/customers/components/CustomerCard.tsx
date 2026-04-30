@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Edit, Mail, MapPin, Phone, Trash2 } from 'lucide-react'
+import { Building2, Crown, Edit, Home, Mail, MapPin, Phone, Trash2, User } from 'lucide-react'
 import type { Customer, CustomerTag } from './types'
 
 interface CustomerCardProps {
@@ -12,81 +12,89 @@ interface CustomerCardProps {
   onDelete: (customerId: string, e: React.MouseEvent) => void
 }
 
+/**
+ * Kund-kort i griden. Vit yta, slate-200 border, hover ger subtil shadow.
+ * Ikon-avatar i primary-50 som speglar kundtyp via Lucide-ikon (User /
+ * Building2 / Home) — istället för tidigare bunta gradient-fyllningar
+ * (amber-orange för företag, emerald för BRF) som inte fanns i paletten.
+ */
 export function CustomerCard({ customer, tagIds, tags, onEdit, onDelete }: CustomerCardProps) {
+  const isVip = (customer.lifetime_value || 0) >= 50000
+  const Icon = customer.customer_type === 'company' ? Building2 : customer.customer_type === 'brf' ? Home : User
+
   return (
     <Link
       href={`/dashboard/customers/${customer.customer_id}`}
-      className="bg-white rounded-xl sm:rounded-xl border border-[#E2E8F0] p-4 sm:p-5 hover:bg-gray-50 transition-all block"
+      className="block bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 hover:shadow-sm transition-all"
     >
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex items-center">
-          <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center ${
-            customer.customer_type === 'company' ? 'bg-gradient-to-br from-amber-400 to-orange-500' :
-            customer.customer_type === 'brf' ? 'bg-gradient-to-br from-emerald-400 to-primary-600' :
-            'bg-primary-700'
-          }`}>
-            <span className="text-white font-bold text-base sm:text-lg">
-              {customer.name ? customer.name.split(' ').map(n => n[0]).join('').substring(0, 2) : '?'}
-            </span>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className="w-10 h-10 rounded-full bg-primary-50 text-primary-700 flex items-center justify-center flex-shrink-0">
+            <Icon className="w-4.5 h-4.5" />
           </div>
-          <div className="ml-3 sm:ml-4">
-            <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                {(customer.lifetime_value || 0) >= 50000 && '👑 '}{customer.name || 'Okänd'}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {isVip && <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />}
+              <h3 className="font-heading text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
+                {customer.name || 'Okänd'}
               </h3>
               {customer.customer_type === 'company' && (
-                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 border border-amber-200 rounded-md">Företag</span>
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-100 rounded-full">
+                  Företag
+                </span>
               )}
               {customer.customer_type === 'brf' && (
-                <span className="px-1.5 py-0.5 text-[10px] font-medium bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-md">BRF</span>
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full">
+                  BRF
+                </span>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-gray-400">
-              {customer.customer_number && <span className="text-gray-500 font-medium">{customer.customer_number} · </span>}
-              {(customer.lifetime_value || 0) > 0 && <span className="text-primary-700 font-medium">{Math.round(customer.lifetime_value || 0).toLocaleString('sv-SE')} kr · </span>}
-              Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}
+            <p className="text-xs text-slate-500 mt-1 truncate">
+              {customer.customer_number && (
+                <span className="text-slate-700 font-medium">{customer.customer_number} · </span>
+              )}
+              {(customer.lifetime_value || 0) > 0 && (
+                <span className="text-primary-700 font-semibold tabular-nums">
+                  {Math.round(customer.lifetime_value || 0).toLocaleString('sv-SE')} kr ·{' '}
+                </span>
+              )}
+              <span>Sedan {new Date(customer.created_at).toLocaleDateString('sv-SE')}</span>
             </p>
           </div>
         </div>
-        <div className="flex space-x-1">
+        <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
             onClick={e => onEdit(customer, e)}
-            className="p-2.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Redigera"
+            className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <Edit className="w-4 h-4" />
           </button>
           <button
             onClick={e => onDelete(customer.customer_id, e)}
-            className="p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[44px] min-h-[44px] flex items-center justify-center"
+            aria-label="Ta bort"
+            className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="space-y-2 sm:space-y-3">
-        <div className="flex items-center text-xs sm:text-sm">
-          <Phone className="w-4 h-4 text-gray-400 mr-2 sm:mr-3 flex-shrink-0" />
-          <span className="text-gray-700 truncate">{customer.phone_number || '-'}</span>
-        </div>
-        <div className="flex items-center text-xs sm:text-sm">
-          <Mail className="w-4 h-4 text-gray-400 mr-2 sm:mr-3 flex-shrink-0" />
-          <span className="text-gray-700 truncate">{customer.email || '-'}</span>
-        </div>
-        <div className="flex items-center text-xs sm:text-sm">
-          <MapPin className="w-4 h-4 text-gray-400 mr-2 sm:mr-3 flex-shrink-0" />
-          <span className="text-gray-700 truncate">{customer.address_line || '-'}</span>
-        </div>
+      <div className="space-y-2">
+        <ContactRow icon={<Phone className="w-3.5 h-3.5" />} value={customer.phone_number} />
+        <ContactRow icon={<Mail className="w-3.5 h-3.5" />} value={customer.email} />
+        <ContactRow icon={<MapPin className="w-3.5 h-3.5" />} value={customer.address_line} />
       </div>
+
       {tagIds.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t border-gray-100">
+        <div className="flex flex-wrap gap-1 mt-4 pt-4 border-t border-slate-100">
           {tagIds.map(tagId => {
             const tag = tags.find(t => t.tag_id === tagId)
             if (!tag) return null
             return (
               <span
                 key={tagId}
-                className="px-2 py-0.5 text-[10px] font-medium rounded-full text-white"
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-full text-white"
                 style={{ backgroundColor: tag.color }}
               >
                 {tag.name}
@@ -96,5 +104,14 @@ export function CustomerCard({ customer, tagIds, tags, onEdit, onDelete }: Custo
         </div>
       )}
     </Link>
+  )
+}
+
+function ContactRow({ icon, value }: { icon: React.ReactNode; value: string | null | undefined }) {
+  return (
+    <div className="flex items-center gap-2 text-xs sm:text-sm">
+      <span className="text-slate-400 flex-shrink-0">{icon}</span>
+      <span className="text-slate-700 truncate">{value || '—'}</span>
+    </div>
   )
 }

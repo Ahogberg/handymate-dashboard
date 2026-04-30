@@ -398,27 +398,21 @@ export default function CustomersPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Laddar...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-sm text-slate-500">Laddar…</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
-      {/* Background */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
-        <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
-      </div>
-
+    <div className="min-h-screen bg-slate-50">
       {/* Toast */}
       {toast.show && (
         <div
-          className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-xl border ${
+          className={`fixed top-4 right-4 z-[9999] px-4 py-2.5 rounded-xl border text-sm font-semibold shadow-sm ${
             toast.type === 'success'
-              ? 'bg-emerald-100 border-emerald-200 text-emerald-600'
-              : 'bg-red-100 border-red-200 text-red-600'
+              ? 'bg-green-50 border-green-200 text-green-700'
+              : 'bg-red-50 border-red-200 text-red-700'
           }`}
         >
           {toast.message}
@@ -438,10 +432,14 @@ export default function CustomersPage() {
         onSubmit={handleSubmit}
       />
 
-      <div className="relative">
-        <CustomersHeader />
+      <CustomersHeader
+        totalCount={customers.length}
+        vipCount={customers.filter(c => (c.lifetime_value || 0) >= 50000).length}
+        campaignCount={campaigns.length}
+      />
 
-        <div className="flex flex-col gap-4 mb-6">
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-8 pb-10">
+        <div className="flex flex-col gap-5 mb-6">
           <CustomersTabs
             activeTab={activeTab}
             setActiveTab={setActiveTab}

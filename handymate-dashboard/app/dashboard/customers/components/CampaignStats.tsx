@@ -12,49 +12,52 @@ export function CampaignStats({ campaignCount, totalSent, totalDelivered }: Camp
   const deliveryRate = totalSent > 0 ? Math.round((totalDelivered / totalSent) * 100) : 0
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-            <Megaphone className="w-5 h-5 text-secondary-700" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900">{campaignCount}</p>
-            <p className="text-xs text-gray-400">Kampanjer</p>
-          </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <StatCard icon={<Megaphone className="w-4.5 h-4.5" />} label="Kampanjer" value={campaignCount} />
+      <StatCard icon={<Send className="w-4.5 h-4.5" />} label="Skickade" value={totalSent} />
+      <StatCard
+        icon={<CheckCircle className="w-4.5 h-4.5" />}
+        label="Levererade"
+        value={totalDelivered}
+        accent="green"
+      />
+      <StatCard
+        icon={<MessageSquare className="w-4.5 h-4.5" />}
+        label="Leveransgrad"
+        value={`${deliveryRate}%`}
+        accent="amber"
+      />
+    </div>
+  )
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: number | string
+  accent?: 'green' | 'amber'
+}) {
+  const iconCls =
+    accent === 'green'
+      ? 'bg-green-50 text-green-700'
+      : accent === 'amber'
+      ? 'bg-amber-50 text-amber-700'
+      : 'bg-primary-50 text-primary-700'
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4">
+      <div className="flex items-center gap-3">
+        <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${iconCls}`}>
+          {icon}
         </div>
-      </div>
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
-            <Send className="w-5 h-5 text-primary-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900">{totalSent}</p>
-            <p className="text-xs text-gray-400">Skickade</p>
-          </div>
-        </div>
-      </div>
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-            <CheckCircle className="w-5 h-5 text-emerald-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900">{totalDelivered}</p>
-            <p className="text-xs text-gray-400">Levererade</p>
-          </div>
-        </div>
-      </div>
-      <div className="bg-white border border-[#E2E8F0] rounded-xl p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-            <MessageSquare className="w-5 h-5 text-amber-600" />
-          </div>
-          <div>
-            <p className="text-xl font-bold text-gray-900">{deliveryRate}%</p>
-            <p className="text-xs text-gray-400">Leveransgrad</p>
-          </div>
+        <div className="min-w-0">
+          <p className="font-heading text-lg font-bold text-slate-900 tabular-nums tracking-tight">{value}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
         </div>
       </div>
     </div>
