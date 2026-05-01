@@ -593,6 +593,7 @@ export async function POST(request: NextRequest) {
     const { messages, context, images: rawImages } = body
 
     if (!messages || !Array.isArray(messages)) {
+      console.error('[matte/chat] 400:', { reason: 'messages krävs', body })
       return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
     }
 
@@ -636,6 +637,7 @@ export async function POST(request: NextRequest) {
     const hasImages = images.length > 0
 
     if (!businessId) {
+      console.error('[matte/chat] 400:', { reason: 'businessId saknas i context', body })
       return NextResponse.json(
         { error: 'businessId saknas i context — kan inte ladda affärsdata' },
         { status: 400 }
