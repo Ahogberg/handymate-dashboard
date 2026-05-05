@@ -365,8 +365,15 @@ export default function PipelinePage() {
     setDealUploading(true)
     let successCount = 0
     let failCount = 0
+    let lastError: string | null = null
     for (const file of Array.from(files)) {
       if (file.size > 10 * 1024 * 1024) {
+        lastError = `${file.name} är för stor (max 10 MB)`
+        failCount++
+        continue
+      }
+      if (file.size === 0) {
+        lastError = `${file.name} är tom`
         failCount++
         continue
       }
@@ -382,15 +389,18 @@ export default function PipelinePage() {
         })
 
         if (!res.ok) {
-          const errData = await res.json().catch(() => ({}))
-          console.error('Document upload failed:', errData)
+          const errData = await res.json().catch(() => ({} as any))
+          const msg = errData?.error || `HTTP ${res.status}`
+          console.error('[upload-doc] deal-upload misslyckades:', msg, errData, { name: file.name, size: file.size })
+          lastError = msg
           failCount++
           continue
         }
 
         successCount++
-      } catch (err) {
-        console.error('Document upload failed:', err)
+      } catch (err: any) {
+        console.error('[upload-doc] deal-upload kastade:', err)
+        lastError = err?.message || 'Nätverksfel'
         failCount++
       }
     }
@@ -402,7 +412,11 @@ export default function PipelinePage() {
       showToast(successCount === 1 ? 'Dokument uppladdat' : `${successCount} dokument uppladdade`, 'success')
     }
     if (failCount > 0) {
-      showToast(failCount === 1 ? 'Ett dokument kunde inte laddas upp' : `${failCount} dokument misslyckades`, 'error')
+      // Visa servrns faktiska felmeddelande så användaren ser varför uppladdningen sprack
+      const summary = failCount === 1
+        ? `Kunde inte ladda upp${lastError ? `: ${lastError}` : ''}`
+        : `${failCount} dokument misslyckades${lastError ? ` (senaste: ${lastError})` : ''}`
+      showToast(summary, 'error')
     }
   }
 

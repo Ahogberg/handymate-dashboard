@@ -3,6 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { ensureBucket } from '@/lib/storage'
 
+const BUCKET = 'customer-documents'
+
 /**
  * POST /api/deals/[id]/documents/upload
  * Upload documents for a deal that may not have a customer yet.
@@ -20,14 +22,29 @@ export async function POST(
 
     const { id: dealId } = await params
     const supabase = getServerSupabase()
-    await ensureBucket(supabase, 'customer-documents', { public: true })
 
-    const formData = await request.formData()
+    // Bucket-config best-effort, kastar aldrig — uploaden funkar via service_role.
+    await ensureBucket(supabase, BUCKET, { public: true })
+
+    let formData: FormData
+    try {
+      formData = await request.formData()
+    } catch (parseErr: any) {
+      console.error('[deals/documents] FormData-parse misslyckades:', parseErr?.message || parseErr)
+      return NextResponse.json({ error: 'Kunde inte läsa filuppladdningen' }, { status: 400 })
+    }
+
     const file = formData.get('file') as File | null
     const category = (formData.get('category') as string) || 'other'
 
     if (!file) {
+      console.error('[deals/documents] Ingen fil i FormData', { deal_id: dealId, category })
       return NextResponse.json({ error: 'Ingen fil bifogad' }, { status: 400 })
+    }
+
+    if (file.size === 0) {
+      console.error('[deals/documents] Tom fil', { name: file.name, deal_id: dealId })
+      return NextResponse.json({ error: 'Filen är tom' }, { status: 400 })
     }
 
     if (file.size > 10 * 1024 * 1024) {
@@ -42,7 +59,6 @@ export async function POST(
       .eq('business_id', business.business_id)
       .single()
 
-    // Upload to Supabase Storage using service role (bypasses RLS)
     const timestamp = Date.now()
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
 
@@ -51,29 +67,45 @@ export async function POST(
       ? `${business.business_id}/${deal.customer_id}/documents/${timestamp}_${safeName}`
       : `${business.business_id}/deals/${dealId}/documents/${timestamp}_${safeName}`
 
-    const arrayBuffer = await file.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
+    let buffer: Buffer
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      buffer = Buffer.from(arrayBuffer)
+    } catch (bufErr: any) {
+      console.error('[deals/documents] arrayBuffer misslyckades:', bufErr?.message || bufErr, {
+        name: file.name,
+        size: file.size,
+      })
+      return NextResponse.json({ error: 'Kunde inte läsa filinnehållet' }, { status: 500 })
+    }
 
     const { error: uploadError } = await supabase.storage
-      .from('customer-documents')
+      .from(BUCKET)
       .upload(filePath, buffer, {
-        contentType: file.type,
+        contentType: file.type || 'application/octet-stream',
         upsert: false,
       })
 
     if (uploadError) {
-      console.error('Storage upload error:', uploadError)
-      return NextResponse.json({ error: 'Kunde inte ladda upp filen: ' + uploadError.message }, { status: 500 })
+      console.error('[deals/documents] Storage upload misslyckades:', {
+        message: uploadError.message,
+        path: filePath,
+        bucket: BUCKET,
+        size: file.size,
+        type: file.type,
+      })
+      return NextResponse.json(
+        { error: 'Kunde inte ladda upp filen: ' + uploadError.message },
+        { status: 500 },
+      )
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('customer-documents')
-      .getPublicUrl(filePath)
+    // Get public URL — används som fallback i UI:t (signerad URL skapas
+    // via /api/customers/[id]/documents/[docId] vid klick).
+    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(filePath)
 
-    // Save metadata - use customer_id if available, otherwise use deal_id as reference
     const docId = 'doc_' + Math.random().toString(36).substr(2, 9)
-    const { data, error } = await supabase
+    const { data, error: insertError } = await supabase
       .from('customer_document')
       .insert({
         id: docId,
@@ -88,12 +120,27 @@ export async function POST(
       .select()
       .single()
 
-    if (error) throw error
+    if (insertError) {
+      console.error('[deals/documents] DB insert misslyckades:', {
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+        code: insertError.code,
+        path: filePath,
+      })
+      // Rollback: ta bort filen så vi inte lämnar orphaner
+      await supabase.storage.from(BUCKET).remove([filePath]).catch(() => {})
+      return NextResponse.json(
+        { error: 'Kunde inte spara dokument-metadata: ' + insertError.message },
+        { status: 500 },
+      )
+    }
 
     return NextResponse.json({ document: data })
   } catch (error: unknown) {
-    console.error('POST deal document upload error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
+    const stack = error instanceof Error ? error.stack : undefined
+    console.error('[deals/documents] Oväntat fel:', message, stack)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

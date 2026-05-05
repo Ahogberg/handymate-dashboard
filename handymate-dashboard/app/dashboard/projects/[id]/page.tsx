@@ -1065,11 +1065,19 @@ export default function ProjectDetailPage() {
       formData.append('file', file)
       formData.append('category', docCategory === 'all' ? 'other' : docCategory)
       const res = await fetch(`/api/projects/${projectId}/documents`, { method: 'POST', body: formData })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        // Surface server's faktiska felmeddelande så vi inte tappar diagnostik.
+        const errData = await res.json().catch(() => ({} as any))
+        const msg = errData?.error || `HTTP ${res.status}`
+        console.error('[upload-doc] projekt-upload misslyckades:', msg, errData)
+        throw new Error(msg)
+      }
       showToast('Dokument uppladdat!', 'success')
       fetchDocuments()
-    } catch {
-      showToast('Kunde inte ladda upp fil', 'error')
+      // Reset input så samma fil kan laddas upp igen om något gick snett
+      e.target.value = ''
+    } catch (err: any) {
+      showToast(err?.message || 'Kunde inte ladda upp fil', 'error')
     } finally {
       setUploading(false)
     }
