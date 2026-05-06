@@ -1,12 +1,22 @@
+# Dev-agenter pausade 2026-05-06.
+# Reason: kostade Opus 4.7 via Claude Code default, levererade inget värde i pilot-fasen.
+# Återaktivera när agenterna har konkreta use cases och rimliga modeller.
+# Trigger: workflow_dispatch only (manuell via GitHub UI).
+
 name: Handymate Agent Team
 
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '0 3 * * *'   # Natt 03:00 — Engineer
-    - cron: '0 8 * * 0'   # Söndag 08:00 — Researcher
-    - cron: '0 6 * * 1'   # Måndag 06:00 — Strategist + CS
+  # PAUSAT — pushar till main triggar inte längre QA-agenten.
+  # Skälet: varje push genererade ~9 Opus-anrop via Claude Code default-modell.
+  # push:
+  #   branches: [main]
+
+  # PAUSAT — schemalagda agenter avstängda tills vidare.
+  # schedule:
+  #   - cron: '0 3 * * *'   # Natt 03:00 — Engineer
+  #   - cron: '0 8 * * 0'   # Söndag 08:00 — Researcher
+  #   - cron: '0 6 * * 1'   # Måndag 06:00 — Strategist + CS
+
   workflow_dispatch:
     inputs:
       agent:
