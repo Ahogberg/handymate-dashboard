@@ -16,6 +16,7 @@ import { CampaignsList } from './components/CampaignsList'
 import { DuplicatesPanel } from './components/DuplicatesPanel'
 import { TagManagementModal } from './components/TagManagementModal'
 import { DealPromptModal } from './components/DealPromptModal'
+import { DuplicateConflictModal } from './components/DuplicateConflictModal'
 import type { Campaign, Customer, CustomerForm, CustomerTag, DuplicateGroup, PricingOption } from './components/types'
 
 export default function CustomersPage() {
@@ -79,6 +80,19 @@ export default function CustomersPage() {
     message: '',
     type: 'success',
   })
+
+  // Dubblett-konflikt — sätts när backend (409) hittade matchande kunder
+  // vid create. UI visar en confirmation-modal: använd befintlig eller skapa ändå.
+  interface DuplicateMatch {
+    customer_id: string
+    name: string
+    phone_number: string | null
+    email: string | null
+    address_line: string | null
+    created_at: string
+    match_type: 'phone' | 'email' | 'name_address'
+  }
+  const [duplicateConflict, setDuplicateConflict] = useState<{ duplicates: DuplicateMatch[] } | null>(null)
 
   useEffect(() => {
     if (business.business_id) {
@@ -208,12 +222,7 @@ export default function CustomersPage() {
     setModalOpen(true)
   }
 
-  const handleSubmit = async () => {
-    if (!form.name || !form.phone_number) {
-      showToast('Namn och telefon krävs', 'error')
-      return
-    }
-
+  const submitCustomerCreate = async (forceCreate: boolean): Promise<void> => {
     setActionLoading(true)
     try {
       const response = await fetch('/api/actions', {
@@ -223,15 +232,28 @@ export default function CustomersPage() {
           action: editingCustomer ? 'update_customer' : 'create_customer',
           data: editingCustomer
             ? { customerId: editingCustomer.customer_id, ...form }
-            : { ...form, businessId: business.business_id },
+            : { ...form, businessId: business.business_id, force_create: forceCreate },
         }),
       })
+
+      // Dedupe-flöde — 409 betyder att backend hittade matchande kunder
+      if (response.status === 409 && !editingCustomer) {
+        const errBody = await response.json().catch(() => ({} as any))
+        if (errBody?.error === 'duplicate_customer' && Array.isArray(errBody.duplicates)) {
+          setDuplicateConflict({
+            duplicates: errBody.duplicates,
+          })
+          setActionLoading(false)
+          return
+        }
+      }
 
       if (!response.ok) throw new Error('Något gick fel')
 
       const result = await response.json().catch(() => null)
       showToast(editingCustomer ? 'Kund uppdaterad!' : 'Kund skapad!', 'success')
       setModalOpen(false)
+      setDuplicateConflict(null)
       fetchData()
 
       if (!editingCustomer && result?.customer) {
@@ -246,6 +268,14 @@ export default function CustomersPage() {
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const handleSubmit = async () => {
+    if (!form.name || !form.phone_number) {
+      showToast('Namn och telefon krävs', 'error')
+      return
+    }
+    await submitCustomerCreate(false)
   }
 
   const handleCustomerDelete = async (customerId: string, e: React.MouseEvent) => {
@@ -532,6 +562,15 @@ export default function CustomersPage() {
           customerId={dealPrompt.customerId}
           customerName={dealPrompt.customerName}
           onDismiss={() => setDealPrompt(null)}
+        />
+      )}
+
+      {duplicateConflict && (
+        <DuplicateConflictModal
+          duplicates={duplicateConflict.duplicates}
+          saving={actionLoading}
+          onClose={() => setDuplicateConflict(null)}
+          onForceCreate={() => submitCustomerCreate(true)}
         />
       )}
     </div>

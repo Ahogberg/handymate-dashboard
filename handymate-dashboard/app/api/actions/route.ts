@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -108,6 +109,30 @@ export async function POST(request: NextRequest) {
         const { name, phone_number, email, address_line, personal_number, property_designation,
                 customer_type, org_number, contact_person, invoice_address, visit_address, reference, apartment_count,
                 segment_id, contract_type_id, price_list_id } = data
+
+        // Pre-check dubbletter på telefon/e-post/namn+adress för att förhindra
+        // att samma kund läggs in flera gånger. Om matchningar finns returneras
+        // 409 med listan så UI kan fråga "Använd befintlig eller skapa ändå?".
+        // Klienten kan skicka { force_create: true } för att skippa kontrollen.
+        if (!data.force_create) {
+          const duplicates = await findCustomerDuplicates(supabase, {
+            business_id: authBusiness.business_id,
+            phone: phone_number,
+            email,
+            name,
+            address: address_line,
+          })
+          if (duplicates.length > 0) {
+            return NextResponse.json(
+              {
+                error: 'duplicate_customer',
+                message: 'En eller flera kunder matchar redan på telefon, e-post eller namn+adress.',
+                duplicates,
+              },
+              { status: 409 },
+            )
+          }
+        }
 
         const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
 

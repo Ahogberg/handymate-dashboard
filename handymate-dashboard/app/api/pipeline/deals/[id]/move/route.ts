@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { moveDeal } from '@/lib/pipeline'
-import { isValidTransition, type PipelineStageId } from '@/lib/pipeline/stages'
 
 /**
  * POST - Flytta deal till nytt steg
@@ -38,21 +37,23 @@ export async function POST(
       return NextResponse.json({ error: 'Deal not found' }, { status: 404 })
     }
 
-    // Get current stage slug for transition validation
+    // Get current stage slug — används för automation-handlern nedan
     const { data: currentStage } = await supabase
       .from('pipeline_stage')
       .select('slug')
       .eq('id', existing.stage_id)
       .single()
 
-    if (currentStage?.slug) {
-      const fromSlug = currentStage.slug as PipelineStageId
-      const toSlug = toStageSlug as PipelineStageId
-      if (!isValidTransition(fromSlug, toSlug)) {
-        return NextResponse.json({
-          error: `Kan inte flytta från "${fromSlug}" till "${toSlug}". Flytta till nästa steg i ordningen.`,
-        }, { status: 400 })
-      }
+    // Tidigare hade vi en strikt isValidTransition-koll mot 6 hardcoded
+    // PIPELINE_STAGES-slugs. Den blockerade drag-and-drop helt så fort
+    // en deal eller stage hade en annan slug (custom stages från
+    // stage-settings, eller legacy data). VALID_TRANSITIONS tillät redan
+    // att varje aktivt steg går till alla andra — kontrollen var
+    // redundant. Borttagen så drag-drop fungerar fritt mellan alla steg.
+
+    // No-op om man droppar tillbaka i samma stage
+    if (currentStage?.slug === toStageSlug) {
+      return NextResponse.json({ success: true, noop: true })
     }
 
     // Validate lost_reason if moving to lost
