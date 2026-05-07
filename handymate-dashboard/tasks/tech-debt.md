@@ -303,3 +303,45 @@ WHERE te.project_id = p.project_id
 **Estimat:** 30 min för customers-sidan + 1h för audit av övriga filer = ~1.5h totalt.
 
 **Inte akut för pilot** men borde fixas innan Christoffer demonstrerar dashboard för någon — fakturasummor på 0 kr är besvärligt synligt.
+
+---
+
+## TD-10 (2026-05-08) — Avrundningspolicy för stämpla-tid (öppen produktfråga)
+
+**Plats:** [app/api/checkin/checkout/route.ts](handymate-dashboard/app/api/checkin/checkout/route.ts) (där `duration_minutes` beräknas), [time_checkins-tabellen](handymate-dashboard/sql/v17_checkin.sql).
+
+**Idag:** Tid lagras med ren minutprecision från GPS-stämpling — `Math.round((checkedOut - checkedIn) / 60000)` i checkout-routen. Ingen avrundning, ingen lunch-avdrag, inget minimum.
+
+**Verkligheten i hantverksföretag:** Konventionen varierar per företag och kollektivavtal:
+- **6-min intervall** — Byggnads kollektivavtal (1/10-timme)
+- **15-min** — kontorskonvention, vanlig i Easoft m.fl.
+- **Minimum 1h** vid jourutryckning
+- **Automatisk lunch-avdrag** vid pass > 5h (vanligt 30-60 min)
+
+Utan policy blir både fakturering och löneunderlag inkonsekvent — och risk att felställa kollektivavtal.
+
+**Frågor till Christoffer när han testar i fält:**
+1. Hur rundar Bee Service tid idag? Manuellt eller via system?
+2. Vad är önskemål i Handymate? Ingen avrundning, 6-min, 15-min, eller per-business konfigurerbart?
+3. Ska minimum-tid per pass finnas (t.ex. < 5 min ignoreras som feltest)?
+4. Lunch-avdrag automatiskt vid pass > 5h, eller låt användaren registrera lunch separat?
+
+**Implementation när policy är klar:**
+
+```sql
+ALTER TABLE business_config
+  ADD COLUMN IF NOT EXISTS time_rounding_minutes INTEGER DEFAULT 0,    -- 0=ingen, 6, 15, 30, 60
+  ADD COLUMN IF NOT EXISTS min_shift_minutes INTEGER DEFAULT 0,        -- ignorera pass < N min
+  ADD COLUMN IF NOT EXISTS auto_lunch_deduction_minutes INTEGER DEFAULT 0;  -- 0=av, 30=halvtimme
+```
+
+Avrundning sker i `/api/checkin/checkout` på beräknad `duration_minutes`:
+- `time_rounding_minutes > 0` → runda upp till närmaste intervall (gynna anställd) eller närmaste (matematiskt) — *ytterligare produktfråga*
+- `min_shift_minutes` → om `duration < min`, sätt `status = 'rejected'` med audit-note (inte tyst kasta)
+- `auto_lunch_deduction_minutes` → om `duration > 5h`, dra av N min
+
+**Audit-spår:** `checked_in_at` och `checked_out_at` bevaras med exakt timestamp så avrundningen kan revideras eller revideras tillbaka. UI visar avrundat värde + exakt vid hover.
+
+**Estimat:** 2–3h när policy är klar (3 SQL-kolumner + ~30 LOC i route + UI-toggle). Inte blocking för pilot.
+
+**Status:** Väntar på input från Christoffer + ev. en till pilotanvändare för att se variation. Defaulter ska vara säkra för pilot — `0/0/0` (dagens beteende) tills någon explicit konfigurerar.
