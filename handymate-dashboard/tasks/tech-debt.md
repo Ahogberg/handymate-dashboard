@@ -118,3 +118,34 @@ Logg över kända optimeringar och skalproblem som inte är akuta men ska adress
 **Förväntad effekt:** Ny kod kan inte slinka in samma bug. Befintliga 131 träffar fångas i en dedikerad sweep-PR (eller flera) med visuell verifiering per area. Mobilen behöver inte ändras (skickar tz som query-param redan).
 
 **Risk under sweep:** Vissa anrop ÄR korrekt UTC (databas-keys, idempotency, audit-loggar). Manuell granskning av varje träff krävs — automatisk replace skulle bryta de fallen. Plan: börja med frontend (`app/dashboard/**`) där lokal tid nästan alltid är rätt val, sen API-routes där det blandas, sist `lib/` där det ofta är medvetet UTC.
+
+---
+
+## TD-4 (2026-05-07) — `/api/checkin/approve` saknar permission-check
+
+**Plats:** [app/api/checkin/approve/route.ts](handymate-dashboard/app/api/checkin/approve/route.ts)
+
+**Säkerhetsproblem:** Routen kallar bara `getAuthenticatedBusiness` — vilken inloggad anställd som helst kan godkänna eller avvisa kollegors incheckningar. Mobilens Fas 2 har UI-gating som döljer attesterings-knappar för anställda utan rätt, men servern måste auktorisera oberoende — frontend-gating är inte säkerhet.
+
+**Konsekvens:** En "employee" som har `can_approve_time = false` kan ändå skicka en POST direkt mot `/api/checkin/approve` (curl, modifierad mobile-build, browser dev-tools) och godkänna sin egen tid → skapar `time_entry` med `is_billable: true`.
+
+**Fix (minimal patch):** Följ mönstret från [app/api/time-entry/approve/route.ts:18-21](handymate-dashboard/app/api/time-entry/approve/route.ts#L18-L21):
+
+```ts
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
+
+export async function POST(request: NextRequest) {
+  const business = await getAuthenticatedBusiness(request)
+  if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const currentUser = await getCurrentUser(request)
+  if (!currentUser || !hasPermission(currentUser, 'approve_time')) {
+    return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+  }
+  // ... resten oförändrat
+}
+```
+
+**Risk vid fix:** Owners + admins är okej (de får `true` från `hasPermission` automatiskt). Anställda som hittills kunnat anropa routen får 403 — det är POÄNGEN, men dokumentera i changelog så ingen blir förvånad.
+
+**Också relevant:** Samma audit borde göras för andra time-routes som muterar approvals/state (`/api/checkin/checkout` är okej — anställda får checka ut sig själva). En quick grep på `time_checkins.*update` och `pending_approvals.*update` i route-filer skulle hitta luckor systematiskt.
