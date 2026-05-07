@@ -177,3 +177,21 @@ Konsekvens: Toggle-läget ger en *illusion* av employee/admin-separation. Visuel
 **Risk om vi skippar:** Permission-buggar fångas inte i DEV-test eftersom samma användare alltid pratar med routen. När anställda kör appen skarpt kan luckor (som TD-4) leda till otillbörlig access. Säkerhets-egenskaper måste verifieras med riktiga konton, inte UI-togglar.
 
 **Tills dess (interim):** När någon ändrar permission-relaterad routekod, kör manuell `curl` med två olika auth-tokens som smoke-test innan deploy. Lägg gärna in en kort runbook i `tasks/` när Christoffer + Mathias-flowet är klart.
+
+---
+
+## TD-6 (2026-05-07) — Justera tid innan godkännande (Fas 4.5)
+
+**Plats:** Mobile-app (Att attestera-vy) + [app/api/checkin/approve/route.ts](handymate-dashboard/app/api/checkin/approve/route.ts).
+
+**Feature:** Admin/owner ska kunna justera duration innan attestering. Tap på ⋯ på en attesteringspost → modal med duration-input (timmar + minuter) → POST `/api/checkin/approve` med `adjusted_minutes`.
+
+**Status:** Backend stödjer redan detta — [app/api/checkin/approve/route.ts:34](handymate-dashboard/app/api/checkin/approve/route.ts#L34) läser `adjusted_minutes` från body och använder det istället för `checkin.duration_minutes` när time_entry skapas. Inga server-ändringar behövs.
+
+**Vad som saknas:** Bara mobile-UI:n — modal med +/- knappar eller fritext-input, validering (positiv int, rimlig övre gräns), bekräftelse-snackbar.
+
+**Workaround tills dess:** Admin avvisar incheckningen → anställd stämplar in/ut igen med korrekt tid. Klumpigt men fungerar.
+
+**Trigger för att bygga:** När pilot-användare (Christoffer/Mathias eller deras kollegor) börjar fråga efter det. Inte spec-driven prio nu.
+
+**Estimat:** 1–2 timmar mobile-only — modal, en POST-call, snackbar-feedback. Testbar via existerande `adjusted_minutes`-stöd på servern.
