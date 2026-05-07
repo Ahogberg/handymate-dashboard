@@ -33,18 +33,41 @@ export async function POST(request: NextRequest) {
 
     const minutes = adjusted_minutes ?? checkin.duration_minutes ?? 0
 
+    // Resolve hourly_rate: per-user-rate → business-default → 0.
+    // checkin.user_id är auth-UUID (TD-1) — matchar mot business_users.user_id.
+    const { data: businessUser } = await supabase
+      .from('business_users')
+      .select('hourly_rate')
+      .eq('user_id', checkin.user_id)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
+    const { data: businessConfig } = await supabase
+      .from('business_config')
+      .select('default_hourly_rate')
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+
+    const hourlyRate =
+      businessUser?.hourly_rate ?? businessConfig?.default_hourly_rate ?? 0
+
+    const approvedAt = new Date().toISOString()
+
     // Markera som godkänd
     await supabase
       .from('time_checkins')
       .update({
         status: 'approved',
         approved_by: business.contact_name || 'Chef',
-        approved_at: new Date().toISOString(),
+        approved_at: approvedAt,
         duration_minutes: minutes,
       })
       .eq('id', checkin_id)
 
-    // Skapa time_entry automatiskt
+    // Skapa time_entry automatiskt — incheckningen just attesterades, så
+    // raden ska skapas med approval_status='approved' direkt (annars
+    // hamnar den i "Att attestera"-vyn igen pga DB-default 'pending').
+    // approved_by speglar mönstret i /api/time-entry/approve (business_id).
     const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
     await supabase.from('time_entry').insert({
       time_entry_id: entryId,
@@ -54,6 +77,10 @@ export async function POST(request: NextRequest) {
       duration_minutes: minutes,
       work_date: checkin.checked_in_at.split('T')[0],
       is_billable: true,
+      hourly_rate: hourlyRate,
+      approval_status: 'approved',
+      approved_by: business.business_id,
+      approved_at: approvedAt,
     })
 
     // Godkänn approval om ID finns
