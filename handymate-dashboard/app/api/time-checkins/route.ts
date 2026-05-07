@@ -28,10 +28,12 @@ interface SummaryResponse {
  * användare, antingen för en specifik dag eller en hel vecka.
  *
  * Query-params:
- * - date: YYYY-MM-DD (default = idag, ignoreras om week_start satt)
+ * - date: YYYY-MM-DD (default = idag i tz, ignoreras om week_start satt)
  * - week_start: YYYY-MM-DD — om satt returneras week_start..week_start+7d
  * - user_id: auth-UUID — default current user. Annan användare kräver
  *   see_all_projects-permission.
+ * - tz: IANA-tidszon, default 'Europe/Stockholm'. Avgör vad ett "dygn"
+ *   är — DST-säkert via Intl.DateTimeFormat.
  */
 export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
@@ -43,6 +45,7 @@ export async function GET(request: NextRequest) {
   const dateParam = url.searchParams.get('date')
   const weekStartParam = url.searchParams.get('week_start')
   const requestedUserId = url.searchParams.get('user_id') || business.user_id
+  const tz = url.searchParams.get('tz') || 'Europe/Stockholm'
 
   // Permission-check: läsning av annan användares data kräver see_all_projects.
   if (requestedUserId !== business.user_id) {
@@ -55,24 +58,25 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Beräkna fönster (UTC). week_start har företräde över date.
+  // Beräkna fönster — 00:00 lokal tid i tz, konverterat till UTC. För
+  // week läggs 7 lokala dagar på (inte 7×24h UTC, så DST-skift inom
+  // veckan inte ger ett 23/25h-fönster).
   let rangeStart: Date
   let rangeEnd: Date
 
   if (weekStartParam) {
-    const ws = parseDate(weekStartParam)
-    if (!ws) {
+    if (!isValidYmd(weekStartParam)) {
       return NextResponse.json({ error: 'Ogiltigt week_start (YYYY-MM-DD)' }, { status: 400 })
     }
-    rangeStart = ws
-    rangeEnd = new Date(ws.getTime() + 7 * 24 * 60 * 60 * 1000)
+    rangeStart = zonedMidnightToUtc(weekStartParam, tz)
+    rangeEnd = zonedMidnightToUtc(addDaysToYmd(weekStartParam, 7), tz)
   } else {
-    const day = dateParam ? parseDate(dateParam) : startOfTodayUtc()
-    if (!day) {
+    const ymd = dateParam || todayInTz(tz)
+    if (!isValidYmd(ymd)) {
       return NextResponse.json({ error: 'Ogiltigt date (YYYY-MM-DD)' }, { status: 400 })
     }
-    rangeStart = day
-    rangeEnd = new Date(day.getTime() + 24 * 60 * 60 * 1000)
+    rangeStart = zonedMidnightToUtc(ymd, tz)
+    rangeEnd = zonedMidnightToUtc(addDaysToYmd(ymd, 1), tz)
   }
 
   const supabase = getServerSupabase()
@@ -159,16 +163,75 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ checkins, summary })
 }
 
-function parseDate(input: string): Date | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input)
-  if (!match) return null
-  const [, y, m, d] = match
-  const date = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)))
-  if (isNaN(date.getTime())) return null
-  return date
+function isValidYmd(input: string): boolean {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input)
+  if (!m) return false
+  const [, y, mo, d] = m
+  const date = new Date(Date.UTC(Number(y), Number(mo) - 1, Number(d)))
+  return (
+    !isNaN(date.getTime()) &&
+    date.getUTCFullYear() === Number(y) &&
+    date.getUTCMonth() === Number(mo) - 1 &&
+    date.getUTCDate() === Number(d)
+  )
 }
 
-function startOfTodayUtc(): Date {
-  const now = new Date()
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+function todayInTz(tz: string): string {
+  // en-CA formatterar som YYYY-MM-DD och är stabilt över Node-versioner.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
+}
+
+function addDaysToYmd(ymd: string, days: number): string {
+  const [y, mo, d] = ymd.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, mo - 1, d + days))
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`
+}
+
+/**
+ * Konverterar 00:00 lokal tid på en kalenderdag (YYYY-MM-DD i tz) till
+ * motsvarande UTC-instans. Använder Intl.DateTimeFormat för att läsa av
+ * TZ-offset i två varv — om DST-transition ligger mellan kandidaten och
+ * justerad tid korrigeras offseten i andra varvet.
+ */
+function zonedMidnightToUtc(ymd: string, tz: string): Date {
+  const [y, mo, d] = ymd.split('-').map(Number)
+  const naiveUtc = new Date(Date.UTC(y, mo - 1, d, 0, 0, 0))
+  const offset1 = getTzOffsetMinutes(naiveUtc, tz)
+  const adjusted = new Date(naiveUtc.getTime() - offset1 * 60_000)
+  const offset2 = getTzOffsetMinutes(adjusted, tz)
+  if (offset2 !== offset1) {
+    return new Date(naiveUtc.getTime() - offset2 * 60_000)
+  }
+  return adjusted
+}
+
+function getTzOffsetMinutes(at: Date, tz: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(at)
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value)
+  let h = get('hour')
+  if (h === 24) h = 0
+  const asUtc = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    h,
+    get('minute'),
+    get('second'),
+  )
+  return (asUtc - at.getTime()) / 60_000
 }
