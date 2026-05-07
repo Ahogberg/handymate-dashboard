@@ -34,18 +34,16 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const sp = request.nextUrl.searchParams
 
-    // time_entry.project_id och .customer_id är oconstrained TEXT — ingen FK
-    // declared, så Supabase nested select föll med PGRST200. Hämtar därför
-    // project + customer i två separata round-trips (samma mönster som
-    // /api/time-checkins). work_type och business_user behåller nested select
-    // — de FK:erna är declared och har funkat sedan första GET-versionen.
+    // Alla fyra FK-kolumner på time_entry är oconstrained TEXT — ingen FK
+    // declared (project_id, customer_id, work_type_id, business_user_id).
+    // Supabase nested select föll med PGRST200 på minst project_id och
+    // work_type_id. Att customer/business_user fungerat tidigare beror på
+    // tillfällig PostgREST relationship-discovery och är opålitligt.
+    // Lösning: hämta time_entry plain och resolva alla fyra relations
+    // i separata bulk-queries.
     let query = supabase
       .from('time_entry')
-      .select(`
-        *,
-        work_type:work_type_id (work_type_id, name, multiplier),
-        business_user:business_user_id (id, name, color)
-      `)
+      .select('*')
       .eq('business_id', business.business_id)
       .order('work_date', { ascending: false })
       .order('project_id', { ascending: true, nullsFirst: false })
@@ -80,7 +78,7 @@ export async function GET(request: NextRequest) {
 
     const list = entries || []
 
-    // Bulk-resolva project + customer för alla unika ids i resultatet.
+    // Bulk-resolva alla fyra relations i parallella queries.
     const projectIdSet = new Set<string>(
       list
         .map((e: any) => e.project_id as string | null)
@@ -91,35 +89,88 @@ export async function GET(request: NextRequest) {
         .map((e: any) => e.customer_id as string | null)
         .filter((id: string | null): id is string => !!id),
     )
+    const workTypeIdSet = new Set<string>(
+      list
+        .map((e: any) => e.work_type_id as string | null)
+        .filter((id: string | null): id is string => !!id),
+    )
+    const businessUserIdSet = new Set<string>(
+      list
+        .map((e: any) => e.business_user_id as string | null)
+        .filter((id: string | null): id is string => !!id),
+    )
+
+    const [projectsRes, customersRes, workTypesRes, businessUsersRes] = await Promise.all([
+      projectIdSet.size > 0
+        ? supabase
+            .from('project')
+            .select('project_id, name')
+            .eq('business_id', business.business_id)
+            .in('project_id', Array.from(projectIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+      customerIdSet.size > 0
+        ? supabase
+            .from('customer')
+            .select('customer_id, name')
+            .eq('business_id', business.business_id)
+            .in('customer_id', Array.from(customerIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+      workTypeIdSet.size > 0
+        ? supabase
+            .from('work_type')
+            .select('work_type_id, name, multiplier')
+            .eq('business_id', business.business_id)
+            .in('work_type_id', Array.from(workTypeIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+      businessUserIdSet.size > 0
+        ? supabase
+            .from('business_users')
+            .select('id, name, color')
+            .eq('business_id', business.business_id)
+            .in('id', Array.from(businessUserIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+    ])
 
     const projectMap = new Map<string, { project_id: string; name: string | null }>()
-    if (projectIdSet.size > 0) {
-      const { data: projects } = await supabase
-        .from('project')
-        .select('project_id, name')
-        .eq('business_id', business.business_id)
-        .in('project_id', Array.from(projectIdSet))
-      for (const p of projects || []) {
-        projectMap.set(p.project_id, { project_id: p.project_id, name: p.name || null })
-      }
+    for (const p of (projectsRes as any).data || []) {
+      projectMap.set(p.project_id, { project_id: p.project_id, name: p.name || null })
     }
 
     const customerMap = new Map<string, { customer_id: string; name: string | null }>()
-    if (customerIdSet.size > 0) {
-      const { data: customers } = await supabase
-        .from('customer')
-        .select('customer_id, name')
-        .eq('business_id', business.business_id)
-        .in('customer_id', Array.from(customerIdSet))
-      for (const c of customers || []) {
-        customerMap.set(c.customer_id, { customer_id: c.customer_id, name: c.name || null })
-      }
+    for (const c of (customersRes as any).data || []) {
+      customerMap.set(c.customer_id, { customer_id: c.customer_id, name: c.name || null })
+    }
+
+    const workTypeMap = new Map<
+      string,
+      { work_type_id: string; name: string | null; multiplier: number | null }
+    >()
+    for (const w of (workTypesRes as any).data || []) {
+      workTypeMap.set(w.work_type_id, {
+        work_type_id: w.work_type_id,
+        name: w.name || null,
+        multiplier: w.multiplier ?? null,
+      })
+    }
+
+    const businessUserMap = new Map<
+      string,
+      { id: string; name: string | null; color: string | null }
+    >()
+    for (const u of (businessUsersRes as any).data || []) {
+      businessUserMap.set(u.id, {
+        id: u.id,
+        name: u.name || null,
+        color: u.color || null,
+      })
     }
 
     const enriched = list.map((e: any) => ({
       ...e,
       project: e.project_id ? projectMap.get(e.project_id) || null : null,
       customer: e.customer_id ? customerMap.get(e.customer_id) || null : null,
+      work_type: e.work_type_id ? workTypeMap.get(e.work_type_id) || null : null,
+      business_user: e.business_user_id ? businessUserMap.get(e.business_user_id) || null : null,
     }))
 
     const totalMinutes = enriched.reduce(

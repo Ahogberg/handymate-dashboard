@@ -195,3 +195,33 @@ Konsekvens: Toggle-läget ger en *illusion* av employee/admin-separation. Visuel
 **Trigger för att bygga:** När pilot-användare (Christoffer/Mathias eller deras kollegor) börjar fråga efter det. Inte spec-driven prio nu.
 
 **Estimat:** 1–2 timmar mobile-only — modal, en POST-call, snackbar-feedback. Testbar via existerande `adjusted_minutes`-stöd på servern.
+
+---
+
+## TD-7 (2026-05-07) — `time_entry`-tabellen har fyra TEXT-kolumner som borde vara FK
+
+**Plats:** [sql/projects.sql:95](handymate-dashboard/sql/projects.sql#L95), [sql/new_tables.sql:13](handymate-dashboard/sql/new_tables.sql#L13), [sql/time_tracking_expansion.sql:30](handymate-dashboard/sql/time_tracking_expansion.sql#L30), [sql/business_users.sql:78](handymate-dashboard/sql/business_users.sql#L78).
+
+**Idag:** Fyra kolumner på `time_entry` är oconstrained `TEXT`:
+| Kolumn | Borde referera | Status |
+|---|---|---|
+| `project_id` | `project(project_id)` | TEXT, ingen FK |
+| `customer_id` | `customer(customer_id)` | TEXT, ingen FK |
+| `work_type_id` | `work_type(work_type_id)` | TEXT, ingen FK |
+| `business_user_id` | `business_users(id)` | TEXT, ingen FK |
+
+**Konsekvens:** Supabase nested select (`select('*, project:project_id(...)')`) faller med `PGRST200` eftersom PostgREST inte kan resolvera relationen. Tre buggar fångades samma dag i `/api/time-entry`-routen — varje patch flyttade en kolumn till två-query-lookup. Att vissa relations *ibland* funkar i frontend (BillableView, POST-routen) beror på opålitlig PostgREST relationship-discovery via namn-konvention och kan brytas vid valfri schema-cache-refresh.
+
+Samma problem som TD-2 men på `time_entry` istället för `time_checkins`.
+
+**Migration (per kolumn — kör i staging först):**
+1. Pre-flight: `SELECT id FROM time_entry WHERE <col> IS NOT NULL AND <col> NOT IN (SELECT <pk> FROM <ref-table>)` — orphans?
+2. Hantera orphans: `UPDATE time_entry SET <col> = NULL WHERE id IN (...)`
+3. `ALTER TABLE time_entry ADD CONSTRAINT fk_time_entry_<col> FOREIGN KEY (<col>) REFERENCES <ref>(<pk>) ON DELETE SET NULL`
+4. Verifiera: relations syns i Supabase Studio under Database → time_entry → relationships
+
+**Ordningsförslag:** börja med `project_id` (störst orphan-risk), sen `customer_id`, sen `work_type_id`, sist `business_user_id`. ON DELETE SET NULL för alla utom ev. business_user_id där man kan vilja ha tightare semantics.
+
+**Bonus efter migration:** GET-routen kan rensas — Promise.all-blocket med 4 separata fetches kan ersättas av nested select (`*, project:project_id(...), customer:customer_id(...), work_type:work_type_id(...), business_user:business_user_id(...)`). Mindre kod, en query istället för fem.
+
+**Risk:** Att hitta orphan-rader i prod-data är arbetet — varje konstighet i historiska imports (Fortnox-sync, manuell SQL) kan ha skapat dem. Förvänta att backfilla med NULL där referensen saknas, INTE radera tidsraden (representerar arbetad tid och lön).
