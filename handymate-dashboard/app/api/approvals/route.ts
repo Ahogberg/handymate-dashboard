@@ -18,13 +18,20 @@ export async function GET(request: NextRequest) {
 
     const supabase = getServerSupabase()
     const status = request.nextUrl.searchParams.get('status') || 'pending'
+    const approvalType = request.nextUrl.searchParams.get('approval_type')
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('pending_approvals')
       .select('*')
       .eq('business_id', business.business_id)
       .eq('status', status)
       .order('created_at', { ascending: false })
+
+    if (approvalType) {
+      query = query.eq('approval_type', approvalType)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
