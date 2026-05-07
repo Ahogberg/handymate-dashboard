@@ -275,3 +275,31 @@ WHERE te.project_id = p.project_id
 **Inte blockande för Fas 5.3** — kan göras i en separat PR när någon ändå rör `/api/checkin/approve`. Pilotdatat har dessutom få rader som påverkas eftersom de manuella time_entry-flödena redan sätter customer_id korrekt.
 
 **Update 2026-05-07:** Visade sig vara blockerande — Christoffer kunde inte fakturera (4 pilot-rader hade customer_id=NULL). Fixat: customer_id resolvas från project i `/api/checkin/approve` och INSERT sätter fältet. Backfill för befintliga rader + en faktura (FV-2026-001) i [sql/backfill_pilot_te_customer_id.sql](handymate-dashboard/sql/backfill_pilot_te_customer_id.sql).
+
+---
+
+## TD-9 (2026-05-07) — Kund-sidan läser obefintlig `total_amount`-kolumn på invoice → tyst 0 kr
+
+**Plats:** [app/dashboard/customers/[id]/page.tsx](handymate-dashboard/app/dashboard/customers/[id]/page.tsx) — tre callsites.
+
+**Verifierat 2026-05-07:** Backfill-scriptet [sql/backfill_pilot_te_customer_id.sql](handymate-dashboard/sql/backfill_pilot_te_customer_id.sql) kraschade på `SELECT total_amount FROM invoice` i Supabase SQL Editor → kolumnen finns inte på invoice-tabellen. Rätt namn är `total` (samma kolumn används av [lib/smart-communication.ts:134](handymate-dashboard/lib/smart-communication.ts#L134) och [supabase/functions/scheduled-triggers/index.ts:275](handymate-dashboard/supabase/functions/scheduled-triggers/index.ts#L275)).
+
+**Tre rena `total_amount`-buggar** (utan fallback — så de tyst returnerar `null` från Supabase, sedan rendreras som `0`):
+- [customers/[id]/page.tsx:283](handymate-dashboard/app/dashboard/customers/[id]/page.tsx#L283) — invoice-list `.select(... total_amount ...)`
+- [customers/[id]/page.tsx:932](handymate-dashboard/app/dashboard/customers/[id]/page.tsx#L932) — "betalat totalt"-stat (`.reduce` på `i.total_amount || 0`)
+- [customers/[id]/page.tsx:1308](handymate-dashboard/app/dashboard/customers/[id]/page.tsx#L1308) — invoice-list rad-belopp
+
+**Konsekvens:** Christoffer ser sannolikt 0 kr på alla kunders sidor i dashboard idag. UI ser ut att fungera, men siffrorna är fel — tyst dataquality-bugg.
+
+**Större kodbas-osäkerhet:** `grep -rn total_amount app/ lib/ components/` ger **19 filer**. Många av dessa är legitima (quote, supplier_invoice, travel_entry har faktiska `total_amount`-kolumner). Men flera invoice-routes (mark-paid, status, reminder, send) använder defensiv `invoice.total ?? invoice.total_amount`-fallback — författarna har inte varit säkra på rätt namn. Det fungerar (kraschar inte) men avslöjar att osäkerheten är spridd över kodbasen. customers-sidan saknar denna fallback och därför är den enda som tyst returnerar 0.
+
+**Sweep-PR plan:**
+1. Byt `total_amount` → `total` på de tre customers-sidan-callsites
+2. Granska de övriga ~16 filerna en och en — om de joinar mot invoice, byt också; om de joinar mot quote/supplier_invoice/travel_entry, lämna
+3. Bonus: rensa defensiva fallback (`invoice.total ?? invoice.total_amount`) i invoice-routerna när rätt namn är fastställt — färre `as any`-casts, ärligare typer
+4. Verifierings-test: spendera 5 min på en kund-sida i pilot-businessen, jämför mot Fortnox-faktura → siffrorna ska matcha
+5. `npx tsc --noEmit` + `npx next build` rent
+
+**Estimat:** 30 min för customers-sidan + 1h för audit av övriga filer = ~1.5h totalt.
+
+**Inte akut för pilot** men borde fixas innan Christoffer demonstrerar dashboard för någon — fakturasummor på 0 kr är besvärligt synligt.
