@@ -149,3 +149,31 @@ export async function POST(request: NextRequest) {
 **Risk vid fix:** Owners + admins är okej (de får `true` från `hasPermission` automatiskt). Anställda som hittills kunnat anropa routen får 403 — det är POÄNGEN, men dokumentera i changelog så ingen blir förvånad.
 
 **Också relevant:** Samma audit borde göras för andra time-routes som muterar approvals/state (`/api/checkin/checkout` är okej — anställda får checka ut sig själva). En quick grep på `time_checkins.*update` och `pending_approvals.*update` i route-filer skulle hitta luckor systematiskt.
+
+---
+
+## TD-5 (2026-05-07) — DEV role-toggle är inte en riktig multi-user-test
+
+**Plats:** Mobile-app (DEV-läge), berör alla endpoints med per-user-filter eller permission-check.
+
+**Problem:** Role-togglen i mobilens DEV-läge ändrar bara UI-gating (visar/döljer attesterings-knappar, ändrar synliga vyer). Den ändrar **inte** den underliggande `user_id`/`business_users`-raden — alla anrop skickas fortfarande som samma inloggade konto. Det betyder att:
+- `getCurrentUser()` returnerar samma person oavsett toggle-läge
+- `hasPermission()` på servern bedöms mot den verkliga rollen, inte den togglade
+- Per-user-filter (t.ex. `/api/time-checkins?user_id=...`) använder samma auth-UUID
+
+Konsekvens: Toggle-läget ger en *illusion* av employee/admin-separation. Visuell verifiering räcker för att se att UI-gating fungerar, men kan **inte** bekräfta att RLS, permission-checks eller user_id-filter faktiskt blockerar otillåten access.
+
+**Riktig verifiering kräver två separata inloggade konton inom samma business.** Acceptanstest när Christoffer + Mathias testar skarpt:
+
+1. **Christoffer = owner**, Mathias = employee (`can_approve_time = false`, `can_see_all_projects = false`)
+2. Båda checkar in på olika projekt samma dag
+3. **Förvänta:**
+   - Mathias `GET /api/time-checkins` (utan user_id-param) → endast egna checkins
+   - Mathias `GET /api/time-checkins?user_id=<christoffer-uuid>` → 403
+   - Mathias `POST /api/checkin/approve` (efter TD-4 är fixad) → 403
+   - Christoffer `GET /api/time-checkins?user_id=<mathias-uuid>` → Mathias data (har `see_all_projects`)
+   - Christoffer `POST /api/checkin/approve` på Mathias incheckning → 200
+
+**Risk om vi skippar:** Permission-buggar fångas inte i DEV-test eftersom samma användare alltid pratar med routen. När anställda kör appen skarpt kan luckor (som TD-4) leda till otillbörlig access. Säkerhets-egenskaper måste verifieras med riktiga konton, inte UI-togglar.
+
+**Tills dess (interim):** När någon ändrar permission-relaterad routekod, kör manuell `curl` med två olika auth-tokens som smoke-test innan deploy. Lägg gärna in en kort runbook i `tasks/` när Christoffer + Mathias-flowet är klart.
