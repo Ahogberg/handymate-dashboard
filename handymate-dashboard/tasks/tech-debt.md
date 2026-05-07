@@ -32,3 +32,45 @@ Logg över kända optimeringar och skalproblem som inte är akuta men ska adress
 3. Stora delar av prompten är identiska över entiteter (system prompt, business config) — passa på att aktivera prompt caching samtidigt som batch-logiken införs.
 
 **Mitigering tills vidare (2026-05-07):** Cron-runs använder nu Haiku 4.5 (router i `/api/agent/trigger`), inte Sonnet 4.6 — ~10x billigare per run. Men fan-out-mönstret består.
+
+---
+
+## TD-1 (2026-05-07) — `time_checkins.user_id` borde FK till `business_users.id`
+
+**Plats:** `sql/v17_checkin.sql`, `app/api/checkin/*`, `app/api/time-checkins/route.ts`
+
+**Idag:** Kolumnen är `TEXT` och lagrar auth-UUID:n (`auth.users.id`). Det är inkonsistent med övriga relationsmodeller i appen där `business_users.id` är den stabila per-anställd-identifieraren och auth-UUID:n är ett implementationsdetalj som kan saknas (anställda utan inloggning, framtida SSO m.m.).
+
+**Konsekvens:** Endpoints behöver oversätta auth-UUID ↔ `business_users.id` ad hoc. /api/team/me returnerar `id` (= business_users.id) men /api/time-checkins-param måste vara auth-UUID — friktion för mobilklienten och risk för bugg när någon förväxlar dem.
+
+**Migration:**
+1. Lägg till ny kolumn `business_user_id UUID REFERENCES business_users(id)`
+2. Backfill: `UPDATE time_checkins t SET business_user_id = bu.id FROM business_users bu WHERE bu.user_id::text = t.user_id`
+3. Pre-flight: verifiera 0 rader där `business_user_id IS NULL` efter backfill
+4. Uppdatera endpoints (`/api/checkin`, `/api/checkin/checkout`, `/api/checkin/approve`, `/api/time-checkins`) att skriva/läsa via nya kolumnen
+5. Markera `user_id` som deprecated, kör i parallell ett tag
+6. Drop `user_id` när alla endpoints + mobile + dashboard är migrerade
+
+**Risk:** Auth-UUID → business_users.id-mappingen måste vara komplett innan drop. Anställda som checkat in via legacy-flow utan business_users-rad blir orphans. Säkerhetstest: `SELECT COUNT(*) FROM time_checkins WHERE user_id NOT IN (SELECT user_id::text FROM business_users)` — måste vara 0 innan migration tas vidare.
+
+---
+
+## TD-2 (2026-05-07) — `time_checkins.project_id` borde FK till `project.project_id`
+
+**Plats:** `sql/v17_checkin.sql`
+
+**Idag:** Kolumnen är oconstrained `TEXT`. Ingen DB-validering att värdet faktiskt motsvarar ett existerande projekt — orphan-rader uppstår när projekt raderas men incheckningar är kvar. Konsekvens: `/api/time-checkins`-routens projekt-join faller tyst tillbaka på `project_name = null` för dessa rader, vilket ser ut som "ingen projekttagging" i mobilen.
+
+**Migration:**
+1. Pre-flight: hitta orphans — `SELECT id, project_id FROM time_checkins WHERE project_id IS NOT NULL AND project_id NOT IN (SELECT project_id FROM project)`
+2. Hantera: `UPDATE time_checkins SET project_id = NULL WHERE id IN (...)` för alla orphans
+3. Lägg till constraint: `ALTER TABLE time_checkins ADD CONSTRAINT fk_time_checkins_project FOREIGN KEY (project_id) REFERENCES project(project_id) ON DELETE SET NULL`
+4. `ON DELETE SET NULL` är medvetet: när ett projekt raderas vill vi behålla incheckningarna (lönebevis) men släppa kopplingen.
+
+**Risk:** Steg 2 är destruktivt — orphans förlorar sin projekttagging. Acceptabelt eftersom projekttaggen redan är värdelös (refererar till raderat projekt) men dokumentera vilka rader som påverkades.
+
+**Bonus efter migration:** Då fungerar Supabase nested select i `/api/time-checkins` (`select('*, project:project_id(name, customer:customer_id(name))')`) — kan ersätta de två extra round-trips i routen idag.
+
+---
+
+**Båda migrationer:** Kör pre-flight checks i staging först. Inte nu — vänta till Verksamhet & Tid är klart och vi har lugn period.
