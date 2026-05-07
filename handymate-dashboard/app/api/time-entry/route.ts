@@ -34,12 +34,15 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const sp = request.nextUrl.searchParams
 
+    // time_entry.project_id och .customer_id är oconstrained TEXT — ingen FK
+    // declared, så Supabase nested select föll med PGRST200. Hämtar därför
+    // project + customer i två separata round-trips (samma mönster som
+    // /api/time-checkins). work_type och business_user behåller nested select
+    // — de FK:erna är declared och har funkat sedan första GET-versionen.
     let query = supabase
       .from('time_entry')
       .select(`
         *,
-        customer:customer_id (customer_id, name),
-        project:project_id (project_id, name),
         work_type:work_type_id (work_type_id, name, multiplier),
         business_user:business_user_id (id, name, color)
       `)
@@ -76,32 +79,77 @@ export async function GET(request: NextRequest) {
     if (error) throw error
 
     const list = entries || []
-    const totalMinutes = list.reduce(
+
+    // Bulk-resolva project + customer för alla unika ids i resultatet.
+    const projectIdSet = new Set<string>(
+      list
+        .map((e: any) => e.project_id as string | null)
+        .filter((id: string | null): id is string => !!id),
+    )
+    const customerIdSet = new Set<string>(
+      list
+        .map((e: any) => e.customer_id as string | null)
+        .filter((id: string | null): id is string => !!id),
+    )
+
+    const projectMap = new Map<string, { project_id: string; name: string | null }>()
+    if (projectIdSet.size > 0) {
+      const { data: projects } = await supabase
+        .from('project')
+        .select('project_id, name')
+        .eq('business_id', business.business_id)
+        .in('project_id', Array.from(projectIdSet))
+      for (const p of projects || []) {
+        projectMap.set(p.project_id, { project_id: p.project_id, name: p.name || null })
+      }
+    }
+
+    const customerMap = new Map<string, { customer_id: string; name: string | null }>()
+    if (customerIdSet.size > 0) {
+      const { data: customers } = await supabase
+        .from('customer')
+        .select('customer_id, name')
+        .eq('business_id', business.business_id)
+        .in('customer_id', Array.from(customerIdSet))
+      for (const c of customers || []) {
+        customerMap.set(c.customer_id, { customer_id: c.customer_id, name: c.name || null })
+      }
+    }
+
+    const enriched = list.map((e: any) => ({
+      ...e,
+      project: e.project_id ? projectMap.get(e.project_id) || null : null,
+      customer: e.customer_id ? customerMap.get(e.customer_id) || null : null,
+    }))
+
+    const totalMinutes = enriched.reduce(
       (sum: number, e: any) => sum + (e.duration_minutes || 0),
       0,
     )
     const totalValue = Math.round(
-      list.reduce((sum: number, e: any) => {
+      enriched.reduce((sum: number, e: any) => {
         const hours = (e.duration_minutes || 0) / 60
         return sum + hours * (e.hourly_rate || 0)
       }, 0),
     )
-    const projectIds = new Set(
-      list.map((e: any) => e.project_id).filter((id: string | null) => !!id),
-    )
 
     return NextResponse.json({
-      entries: list,
+      entries: enriched,
       summary: {
         total_minutes: totalMinutes,
         total_value: totalValue,
-        entry_count: list.length,
-        project_count: projectIds.size,
+        entry_count: enriched.length,
+        project_count: projectIdSet.size,
       },
     })
   } catch (error: unknown) {
     console.error('Get time entries error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to fetch'
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Failed to fetch'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
