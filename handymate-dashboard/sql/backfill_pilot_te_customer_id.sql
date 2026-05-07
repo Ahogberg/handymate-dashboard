@@ -57,7 +57,7 @@ WHERE business_id = 'biz_al7pjuu5smi'
   AND project_id IS NOT NULL
 ORDER BY work_date DESC;
 
-SELECT invoice_id, invoice_number, customer_id, total_amount
+SELECT invoice_id, invoice_number, customer_id
 FROM invoice
 WHERE business_id = 'biz_al7pjuu5smi'
 ORDER BY created_at DESC
