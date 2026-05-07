@@ -74,3 +74,47 @@ Logg över kända optimeringar och skalproblem som inte är akuta men ska adress
 ---
 
 **Båda migrationer:** Kör pre-flight checks i staging först. Inte nu — vänta till Verksamhet & Tid är klart och vi har lugn period.
+
+---
+
+## TD-3 (2026-05-07) — Centralisera datum/tid-hantering med tz-medvetenhet
+
+**Plats:** Hela kodbasen — `grep "toISOString().split('T')[0]"` ger **131 träffar i 75 filer** (frontend, API, lib, scripts).
+
+**Problem:** Ad-hoc datum/tid-konvertering är spritt överallt och nästan alltid fel:
+- `new Date().toISOString().split('T')[0]` → ger UTC-datumet, inte lokalt. För en användare i Stockholm vid 23:30 lokal tid (= 22:30 UTC) ger det fortfarande rätt dag, men vid 00:30 lokal tid (= 23:30 UTC dagen innan) får man **gårdagens datum** i en ruta som ser ut att visa "idag". Bug-magneter för rapporter, fakturafält och time-entries.
+- `new Date()` utan tz-context i serverkod (Vercel kör UTC) ger andra resultat än samma kod på en lokal dev-maskin (CET/CEST).
+- Nuvarande [lib/datetime-defaults.ts:8](handymate-dashboard/lib/datetime-defaults.ts#L8) har själv buggen i `todayDateStr()` — det är seed:en för centralisering men implementationen är fel.
+
+**Plan:**
+1. **Bygg `lib/datetime.ts`** med uttrycklig tz-parameter (default `'Europe/Stockholm'`, samma konvention som `/api/time-checkins`):
+   - `todayInTz(tz?)` → `'YYYY-MM-DD'` i tz
+   - `nowInTz(tz?)` → `'HH:MM'` i tz
+   - `zonedMidnightToUtc(ymd, tz?)` → `Date` (UTC-instans för 00:00 lokal)
+   - `formatDateInTz(date, tz?, options)` → display-format
+   - `parseLocalDateTime(ymd, hm, tz?)` → `Date` (UTC från lokal datum+tid)
+   - `addDaysInTz(ymd, days, tz?)` → `'YYYY-MM-DD'` (DST-säker)
+2. **Ersätt `lib/datetime-defaults.ts`** med re-exports från nya modulen + deprecation-kommentar.
+3. **Migrera anrop:** sweep i batches (frontend, API, lib, agent-tools). Varje batch = en commit. Mobile får inget från detta — bara dashboard-koden.
+4. **ESLint-regel** med `no-restricted-syntax` (eller custom rule om `no-restricted-syntax` inte räcker):
+   ```json
+   {
+     "no-restricted-syntax": [
+       "error",
+       {
+         "selector": "CallExpression[callee.object.callee.name='Date'][callee.property.name='toISOString']",
+         "message": "Använd lib/datetime.ts (todayInTz/formatDateInTz). new Date().toISOString() ger UTC, inte lokal tid."
+       },
+       {
+         "selector": "MemberExpression[object.callee.object.callee.name='Date'][property.name='split']",
+         "message": "toISOString().split('T')[0] ger UTC-datumet — använd todayInTz() från lib/datetime.ts."
+       }
+     ]
+   }
+   ```
+   (Exakta selektorer behöver finslipas — testa mot `new Date().toISOString().split('T')[0]` och `someDate.toISOString().split('T')[0]`.)
+5. **Whitelist:** vissa kontexter ska *medvetet* använda UTC — ex. timestamps i API-payloads, database-fält, idempotency-keys. Markera med `// allow-utc-iso` och låt ESLint-regeln respektera kommentaren via `eslint-disable-next-line`.
+
+**Förväntad effekt:** Ny kod kan inte slinka in samma bug. Befintliga 131 träffar fångas i en dedikerad sweep-PR (eller flera) med visuell verifiering per area. Mobilen behöver inte ändras (skickar tz som query-param redan).
+
+**Risk under sweep:** Vissa anrop ÄR korrekt UTC (databas-keys, idempotency, audit-loggar). Manuell granskning av varje träff krävs — automatisk replace skulle bryta de fallen. Plan: börja med frontend (`app/dashboard/**`) där lokal tid nästan alltid är rätt val, sen API-routes där det blandas, sist `lib/` där det ofta är medvetet UTC.
