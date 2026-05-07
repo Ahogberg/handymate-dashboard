@@ -228,7 +228,7 @@ Samma problem som TD-2 men på `time_entry` istället för `time_checkins`.
 
 ---
 
-## TD-8 (2026-05-07) — `/api/checkin/approve` ärver inte `customer_id` från projektet
+## TD-8 (2026-05-07) — `/api/checkin/approve` ärver inte `customer_id` från projektet  *[RESOLVED 2026-05-07]*
 
 **Plats:** [app/api/checkin/approve/route.ts:62-75](handymate-dashboard/app/api/checkin/approve/route.ts#L62-L75)
 
@@ -273,3 +273,5 @@ WHERE te.project_id = p.project_id
 ```
 
 **Inte blockande för Fas 5.3** — kan göras i en separat PR när någon ändå rör `/api/checkin/approve`. Pilotdatat har dessutom få rader som påverkas eftersom de manuella time_entry-flödena redan sätter customer_id korrekt.
+
+**Update 2026-05-07:** Visade sig vara blockerande — Christoffer kunde inte fakturera (4 pilot-rader hade customer_id=NULL). Fixat: customer_id resolvas från project i `/api/checkin/approve` och INSERT sätter fältet. Backfill för befintliga rader + en faktura (FV-2026-001) i [sql/backfill_pilot_te_customer_id.sql](handymate-dashboard/sql/backfill_pilot_te_customer_id.sql).

@@ -51,6 +51,19 @@ export async function POST(request: NextRequest) {
     const hourlyRate =
       businessUser?.hourly_rate ?? businessConfig?.default_hourly_rate ?? 0
 
+    // Ärv customer från projektet — annars blir time_entry.customer_id NULL
+    // och raden hoppar över i fakturera-flödet (Christoffer kan inte fakturera).
+    let customerId: string | null = null
+    if (checkin.project_id) {
+      const { data: project } = await supabase
+        .from('project')
+        .select('customer_id')
+        .eq('project_id', checkin.project_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      customerId = project?.customer_id ?? null
+    }
+
     const approvedAt = new Date().toISOString()
 
     // Markera som godkänd
@@ -73,6 +86,7 @@ export async function POST(request: NextRequest) {
       time_entry_id: entryId,
       business_id: business.business_id,
       project_id: checkin.project_id || null,
+      customer_id: customerId,
       description: `Incheckning ${new Date(checkin.checked_in_at).toLocaleDateString('sv-SE')}${checkin.project_name ? ' · ' + checkin.project_name : ''}`,
       duration_minutes: minutes,
       work_date: checkin.checked_in_at.split('T')[0],
