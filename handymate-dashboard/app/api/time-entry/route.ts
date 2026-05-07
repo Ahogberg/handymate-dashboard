@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { getCurrentUser, hasPermission, isOwnerOrAdmin } from '@/lib/permissions'
 
 /**
- * GET - Hämta tidsrapporter för ett företag
- * Query params: startDate, endDate, customerId, invoiced, workTypeId
+ * GET /api/time-entry — lista tidsrapporter, primärt för "Att fakturera"-vyn
+ * i mobilen (Fas 5). Returnerar entries med joinad customer + project, plus
+ * summary med total_minutes, total_value, entry_count och project_count.
+ *
+ * Query-params (alla optional):
+ * - invoiced: 'true' | 'false' (default: alla)
+ * - approval_status: 'pending' | 'approved' | 'rejected' (default: alla)
+ * - person_id: business_users.id — filtrera på en anställd
+ * - project_id: project.project_id
+ * - customer_id: customer.customer_id
+ * - work_type_id: work_type.work_type_id
+ * - date_from / date_to: YYYY-MM-DD — filtrera work_date
+ *
+ * Permission: kräver create_invoices (samma mönster som /api/time-entry/approve).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -14,78 +26,79 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const supabase = getServerSupabase()
-    const businessId = business.business_id
-    const startDate = request.nextUrl.searchParams.get('startDate')
-    const endDate = request.nextUrl.searchParams.get('endDate')
-    const customerId = request.nextUrl.searchParams.get('customerId')
-    const invoiced = request.nextUrl.searchParams.get('invoiced')
-    const workTypeId = request.nextUrl.searchParams.get('workTypeId')
-    const projectId = request.nextUrl.searchParams.get('projectId')
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+    }
 
-    const businessUserId = request.nextUrl.searchParams.get('businessUserId')
+    const supabase = getServerSupabase()
+    const sp = request.nextUrl.searchParams
 
     let query = supabase
       .from('time_entry')
       .select(`
         *,
-        customer:customer_id (
-          customer_id,
-          name,
-          phone_number
-        ),
-        booking:booking_id (
-          booking_id,
-          scheduled_start,
-          notes
-        ),
-        work_type:work_type_id (
-          work_type_id,
-          name,
-          multiplier
-        ),
-        business_user:business_user_id (
-          id,
-          name,
-          color
-        )
+        customer:customer_id (customer_id, name),
+        project:project_id (project_id, name),
+        work_type:work_type_id (work_type_id, name, multiplier),
+        business_user:business_user_id (id, name, color)
       `)
-      .eq('business_id', businessId)
+      .eq('business_id', business.business_id)
       .order('work_date', { ascending: false })
-      .order('created_at', { ascending: false })
+      .order('project_id', { ascending: true, nullsFirst: false })
 
-    if (startDate) query = query.gte('work_date', startDate)
-    if (endDate) query = query.lte('work_date', endDate)
-    if (customerId) query = query.eq('customer_id', customerId)
-    if (workTypeId) query = query.eq('work_type_id', workTypeId)
+    const invoiced = sp.get('invoiced')
     if (invoiced === 'true') query = query.eq('invoiced', true)
-    if (invoiced === 'false') query = query.eq('invoiced', false)
+    else if (invoiced === 'false') query = query.eq('invoiced', false)
+
+    const approvalStatus = sp.get('approval_status')
+    if (approvalStatus) query = query.eq('approval_status', approvalStatus)
+
+    const personId = sp.get('person_id')
+    if (personId) query = query.eq('business_user_id', personId)
+
+    const projectId = sp.get('project_id')
     if (projectId) query = query.eq('project_id', projectId)
-    if (businessUserId) query = query.eq('business_user_id', businessUserId)
+
+    const customerId = sp.get('customer_id')
+    if (customerId) query = query.eq('customer_id', customerId)
+
+    const workTypeId = sp.get('work_type_id')
+    if (workTypeId) query = query.eq('work_type_id', workTypeId)
+
+    const dateFrom = sp.get('date_from')
+    if (dateFrom) query = query.gte('work_date', dateFrom)
+
+    const dateTo = sp.get('date_to')
+    if (dateTo) query = query.lte('work_date', dateTo)
 
     const { data: entries, error } = await query
-
     if (error) throw error
 
-    // Calculate totals using duration_minutes
-    const totalMinutes = entries?.reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0) || 0
-    const billableMinutes = entries?.filter((e: any) => e.is_billable).reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0) || 0
-    const totalRevenue = entries?.reduce((sum: number, e: any) => {
-      const hours = (e.duration_minutes || 0) / 60
-      return sum + (hours * (e.hourly_rate || 0))
-    }, 0) || 0
+    const list = entries || []
+    const totalMinutes = list.reduce(
+      (sum: number, e: any) => sum + (e.duration_minutes || 0),
+      0,
+    )
+    const totalValue = Math.round(
+      list.reduce((sum: number, e: any) => {
+        const hours = (e.duration_minutes || 0) / 60
+        return sum + hours * (e.hourly_rate || 0)
+      }, 0),
+    )
+    const projectIds = new Set(
+      list.map((e: any) => e.project_id).filter((id: string | null) => !!id),
+    )
 
     return NextResponse.json({
-      entries,
-      totals: {
-        minutes: totalMinutes,
-        hours: Math.round((totalMinutes / 60) * 10) / 10,
-        billable_minutes: billableMinutes,
-        revenue: Math.round(totalRevenue),
-        count: entries?.length || 0
-      }
+      entries: list,
+      summary: {
+        total_minutes: totalMinutes,
+        total_value: totalValue,
+        entry_count: list.length,
+        project_count: projectIds.size,
+      },
     })
-
   } catch (error: unknown) {
     console.error('Get time entries error:', error)
     const message = error instanceof Error ? error.message : 'Failed to fetch'
