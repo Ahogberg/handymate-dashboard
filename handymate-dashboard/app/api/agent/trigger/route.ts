@@ -19,7 +19,15 @@ import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentM
 export const maxDuration = 60
 
 const MAX_STEPS = 10
-const MODEL = 'claude-sonnet-4-6'
+
+// Modell-routing per trigger_type:
+// - Live customer interactions (phone_call, incoming_sms) — Sonnet 4.6 för
+//   bästa kvalitet på multi-step tool-loopar och kunddialog.
+// - Övriga (cron, manual, gmail_lead_imported m.fl.) — Haiku 4.5. Cron-runs
+//   gör mest "läs data → skicka SMS" som inte kräver Sonnet-kvalitet, och
+//   communication-check fan-outar 16+ runs/dag → kostnadskänsligt.
+const MODEL_LIVE = 'claude-sonnet-4-6'
+const MODEL_BACKGROUND = 'claude-haiku-4-5-20251001'
 
 export async function POST(request: NextRequest) {
   try {
@@ -52,6 +60,11 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const MODEL =
+      trigger_type === 'phone_call' || trigger_type === 'incoming_sms'
+        ? MODEL_LIVE
+        : MODEL_BACKGROUND
 
     // ── Idempotency check — prevent duplicate runs ──
     if (idempotency_key) {
