@@ -225,3 +225,51 @@ Samma problem som TD-2 men på `time_entry` istället för `time_checkins`.
 **Bonus efter migration:** GET-routen kan rensas — Promise.all-blocket med 4 separata fetches kan ersättas av nested select (`*, project:project_id(...), customer:customer_id(...), work_type:work_type_id(...), business_user:business_user_id(...)`). Mindre kod, en query istället för fem.
 
 **Risk:** Att hitta orphan-rader i prod-data är arbetet — varje konstighet i historiska imports (Fortnox-sync, manuell SQL) kan ha skapat dem. Förvänta att backfilla med NULL där referensen saknas, INTE radera tidsraden (representerar arbetad tid och lön).
+
+---
+
+## TD-8 (2026-05-07) — `/api/checkin/approve` ärver inte `customer_id` från projektet
+
+**Plats:** [app/api/checkin/approve/route.ts:62-75](handymate-dashboard/app/api/checkin/approve/route.ts#L62-L75)
+
+**Idag:** INSERT på time_entry sätter `project_id` men inte `customer_id` → DB-default NULL kickar in. Resultat: time_entry-rader skapade via GPS-attest har ingen kundkoppling, trots att den anställde valt ett projekt som *har* en kund.
+
+**Konsekvens:** Fakturering, kund-rapporter och customer-LTV missar tid som loggats via GPS-flowet. Fas 5-vyn ("Att fakturera") visar `customer = null` på dessa rader. Också rörande för Fortnox-export och rot/rut-flöden som filtrerar per kund.
+
+**Fix (minimal patch):** Resolva customer från project innan INSERT — projektet har redan kunden satt:
+
+```ts
+let customerId: string | null = null
+if (checkin.project_id) {
+  const { data: project } = await supabase
+    .from('project')
+    .select('customer_id')
+    .eq('project_id', checkin.project_id)
+    .eq('business_id', business.business_id)
+    .maybeSingle()
+  customerId = project?.customer_id || null
+}
+
+await supabase.from('time_entry').insert({
+  ...,
+  project_id: checkin.project_id || null,
+  customer_id: customerId,
+  ...
+})
+```
+
+**Risk vid fix:** Om `project.customer_id` är NULL (sällan, men hänt — projekt utan kund) blir time_entry också NULL — det är förbättring jämfört med dagens 100% NULL.
+
+**Backfill för existerande rader:**
+```sql
+UPDATE time_entry te
+SET customer_id = p.customer_id
+FROM project p
+WHERE te.project_id = p.project_id
+  AND te.business_id = p.business_id
+  AND te.customer_id IS NULL
+  AND te.project_id IS NOT NULL
+  AND p.customer_id IS NOT NULL;
+```
+
+**Inte blockande för Fas 5.3** — kan göras i en separat PR när någon ändå rör `/api/checkin/approve`. Pilotdatat har dessutom få rader som påverkas eftersom de manuella time_entry-flödena redan sätter customer_id korrekt.
