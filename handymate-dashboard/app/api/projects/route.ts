@@ -18,6 +18,14 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
 
+    // include=workflow → joina stage-data per projekt så mobilen slipper N+1
+    // mot /api/projects/[id]/workflow. Utan param: bakåtkompatibel respons.
+    const includes = (request.nextUrl.searchParams.get('include') || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const includeWorkflow = includes.includes('workflow')
+
     let query = supabase
       .from('project')
       .select('*')
@@ -89,6 +97,37 @@ export async function GET(request: NextRequest) {
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
 
+    // Workflow-stages (system + ev. business-egna). En bulk-fetch som mappas
+    // mot varje projekts current_workflow_stage_id nedan. Position används
+    // för att räkna completed_stages och stage_progress.
+    type WorkflowStage = {
+      id: string
+      name: string
+      position: number
+      color: string
+      icon: string
+    }
+    const stagesById = new Map<string, WorkflowStage>()
+    let totalStages = 0
+    if (includeWorkflow) {
+      const { data: stagesRaw } = await supabase
+        .from('project_workflow_stages')
+        .select('id, name, position, color, icon, business_id')
+        .or(`business_id.is.null,business_id.eq.${businessId}`)
+        .order('position', { ascending: true })
+      for (const s of stagesRaw || []) {
+        stagesById.set(s.id, {
+          id: s.id,
+          name: s.name,
+          position: s.position,
+          color: s.color,
+          icon: s.icon,
+        })
+      }
+      totalStages = stagesById.size
+    }
+    const nowMs = Date.now()
+
     const enrichedProjects = (projects || []).map((project: any) => {
       const entries = timeData.filter((t: any) => t.project_id === project.project_id)
       const actual_minutes = entries.reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0)
@@ -102,13 +141,50 @@ export async function GET(request: NextRequest) {
 
       const nextDeadline = milestoneData.find((m: any) => m.project_id === project.project_id)
 
-      return {
+      const base = {
         ...project,
         customer: project.customer_id ? customerMap[project.customer_id] || null : null,
         actual_hours: Math.round(actual_minutes / 60 * 100) / 100,
         actual_amount: Math.round(actual_amount),
         uninvoiced_hours: Math.round(uninvoiced_minutes / 60 * 100) / 100,
-        next_deadline: nextDeadline?.due_date || null
+        next_deadline: nextDeadline?.due_date || null,
+      }
+
+      if (!includeWorkflow) return base
+
+      const currentStage = project.current_workflow_stage_id
+        ? stagesById.get(project.current_workflow_stage_id) || null
+        : null
+      const currentPosition = currentStage?.position ?? 0
+
+      // completed_stages = alla stages med lägre position än current.
+      // Tomt om projektet inte har en current_stage satt (då är inget klart).
+      const completedStages: string[] = []
+      if (currentPosition > 0) {
+        for (const s of Array.from(stagesById.values())) {
+          if (s.position < currentPosition) completedStages.push(s.id)
+        }
+      }
+
+      // is_late: projektets deadline har passerat och status är inte slutfört.
+      // project_workflow_stages har inget per-stage due_date; project.end_date
+      // är den auktoritativa deadlinen. Cancelled och completed räknas inte.
+      const isLate =
+        !!project.end_date &&
+        new Date(project.end_date).getTime() < nowMs &&
+        project.status !== 'completed' &&
+        project.status !== 'cancelled'
+
+      return {
+        ...base,
+        current_stage_id: currentStage?.id ?? null,
+        current_stage_name: currentStage?.name ?? null,
+        current_stage_color: currentStage?.color ?? null,
+        current_stage_icon: currentStage?.icon ?? null,
+        completed_stages: completedStages,
+        total_stages: totalStages,
+        stage_progress: completedStages.length,
+        is_late: isLate,
       }
     })
 
