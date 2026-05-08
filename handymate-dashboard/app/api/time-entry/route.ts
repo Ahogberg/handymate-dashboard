@@ -260,10 +260,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'GPS-position krävs vid instämpling' }, { status: 400 })
     }
 
-    // Get default hourly rate from business config if not provided
+    // Auto-resolve customer_id från project om inte satt explicit. Samma
+    // TD-8-pattern som /api/checkin/approve använder — annars blir raden
+    // osynlig i fakturera-vyn (Christoffer kan inte fakturera).
+    let effectiveCustomerId: string | null = customer_id || null
+    if (!effectiveCustomerId && project_id) {
+      const { data: proj } = await supabase
+        .from('project')
+        .select('customer_id')
+        .eq('project_id', project_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      effectiveCustomerId = proj?.customer_id || null
+    }
+
+    // Auto-resolve business_user_id + hourly_rate-fallback från inloggad user.
+    // getCurrentUser returnerar null vid server-to-server-anrop (ingen
+    // business_users-rad) — då faller business_user_id tillbaka på null
+    // och hourly_rate på business-defaulten.
+    const currentUser = await getCurrentUser(request)
+    const effectiveBusinessUserId: string | null =
+      business_user_id || currentUser?.id || null
+
+    // Hourly rate-prioritet: explicit body → user-specifik rate → business-default → 500
     let effectiveRate = hourly_rate
     if (!effectiveRate) {
-      effectiveRate = bizConfig?.default_hourly_rate || 500
+      effectiveRate =
+        currentUser?.hourly_rate ?? bizConfig?.default_hourly_rate ?? 500
     }
 
     // Apply work type multiplier if provided
@@ -285,11 +308,11 @@ export async function POST(request: NextRequest) {
       .insert({
         business_id: business.business_id,
         booking_id: booking_id || null,
-        customer_id: customer_id || null,
+        customer_id: effectiveCustomerId,
         work_type_id: work_type_id || null,
         project_id: project_id || null,
         milestone_id: milestone_id || null,
-        business_user_id: business_user_id || null,
+        business_user_id: effectiveBusinessUserId,
         work_date,
         start_time: start_time || null,
         end_time: end_time || null,

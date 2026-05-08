@@ -472,3 +472,29 @@ Båda repona kör samma kommando, har samma `database.ts`. Buggar som "kolumnen 
 **Risk:** Auto-faktura kan skapa duplicate-fakturor om både booking och project markeras klart för samma jobb. Behöver dedupe-logik baserad på booking_id eller project_id på invoice. Inte i denna spike — börja med simpla fall.
 
 **Estimat:** 2-3h att skriva motsvarande lib-funktion + wire i routen + dedupe-logik + tester. Kan göras när Christoffer börjar fakturera från mobile på riktigt.
+
+---
+
+## TD-14 (2026-05-08) — `time_entry.description` vs mobile-konventionens `notes`
+
+**Plats:** [app/api/time-entry/route.ts:108-123](handymate-dashboard/app/api/time-entry/route.ts#L108-L123) (POST body destructuring), `time_entry`-tabellen i DB.
+
+**Idag:** POST-routen läser fältet `description` från body. Mobile-team-konventionen och spec använder `notes` som fält-namn för fritextkommentarer. Det blir en silent mismatch — om mobile skickar `{ notes: "..." }` ignoreras det och raden får `description: null`.
+
+**Schema:** `time_entry`-tabellen har `description` (huvud-anteckning, typiskt vad som gjordes) + `internal_notes` (interna kommentarer som inte visas på faktura). Båda finns. Men inget fält heter bara `notes`.
+
+**Två lösningar:**
+
+**A. Alias `notes` → `description` i POST-routen (rekommenderas).** Lägg till på rad där destructuring sker:
+```ts
+const description = body.description || body.notes || null
+```
+Bakåtkompatibel — befintliga callers som skickar `description` påverkas inte. Mobile får använda `notes` som de förväntar.
+
+**B. Dokumentera tydligt** att server-fältet heter `description` och uppdatera mobile-handoff-doc + Supabase type-gen (TD-12) så det blir typed compile-error om någon skriver `notes`.
+
+**Rekommendation:** Variant A nu (5 min, minskar friktion), Variant B-dokumentation kommer som biprodukt av TD-12 när vi sätter upp Supabase type-gen.
+
+**Risk vid alias:** Om någon i framtiden lägger till en `notes`-kolumn på `time_entry` får vi en silent kollision. Då behöver alias:et tas bort. Inte sannolikt men värt att flagga i kommentar i koden.
+
+**Inte fixad i denna commit** — väntar på beslut om A vs B. Ping mig så implementerar jag.
