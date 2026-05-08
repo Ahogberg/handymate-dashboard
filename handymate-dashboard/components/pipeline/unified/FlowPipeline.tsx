@@ -44,6 +44,17 @@ interface FlowPipelineProps {
    * localStorage och åter-läses vid nästa rendering.
    */
   initialSplitPercent?: number
+  /**
+   * Drag-and-drop på deal-korten — samma handlers som kanban-vyn
+   * använder. Kommer från page.tsx via PipelineContext-state.
+   */
+  draggingDealId: string | null
+  dragOverStageId: string | null
+  handleDragStart: (e: React.DragEvent, dealId: string) => void
+  handleDragEnd: () => void
+  handleDragOver: (e: React.DragEvent, stageId: string) => void
+  handleDragLeave: (e: React.DragEvent) => void
+  handleDrop: (e: React.DragEvent, stage: Stage) => void
 }
 
 const SPLIT_STORAGE_KEY = 'verksamhetsoversikt.split'
@@ -66,6 +77,13 @@ export default function FlowPipeline({
   onProjectClick,
   density = 'comfortable',
   initialSplitPercent = SPLIT_DEFAULT,
+  draggingDealId,
+  dragOverStageId,
+  handleDragStart,
+  handleDragEnd,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop,
 }: FlowPipelineProps) {
   // Filtrera bort lost-stage från unified-vyn — de visas i sin egen sidebar
   const activeStages = useMemo(() => stages.filter(s => !s.is_lost), [stages])
@@ -85,12 +103,19 @@ export default function FlowPipeline({
     return [...fromDeals, ...fromOrphans]
   }, [deals, orphanProjects])
 
-  // Stage-filter på höger panel
+  // Filter på höger panel — stage + customer_type (private/company/brf)
   const [stageFilter, setStageFilter] = useState<string | null>(null)
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<string | null>(null)
   const filteredProjects = useMemo(() => {
-    if (!stageFilter) return allProjects
-    return allProjects.filter(p => p.project.current_workflow_stage_id === stageFilter)
-  }, [allProjects, stageFilter])
+    let result = allProjects
+    if (stageFilter) {
+      result = result.filter(p => p.project.current_workflow_stage_id === stageFilter)
+    }
+    if (customerTypeFilter) {
+      result = result.filter(p => (p.project.customer_type || null) === customerTypeFilter)
+    }
+    return result
+  }, [allProjects, stageFilter, customerTypeFilter])
 
   // Drag-resizable divider — säljtrattens andel av bredden i procent.
   const [splitPercent, setSplitPercent] = useState<number>(() => clampSplit(initialSplitPercent))
@@ -154,6 +179,13 @@ export default function FlowPipeline({
         stages={activeStages}
         onDealClick={onDealClick}
         density={density}
+        draggingDealId={draggingDealId}
+        dragOverStageId={dragOverStageId}
+        handleDragStart={handleDragStart}
+        handleDragEnd={handleDragEnd}
+        handleDragOver={handleDragOver}
+        handleDragLeave={handleDragLeave}
+        handleDrop={handleDrop}
       />
 
       {/* ── DIVIDER ────────────────────────────────────────── */}
@@ -170,6 +202,9 @@ export default function FlowPipeline({
         allProjectsCount={allProjects.length}
         stageFilter={stageFilter}
         onStageFilter={setStageFilter}
+        customerTypeFilter={customerTypeFilter}
+        onCustomerTypeFilter={setCustomerTypeFilter}
+        availableCustomerTypes={Array.from(new Set(allProjects.map(p => p.project.customer_type).filter(Boolean) as string[]))}
         onProjectClick={onProjectClick}
         density={density}
       />
@@ -186,11 +221,25 @@ function SalesPane({
   stages,
   onDealClick,
   density,
+  draggingDealId,
+  dragOverStageId,
+  handleDragStart,
+  handleDragEnd,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop,
 }: {
   deals: Deal[]
   stages: Stage[]
   onDealClick: (deal: Deal) => void
   density: 'comfortable' | 'compact'
+  draggingDealId: string | null
+  dragOverStageId: string | null
+  handleDragStart: (e: React.DragEvent, dealId: string) => void
+  handleDragEnd: () => void
+  handleDragOver: (e: React.DragEvent, stageId: string) => void
+  handleDragLeave: (e: React.DragEvent) => void
+  handleDrop: (e: React.DragEvent, stage: Stage) => void
 }) {
   const totalValue = deals.reduce((sum, d) => sum + (d.value || 0), 0)
   return (
@@ -213,6 +262,13 @@ function SalesPane({
               deals={deals.filter(d => d.stage_id === stage.id)}
               onDealClick={onDealClick}
               density={density}
+              draggingDealId={draggingDealId}
+              isDropTarget={dragOverStageId === stage.id}
+              handleDragStart={handleDragStart}
+              handleDragEnd={handleDragEnd}
+              handleDragOver={handleDragOver}
+              handleDragLeave={handleDragLeave}
+              handleDrop={handleDrop}
             />
           ))}
         </div>
@@ -226,16 +282,40 @@ function KanbanCol({
   deals,
   onDealClick,
   density,
+  draggingDealId,
+  isDropTarget,
+  handleDragStart,
+  handleDragEnd,
+  handleDragOver,
+  handleDragLeave,
+  handleDrop,
 }: {
   stage: Stage
   deals: Deal[]
   onDealClick: (deal: Deal) => void
   density: 'comfortable' | 'compact'
+  draggingDealId: string | null
+  isDropTarget: boolean
+  handleDragStart: (e: React.DragEvent, dealId: string) => void
+  handleDragEnd: () => void
+  handleDragOver: (e: React.DragEvent, stageId: string) => void
+  handleDragLeave: (e: React.DragEvent) => void
+  handleDrop: (e: React.DragEvent, stage: Stage) => void
 }) {
   const totalValue = deals.reduce((s, d) => s + (d.value || 0), 0)
   const isWon = stage.is_won
   return (
-    <div className={`${styles.kanbanCol} ${isWon ? styles.kanbanColWon : ''}`}>
+    <div
+      className={`${styles.kanbanCol} ${isWon ? styles.kanbanColWon : ''}`}
+      onDragOver={e => handleDragOver(e, stage.id)}
+      onDragLeave={handleDragLeave}
+      onDrop={e => handleDrop(e, stage)}
+      style={isDropTarget ? {
+        outline: '2px dashed #14b8a6',
+        outlineOffset: '-2px',
+        background: 'rgba(13, 148, 136, 0.05)',
+      } : undefined}
+    >
       <div className={styles.kanbanColHead}>
         <div className={styles.kanbanColRow1}>
           <span className="dot" style={{ background: stage.color, width: 7, height: 7, borderRadius: 999 }} />
@@ -254,9 +334,18 @@ function KanbanCol({
       </div>
       <div className={styles.kanbanColBody}>
         {deals.length === 0 ? (
-          <div className={styles.emptyState}>Inga deals</div>
+          <div className={styles.emptyState}>{isDropTarget ? 'Släpp här' : 'Inga deals'}</div>
         ) : deals.map(deal => (
-          <DealCard key={deal.id} deal={deal} onClick={onDealClick} density={density} stageIsWon={isWon} />
+          <DealCard
+            key={deal.id}
+            deal={deal}
+            onClick={onDealClick}
+            density={density}
+            stageIsWon={isWon}
+            isDragging={draggingDealId === deal.id}
+            handleDragStart={handleDragStart}
+            handleDragEnd={handleDragEnd}
+          />
         ))}
       </div>
     </div>
@@ -272,11 +361,17 @@ function DealCard({
   onClick,
   density,
   stageIsWon,
+  isDragging,
+  handleDragStart,
+  handleDragEnd,
 }: {
   deal: Deal
   onClick: (deal: Deal) => void
   density: 'comfortable' | 'compact'
   stageIsWon: boolean
+  isDragging: boolean
+  handleDragStart: (e: React.DragEvent, dealId: string) => void
+  handleDragEnd: () => void
 }) {
   const cat = categoryMeta(deal.category)
 
@@ -298,7 +393,14 @@ function DealCard({
   ].filter(Boolean).join(' ')
 
   return (
-    <div className={cardClass} onClick={() => onClick(deal)}>
+    <div
+      className={cardClass}
+      draggable
+      onDragStart={e => handleDragStart(e, deal.id)}
+      onDragEnd={handleDragEnd}
+      onClick={() => onClick(deal)}
+      style={isDragging ? { opacity: 0.4, transform: 'scale(0.97)' } : undefined}
+    >
       <div className={styles.dealCardTopRow}>
         {deal.category && (
           <span className={styles.catBadge} style={{ background: cat.bg, color: cat.color }}>
@@ -384,11 +486,20 @@ function PipelineDivider({
 // ProjectExecutionPane (höger) — projekt-lista med stage-filter
 // ────────────────────────────────────────────────────────────────────────────
 
+const CUSTOMER_TYPE_LABEL: Record<string, string> = {
+  private: 'Privat',
+  company: 'Företag',
+  brf: 'BRF',
+}
+
 function ProjectExecutionPane({
   projects,
   allProjectsCount,
   stageFilter,
   onStageFilter,
+  customerTypeFilter,
+  onCustomerTypeFilter,
+  availableCustomerTypes,
   onProjectClick,
   density,
 }: {
@@ -396,10 +507,14 @@ function ProjectExecutionPane({
   allProjectsCount: number
   stageFilter: string | null
   onStageFilter: (id: string | null) => void
+  customerTypeFilter: string | null
+  onCustomerTypeFilter: (type: string | null) => void
+  availableCustomerTypes: string[]
   onProjectClick: (projectId: string) => void
   density: 'comfortable' | 'compact'
 }) {
   const totalValue = projects.reduce((s, p) => s + (p.project.budget_sek || 0), 0)
+  const isFiltered = !!stageFilter || !!customerTypeFilter
 
   // Räkna projekt per stage för pillen
   const projectCountByStage: Record<string, number> = {}
@@ -411,13 +526,39 @@ function ProjectExecutionPane({
   return (
     <div className={styles.execPane}>
       <div className={styles.paneHead}>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className={styles.label}>Projekt</div>
           <h2>Aktiva projekt</h2>
           <div className={styles.paneMeta}>
-            {projects.length} {stageFilter ? `(${allProjectsCount} totalt)` : 'pågår'} · {fmtKr(totalValue)}
+            {projects.length} {isFiltered ? `(${allProjectsCount} totalt)` : 'pågår'} · {fmtKr(totalValue)}
           </div>
         </div>
+        {/* Kundtyp-filter — bara om det finns 2+ kundtyper att välja mellan */}
+        {availableCustomerTypes.length >= 2 && (
+          <select
+            value={customerTypeFilter || ''}
+            onChange={e => onCustomerTypeFilter(e.target.value || null)}
+            style={{
+              fontSize: 11,
+              padding: '5px 8px',
+              borderRadius: 8,
+              border: '1px solid #e2e8f0',
+              background: '#fff',
+              color: customerTypeFilter ? '#0f766e' : '#64748b',
+              fontWeight: customerTypeFilter ? 600 : 500,
+              cursor: 'pointer',
+              outline: 'none',
+              flexShrink: 0,
+            }}
+            aria-label="Filtrera projekt på kundtyp"
+            title="Filtrera på kundtyp"
+          >
+            <option value="">Alla kundtyper</option>
+            {availableCustomerTypes.map(t => (
+              <option key={t} value={t}>{CUSTOMER_TYPE_LABEL[t] || t}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <ProjectStageFilter
@@ -432,7 +573,13 @@ function ProjectExecutionPane({
             textAlign: 'center', padding: '40px 20px',
             color: '#94a3b8', fontSize: 12, fontStyle: 'italic',
           }}>
-            {stageFilter ? 'Inga projekt i den här fasen' : 'Inga aktiva projekt än'}
+            {customerTypeFilter && stageFilter
+              ? `Inga ${CUSTOMER_TYPE_LABEL[customerTypeFilter] || customerTypeFilter}-projekt i den här fasen`
+              : customerTypeFilter
+                ? `Inga ${CUSTOMER_TYPE_LABEL[customerTypeFilter] || customerTypeFilter}-projekt aktiva`
+                : stageFilter
+                  ? 'Inga projekt i den här fasen'
+                  : 'Inga aktiva projekt än'}
           </div>
         ) : projects.map(p => (
           <ProjectRow

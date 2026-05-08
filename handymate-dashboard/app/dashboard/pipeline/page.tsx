@@ -1722,6 +1722,13 @@ export default function PipelinePage() {
               onDealClick={openDealDetail}
               onProjectClick={(projectId) => setOpenProjectStageId(projectId)}
               density="comfortable"
+              draggingDealId={draggingDealId}
+              dragOverStageId={dragOverStageId}
+              handleDragStart={handleDragStart}
+              handleDragEnd={handleDragEnd}
+              handleDragOver={handleDragOver}
+              handleDragLeave={handleDragLeave}
+              handleDrop={handleDrop}
             />
           ) : pipelineView === 'timeline' ? (
             <TimelineView
