@@ -6,6 +6,7 @@ import {
   updateBookingInCalendar,
   deleteBookingFromCalendar,
 } from '@/lib/google-calendar-sync'
+import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -49,29 +50,100 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    // Build customer map
-    const customerIdSet: Record<string, boolean> = {}
-    for (const b of bookings || []) {
-      if (b.customer_id) customerIdSet[b.customer_id] = true
+    const list = bookings || []
+
+    // ── Bulk-resolva relations ──────────────────────────────────────
+    // Customer + project (för projekt-bokningar) + workflow_stage
+    // (för stage-info per project) + project's egna bookings (för
+    // day-progress). Samma TD-7 two-query-pattern som GET /api/projects.
+
+    const customerIdSet = new Set<string>()
+    const projectIdSet = new Set<string>()
+    for (const b of list) {
+      if (b.customer_id) customerIdSet.add(b.customer_id)
+      if (b.project_id) projectIdSet.add(b.project_id)
     }
-    const customerIds = Object.keys(customerIdSet)
-    const customerMap: Record<string, any> = {}
 
-    if (customerIds.length > 0) {
-      const { data: customers } = await supabase
-        .from('customer')
-        .select('customer_id, name, phone_number, email')
-        .in('customer_id', customerIds)
+    const [customersRes, projectsRes, projectBookingsMap] = await Promise.all([
+      customerIdSet.size > 0
+        ? supabase
+            .from('customer')
+            .select('customer_id, name, phone_number, email')
+            .in('customer_id', Array.from(customerIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+      projectIdSet.size > 0
+        ? supabase
+            .from('project')
+            .select('project_id, name, current_workflow_stage_id, status')
+            .eq('business_id', business.business_id)
+            .in('project_id', Array.from(projectIdSet))
+        : Promise.resolve({ data: [] as any[] }),
+      fetchProjectBookings(supabase, business.business_id, Array.from(projectIdSet)),
+    ])
 
-      for (const c of customers || []) {
-        customerMap[c.customer_id] = c
+    const customerMap = new Map<string, any>()
+    for (const c of (customersRes as any).data || []) {
+      customerMap.set(c.customer_id, c)
+    }
+
+    const projectMap = new Map<string, any>()
+    const stageIdSet = new Set<string>()
+    for (const p of (projectsRes as any).data || []) {
+      projectMap.set(p.project_id, p)
+      if (p.current_workflow_stage_id) stageIdSet.add(p.current_workflow_stage_id)
+    }
+
+    // Workflow-stages — system + business-egna. project_workflow_stages.id är
+    // TEXT (ps-01..ps-08 för system) så vi kan slå mot id:n direkt.
+    const stageMap = new Map<string, any>()
+    if (stageIdSet.size > 0) {
+      const { data: stages } = await supabase
+        .from('project_workflow_stages')
+        .select('id, name, position, color, icon')
+        .in('id', Array.from(stageIdSet))
+      for (const s of stages || []) {
+        stageMap.set(s.id, s)
       }
     }
 
-    const enriched = (bookings || []).map((b: any) => ({
-      ...b,
-      customer: customerMap[b.customer_id] || null,
-    }))
+    const enriched = list.map((b: any) => {
+      const project = b.project_id ? projectMap.get(b.project_id) || null : null
+      const projectStage =
+        project?.current_workflow_stage_id
+          ? stageMap.get(project.current_workflow_stage_id) || null
+          : null
+
+      const projectBookings = b.project_id ? projectBookingsMap.get(b.project_id) || [] : []
+      const dayProgress = b.project_id
+        ? computeBookingDayProgress(b.booking_id, projectBookings)
+        : { current_day: 0, total_days: 0, is_final_day: false }
+
+      return {
+        ...b,
+        customer: customerMap.get(b.customer_id) || null,
+        project: project
+          ? {
+              project_id: project.project_id,
+              name: project.name,
+              status: project.status,
+              current_workflow_stage_id: project.current_workflow_stage_id,
+              current_stage: projectStage
+                ? {
+                    id: projectStage.id,
+                    name: projectStage.name,
+                    position: projectStage.position,
+                    color: projectStage.color,
+                    icon: projectStage.icon,
+                  }
+                : null,
+            }
+          : null,
+        project_day: b.project_id
+          ? { current: dayProgress.current_day, total: dayProgress.total_days }
+          : null,
+        is_final_day: dayProgress.is_final_day,
+      }
+    })
 
     return NextResponse.json({ bookings: enriched })
   } catch (error: any) {
