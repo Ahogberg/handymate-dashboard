@@ -403,3 +403,37 @@ WHERE business_id = 'biz_al7pjuu5smi'
 **Estimat:** 30 min route-fix + body-params + commit. Backfill-SQL kan köras direkt när det passar pilot.
 
 **Inte blocking** för Fas 7B — `?include=workflow` returnerar idag korrekta defaults för null-stages (`stage_progress: 0`). Men UI:n blir mer talande direkt om alla projekt har en stage.
+
+---
+
+## TD-12 (2026-05-08) — Mobile/dashboard typed-shape-synkronisering
+
+**Plats:** Mobile-repot (typer för Booking, Project, Deal, Customer, Invoice m.fl.) vs dashboard-repot (server-side TypeScript-interfaces + DB-schema).
+
+**Symptom:** Mobile-Code's audit av Hem + Booking-flödet (2026-05-08) hittade en del fält i mobile-typerna som inte motsvarar dashboardens auktoritativa shape. Det är inte en isolerad bug — det är **ett bredare strukturproblem**: de två repona har separata typer som driftar isär över tid utan compile-time-feedback.
+
+**Tre konkreta exempel som dykt upp under denna sprint:**
+1. `time_checkins.user_id` — mobile antog `business_users.id`, dashboarden lagrade auth-UUID (TD-1)
+2. `invoice.total_amount` (frontend) — kolumnen finns inte, rätt namn är `total` (TD-9)
+3. Booking-shape — mobile-Code's audit-rapport hade fält som inte finns på server-sidan
+
+**Konsekvens:** Tyst dataquality-buggar i frontend (UI visar `0`/`null`/`undefined` där siffror skulle vara), 500:or i prod när mobile skickar fält som routen inte kan parsa, och refactor-rädsla när dashboard-utvecklare inte vet vilka fält mobile faktiskt läser.
+
+**Tre lösningsalternativ (rangordnade):**
+
+**A. Supabase CLI type-generation (rekommenderas).** Generera TypeScript-typer direkt från Supabase-schemat:
+```bash
+npx supabase gen types typescript --project-id <id> > types/database.ts
+```
+Båda repona kör samma kommando, har samma `database.ts`. Buggar som "kolumnen finns inte" fångas vid build, inte runtime. Kräver att schemat är källan-till-sanning (vilket det redan ÄR — vi rör DB:n manuellt och bara via .sql-filer i dashboard-repot).
+
+**B. Shared types-paket.** Dashboard exporterar en `@handymate/shared-types`-package (npm/pnpm-workspace eller GitHub-package). Mobile importerar. Mer arbete (publish-flow, version-sync) men ger flexibilitet att ha derived types som inte mappar direkt mot DB.
+
+**C. Auto-generered API contract från OpenAPI spec.** Genererar typer ur en OpenAPI-spec som beskriver routerna. Bäst för kontrakt-baserad utveckling men overkill för en startup i denna fas.
+
+**Pragmatisk plan:**
+1. **Kör Variant A** först — billigast (5 min `supabase gen types` setup) och fångar 80% av problemen (alla DB-shape-buggar). Båda repona checka in den gemensamma `types/database.ts` (eller hämta den vid build-tid).
+2. **Skriv runbook** för hur man uppdaterar typerna efter en migration: kör `supabase gen types`, commita filen i båda repona.
+3. **Senare:** överväg shared-types-paket om derived types (t.ex. response-shapes som joinar tabeller) blir många.
+
+**Inte akut för pilot** men varje sprint vi kör utan typed-sync ackumulerar fler subtila buggar som TD-9. Estimat: 1–2h att sätta upp Supabase type-gen + en `update-types`-runbook + commit båda repona med initial generated file.
