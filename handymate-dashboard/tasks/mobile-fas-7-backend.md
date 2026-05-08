@@ -273,7 +273,7 @@ ai_auto_created             BOOLEAN
 
 | Method | Path | Beskrivning |
 |---|---|---|
-| GET | `/api/projects` | Lista projekt + customer + actual_hours/uninvoiced_hours + next_deadline. **Stage-info ingår INTE** — separat fetch krävs. Query: `status`, `customerId` |
+| GET | `/api/projects` | Lista projekt + customer + actual_hours/uninvoiced_hours + next_deadline. Query: `status`, `customerId`, **`include`** (komma-separerad). Med `?include=workflow` joinas stage-data per projekt — se [§ 2.3.1](#231-includeworkflow--ny-fält-per-projekt) |
 | POST | `/api/projects` | Skapa nytt projekt. Body se [§ 2.6](#26-sample-payload) |
 | GET | `/api/projects/[id]` | Enskilt projekt |
 | PUT | `/api/projects/[id]` | Uppdatera projekt-fält |
@@ -283,6 +283,67 @@ ai_auto_created             BOOLEAN
 | GET | `/api/projects/[id]/team` | Projekt-team. Har `requirePermission` på vissa actions |
 | GET | `/api/projects/[id]/costs` | Kostnader för projektet |
 | GET | `/api/projects/[id]/documents` | Projekt-dokument |
+
+### 2.3.1 `?include=workflow` — nya fält per projekt
+
+Tillagd i commit `ce24b1d1` (2026-05-08) för att eliminera N+1-anrop från mobil-listvyn. **Bakåtkompatibel** — utan param är response-shape oförändrad och dashboard-callers (som inte behöver stage-info i listan) påverkas inte.
+
+**Exempel:**
+```
+GET /api/projects?status=active&include=workflow
+```
+
+Routen gör en bulk-fetch mot `project_workflow_stages` (system + business-egna) och berikar varje rad i `projects[]`-arrayen. Mobilen behöver **inte** göra en separat `/api/projects/[id]/workflow`-fetch per rad för att rendera badge/progress.
+
+**Åtta nya fält per projekt** (utöver befintliga `customer`, `actual_hours`, m.fl.):
+
+| Fält | Typ | Beskrivning |
+|---|---|---|
+| `current_stage_id` | `string \| null` | t.ex. `'ps-03'`. Null om projektet inte har en stage satt än |
+| `current_stage_name` | `string \| null` | t.ex. `'Jobb påbörjat'` |
+| `current_stage_color` | `string \| null` | hex, t.ex. `'#7C3AED'` |
+| `current_stage_icon` | `string \| null` | emoji, t.ex. `'🔨'` |
+| `completed_stages` | `string[]` | array av stage-ids med `position < current.position`. Tom array om `current_stage_id` är null |
+| `total_stages` | `number` | system-stages + ev. business-custom. Default 8 om inga custom |
+| `stage_progress` | `number` | `= completed_stages.length`, alltså 0..total_stages |
+| `is_late` | `boolean` | se nedan |
+
+**`is_late`-tolkning:** `project.end_date < now` AND `status NOT IN ('completed', 'cancelled')`. **Inte** per-stage `due_date` eftersom `project_workflow_stages`-tabellen inte har det fältet — `project.end_date` är den auktoritativa deadlinen. Om mobilen vill ha stage-specifika deadlines måste schema utökas (eller `project_milestone.due_date` mappas mot stages, men den heuristiken finns inte idag).
+
+**Sample-payload (utdrag — bara workflow-relevanta fält):**
+
+```json
+{
+  "projects": [
+    {
+      "project_id": "proj_d91a4c2e",
+      "name": "Badrumsrenovering",
+      "status": "active",
+      "end_date": "2026-05-15",
+      "customer": { "customer_id": "cust_xyz", "name": "Anna Andersson", "phone_number": "+4670...", "email": "anna@..." },
+      "actual_hours": 32.5,
+      "actual_amount": 4875,
+      "uninvoiced_hours": 8.0,
+      "next_deadline": "2026-05-12",
+
+      "current_stage_id": "ps-03",
+      "current_stage_name": "Jobb påbörjat",
+      "current_stage_color": "#7C3AED",
+      "current_stage_icon": "🔨",
+      "completed_stages": ["ps-01", "ps-02"],
+      "total_stages": 8,
+      "stage_progress": 2,
+      "is_late": false
+    }
+  ],
+  "job_types": [...]
+}
+```
+
+**När använda `?include=workflow` vs separat `/workflow`-anrop:**
+
+- **List-vy** (Verksamhet-tabben, projekt-list): använd `?include=workflow`. Räcker för badges, progress-bar, "X av 8 steg klar".
+- **Detalj-vy** (ProjectStageModal): anropa fortfarande `GET /api/projects/[id]/workflow` — där får du full timeline med per-stage `completed_at`, `planned_date` och `latest_automation`. Det fältet ingår **inte** i `?include=workflow`-svaret eftersom det skulle blåsa upp listan markant.
 
 ### 2.4 `GET /api/projects/[id]/workflow` — payload
 
@@ -582,7 +643,7 @@ export interface AdvanceStageResponse {
 - **Stage-moves är slug-baserade** för deals (`toStageSlug`), men ID-baserade för projekt (`to_stage_id`). Inkonsekvent — håll isär i klienten.
 - **Lead-systemet är separat** från deal-pipelinen och har eget stage-fält (`leads.pipeline_stage_key`). Mobil-Fas 7 kan ignorera leads tills explicit scope kräver dem.
 - **Inget permission-check** på pipeline/projects-routes — mobilen kan visa knappar för alla, men säkerhets-egenskaper kan inte verifieras med DEV role-toggle (se TD-5). Kräver två separata konton för audit.
-- **`GET /api/projects` returnerar inte stage-info.** Mobilen behöver göra en extra fetch mot `/api/projects/[id]/workflow` per projekt om stages ska visas i en lista-vy. För performance: överväg en batch-endpoint om det blir tungt.
+- **`GET /api/projects` stage-info:** ~~Mobilen behöver göra en extra fetch~~ — löst i commit `ce24b1d1` via `?include=workflow`-param (se § 2.3.1). Detalj-vyn kan fortfarande använda `/api/projects/[id]/workflow` för full timeline.
 - **`pipeline_activity` cascadar vid deal-delete** — borttagna deals förlorar audit-spår. Reversibelt via `undone_at`/`undone_by`-fälten på existerande activities, men inte vid cascade.
 - **AI-automation logged via `triggered_by='ai'`** — visa det i UI:n med separat ikon/färg så användare förstår skillnaden mellan egna och AI-flyttar.
 - **Custom stages stöds** i deal-pipelinen men **inte** i projekt-workflowet (8-stegs är låst som master-config med `business_id=NULL`).
