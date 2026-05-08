@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { LaneView } from './components/LaneView'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,7 +58,7 @@ interface CalendarTask {
   deal_id: string | null
 }
 
-type ViewMode = 'week' | 'day'
+type ViewMode = 'week' | 'day' | 'lanes'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -755,6 +756,15 @@ export default function CalendarPage() {
               >
                 Dag
               </button>
+              <button
+                onClick={() => setViewMode('lanes')}
+                className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                  viewMode === 'lanes' ? 'bg-[#0F766E] text-white' : 'text-[#64748B] hover:text-[#1E293B]'
+                }`}
+                title="Visa veckan grupperad per projekt"
+              >
+                Schema
+              </button>
             </div>
 
             {/* Visa uppgifter-toggle */}
@@ -803,8 +813,13 @@ export default function CalendarPage() {
           </div>
         )}
 
-        {/* ── Calendar Grid ──────────────────────────────────────────── */}
-        {!loading && (
+        {/* ── Lane view (Schema-mode) — projekt-grupperad veckovy ──── */}
+        {!loading && viewMode === 'lanes' && (
+          <LaneView monday={monday} weekDays={weekDates} today={new Date()} />
+        )}
+
+        {/* ── Calendar Grid (week + day) ──────────────────────────── */}
+        {!loading && viewMode !== 'lanes' && (
           <div className="bg-white border border-[#E2E8F0] rounded-xl overflow-hidden">
             {/* All-day events row */}
             {viewMode === 'week' && (() => {
