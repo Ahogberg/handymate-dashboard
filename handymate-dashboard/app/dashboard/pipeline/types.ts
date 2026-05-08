@@ -17,6 +17,10 @@ export interface DealProjectSummary {
   id: string
   name: string
   status: string
+  /** Kundtyp för Verksamhetsöversiktens filter — 'private' | 'company' | 'brf' | null */
+  customer_type?: string | null
+  /** Kundnamn för orphan-projekt (utan kopplad deal) */
+  customer_name?: string | null
   start_date: string | null
   end_date: string | null
   progress_percent: number
