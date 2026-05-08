@@ -654,3 +654,49 @@ Större jobb. `schedule_entry` har egna fält (vacation, time_off, travel) som i
 **Estimat:** 2-3h om profitability-logiken är robust. 4-5h om vi måste bygga material-aggregeringen.
 
 **Trigger för att bygga:** Christoffer ser projekt-detaljsidan utan stats och säger "jag vill se marginal direkt". Annars är det en bonus-visualisering — inte funktionellt blockerande.
+
+---
+
+## TD-21 (2026-05-08) — Mobile-UI för befintligt ÄTA-system
+
+**Plats:** Mobile-app (saknas helt). Backend + dashboard finns. Feedback från Christoffer 2026-05-08.
+
+**Christoffers önskan:** "Hantverkaren ska kunna lägga till tilläggsarbete på befintligt projekt mobilt + skicka för godkännande till kund. När godkänt → ingår i slutfakturan."
+
+**Audit:** ÄTA-systemet är redan byggt i dashboard-repot. Bara mobile-UI saknas.
+
+**Vad som finns idag:**
+
+- **`project_change`-tabellen** ([sql/v10_ata.sql](handymate-dashboard/sql/v10_ata.sql)) med:
+  - `ata_number` (löpnummer per projekt)
+  - `items: JSONB` (radobjekt, samma format som offert)
+  - `total`, `notes`, `customer_id`, `quote_id`, `invoice_id`, `invoiced_at`
+  - Signeringsflöde: `sign_token`, `sent_at`, `sent_to_email`, `sent_to_phone`, `signed_at`, `signed_by_name`, `signed_by_ip`, `signature_data`, `declined_at`, `declined_reason`
+- **4 API-routes** under [app/api/ata/](handymate-dashboard/app/api/ata/):
+  - `GET/POST /api/ata` — lista per projekt + skapa
+  - `GET/PATCH /api/ata/[id]` — hämta + uppdatera
+  - `POST /api/ata/[id]/send` — generera sign_token + SMS/email till kund
+  - `GET/POST /api/ata/sign/[token]` — customer-portal signering
+- **Dashboard-UI** på [projects/[id]/page.tsx:2207](handymate-dashboard/app/dashboard/projects/[id]/page.tsx#L2207) — "ÄTA (Ändring/Tillägg/Avgående)"-sektion med skapa-form, lista, send-knapp
+- **Customer-portal** för signering via `sign_token` finns
+
+**Vad som saknas:**
+
+1. **Mobile-UI** — Christoffer kan inte skapa eller skicka ÄTA från telefonen idag. Detta är det specifika gapet hen bett om.
+2. **Faktura-integrations-audit** — verifiera att [lib/projects/auto-invoice-on-complete.ts](handymate-dashboard/lib/projects/auto-invoice-on-complete.ts) inkluderar `project_change` med `signed_at IS NOT NULL AND invoiced_at IS NULL` när slutfakturan skapas. Om gap → fix.
+
+**Reviderad scope-estimat: 4-6h** (inte 12-18h som första uppskattning — backend + customer-portal + dashboard-UI är redan byggt):
+
+| Komponent | Estimat |
+|---|---|
+| Mobile skapa-form (rad-redigering, item-input) | 2h |
+| Mobile send-flow (välj kontakt, trigga `/api/ata/[id]/send`) | 1h |
+| Mobile lista över projektets ÄTA | 1h |
+| Polish (status-pills, sista-ändring-tid, error states) | 1h |
+| Faktura-integration audit + ev. fix | 30 min – 1h |
+
+**Pre-requisite:** Claude Design-iteration på mobile UX för ÄTA (separat doc) — validera flow + UI innan implementation. Mobile-skärmar för ÄTA finns inte i befintliga mockuparna.
+
+**Pilot-impact:** Christoffer kan idag använda dashboard för att skapa ÄTA på sin desktop/laptop. Inte blockerande för pilot — bara begränsar *var* hen gör det. Mobile-UI är en bekvämlighets-feature för pilot v1.5 / v2.
+
+**Trigger för att bygga:** Efter pilot-feedback från Christoffer på existing dashboard-flow + Claude Design-iteration på mobile UX.
