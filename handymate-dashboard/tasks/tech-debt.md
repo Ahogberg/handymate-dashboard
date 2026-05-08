@@ -345,3 +345,61 @@ Avrundning sker i `/api/checkin/checkout` på beräknad `duration_minutes`:
 **Estimat:** 2–3h när policy är klar (3 SQL-kolumner + ~30 LOC i route + UI-toggle). Inte blocking för pilot.
 
 **Status:** Väntar på input från Christoffer + ev. en till pilotanvändare för att se variation. Defaulter ska vara säkra för pilot — `0/0/0` (dagens beteende) tills någon explicit konfigurerar.
+
+---
+
+## TD-11 (2026-05-08) — Nya projekt har `current_workflow_stage_id = NULL`
+
+**Plats:** [app/api/projects/route.ts:140-152](handymate-dashboard/app/api/projects/route.ts#L140-L152) (POST-handler).
+
+**Idag:** INSERT på `project` sätter inte `current_workflow_stage_id` → kolumnen blir NULL. PUT-handlern advansar stage vid `status='active'` (→ ps-03 JOB_STARTED) och `status='completed'` (→ ps-05 FINAL_INSPECTION), men ps-01 (Kontrakt) och ps-02 (Startmöte) hoppas över helt.
+
+**Konsekvens:** Mobile Verksamhet → Projekt-vyn visar nya projekt utan stage-badge ("ej startat"). När projektet aktiveras hoppar det rakt till ps-03 utan att passera ps-01/ps-02 → `workflow_stage_history` saknar de två första entries → progress-bar visar `2/8` direkt utan att någonsin visa `1/8`. Inte fel, men ofullständig stage-historik och dålig narrativ för kunden (kontrakt-signering är en *händelse* som verkligen ska markeras).
+
+För `?include=workflow`-stödet (commit `ce24b1d1`):
+- `current_stage_id: null`
+- `completed_stages: []`
+- `stage_progress: 0`
+- `total_stages: 8`
+
+UI-konsekvens: ny rad visas som "0/8 steg klar" med tom badge. Funktionellt men inte värdefullt.
+
+**Två lösningsförslag:**
+
+**Variant A — Route-logik (rekommenderas).** Lägg till i POST-handlern efter att projektet skapats:
+```ts
+// Default till ps-01 (Kontrakt signerat) om inget annat satts
+try {
+  const { advanceProjectStage, SYSTEM_STAGES } = await import('@/lib/project-stages/automation-engine')
+  await advanceProjectStage(project.project_id, SYSTEM_STAGES.CONTRACT_SIGNED, business.business_id)
+} catch (err) {
+  console.error('[projects] initial stage default failed:', err)
+}
+```
+Plus: triggar default-automationen för ps-01 (SMS "Vi har mottagit er signerade offert..."). **Detta är troligen oönskat för manuella projekt** som skapas innan kontrakt skrivits — då måste projekt skapas med en annan defaul-stage eller flag som suppressar automation-triggers vid initial create.
+
+**Variant B — DB-trigger med `DEFAULT 'ps-01'`.** Sätt `ALTER TABLE project ALTER COLUMN current_workflow_stage_id SET DEFAULT 'ps-01'`. Enkelt, men:
+- Triggrar inte automation (default-värden går inte genom `advanceProjectStage`)
+- `workflow_stage_history` skulle behöva backfillas separat
+- Påverkar inte befintliga rader
+
+**Rekommendation:** Variant A med en `initial_stage_id` body-param (default `'ps-01'`, kan overrides till `null` om kallaren inte vill ha auto-stage). Och en `skip_stage_automation: true`-flag som hoppar över SMS:et vid initial create — annars riskerar mobilen att skapa projekt och spamma kund.
+
+**Backfill för befintliga pilot-projekt:**
+```sql
+UPDATE project
+SET current_workflow_stage_id = 'ps-01',
+    workflow_stage_entered_at = COALESCE(workflow_stage_entered_at, created_at),
+    workflow_stage_history = COALESCE(workflow_stage_history, '[]'::jsonb) ||
+      jsonb_build_object(
+        'stage_id', 'ps-01',
+        'entered_at', created_at::text,
+        'previous_stage_id', null
+      )
+WHERE business_id = 'biz_al7pjuu5smi'
+  AND current_workflow_stage_id IS NULL;
+```
+
+**Estimat:** 30 min route-fix + body-params + commit. Backfill-SQL kan köras direkt när det passar pilot.
+
+**Inte blocking** för Fas 7B — `?include=workflow` returnerar idag korrekta defaults för null-stages (`stage_progress: 0`). Men UI:n blir mer talande direkt om alla projekt har en stage.
