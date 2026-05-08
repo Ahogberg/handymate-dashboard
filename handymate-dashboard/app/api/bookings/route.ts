@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
+    const projectId = request.nextUrl.searchParams.get('project_id')
     const from = request.nextUrl.searchParams.get('from')
     const to = request.nextUrl.searchParams.get('to')
 
@@ -36,6 +37,10 @@ export async function GET(request: NextRequest) {
 
     if (customerId) {
       query = query.eq('customer_id', customerId)
+    }
+
+    if (projectId) {
+      query = query.eq('project_id', projectId)
     }
 
     if (from) {
