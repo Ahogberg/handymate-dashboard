@@ -303,7 +303,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await supabase
+    const { data: inserted, error } = await supabase
       .from('time_entry')
       .insert({
         business_id: business.business_id,
@@ -322,12 +322,7 @@ export async function POST(request: NextRequest) {
         hourly_rate: effectiveRate,
         is_billable: is_billable ?? true
       })
-      .select(`
-        *,
-        customer:customer_id (customer_id, name, phone_number),
-        work_type:work_type_id (work_type_id, name, multiplier),
-        business_user:business_user_id (id, name, color)
-      `)
+      .select()
       .single()
 
     if (error) {
@@ -343,22 +338,68 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Two-query för relations — alla fyra FK-kolumner är oconstrained TEXT
+    // (TD-7) så Supabase nested select faller med PGRST200. Samma pattern
+    // som GET-routen löste i 4d61c388. Parallel fetch via Promise.all.
+    const [projectRes, customerRes, workTypeRes, businessUserRes] = await Promise.all([
+      inserted?.project_id
+        ? supabase
+            .from('project')
+            .select('project_id, name')
+            .eq('project_id', inserted.project_id)
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      inserted?.customer_id
+        ? supabase
+            .from('customer')
+            .select('customer_id, name, phone_number')
+            .eq('customer_id', inserted.customer_id)
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      inserted?.work_type_id
+        ? supabase
+            .from('work_type')
+            .select('work_type_id, name, multiplier')
+            .eq('work_type_id', inserted.work_type_id)
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as any }),
+      inserted?.business_user_id
+        ? supabase
+            .from('business_users')
+            .select('id, name, color')
+            .eq('id', inserted.business_user_id)
+            .eq('business_id', business.business_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null as any }),
+    ])
+
+    const enriched = {
+      ...inserted,
+      project: projectRes.data || null,
+      customer: customerRes.data || null,
+      work_type: workTypeRes.data || null,
+      business_user: businessUserRes.data || null,
+    }
+
     // AI Projektledare: uppdatera framsteg och budget
-    if (data?.project_id) {
+    if (inserted?.project_id) {
       try {
         const { handleProjectEvent } = await import('@/lib/project-ai-engine')
         await handleProjectEvent({
           type: 'time_logged',
           businessId: business.business_id,
-          projectId: data.project_id,
-          entryId: data.time_entry_id,
+          projectId: inserted.project_id,
+          entryId: inserted.time_entry_id,
         })
       } catch { /* non-blocking */ }
 
       // Realtids-lönsamhetslarm — Karin kollar om projektet spårar ur
       try {
         const { calculateProfitability } = await import('@/lib/profitability')
-        const prof = await calculateProfitability(data.project_id, business.business_id)
+        const prof = await calculateProfitability(inserted.project_id, business.business_id)
         if (prof && prof.status !== 'on_track') {
           const { checkProfitabilityWarnings } = await import('@/lib/profitability')
           await checkProfitabilityWarnings(business.business_id)
@@ -366,7 +407,7 @@ export async function POST(request: NextRequest) {
       } catch { /* non-blocking */ }
     }
 
-    return NextResponse.json({ entry: data })
+    return NextResponse.json({ entry: enriched })
 
   } catch (error: unknown) {
     console.error('[time-entry POST] exception:', error)
