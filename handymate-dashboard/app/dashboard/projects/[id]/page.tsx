@@ -84,6 +84,7 @@ import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
+import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -2086,11 +2087,30 @@ export default function ProjectDetailPage() {
 
         {/* === TAB: Schema === */}
         {activeTab === 'schedule' && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Bokningar (kund) — riktiga kund-bokningar via /api/bookings */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-primary-700" />
+                  Bokningar (kund)
+                </h2>
+                <Link
+                  href="/dashboard/calendar"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-gray-700 text-sm font-medium hover:bg-gray-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Lägg till bokning
+                </Link>
+              </div>
+              <ProjectBookingsTable projectId={projectId} addBookingHref="/dashboard/calendar" />
+            </div>
+
+            {/* Schemalagt team — schedule_entry-baserad team-planering */}
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-secondary-700" />
-                Planerade arbetstillfällen ({projectSchedule.length})
+                Schemalagt team ({projectSchedule.length})
               </h2>
               <Link
                 href={`/dashboard/schedule?project=${projectId}`}
