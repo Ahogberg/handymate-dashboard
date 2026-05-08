@@ -498,3 +498,64 @@ Bakåtkompatibel — befintliga callers som skickar `description` påverkas inte
 **Risk vid alias:** Om någon i framtiden lägger till en `notes`-kolumn på `time_entry` får vi en silent kollision. Då behöver alias:et tas bort. Inte sannolikt men värt att flagga i kommentar i koden.
 
 **Inte fixad i denna commit** — väntar på beslut om A vs B. Ping mig så implementerar jag.
+
+---
+
+## TD-15 (2026-05-08) — "Senaste från Anna" på Jobbdetalj kräver kund-kommunikations-feed
+
+**Plats:** Mobile Jobbdetalj-vyn (skärm 2 i [handoff/booking-types/](handymate-dashboard/handoff/booking-types/)).
+
+**Idag:** Mockuparna visar en "Senaste från Anna"-sektion med ett citat från kunden ("Vi har ett barn som sover middag 12–13:30..."). Datat finns inte tillgängligt — `customer_activity`-tabellen samlar interaktioner men ingen route returnerar "senaste meddelande från kunden för denna booking".
+
+**Skip i v1** enligt Christoffer-beslut. Hantverkaren får inte kund-citat på Jobbdetalj v1. Acceptabelt — andra fält (banner, tid, adress, tasks) är viktigare.
+
+**Implementation senare:**
+1. Endpoint `GET /api/bookings/[id]/customer-feed?since=...` som returnerar senaste 5 customer_activity-rader (SMS, email, anteckningar) för kunden
+2. AI-summary om aktiviteten är >3 rader: skicka till Haiku och få en mening tillbaka
+3. Mobile renderar citat eller "Inga nya meddelanden från Anna"
+
+**Estimat:** 2h endpoint + 1h AI-summary + cache. Inte blocking — pilot kan testa booking-flow utan denna feature och ge feedback om de saknar den.
+
+---
+
+## TD-16 (2026-05-08) — Manuell `is_final_day`-flagga om edge cases dyker upp
+
+**Plats:** [tasks/booking-type-implementation.md § 4](handymate-dashboard/tasks/booking-type-implementation.md), `booking`-tabellen.
+
+**Idag (efter v51):** `is_final_day` härleds från booking-sekvens — sista bokningen i tidsordning per project = `current_day === total_days`. Räcker för 90% av fallen.
+
+**Skip i v1** enligt Christoffer-beslut. Variant B-räkning är defaulten.
+
+**Edge cases där manuell flagga skulle behövas:**
+- Hantverkaren vet att slutbesiktning ligger på en specifik dag, men buffer-bokning på senare dag finns "ifall"
+- Sekvensen avbryts av en omplanering — den "morfade" CTA:n hamnar på fel booking
+
+**Implementation om det dyker upp:**
+```sql
+ALTER TABLE booking ADD COLUMN IF NOT EXISTS is_final_day BOOLEAN DEFAULT false;
+```
+Plus toggle i mobile booking-detalj UI ("Markera detta som sista dag"). I `computeBookingDayProgress`: prioritera explicit flag före derivation.
+
+**Trigger för att bygga:** Om Christoffer eller annan pilot säger "morfningen kom på fel dag i mitt scenario X". Annars stanna vid Variant B.
+
+---
+
+## TD-17 (2026-05-08) — `project.expected_days` som manuell override
+
+**Plats:** [tasks/booking-type-implementation.md § 3](handymate-dashboard/tasks/booking-type-implementation.md), `project`-tabellen.
+
+**Idag (efter v51):** `total_days` beräknas dynamiskt från `bookings.length` per project. Om hantverkaren bokar om dagar mitt i projektet ändras nämnaren ("igår dag 4/12, idag dag 4/13"). Christoffer accepterade detta för v1.
+
+**Skip i v1** enligt Christoffer-beslut. Computed-värdet räcker.
+
+**Implementation om Christoffer ber om det:**
+```sql
+ALTER TABLE project ADD COLUMN IF NOT EXISTS expected_days INTEGER;
+```
+Uppdatera `computeBookingDayProgress`:
+```ts
+const totalDays = project.expected_days ?? sortedBookings.length
+```
+Plus UI-fält vid project-skapande: "Förväntat antal arbetsdagar (valfritt)".
+
+**Trigger för att bygga:** Christoffer testar i fält och säger "den dynamiska räkningen kändes konstig när jag flyttade en dag". Då adderar vi override-fältet — minimal patch (ingen breaking change för existerande project utan värdet).

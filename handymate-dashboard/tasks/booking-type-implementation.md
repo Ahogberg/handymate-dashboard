@@ -358,13 +358,21 @@ Inte detaljerad här — mobile-Code och dashboard-Code implementerar UI:n med o
 
 ---
 
-## 8. Öppna frågor till Christoffer
+## 8. Christoffer-beslut (2026-05-08)
 
-1. **Booking-tasks** ("Underlagspapp sektor norr") — fritextfält per booking, eller egen `booking_task`-tabell med checkbox-status? Mockuparna visar ostrukturerade rader, men "Foto till kund — efter avslut" ser ut som checkpoint. Värt 5 min konversation innan vi väljer schema.
-2. **Lösa pass-kategorier** ("Offertbesök", "Service", "Felanmälan") — finns på booking-tabellen idag? Om inte: ny kolumn `booking.kind` med enum, eller hämtas från `booking.notes`-prefix?
-3. **"Senaste från Anna"-kommentaren** — speglar kund-meddelande (SMS/email)? Eller något hantverkaren noterat? Påverkar var datat lagras (customer_activity vs booking.notes vs annan källa).
-4. **Manuell `is_final_day`-flagga** — behövs för edge cases? Eller räcker härledning från booking-sekvens?
-5. **Project.expected_days som override** — vill Christoffer kunna säga "detta projekt är planerat 12 dagar" vid skapande, ELLER nöjer han sig med dynamisk räkning från bokningar?
+Andreas hade redan diskuterat modellen med Christoffer i tidigare samtal. Svar:
+
+1. **Booking-tasks → fritextfält.** Använd `booking.notes` som idag. Inget nytt schema.
+2. **Lösa pass-kategorier → ny kolumn `booking.kind`.** Enum: `'service' | 'offer' | 'emergency' | 'standard'`. Default `'standard'`. För projekt-bokningar är `kind` irrelevant (kortet visar projekt-banner istället för kategori-pill).
+3. **"Senaste från Anna" → skip v1.** Kräver customer_activity + AI-summary. Loggat som **TD-15**.
+4. **Manuell `is_final_day` → skip v1.** Härleds från booking-sekvens (`current_day === total_days`). Loggat som **TD-16** för edge cases om de dyker upp.
+5. **`project.expected_days` → skip v1.** Computed (Variant B). Loggat som **TD-17** om Christoffer ber om manuell override.
+
+**Uppdaterad scope för v51-migration:**
+- `booking.project_id TEXT REFERENCES project(project_id) ON DELETE SET NULL` (oförändrat)
+- `booking.kind TEXT NOT NULL DEFAULT 'standard'` med CHECK på enum-värden (nytt)
+
+Inget annat schema-tillägg i v51.
 
 ---
 
