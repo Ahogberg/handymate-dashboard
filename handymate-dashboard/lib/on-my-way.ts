@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildSmsSuffix } from './sms-reply-number'
+import { normalizeSwedishPhone } from './phone-normalize'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -43,6 +44,14 @@ export interface OnMyWaySmsResult {
 export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsResult> {
   const { supabase, businessId, customerPhone, customerName, customerAddress, lat, lng, message } = args
 
+  // Normalisera till E.164 (+46...). 46elks kräver det formatet — ren
+  // svensk form (0708...) failar tyst med "SMS misslyckades".
+  const normalizedPhone = normalizeSwedishPhone(customerPhone)
+  console.log('[on-my-way] phone normalize:', {
+    raw: customerPhone,
+    normalized: normalizedPhone,
+  })
+
   const { data: bizConfig } = await supabase
     .from('business_config')
     .select('business_name, contact_name, phone_number, assigned_phone_number')
@@ -51,6 +60,15 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
 
   const businessName = bizConfig?.business_name || 'Handymate'
   const contactName = bizConfig?.contact_name || ''
+
+  // Env-var-status (loggas som boolean — aldrig värdet)
+  console.log('[on-my-way] env:', {
+    elks_user: !!ELKS_API_USER,
+    elks_password: !!ELKS_API_PASSWORD,
+    google_maps: !!GOOGLE_MAPS_API_KEY,
+    has_lat_lng: lat != null && lng != null,
+    has_address: !!customerAddress,
+  })
 
   // Beräkna ETA via Google Maps Distance Matrix
   let eta: string | null = null
@@ -69,9 +87,15 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
         etaMinutes = Math.round(seconds / 60)
         const arrivalTime = new Date(Date.now() + seconds * 1000)
         eta = arrivalTime.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })
+        console.log('[on-my-way] ETA computed:', { eta, eta_minutes: etaMinutes })
+      } else {
+        console.warn('[on-my-way] Distance Matrix non-OK:', {
+          status: element?.status,
+          top_status: data?.status,
+        })
       }
-    } catch {
-      // Fallback — ingen ETA, fortsätt utan
+    } catch (err: any) {
+      console.warn('[on-my-way] Distance Matrix exception:', err?.message)
     }
   }
 
@@ -88,7 +112,9 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
   let smsSuccess = false
   let smsError = ''
 
-  if (ELKS_API_USER && ELKS_API_PASSWORD) {
+  if (!normalizedPhone) {
+    smsError = `Ogiltigt telefonnummer: ${customerPhone}`
+  } else if (ELKS_API_USER && ELKS_API_PASSWORD) {
     try {
       const smsRes = await fetch('https://api.46elks.com/a1/sms', {
         method: 'POST',
@@ -99,17 +125,32 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
         },
         body: new URLSearchParams({
           from: businessName.substring(0, 11),
-          to: customerPhone,
+          to: normalizedPhone,
           message: smsText,
         }),
       })
+      const responseBody = await smsRes.text()
       smsSuccess = smsRes.ok
       if (!smsRes.ok) {
-        const result = await smsRes.json().catch(() => ({}))
-        smsError = (result as any)?.message || 'SMS misslyckades'
+        let parsed: any = null
+        try {
+          parsed = JSON.parse(responseBody)
+        } catch {
+          // body kan vara ren text
+        }
+        smsError = parsed?.message || responseBody?.substring(0, 200) || 'SMS misslyckades'
+        console.error('[on-my-way] 46elks error:', {
+          status: smsRes.status,
+          body: responseBody.substring(0, 500),
+          to: normalizedPhone,
+          from_truncated: businessName.substring(0, 11),
+        })
+      } else {
+        console.log('[on-my-way] 46elks ok:', { status: smsRes.status, to: normalizedPhone })
       }
     } catch (err: any) {
       smsError = err?.message || 'SMS-fel'
+      console.error('[on-my-way] 46elks fetch exception:', err?.message)
     }
   } else {
     smsError = '46elks ej konfigurerad'

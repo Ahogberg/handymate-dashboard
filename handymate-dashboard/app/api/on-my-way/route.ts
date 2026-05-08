@@ -52,10 +52,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: bookingError.message }, { status: 500 })
     }
     if (!booking) {
+      console.warn('[on-my-way] booking not found:', { booking_id, business_id: business.business_id })
       return NextResponse.json({ error: 'Bokning hittades inte' }, { status: 404 })
     }
 
     if (!booking.customer_id) {
+      console.warn('[on-my-way] booking missing customer_id:', { booking_id })
       return NextResponse.json(
         { error: 'Bokningen saknar kund — kan inte skicka på väg-SMS' },
         { status: 400 },
@@ -70,15 +72,24 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
 
     if (!customer) {
+      console.warn('[on-my-way] customer not found:', { customer_id: booking.customer_id })
       return NextResponse.json({ error: 'Kund hittades inte' }, { status: 404 })
     }
 
     if (!customer.phone_number) {
+      console.warn('[on-my-way] customer missing phone:', { customer_id: booking.customer_id })
       return NextResponse.json(
         { error: 'Kunden saknar telefonnummer' },
         { status: 400 },
       )
     }
+
+    console.log('[on-my-way] resolved:', {
+      booking_id,
+      customer_id: booking.customer_id,
+      has_address: !!customer.address_line,
+      has_lat_lng: lat != null && lng != null,
+    })
 
     const result = await sendOnMyWaySms({
       supabase,
