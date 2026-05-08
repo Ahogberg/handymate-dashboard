@@ -599,3 +599,58 @@ Tar bort `project_day`-wrappern. Mobile uppdaterar fältreferenser.
 **Risk:** Breaking för konsumenter som läser `project_day.current` (mobile gör det idag enligt design-doc-specen). Behöver synkad release: server-deploy + mobile-bump.
 
 **Estimat:** 5 min server-fix + 5 min mobile-fix. Inte akut — först när ytterligare en caller plockar upp samma nestat-pattern och vi måste rensa systematiskt.
+
+---
+
+## TD-19 (2026-05-08) — `schedule_entry` vs `booking.project_id` domän-konflikt
+
+**Plats:** [sql/schedule_tables.sql](handymate-dashboard/sql/schedule_tables.sql) (`schedule_entry`-tabellen) + [sql/v51_booking_project_id.sql](handymate-dashboard/sql/v51_booking_project_id.sql) (`booking.project_id`).
+
+**Idag:** Två parallella datakällor för "vad händer på ett projekt en given dag":
+
+| Tabell | Domän | Skapas av | Visas i |
+|---|---|---|---|
+| `booking` (med project_id efter v51) | **Kund-bokningar** — kund X bokade tid Y kl Z | Kunder via formulär, manuell-via-dashboard, agent-flöden | /dashboard/calendar (week/day/lanes), /dashboard/projects/[id] "Bokningar (kund)"-sektion (Etapp 3) |
+| `schedule_entry` | **Team-planering** — Erik tilldelas Bromma-tak måndag-onsdag, vacation, time_off | Resursplanerare i /dashboard/schedule | /dashboard/schedule, /dashboard/projects/[id] "Schemalagt team"-sektion |
+
+**Konsekvens:** Användaren måste förstå *två* "schema"-koncept. Domän-distinktionen är legitim (kund vs team) men terminologin är förvirrande:
+- Calendar-vyns nya `lanes`-mode kallas "Schema" trots att den läser `booking`
+- Schedule-vyn (`/dashboard/schedule`) läser `schedule_entry` och kallas också "Schema"
+- Båda sektionerna på projekt-detaljsidan har "Schema" i tabbens namn
+
+**Tre vägar framåt** (rangordnade):
+
+**A. Behåll båda — förbättra terminologi (rekommenderas).**
+- Calendar `lanes`-mode → byt knapp-text från "Schema" till "Översikt" eller "Lane-vy"
+- /dashboard/schedule → byt rubrik från "Schema" till "Resursplanering" eller "Team-planering"
+- Projekt-detalj-tabben → behåll "Schema" som tab-namn, men sektions-rubrikerna ("Bokningar (kund)" + "Schemalagt team") gör domänen tydlig
+
+**B. Slå ihop till en tabell — `booking` med typ-flagga.**
+Större jobb. `schedule_entry` har egna fält (vacation, time_off, travel) som inte passar booking-domänen. Kräver migration + UI-omskrivning. Inte värt scope-creep.
+
+**C. Skapa en read-only "agg-vy"** som unifierar för dashboard-rendering. Behåll skriv-modeller separata. Mellanväg.
+
+**Rekommendation:** Variant A. Renaming + dokumentation i denna doc räcker för v1. Titta om igen om Christoffer förvirras under pilot.
+
+**Inte akut för pilot** — bägge sektionerna på projekt-detaljsidan har klar terminologi efter Etapp 3.4. Calendar-vyns "Schema"-knapp kan döpas om i en separat liten commit om det stör.
+
+---
+
+## TD-20 (2026-05-08) — Stats-strip på projekt-detaljsidan (material + marginal)
+
+**Plats:** [app/dashboard/projects/[id]/page.tsx](handymate-dashboard/app/dashboard/projects/[id]/page.tsx) (skärm 5 i [handoff/booking-types/](handymate-dashboard/handoff/booking-types/)).
+
+**Idag:** Mockup-skärm 5 visar fyra stat-kort: dag av plan, tid loggad, material, marginal. Etapp 3 implementerade booking-sektionen men **stats-strip skippades**.
+
+**Skip-skäl:**
+- **Material** kräver `project_material`-tabellen. Existerar (sql/projects.sql) men ingen aggregering i existing API-svar. Behöver ny logic: sum(project_material.amount WHERE project_id = X) + jämförelse mot offert-belopp för "%-vs-offert"-stat.
+- **Marginal** — `project.actual_amount` och `project.budget_amount` finns, så simpel beräkning `(budget - actual_cost) / budget * 100` är möjlig. Men "actual_cost" kräver också material + lön — inte bara `actual_amount`. Skarpare beräkning kräver mer data-aggregation.
+
+**Implementation om Christoffer ber om det:**
+1. Utöka `GET /api/projects/[id]` med `costs: { hours_logged, hours_budgeted, material_cost, material_budget, margin_percent, margin_offert_percent }` 
+2. Inline `<ProjectStatsStrip>`-komponent på projekt-detaljsidan ovanför tabsraden
+3. Återanvänd existing `lib/profitability.ts` (om logiken finns där)
+
+**Estimat:** 2-3h om profitability-logiken är robust. 4-5h om vi måste bygga material-aggregeringen.
+
+**Trigger för att bygga:** Christoffer ser projekt-detaljsidan utan stats och säger "jag vill se marginal direkt". Annars är det en bonus-visualisering — inte funktionellt blockerande.
