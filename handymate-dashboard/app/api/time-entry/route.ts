@@ -330,7 +330,18 @@ export async function POST(request: NextRequest) {
       `)
       .single()
 
-    if (error) throw error
+    if (error) {
+      console.error('[time-entry POST] insert error:', error)
+      return NextResponse.json(
+        {
+          error: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        },
+        { status: 500 },
+      )
+    }
 
     // AI Projektledare: uppdatera framsteg och budget
     if (data?.project_id) {
@@ -358,9 +369,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ entry: data })
 
   } catch (error: unknown) {
-    console.error('Create time entry error:', error)
-    const message = error instanceof Error ? error.message : 'Failed to create'
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error('[time-entry POST] exception:', error)
+    // PostgrestError är inte instanceof Error — kolla 'message'-prop på objekt också
+    const message =
+      error instanceof Error
+        ? error.message
+        : error && typeof error === 'object' && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : 'Failed to create'
+    const code =
+      error && typeof error === 'object' && 'code' in error
+        ? String((error as { code: unknown }).code)
+        : undefined
+    const details =
+      error && typeof error === 'object' && 'details' in error
+        ? String((error as { details: unknown }).details)
+        : undefined
+    return NextResponse.json({ error: message, code, details }, { status: 500 })
   }
 }
 
