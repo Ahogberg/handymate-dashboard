@@ -93,25 +93,47 @@ export async function GET(request: NextRequest) {
       if (p.current_workflow_stage_id) stageIdSet.add(p.current_workflow_stage_id)
     }
 
-    // Workflow-stages — system + business-egna. project_workflow_stages.id är
-    // TEXT (ps-01..ps-08 för system) så vi kan slå mot id:n direkt.
-    const stageMap = new Map<string, any>()
-    if (stageIdSet.size > 0) {
+    // Workflow-stages — system (business_id IS NULL) + business-egna. Bulk-
+    // fetch alla relevanta stages en gång för att kunna räkna completed_stages
+    // och total_stages per projekt. Speglar /api/projects?include=workflow-
+    // mönstret så mobile får samma fält-shape.
+    const stagesMap = new Map<
+      string,
+      { id: string; name: string; position: number; color: string; icon: string }
+    >()
+    if (projectIdSet.size > 0) {
       const { data: stages } = await supabase
         .from('project_workflow_stages')
-        .select('id, name, position, color, icon')
-        .in('id', Array.from(stageIdSet))
+        .select('id, name, position, color, icon, business_id')
+        .or(`business_id.is.null,business_id.eq.${business.business_id}`)
+        .order('position', { ascending: true })
       for (const s of stages || []) {
-        stageMap.set(s.id, s)
+        stagesMap.set(s.id, {
+          id: s.id,
+          name: s.name,
+          position: s.position,
+          color: s.color,
+          icon: s.icon,
+        })
       }
     }
+    const totalStages = stagesMap.size
 
     const enriched = list.map((b: any) => {
       const project = b.project_id ? projectMap.get(b.project_id) || null : null
-      const projectStage =
-        project?.current_workflow_stage_id
-          ? stageMap.get(project.current_workflow_stage_id) || null
-          : null
+      const currentStage = project?.current_workflow_stage_id
+        ? stagesMap.get(project.current_workflow_stage_id) || null
+        : null
+      const currentPosition = currentStage?.position ?? 0
+
+      // completed_stages = alla stages med lägre position än current.
+      // Tomt om projektet inte har en current_stage satt.
+      const completedStages: string[] = []
+      if (currentPosition > 0) {
+        for (const s of Array.from(stagesMap.values())) {
+          if (s.position < currentPosition) completedStages.push(s.id)
+        }
+      }
 
       const projectBookings = b.project_id ? projectBookingsMap.get(b.project_id) || [] : []
       const dayProgress = b.project_id
@@ -126,16 +148,14 @@ export async function GET(request: NextRequest) {
               project_id: project.project_id,
               name: project.name,
               status: project.status,
-              current_workflow_stage_id: project.current_workflow_stage_id,
-              current_stage: projectStage
-                ? {
-                    id: projectStage.id,
-                    name: projectStage.name,
-                    position: projectStage.position,
-                    color: projectStage.color,
-                    icon: projectStage.icon,
-                  }
-                : null,
+              current_stage_id: currentStage?.id ?? null,
+              current_stage_name: currentStage?.name ?? null,
+              current_stage_color: currentStage?.color ?? null,
+              current_stage_icon: currentStage?.icon ?? null,
+              current_stage_position: currentStage?.position ?? null,
+              completed_stages: completedStages,
+              total_stages: totalStages,
+              stage_progress: completedStages.length,
             }
           : null,
         project_day: b.project_id
