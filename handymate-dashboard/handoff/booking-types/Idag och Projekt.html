@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<title>Handymate · Idag & Projekt – prototyp</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../colors_and_type.css">
+<link rel="stylesheet" href="idag-projekt.css">
+</head>
+<body>
+<div class="ip-page">
+  <div class="ip-doc-head">
+    <div>
+      <h1>Idag & Projekt – Modell B med smart-hide</h1>
+      <p>Prototyp av sektionsbaserad gruppering: <b>Projekt idag</b> + <b>Lösa pass</b>. Projekt-bokningar har färgad stage-band, lösa pass är rena vita kort. Sektioner döljs när tomma. Sista-dagen-magin (Modell C) ärvs in i Jobbdetalj-CTA.</p>
+    </div>
+    <div class="ip-brand"><img src="../assets/logo.png" alt=""><span>Handymate · prototyper</span></div>
+  </div>
+
+  <!-- Mobile row -->
+  <div class="ip-section">
+    <h2 class="ip-section-title">Mobil – för hantverkaren på trappan</h2>
+    <p class="ip-section-sub">Tre kärnskärmar i flödet "vad ska jag göra idag → öppna jobbet → avsluta dagen". Sista skärmen visar morfningen som händer på sista projekt-dagen.</p>
+    <div class="ip-row">
+      <div class="ip-frame-wrap">
+        <div class="ip-frame-label"><span class="num">1</span>Hem · Idag</div>
+        <div class="ip-frame-desc">Modell B – sektioner med smart-hide. 2 projekt-bokningar (band per stage) + 3 lösa pass (rena kort). Inga andra sektioner ritas.</div>
+        <div id="m1"></div>
+      </div>
+      <div class="ip-frame-wrap">
+        <div class="ip-frame-label"><span class="num">2</span>Jobbdetalj · projekt-bokning</div>
+        <div class="ip-frame-desc">Projekt-banner med stage-progress + länk till projekt. "Idag" + "Imorgon (dag 5)" – preview här, inte på kortet. CTA: Avsluta dagen.</div>
+        <div id="m2"></div>
+      </div>
+      <div class="ip-frame-wrap">
+        <div class="ip-frame-label"><span class="num">3</span>Jobbdetalj · sista dagen</div>
+        <div class="ip-frame-desc">Banner morfar till mörk-grön gradient med "SISTA DAGEN"-flagg. Faktura-preview ersätter "imorgon"-listan. CTA: Slutför projektet & fakturera.</div>
+        <div id="m3"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop · Schema -->
+  <div class="ip-section">
+    <h2 class="ip-section-title">Desktop – Schema med samma logik</h2>
+    <p class="ip-section-sub">Projekt blir horisontella "lanes" med sin stage-färg, som spänner över dagar. Lösa pass under, som vanlig kalenderyta. Idag är upplyst i båda sektionerna.</p>
+    <div class="ip-row">
+      <div class="ip-frame-wrap">
+        <div class="ip-frame-label"><span class="num">4</span>Schema · v.18</div>
+        <div class="ip-frame-desc">Två projekt-lanes (Bromma-tak lila, Hagalund-el amber) med per-dag-bokningar. Tom dag = subtil streck. Lösa pass nedan i grid-form.</div>
+        <div id="d1"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop · Projekt detalj -->
+  <div class="ip-section">
+    <h2 class="ip-section-title">Desktop – Projekt-detalj med bokningar</h2>
+    <p class="ip-section-sub">Det 8-stegs workflow ni redan har, plus en bokningstabell som binder dagliga jobb till projektets tidslinje. "Idag" är highlightad så hantverkaren ser sin plats i projektet.</p>
+    <div class="ip-row">
+      <div class="ip-frame-wrap">
+        <div class="ip-frame-label"><span class="num">5</span>Bromma-tak · projekt-vy</div>
+        <div class="ip-frame-desc">Stats-strip (dag, tid, material, marginal) · 8-stage timeline med datum · bokningar per vecka. "Pågår" pulsar idag, planerade dagar är gråa.</div>
+        <div id="d2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="idag-projekt-screens.jsx"></script>
+<script type="text/babel">
+  const { createRoot } = ReactDOM;
+  const S = window.IPScreens;
+  createRoot(document.getElementById('m1')).render(<S.HemIdag />);
+  createRoot(document.getElementById('m2')).render(<S.Jobbdetalj />);
+  createRoot(document.getElementById('m3')).render(<S.JobbdetaljFinal />);
+  createRoot(document.getElementById('d1')).render(<S.Schema />);
+  createRoot(document.getElementById('d2')).render(<S.ProjectDetail />);
+</script>
+</body>
+</html>
