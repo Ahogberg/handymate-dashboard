@@ -437,3 +437,38 @@ Båda repona kör samma kommando, har samma `database.ts`. Buggar som "kolumnen 
 3. **Senare:** överväg shared-types-paket om derived types (t.ex. response-shapes som joinar tabeller) blir många.
 
 **Inte akut för pilot** men varje sprint vi kör utan typed-sync ackumulerar fler subtila buggar som TD-9. Estimat: 1–2h att sätta upp Supabase type-gen + en `update-types`-runbook + commit båda repona med initial generated file.
+
+---
+
+## TD-13 (2026-05-08) — `/api/booking/complete-job` saknar downstream automations
+
+**Plats:** [app/api/booking/complete-job/route.ts](handymate-dashboard/app/api/booking/complete-job/route.ts), jämför med [app/api/projects/route.ts:444-522](handymate-dashboard/app/api/projects/route.ts#L444-L522) (PUT-handler vid status='completed').
+
+**Idag:** Den nya `complete-job`-endpointen sätter bara `job_status`, `completed_at` och `updated_at` på booking-raden. Inga downstream-effekter. Frontend-koden i [app/dashboard/bookings/[id]/page.tsx:103-119](handymate-dashboard/app/dashboard/bookings/[id]/page.tsx#L103-L119) gör **delvis** mer (insert customer_activity-rad, skickar uppföljnings-SMS om rating-flag), men hela auto-faktura-flödet saknas helt för bookings.
+
+**Jämfört med projects-flowet:** PUT på project status='completed' triggar:
+- `fireEvent('job_completed')` → nurture, review-request, automation-engine
+- `autoInvoiceOnComplete()` → skapar faktura automatiskt om plan + business_config tillåter
+- Schemalagd Google-recensionsförfrågan 24h efter
+- Pipeline-deal flyttas till "invoiced"-stage
+
+**För bookings finns ingen `lib/bookings/auto-invoice-on-complete.ts`-motsvarighet.** Det betyder att jobb attesterade/markerade klara via mobile inte automatiskt skapar faktura — användaren måste manuellt skapa en. Förlorad bekvämlighet (och risk att fakturor inte skapas alls).
+
+**Lösningsförslag:**
+
+1. **Skapa `lib/bookings/auto-invoice-on-complete.ts`** som speglar projects-versionen:
+   - Hämtar booking + customer + ev. tidsraporter
+   - Skapar invoice + invoice_items
+   - Returnerar `{ created, invoice_id }`
+2. **Anropa den från `/api/booking/complete-job`** efter UPDATE lyckats:
+   ```ts
+   const { autoInvoiceOnBookingComplete } = await import('@/lib/bookings/auto-invoice-on-complete')
+   await autoInvoiceOnBookingComplete(business.business_id, booking_id)
+   ```
+   Non-blocking try/catch så booking-completion inte rollas tillbaka om faktura-skapandet failar.
+3. **Lägg till `fireEvent('job_completed')`** för nurture/review-request — samma signal som projects använder.
+4. **Insert customer_activity** för konsistens med dashboard-frontend som gör det idag.
+
+**Risk:** Auto-faktura kan skapa duplicate-fakturor om både booking och project markeras klart för samma jobb. Behöver dedupe-logik baserad på booking_id eller project_id på invoice. Inte i denna spike — börja med simpla fall.
+
+**Estimat:** 2-3h att skriva motsvarande lib-funktion + wire i routen + dedupe-logik + tester. Kan göras när Christoffer börjar fakturera från mobile på riktigt.
