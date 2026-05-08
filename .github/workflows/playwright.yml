@@ -1,10 +1,20 @@
+# Playwright QA Tests pausade 2026-05-08.
+# Reason: testerna fungerar inte i prod-miljön, kostar bara CI-minuter och
+# auth-tokens utan att fånga riktiga regressions. Återaktivera när
+# testsuiten är reparerad och stabilt kan köras mot app.handymate.se.
+# Trigger: workflow_dispatch only (manuell via GitHub UI).
+
 name: Playwright QA Tests
 
 on:
-  push:
-    branches: [main]
-  schedule:
-    - cron: '0 3 * * *'  # Varje natt 03:00 UTC
+  # PAUSAT — pushar till main triggar inte längre testerna.
+  # push:
+  #   branches: [main]
+
+  # PAUSAT — nattlig schedule avstängd.
+  # schedule:
+  #   - cron: '0 3 * * *'  # Varje natt 03:00 UTC
+
   workflow_dispatch:
 
 jobs:
