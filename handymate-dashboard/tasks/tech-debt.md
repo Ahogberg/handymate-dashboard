@@ -559,3 +559,43 @@ const totalDays = project.expected_days ?? sortedBookings.length
 Plus UI-fält vid project-skapande: "Förväntat antal arbetsdagar (valfritt)".
 
 **Trigger för att bygga:** Christoffer testar i fält och säger "den dynamiska räkningen kändes konstig när jag flyttade en dag". Då adderar vi override-fältet — minimal patch (ingen breaking change för existerande project utan värdet).
+
+---
+
+## TD-18 (2026-05-08) — `/api/bookings`-respons har inkonsekvent nestat `project_day`
+
+**Plats:** [app/api/bookings/route.ts](handymate-dashboard/app/api/bookings/route.ts) — GET-handlerns response.
+
+**Idag:** Per-booking-svaret har `project_day: { current, total }` (nestat objekt) parallellt med `is_final_day` (flat boolean) och `project: { current_stage_id, current_stage_name, ... }` (flat fields). `BookingDayProgress`-helpern returnerar `{ current_day, total_days, is_final_day }` (flat) men routen wrappar två av tre fält i ett underobjekt.
+
+**Konsekvens:** Mobile måste unwrap:
+```ts
+const day = booking.project_day?.current
+const total = booking.project_day?.total
+const final = booking.is_final_day  // flat — inkonsekvent
+```
+Istället för:
+```ts
+const day = booking.current_day
+const total = booking.total_days
+const final = booking.is_final_day
+```
+
+Inga buggar idag — bara extra friktion + risk att framtida callers (eller framtida mig) väljer fel pattern och förorenar fler endpoints.
+
+**Fix (när någon ändå rör endpointen):**
+```ts
+return {
+  ...b,
+  customer: ...,
+  project: ...,
+  current_day: dayProgress.current_day,
+  total_days: dayProgress.total_days,
+  is_final_day: dayProgress.is_final_day,
+}
+```
+Tar bort `project_day`-wrappern. Mobile uppdaterar fältreferenser.
+
+**Risk:** Breaking för konsumenter som läser `project_day.current` (mobile gör det idag enligt design-doc-specen). Behöver synkad release: server-deploy + mobile-bump.
+
+**Estimat:** 5 min server-fix + 5 min mobile-fix. Inte akut — först när ytterligare en caller plockar upp samma nestat-pattern och vi måste rensa systematiskt.
