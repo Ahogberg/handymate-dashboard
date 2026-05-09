@@ -49,7 +49,17 @@ export default function PortalProjectDetail({
   const [signingAtaId, setSigningAtaId] = useState<string | null>(null)
   const [signerName, setSignerName] = useState('')
   const [signingSaving, setSigningSaving] = useState(false)
+  // Optimistic state: sätter status='signed' lokalt direkt efter sign-success.
+  // Parent gör en re-fetch (page.tsx onAtaSigned), men om den hänger eller
+  // kommer från cache visar vi ändå rätt status omedelbart.
+  const [recentlySigned, setRecentlySigned] = useState<
+    Map<string, { signed_by_name: string; signed_at: string }>
+  >(new Map())
   const ataCanvasRef = useRef<SignatureCanvasHandle>(null)
+
+  function effectiveStatus(ata: { change_id: string; status: string }): string {
+    return recentlySigned.has(ata.change_id) ? 'signed' : ata.status
+  }
 
   const photos = project.photos || []
   const milestones = project.milestones && project.milestones.length > 0
@@ -89,6 +99,18 @@ export default function PortalProjectDetail({
         const data = await res.json().catch(() => ({}))
         alert(data.error || 'Kunde inte signera')
       } else {
+        // Optimistisk uppdatering — sätt status='signed' lokalt direkt
+        // så badge + signed_at-rad visas innan parent's re-fetch returnerar.
+        if (signingAtaId) {
+          setRecentlySigned(prev => {
+            const next = new Map(prev)
+            next.set(signingAtaId, {
+              signed_by_name: signerName.trim(),
+              signed_at: new Date().toISOString(),
+            })
+            return next
+          })
+        }
         setSigningAtaId(null)
         setSignerName('')
         onAtaSigned()
@@ -340,20 +362,26 @@ export default function PortalProjectDetail({
                     </div>
                     <span
                       className={`bp-badge ${
-                        ata.status === 'signed' ? 'green' : ata.status === 'sent' ? 'amber' : 'gray'
+                        effectiveStatus(ata) === 'signed' ? 'green' : effectiveStatus(ata) === 'sent' ? 'amber' : 'gray'
                       }`}
                     >
-                      {ata.status === 'signed' ? 'Signerad' : ata.status === 'sent' ? 'Att signera' : ata.status}
+                      {effectiveStatus(ata) === 'signed' ? 'Signerad' : effectiveStatus(ata) === 'sent' ? 'Att signera' : ata.status}
                     </span>
                   </div>
 
-                  {ata.signed_at && ata.signed_by_name && (
-                    <div style={{ fontSize: 11, color: 'var(--green-600)', marginTop: 4 }}>
-                      Signerad av {ata.signed_by_name}, {formatDate(ata.signed_at)}
-                    </div>
-                  )}
+                  {(() => {
+                    const optimistic = recentlySigned.get(ata.change_id)
+                    const signedByName = ata.signed_by_name || optimistic?.signed_by_name
+                    const signedAt = ata.signed_at || optimistic?.signed_at
+                    if (!signedByName || !signedAt) return null
+                    return (
+                      <div style={{ fontSize: 11, color: 'var(--green-600)', marginTop: 4 }}>
+                        Signerad av {signedByName}, {formatDate(signedAt)}
+                      </div>
+                    )
+                  })()}
 
-                  {ata.status === 'sent' && ata.sign_token && (
+                  {effectiveStatus(ata) === 'sent' && ata.sign_token && (
                     <div style={{ marginTop: 12 }}>
                       {signingAtaId === ata.change_id ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
