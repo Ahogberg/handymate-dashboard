@@ -739,6 +739,8 @@ Större jobb. `schedule_entry` har egna fält (vacation, time_off, travel) som i
 
 **Reviderad scope-estimat: 4-6h** (inte 12-18h som första uppskattning — backend + customer-portal + dashboard-UI är redan byggt):
 
+
+
 | Komponent | Estimat |
 |---|---|
 | Mobile skapa-form (rad-redigering, item-input) | 2h |
@@ -752,3 +754,64 @@ Större jobb. `schedule_entry` har egna fält (vacation, time_off, travel) som i
 **Pilot-impact:** Christoffer kan idag använda dashboard för att skapa ÄTA på sin desktop/laptop. Inte blockerande för pilot — bara begränsar *var* hen gör det. Mobile-UI är en bekvämlighets-feature för pilot v1.5 / v2.
 
 **Trigger för att bygga:** Efter pilot-feedback från Christoffer på existing dashboard-flow + Claude Design-iteration på mobile UX.
+
+---
+
+## TD-22 (2026-05-09) — Portal-routes sväljer Supabase-fel tyst
+
+**Plats:** [app/api/portal/[token]/](handymate-dashboard/app/api/portal/[token]/) — fem routes med samma anti-pattern.
+
+**Konkret bug** (fångad 2026-05-09): `/api/portal/[token]/projects` select:ade kolumn `progress` som inte finns på `project`-tabellen (rätt namn är `progress_percent`). PostgREST returnerade `42703 column does not exist`, men routen destrukturerade bara `{ data }` utan att kolla `error`. Resultatet: `data=null` → `[] || []` → API returnerade `{"projects":[]}` med HTTP 200.
+
+Kunden såg en tom portal trots att 3 projekt existerade i databasen. Inga felmeddelanden i frontend, ingenting i Vercel-logs.
+
+**Filer med samma anti-pattern (audit 2026-05-09):**
+
+```bash
+grep -rn "const { data } = await" app/api/portal --include="*.ts" \
+  | grep -v "data, error\|data:"
+```
+
+| Fil | Anti-pattern på rad |
+|---|---|
+| `app/api/portal/[token]/activity/route.ts` | 6 |
+| `app/api/portal/[token]/invoices/route.ts` | 7 |
+| `app/api/portal/[token]/messages/route.ts` | 6 |
+| `app/api/portal/[token]/quotes/route.ts` | 6 |
+| `app/api/portal/[token]/reports/route.ts` | 6 |
+
+Alla fem har samma `getCustomerFromToken`-utility duplicerat inline. Det är "låg risk" (felet är att resolvering misslyckas → null → 404, vilket är korrekt UX). Men varje route har sannolikt också huvuddata-querier längre ner med samma pattern — kan ha column-mismatch-bugar dolda.
+
+**Två sweep-jobb:**
+
+**A. Konsolidera `getCustomerFromToken` till en helper** ([lib/portal-link.ts](handymate-dashboard/lib/portal-link.ts) eller ny `lib/portal-auth.ts`). Eliminerar 5 duplicerade implementationer + ger en plats att lägga till logging. ~10 LOC × 5 callsites = ~50 LOC sparat.
+
+**B. Audit alla huvud-data-queries i portal-routes** för silent error-swallow. För varje:
+- Byt `{ data }` → `{ data, error }`
+- Lägg till `if (error) { console.error + return 500 with details }`
+- Validera kolumnnamn mot faktiskt schema (eller använda Supabase typed-gen — TD-12)
+
+**C. ESLint-regel** för att fånga pattern systematiskt:
+```json
+{
+  "no-restricted-syntax": [
+    "error",
+    {
+      "selector": "VariableDeclarator[id.type='ObjectPattern'][id.properties.length=1][id.properties.0.key.name='data'][init.callee.property.name='single']",
+      "message": "Destrukturera även 'error' från Supabase-resultatet och hantera det — annars sväljs schema-fel tyst."
+    }
+  ]
+}
+```
+
+(Selektor-syntaxen behöver finslipas — testa mot riktiga callsites före aktivering.)
+
+**Skala:** Anti-patternet finns sannolikt utanför portal också. Bredare audit:
+```bash
+grep -rn "const { data } = await supabase" app/api lib --include="*.ts"
+```
+Hundratals träffar förväntade. Sweep-PR per domän (portal först eftersom det är pilot-kritiskt) är pragmatisk.
+
+**Trigger för att bygga:** A är värt att göra direkt (få minuters arbete, eliminerar duplicering). B kan göras inkrementellt när andra routes rörs. C kräver lint-konfiguration vilket är scope för en separat utvecklarverktygs-PR.
+
+**Relaterat:** TD-12 (mobile/dashboard typed-shape sync) — om Supabase typed-gen körs systematiskt skulle column-name-mismatch fångas vid build-tid istället för runtime. Den lösningen är överlägsen long-term; TD-22 är defensive-programming-fallback tills typed-gen är på plats.
