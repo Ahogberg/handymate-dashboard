@@ -94,9 +94,6 @@ export async function POST(
       if (portalUrl) signUrl = portalUrl
     }
 
-    const ataLabel = `ÄTA-${ata.ata_number || '?'}`
-    const projectName = project?.name || 'Projekt'
-
     // Hämta assigned_phone_number för svarsnummer
     const { data: bizConfig } = await supabase
       .from('business_config')
@@ -129,7 +126,7 @@ export async function POST(
       const firstName = customer?.name ? customer.name.split(' ')[0] : ''
       const companyName = business.business_name || 'Handymate'
       const greeting = firstName ? `Hej ${firstName}` : 'Hej'
-      const message = `${greeting}, ${companyName} har skickat ett förslag på tilläggsarbete på ditt projekt ${projectName}. Granska och svara: ${signUrl}\n${suffix}`
+      const message = `${greeting}, ${companyName} har skickat ett förslag på tilläggsarbete på ditt projekt. Granska och svara: ${signUrl}\n${suffix}`
 
       // SMS-anrop FÖRE UPDATE — om det failar rör vi inte DB. Tidigare
       // ordning (UPDATE först, SMS i try/catch) ljög för frontend och
