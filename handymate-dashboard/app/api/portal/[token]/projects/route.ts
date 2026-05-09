@@ -3,11 +3,14 @@ import { getServerSupabase } from '@/lib/supabase'
 
 async function getCustomerFromToken(token: string) {
   const supabase = getServerSupabase()
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('customer')
     .select('customer_id, business_id, portal_enabled')
     .eq('portal_token', token)
     .single()
+  if (error) {
+    console.error('[portal/projects] customer lookup error:', error)
+  }
   if (!data || !data.portal_enabled) return null
   return data
 }
@@ -22,12 +25,29 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     // Hämta ALLA projekt för kunden — inkl. completed/cancelled. Kunden ska
     // ha full insyn i sin historik, och ÄTA kan skickas i efterhand på
     // completed-projekt (slutbesiktning, garanti, post-completion-tillägg).
-    const { data: rawProjects } = await supabase
+    // Aliasar progress_percent → progress eftersom frontend (PortalHome m.fl.)
+    // läser p.progress. Tidigare select:ade routen `progress` direkt vilket
+    // inte finns på project-tabellen → PostgREST returnerade 42703 → routen
+    // sväljde error tyst (data=null → []). Anti-pattern fixad nedan.
+    const { data: rawProjects, error: projectsError } = await supabase
       .from('project')
-      .select('project_id, name, status, description, progress, created_at, updated_at, completed_at')
+      .select('project_id, name, status, description, progress:progress_percent, created_at, updated_at, completed_at')
       .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
       .order('created_at', { ascending: false })
+
+    if (projectsError) {
+      console.error('[portal/projects] query error:', projectsError)
+      return NextResponse.json(
+        {
+          error: projectsError.message,
+          code: projectsError.code,
+          details: projectsError.details,
+          hint: projectsError.hint,
+        },
+        { status: 500 },
+      )
+    }
 
     // Sortering: aktiva projekt först (planning/active/in_progress/etc),
     // sen completed (senaste completed_at först), cancelled sist av allt.
