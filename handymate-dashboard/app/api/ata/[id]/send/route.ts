@@ -111,10 +111,23 @@ export async function POST(
         )
       }
 
+      // Företagsnamn KRÄVS — kunden får aldrig ett SMS som refererar till
+      // ett annat företagsnamn än hantverkarens egna. Om business_name
+      // saknas i business_config: blockera tills inställning är ifylld.
+      const companyName = (business.business_name || '').trim()
+      if (!companyName) {
+        return NextResponse.json(
+          {
+            error: 'Företagsnamn saknas i inställningar — fyll i under Inställningar → Företag innan du skickar ÄTA',
+            field: 'business_name',
+          },
+          { status: 400 },
+        )
+      }
+
       // Kort kund-text — under 160 tecken så det inte blir 2 SMS av misstag.
-      // Förnamn + företagsnamn dynamiskt, graceful fallback om något saknas.
+      // Förnamn dynamiskt; tom fallback om customer.name saknas.
       const firstName = customer?.name ? customer.name.split(' ')[0] : ''
-      const companyName = business.business_name || 'Handymate'
       const greeting = firstName ? `Hej ${firstName}!` : 'Hej!'
       const message = `${greeting} ${companyName} har ett förslag på tilläggsarbete: ${signUrl}`
 
