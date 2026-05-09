@@ -19,13 +19,33 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
 
     const supabase = getServerSupabase()
 
-    // Get projects for this customer
-    const { data: projects } = await supabase
+    // Hämta ALLA projekt för kunden — inkl. completed/cancelled. Kunden ska
+    // ha full insyn i sin historik, och ÄTA kan skickas i efterhand på
+    // completed-projekt (slutbesiktning, garanti, post-completion-tillägg).
+    const { data: rawProjects } = await supabase
       .from('project')
-      .select('project_id, name, status, description, progress, created_at, updated_at')
+      .select('project_id, name, status, description, progress, created_at, updated_at, completed_at')
       .eq('business_id', customer.business_id)
       .eq('customer_id', customer.customer_id)
       .order('created_at', { ascending: false })
+
+    // Sortering: aktiva projekt först (planning/active/in_progress/etc),
+    // sen completed (senaste completed_at först), cancelled sist av allt.
+    // Inom samma status-rank behålls created_at-ordningen från Supabase.
+    const projects = (rawProjects || []).sort((a: any, b: any) => {
+      const rank = (s: string) => {
+        if (s === 'cancelled') return 2
+        if (s === 'completed') return 1
+        return 0
+      }
+      const ra = rank(a.status)
+      const rb = rank(b.status)
+      if (ra !== rb) return ra - rb
+      if (ra === 1 && a.completed_at && b.completed_at) {
+        return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime()
+      }
+      return 0
+    })
 
     // For each project, get milestones, latest log, stages, and photos
     const enriched = await Promise.all((projects || []).map(async (p: any) => {
