@@ -46,7 +46,7 @@ export async function POST(
     const customerId = ata.customer_id || project?.customer_id
     if (customerId) {
       const { getOrCreatePortalLink } = await import('@/lib/portal-link')
-      const portalUrl = await getOrCreatePortalLink(supabase, customerId, 'changes')
+      const portalUrl = await getOrCreatePortalLink(supabase, customerId, 'projects')
       if (portalUrl) signUrl = portalUrl
     }
 
