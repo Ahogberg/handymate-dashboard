@@ -21,15 +21,29 @@ export async function POST(
     const body = await request.json()
     const { method = 'sms', to } = body
 
-    // Fetch the ÄTA with project + customer info
+    // Two-query lookup — project_change.project_id och project.customer_id
+    // är båda oconstrained TEXT (TD-7-pattern). Nested select föll tyst på
+    // PGRST200 och kastade generisk "ÄTA hittades inte" oavsett rotorsak.
     const { data: ata, error: ataError } = await supabase
       .from('project_change')
-      .select('*, project:project_id(name, customer_id, customer:customer_id(name, phone_number, email))')
+      .select('*')
       .eq('change_id', params.id)
       .eq('business_id', business.business_id)
-      .single()
+      .maybeSingle()
 
-    if (ataError || !ata) {
+    if (ataError) {
+      console.error('[ata/send] fetch ata error:', ataError)
+      return NextResponse.json(
+        {
+          error: ataError.message,
+          code: ataError.code,
+          details: ataError.details,
+          hint: ataError.hint,
+        },
+        { status: 500 },
+      )
+    }
+    if (!ata) {
       return NextResponse.json({ error: 'ÄTA hittades inte' }, { status: 404 })
     }
 
@@ -37,13 +51,42 @@ export async function POST(
       return NextResponse.json({ error: 'ÄTA saknar signeringstoken' }, { status: 400 })
     }
 
-    const project = ata.project as any
-    const customer = project?.customer as any
+    // Resolva project + customer separat
+    let project: { name: string | null; customer_id: string | null } | null = null
+    if (ata.project_id) {
+      const { data: p, error: pErr } = await supabase
+        .from('project')
+        .select('name, customer_id')
+        .eq('project_id', ata.project_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (pErr) {
+        console.error('[ata/send] fetch project error:', pErr)
+      } else {
+        project = p
+      }
+    }
+
+    let customer: { name: string | null; phone_number: string | null; email: string | null } | null = null
+    const customerId = ata.customer_id || project?.customer_id || null
+    if (customerId) {
+      const { data: c, error: cErr } = await supabase
+        .from('customer')
+        .select('name, phone_number, email')
+        .eq('customer_id', customerId)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (cErr) {
+        console.error('[ata/send] fetch customer error:', cErr)
+      } else {
+        customer = c
+      }
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://app.handymate.se'
 
     // Föredra portal-URL med djuplänk till ÄTA-tab, fall back till direkt sign-URL
     let signUrl = `${baseUrl}/api/ata/sign/${ata.sign_token}`
-    const customerId = ata.customer_id || project?.customer_id
     if (customerId) {
       const { getOrCreatePortalLink } = await import('@/lib/portal-link')
       const portalUrl = await getOrCreatePortalLink(supabase, customerId, 'projects')
