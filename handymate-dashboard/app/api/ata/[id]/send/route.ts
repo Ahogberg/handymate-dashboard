@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 
 /**
  * POST /api/ata/[id]/send — Skicka ÄTA till kund för signering
@@ -107,13 +108,35 @@ export async function POST(
 
     // Send via SMS or email
     if (method === 'sms') {
-      const phone = to || customer?.phone_number
-      if (!phone) {
+      const rawPhone = to || customer?.phone_number
+      if (!rawPhone) {
         return NextResponse.json({ error: 'Inget telefonnummer att skicka till' }, { status: 400 })
       }
 
-      const message = `Hej! Du har fått ${ataLabel} för ${projectName} att granska och signera. Klicka här: ${signUrl}\n${suffix}`
+      // Normalisera till E.164 — 46elks kräver det formatet. Lokal form
+      // (0708...) failar tyst i deras validering och kraschen sväljs i
+      // try/catch nedan. Samma TD-14-pattern som on-my-way-fixen.
+      const phone = normalizeSwedishPhone(rawPhone)
+      if (!phone || !phone.startsWith('+')) {
+        return NextResponse.json(
+          { error: `Ogiltigt telefonnummer: "${rawPhone}"` },
+          { status: 400 },
+        )
+      }
 
+      // Kund-vänlig text — använd förnamn + business-namn när tillgängliga,
+      // graceful fallback annars.
+      const firstName = customer?.name ? customer.name.split(' ')[0] : ''
+      const companyName = business.business_name || 'Handymate'
+      const greeting = firstName ? `Hej ${firstName}` : 'Hej'
+      const message = `${greeting}, ${companyName} har skickat ett förslag på tilläggsarbete på ditt projekt ${projectName}. Granska och svara: ${signUrl}\n${suffix}`
+
+      // SMS-anrop FÖRE UPDATE — om det failar rör vi inte DB. Tidigare
+      // ordning (UPDATE först, SMS i try/catch) ljög för frontend och
+      // gjorde det omöjligt att retry:a utan att resetta status.
+      let smsOk = false
+      let smsErrorDetail: string | null = null
+      let smsStatus: number | null = null
       try {
         const smsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sms/send`, {
           method: 'POST',
@@ -124,19 +147,38 @@ export async function POST(
           body: JSON.stringify({
             to: phone,
             message,
-            customer_id: ata.customer_id || project?.customer_id,
+            customer_id: customerId,
           }),
         })
 
+        smsStatus = smsRes.status
+        smsOk = smsRes.ok
         if (!smsRes.ok) {
-          console.error('SMS send failed:', await smsRes.text())
+          smsErrorDetail = await smsRes.text().catch(() => 'unknown')
+          console.error('[ata/send] sms-call HTTP error:', {
+            status: smsRes.status,
+            body: smsErrorDetail.substring(0, 300),
+            to: phone,
+          })
         }
-      } catch (smsErr) {
-        console.error('SMS send error:', smsErr)
+      } catch (smsErr: any) {
+        smsErrorDetail = smsErr?.message || 'fetch exception'
+        console.error('[ata/send] sms-call exception:', smsErr)
       }
 
-      // Update ÄTA
-      await supabase
+      if (!smsOk) {
+        return NextResponse.json(
+          {
+            error: 'SMS kunde inte skickas',
+            sms_status: smsStatus,
+            sms_detail: smsErrorDetail,
+          },
+          { status: 500 },
+        )
+      }
+
+      // SMS bekräftat skickat → uppdatera ÄTA
+      const { error: updateErr } = await supabase
         .from('project_change')
         .update({
           status: 'sent',
@@ -144,6 +186,13 @@ export async function POST(
           sent_to_phone: phone,
         })
         .eq('change_id', params.id)
+
+      if (updateErr) {
+        // SMS gick iväg men UPDATE failade — logga, men returnera 200
+        // eftersom kunden faktiskt fått SMS:et. Hantverkaren kan retry
+        // efter manuell DB-fix om det blir problem.
+        console.error('[ata/send] update after sms-success failed:', updateErr)
+      }
 
     } else if (method === 'email') {
       const email = to || customer?.email
