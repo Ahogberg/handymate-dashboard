@@ -226,6 +226,58 @@ Samma problem som TD-2 men på `time_entry` istället för `time_checkins`.
 
 **Risk:** Att hitta orphan-rader i prod-data är arbetet — varje konstighet i historiska imports (Fortnox-sync, manuell SQL) kan ha skapat dem. Förvänta att backfilla med NULL där referensen saknas, INTE radera tidsraden (representerar arbetad tid och lön).
 
+### Update 2026-05-09 — Tredje recurrence (utanför time_entry)
+
+Samma TEXT-FK-bug har nu fångats i tre olika routes. Pattern:et är inte begränsat till `time_entry`-tabellen — det är **systemiskt över hela kodbasen** där Supabase nested select används mot oconstrained TEXT-kolumner.
+
+**Tre kända recurrences (alla i samma vecka):**
+1. `/api/time-entry` GET — fix `4d61c388` (project + customer relations)
+2. `/api/time-entry` POST — fix `db62186f` (project + customer + work_type + business_user)
+3. `/api/ata/[id]/send` POST — fix `2fead4f6` (project_change → project → customer, två chained relations)
+
+`project_change.project_id` (TEXT utan FK enligt [sql/projects.sql:73](handymate-dashboard/sql/projects.sql#L73)) och `project.customer_id` (TEXT utan FK enligt [sql/projects.sql:13](handymate-dashboard/sql/projects.sql#L13)) är inkluderade i samma TD eftersom de delar samma rotorsak — kodbasen har generellt TEXT-only-IDs utan FK-constraints.
+
+**Audit-förslag — hitta resten innan de smäller:**
+
+```bash
+# Alla nested selects i app/api/ — exkludera kända fungerande tabeller
+grep -rn "select.*\(.*\(.*\)\)" --include='*.ts' app/api \
+  | grep -v 'business_users' \
+  | grep -v 'business_config'
+```
+
+(Hjärtat av regex:en är `\(...\(...\)...\)` — letar efter Supabase nested select-syntax `parent:fk(child:fk(...))`.)
+
+För varje träff: kolla om FK:n är declared i SQL-filerna. Om inte → riskerar PGRST200 vid relations-discovery-miss.
+
+**Säkrare audit (manuell men tillförlitlig):** Kör dessa queries mot Supabase och jämför mot kodanvändning:
+
+```sql
+-- Kolumner som heter *_id och INTE har FK constraint
+SELECT
+  c.table_name,
+  c.column_name,
+  c.data_type
+FROM information_schema.columns c
+WHERE c.column_name LIKE '%_id'
+  AND c.column_name NOT IN ('id', 'business_id', 'user_id')
+  AND NOT EXISTS (
+    SELECT 1 FROM information_schema.key_column_usage k
+    JOIN information_schema.table_constraints tc
+      ON tc.constraint_name = k.constraint_name
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND k.table_name = c.table_name
+      AND k.column_name = c.column_name
+  )
+ORDER BY c.table_name, c.column_name;
+```
+
+Detta listar alla `*_id`-kolumner som *borde* vara FK men inte är. Kombinera med grep:en ovan för att veta vilka som faktiskt anropas via nested select i Next-koden.
+
+**När fixas det permanent (migration):** Tre recurrences inom en vecka är signal att TD-7-migrationen borde prioriteras före nästa stora feature. Estimat enligt original TD-7 fortsatt giltigt — pre-flight + ALTER per kolumn, ~30 min per FK om det inte finns orphans.
+
+**Tills migration:** Använd ALLTID two-query-pattern för nya routes som joinar mot project, customer, project_change, work_type, business_users. Lägg in det i [tasks/lessons.md](handymate-dashboard/tasks/lessons.md) så framtida sessioner inte gör om misstaget.
+
 ---
 
 ## TD-8 (2026-05-07) — `/api/checkin/approve` ärver inte `customer_id` från projektet  *[RESOLVED 2026-05-07]*
