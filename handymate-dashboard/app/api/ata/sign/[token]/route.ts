@@ -111,16 +111,42 @@ export async function POST(
 
     // Decline
     if (action === 'decline') {
+      const declinedAt = new Date().toISOString()
       const { error: updateError } = await supabase
         .from('project_change')
         .update({
           status: 'declined',
-          declined_at: new Date().toISOString(),
+          declined_at: declinedAt,
           declined_reason: reason || null,
         })
         .eq('sign_token', token)
 
       if (updateError) throw updateError
+
+      // Notifiering till hantverkaren via existing pending_approvals-feed.
+      // Hem-skärmens ApprovalCard renderar denna automatiskt — ingen ny
+      // mobile-kod behövs. Non-blocking så decline-flödet lyckas även
+      // om approval-insert failar.
+      try {
+        await supabase.from('pending_approvals').insert({
+          business_id: ata.business_id,
+          approval_type: 'ata_declined_notification',
+          title: `ÄTA-${ata.ata_number} avböjd`,
+          description: `Kund avböjde tilläggsarbete${reason ? `: "${reason}"` : ''} (${ata.total} kr) på projekt ${ata.project_id}`,
+          payload: {
+            change_id: ata.change_id,
+            ata_number: ata.ata_number,
+            project_id: ata.project_id,
+            total: ata.total,
+            declined_at: declinedAt,
+            declined_reason: reason || null,
+          },
+          status: 'pending',
+          risk_level: 'low',
+        })
+      } catch (notifyErr) {
+        console.error('[ata/sign] decline pending_approvals insert failed (non-blocking):', notifyErr)
+      }
 
       return NextResponse.json({ success: true })
     }
@@ -135,11 +161,12 @@ export async function POST(
       request.headers.get('x-real-ip') ||
       'unknown'
 
+    const signedAt = new Date().toISOString()
     const { error: updateError } = await supabase
       .from('project_change')
       .update({
         status: 'signed',
-        signed_at: new Date().toISOString(),
+        signed_at: signedAt,
         signed_by_name: name,
         signed_by_ip: ip,
         signature_data,
@@ -148,7 +175,33 @@ export async function POST(
 
     if (updateError) throw updateError
 
-    // Fire event (non-blocking)
+    // Notifiering till hantverkaren via existing pending_approvals-feed.
+    // Hem-skärmens ApprovalCard renderar denna automatiskt — Christoffer
+    // ser ÄTA-signeringen utan att manuellt kolla projektet. Non-blocking
+    // så sign-flödet lyckas även om approval-insert failar.
+    try {
+      await supabase.from('pending_approvals').insert({
+        business_id: ata.business_id,
+        approval_type: 'ata_signed_notification',
+        title: `ÄTA-${ata.ata_number} signerad`,
+        description: `${name} har godkänt tilläggsarbete (${ata.total} kr) på projekt ${ata.project_id}`,
+        payload: {
+          change_id: ata.change_id,
+          ata_number: ata.ata_number,
+          project_id: ata.project_id,
+          signed_by_name: name,
+          total: ata.total,
+          signed_at: signedAt,
+        },
+        status: 'pending',
+        risk_level: 'low',
+      })
+    } catch (notifyErr) {
+      console.error('[ata/sign] signed pending_approvals insert failed (non-blocking):', notifyErr)
+    }
+
+    // Fire event (non-blocking) — automation-engine reagerar inte på
+    // 'ata_signed' i nuläget men eventet behålls för framtida rules.
     try {
       const { fireEvent } = await import('@/lib/automation-engine')
       await fireEvent(supabase, 'ata_signed', ata.business_id, {
