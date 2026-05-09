@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
+import { sendSmsViaElks } from '@/lib/sms-send'
 
 /**
  * POST /api/ata/[id]/send — Skicka ÄTA till kund för signering
@@ -94,15 +94,6 @@ export async function POST(
       if (portalUrl) signUrl = portalUrl
     }
 
-    // Hämta assigned_phone_number för svarsnummer
-    const { data: bizConfig } = await supabase
-      .from('business_config')
-      .select('assigned_phone_number')
-      .eq('business_id', business.business_id)
-      .single()
-
-    const suffix = buildSmsSuffix(business.business_name || 'Handymate', bizConfig?.assigned_phone_number)
-
     // Send via SMS or email
     if (method === 'sms') {
       const rawPhone = to || customer?.phone_number
@@ -110,9 +101,8 @@ export async function POST(
         return NextResponse.json({ error: 'Inget telefonnummer att skicka till' }, { status: 400 })
       }
 
-      // Normalisera till E.164 — 46elks kräver det formatet. Lokal form
-      // (0708...) failar tyst i deras validering och kraschen sväljs i
-      // try/catch nedan. Samma TD-14-pattern som on-my-way-fixen.
+      // E.164-validering här i routen ger snabb 400 vid garbage-input.
+      // sendSmsViaElks normaliserar igen för säkerhet (idempotent).
       const phone = normalizeSwedishPhone(rawPhone)
       if (!phone || !phone.startsWith('+')) {
         return NextResponse.json(
@@ -121,60 +111,40 @@ export async function POST(
         )
       }
 
-      // Kund-vänlig text — använd förnamn + business-namn när tillgängliga,
-      // graceful fallback annars.
+      // Kort kund-text — under 160 tecken så det inte blir 2 SMS av misstag.
+      // Förnamn + företagsnamn dynamiskt, graceful fallback om något saknas.
       const firstName = customer?.name ? customer.name.split(' ')[0] : ''
       const companyName = business.business_name || 'Handymate'
-      const greeting = firstName ? `Hej ${firstName}` : 'Hej'
-      const message = `${greeting}, ${companyName} har skickat ett förslag på tilläggsarbete på ditt projekt. Granska och svara: ${signUrl}\n${suffix}`
+      const greeting = firstName ? `Hej ${firstName}!` : 'Hej!'
+      const message = `${greeting} ${companyName} har ett förslag på tilläggsarbete: ${signUrl}`
 
-      // SMS-anrop FÖRE UPDATE — om det failar rör vi inte DB. Tidigare
-      // ordning (UPDATE först, SMS i try/catch) ljög för frontend och
-      // gjorde det omöjligt att retry:a utan att resetta status.
-      let smsOk = false
-      let smsErrorDetail: string | null = null
-      let smsStatus: number | null = null
-      try {
-        const smsRes = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/sms/send`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            cookie: request.headers.get('cookie') || '',
-          },
-          body: JSON.stringify({
-            to: phone,
-            message,
-            customer_id: customerId,
-          }),
-        })
+      // Direkt 46elks-anrop via shared helper. Tidigare intern fetch mot
+      // /api/sms/send failade med 'Failed to parse URL' (relativ URL
+      // fungerar inte server-side i Next-routes).
+      const smsResult = await sendSmsViaElks({
+        supabase,
+        businessId: business.business_id,
+        businessName: business.business_name,
+        to: phone,
+        message,
+        customerId,
+        relatedId: ata.change_id,
+        messageType: 'ata_send',
+      })
 
-        smsStatus = smsRes.status
-        smsOk = smsRes.ok
-        if (!smsRes.ok) {
-          smsErrorDetail = await smsRes.text().catch(() => 'unknown')
-          console.error('[ata/send] sms-call HTTP error:', {
-            status: smsRes.status,
-            body: smsErrorDetail.substring(0, 300),
-            to: phone,
-          })
-        }
-      } catch (smsErr: any) {
-        smsErrorDetail = smsErr?.message || 'fetch exception'
-        console.error('[ata/send] sms-call exception:', smsErr)
-      }
-
-      if (!smsOk) {
+      if (!smsResult.success) {
         return NextResponse.json(
           {
-            error: 'SMS kunde inte skickas',
-            sms_status: smsStatus,
-            sms_detail: smsErrorDetail,
+            error: smsResult.error || 'SMS kunde inte skickas',
+            sms_status: smsResult.status,
           },
           { status: 500 },
         )
       }
 
-      // SMS bekräftat skickat → uppdatera ÄTA
+      // SMS bekräftat skickat (sms_log INSERT redan gjord av helpern) →
+      // uppdatera ÄTA-status. Om UPDATE failar har kunden ändå fått SMS:et;
+      // logga warning men returnera 200 för att inte ljuga om leveransen.
       const { error: updateErr } = await supabase
         .from('project_change')
         .update({
@@ -185,9 +155,6 @@ export async function POST(
         .eq('change_id', params.id)
 
       if (updateErr) {
-        // SMS gick iväg men UPDATE failade — logga, men returnera 200
-        // eftersom kunden faktiskt fått SMS:et. Hantverkaren kan retry
-        // efter manuell DB-fix om det blir problem.
         console.error('[ata/send] update after sms-success failed:', updateErr)
       }
 
