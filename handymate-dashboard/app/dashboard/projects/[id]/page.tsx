@@ -1686,49 +1686,114 @@ export default function ProjectDetailPage() {
       )}
 
       <div className="relative max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard/projects" className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{project.name}</h1>
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm text-slate-500 mb-3">
+          <Link href="/dashboard/projects" className="hover:text-slate-700 transition-colors">
+            Projekt
+          </Link>
+          <ChevronRight className="w-3 h-3 text-slate-400" />
+          <span className="text-slate-900 font-semibold truncate">{project.name}</span>
+        </nav>
+
+        {/* Hero — left (name + meta + actions) + right placeholder (totals-card kommer i commit 2) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6 items-start mb-8">
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 tracking-tight mb-3">
+              {project.name}
+            </h1>
+
+            {/* Meta-rad: kund · adress · status */}
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500 mb-5">
               {project.customer && (
-                <p className="text-sm text-gray-500">{project.customer.name}</p>
+                <span className="inline-flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
+                  {project.customer.name}
+                </span>
               )}
+              {project.customer?.address_line && (
+                <>
+                  <span className="text-slate-300">·</span>
+                  <span>{project.customer.address_line}</span>
+                </>
+              )}
+              <span className="text-slate-300">·</span>
+              <span className="inline-flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    project.status === 'completed' ? 'bg-emerald-500'
+                    : project.status === 'active' ? 'bg-amber-500'
+                    : project.status === 'cancelled' ? 'bg-red-500'
+                    : 'bg-slate-400'
+                  }`}
+                />
+                {STATUS_MAP[project.status] || project.status}
+                {typeof project.progress_percent === 'number' && project.progress_percent > 0 && (
+                  <span className="text-slate-400 ml-1">· {project.progress_percent}%</span>
+                )}
+              </span>
+            </div>
+
+            {/* Action-knappar — primary + ghost + ghost (conditional) */}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setChangeModal({ open: true, editing: null })}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-primary-700 text-white text-sm font-semibold rounded-lg hover:bg-primary-600 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                Nytt tilläggsarbete
+              </button>
+              <button
+                onClick={() => showToast('Faktura-förhandsgranskning kommer snart', 'success')}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                title="Förhandsgranska faktura (kommer snart)"
+              >
+                <Receipt className="w-4 h-4" />
+                Förhandsgranska faktura
+              </button>
+              {project.quote_id && (
+                <Link
+                  href={`/dashboard/quotes/${project.quote_id}`}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white text-slate-700 text-sm font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  Visa offert
+                </Link>
+              )}
+
+              {/* Status-dropdown — funktionell kvar, flyttad till actions-rad */}
+              <div className="relative ml-auto">
+                <button
+                  onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                  disabled={savingStatus}
+                  className={`flex items-center gap-2 px-3 py-2.5 text-sm rounded-lg border transition-all ${STATUS_STYLES[project.status] || 'bg-gray-100 text-gray-500 border-gray-300'}`}
+                >
+                  {savingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {STATUS_MAP[project.status] || project.status}
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {statusDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-xl z-20 w-44 overflow-hidden">
+                    {Object.entries(STATUS_MAP).map(([key, label]) => (
+                      <button
+                        key={key}
+                        onClick={() => updateProjectStatus(key)}
+                        className={`w-full text-left px-4 py-2.5 text-sm hover:bg-slate-50 transition-all ${
+                          key === project.status ? 'text-primary-700 bg-slate-50' : 'text-slate-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Status badge + dropdown */}
-          <div className="flex items-center gap-3 relative">
-            <button
-              onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-              disabled={savingStatus}
-              className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-full border transition-all ${STATUS_STYLES[project.status] || 'bg-gray-100 text-gray-500 border-gray-300'}`}
-            >
-              {savingStatus ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : null}
-              {STATUS_MAP[project.status] || project.status}
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
-
-            {statusDropdownOpen && (
-              <div className="absolute top-full right-0 mt-2 bg-white border border-[#E2E8F0] rounded-xl shadow-xl z-20 w-44 overflow-hidden">
-                {Object.entries(STATUS_MAP).map(([key, label]) => (
-                  <button
-                    key={key}
-                    onClick={() => updateProjectStatus(key)}
-                    className={`w-full text-left px-4 py-2.5 text-sm hover:bg-gray-100 transition-all ${
-                      key === project.status ? 'text-secondary-700 bg-gray-50' : 'text-gray-700'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            )}
+          {/* Right column — totals-card kommer i commit 2 */}
+          <div className="hidden lg:block">
+            {/* TODO commit 2: <ProjectTotalsCard project={project} atas={changes} /> */}
           </div>
         </div>
 
