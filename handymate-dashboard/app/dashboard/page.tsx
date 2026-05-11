@@ -37,7 +37,6 @@ import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import IdentityPill from '@/components/IdentityPill'
-import MorningBriefWidget from '@/components/dashboard/MorningBriefWidget'
 
 interface Booking {
   booking_id: string
@@ -605,11 +604,6 @@ export default function DashboardPage() {
               </>
             )}
           </p>
-        </div>
-
-        {/* Morning Brief — strukturerade dagens uppmärksamheter per agent */}
-        <div className="mb-4 sm:mb-6">
-          <MorningBriefWidget />
         </div>
 
         {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h */}
