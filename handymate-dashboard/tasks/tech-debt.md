@@ -1064,3 +1064,35 @@ c) **Returning + retry** — `UPDATE business_config SET next_invoice_number = n
 **Estimat:** ~30min — byt read-then-write mot UPDATE...RETURNING i båda routes + verifiera att invoice_number sätts från resultatet, inte från en pre-read.
 
 **Trigger:** När team-businesses börjar onboardas (flera användare med `create_invoices`-permission per business). Eller om Andreas ser unique-constraint-fel på invoice_number i Vercel-loggar.
+
+---
+
+## TD-31 (2026-05-11) — invoice-tabellen saknar project_id-kolumn
+
+**Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~347-376 (INSERT) + alla framtida invoice-listings som vill filtrera på projekt.
+
+**Idag:** `invoice`-tabellen har spårbarhetskolumner `business_id`, `customer_id`, `quote_id` — men ingen `project_id`. Schemat antar att invoice-till-projekt-koppling sker indirekt via `quote_id → project.quote_id`. Försök att INSERT med `project_id` returnerar PostgREST-fel `Could not find the 'project_id' column of 'invoice' in the schema cache` (verifierat 2026-05-11 i create-final-invoice POST).
+
+**Konsekvens:**
+
+1. **Q: "Visa alla fakturor för projekt X"** kräver två-steg-query: hitta `project.quote_id`, sen filtrera `invoice WHERE quote_id = ?`. Funkar bara för projekt som har quote_id — projekt utan offert (manuellt skapade, direkt-fakturering utan offert) kan inte hittas alls via denna väg.
+2. **Fakturor utan quote_id** (skapade från time_entry direkt, från project_material direkt) är helt utan spårbar projekt-koppling i schemat. Idag fungerar det via `app/api/invoices/route.ts` POST som accepterar time_entry_ids / project_material_ids, men resultat-fakturan har ingen kvarstående projekt-länk.
+3. **Multi-faktura-projekt** (delfakturor, slutfaktura efter delfaktura) blir svårhanterligt — alla faktyrer hänvisar till samma quote_id men ordningen tappas bort.
+
+**Implementation v2:**
+
+```sql
+ALTER TABLE invoice ADD COLUMN IF NOT EXISTS project_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_invoice_project ON invoice(project_id);
+-- Backfill från quote-koppling där möjligt:
+UPDATE invoice i
+SET project_id = q.project_id
+FROM quotes q
+WHERE i.quote_id = q.quote_id AND i.project_id IS NULL;
+```
+
+Sedan: rad 356 i create-final-invoice INSERT återinför `project_id: projectId` + uppdatera GET-routes (`app/api/invoices/route.ts` list-endpoint) så de exponerar och kan filtrera på fältet.
+
+**Estimat:** ~45min — SQL-migration (10min) + backfill-test mot pilot-data (10min) + route-updates i 2-3 filer (25min).
+
+**Trigger:** Andreas behöver lista alla fakturor (delfaktura + slutfaktura) för ett pilot-projekt och stöter på saknad direkt-koppling. Eller när delfakturor implementeras (på roadmap).
