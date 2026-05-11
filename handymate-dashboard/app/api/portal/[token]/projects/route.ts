@@ -107,6 +107,19 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           .limit(12),
       ])
 
+      // DEBUG (TD-22 audit): ÄTA-4 saknas i API-respons trots att SQL-
+      // simulering returnerar 4 rader. Loggar exakt vad Supabase-klienten
+      // ser per projekt så vi kan skilja klient vs server-bug.
+      console.log('[portal/projects] ata fetch:', {
+        project_id: p.project_id,
+        count: ataRes.data?.length ?? 0,
+        ata_numbers: ataRes.data?.map((a: any) => a.ata_number) ?? [],
+        ata_change_ids: ataRes.data?.map((a: any) => a.change_id) ?? [],
+        error_message: ataRes.error?.message,
+        error_code: ataRes.error?.code,
+        error_details: ataRes.error?.details,
+      })
+
       return {
         ...p,
         milestones: milestonesRes.data || [],
