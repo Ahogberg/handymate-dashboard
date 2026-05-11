@@ -83,7 +83,9 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     data.companyName?.trim() &&
     data.trade &&
     data.orgNumber?.length === 11 &&
-    data.area?.trim()
+    data.area?.trim() &&
+    data.paymentMethod &&
+    data.paymentNumber?.trim()
   )
 
   const validAccount = !!(
@@ -126,6 +128,10 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             phone: cleanPhone,
             branch: data.trade,
             serviceArea: data.area,
+            orgNumber: data.orgNumber || null,
+            bankgiro: data.paymentMethod === 'bankgiro' ? data.paymentNumber?.trim() : null,
+            plusgiro: data.paymentMethod === 'plusgiro' ? data.paymentNumber?.trim() : null,
+            bankAccount: data.paymentMethod === 'bankAccount' ? data.paymentNumber?.trim() : null,
             referralCode: refCode || undefined,
           },
         }),
@@ -271,6 +277,67 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
             value={data.orgNumber || ''}
             onChange={e => update({ orgNumber: formatOrg(e.target.value) })}
           />
+          <p className="ob-help">
+            Behövs för att skapa fakturor.{' '}
+            <a
+              href="https://www.bolagsverket.se/sok/sokforetagsfakta"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--ob-primary-700)', textDecoration: 'underline' }}
+            >
+              Vet du inte? Hitta hos Bolagsverket
+            </a>
+          </p>
+        </div>
+
+        {/* Betalmottagare för fakturor — TD-27 pre-flight */}
+        <div className="ob-field">
+          <label className="ob-label">Betalmottagare för fakturor</label>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {([
+              { id: 'bankgiro' as const, label: 'Bankgiro' },
+              { id: 'plusgiro' as const, label: 'Plusgiro' },
+              { id: 'bankAccount' as const, label: 'Bankkonto' },
+            ]).map(opt => (
+              <button
+                type="button"
+                key={opt.id}
+                onClick={() => update({ paymentMethod: opt.id, paymentNumber: '' })}
+                style={{
+                  flex: 1,
+                  padding: '8px 12px',
+                  borderRadius: 'var(--ob-r-md)',
+                  border: `1px solid ${data.paymentMethod === opt.id ? 'var(--ob-primary-700)' : 'var(--ob-border)'}`,
+                  background: data.paymentMethod === opt.id ? 'var(--ob-primary-50)' : 'var(--ob-surface)',
+                  color: data.paymentMethod === opt.id ? 'var(--ob-primary-700)' : 'var(--ob-ink)',
+                  fontWeight: data.paymentMethod === opt.id ? 600 : 500,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  transition: 'all var(--ob-t-fast)',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {data.paymentMethod && (
+            <input
+              className="ob-input"
+              placeholder={
+                data.paymentMethod === 'bankgiro'
+                  ? '123-4567'
+                  : data.paymentMethod === 'plusgiro'
+                  ? '12 34 56-7'
+                  : 'Clearing + kontonummer'
+              }
+              inputMode={data.paymentMethod === 'bankAccount' ? 'text' : 'numeric'}
+              value={data.paymentNumber || ''}
+              onChange={e => update({ paymentNumber: e.target.value })}
+            />
+          )}
+          <p className="ob-help">
+            Krävs för fakturor — Bokföringslagen kräver en betalmottagare på varje fakturahandling.
+          </p>
         </div>
 
         {/* F-skatt */}

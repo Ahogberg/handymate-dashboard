@@ -13,6 +13,10 @@ export interface OnboardingFormData {
   area?: string
   logoDataUrl?: string
 
+  // Betalmottagare (krävs för fakturor — TD-27 pre-flight)
+  paymentMethod?: 'bankgiro' | 'plusgiro' | 'bankAccount'
+  paymentNumber?: string
+
   // Account creation (pre-registration)
   contactName?: string
   email?: string

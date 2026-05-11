@@ -20,7 +20,7 @@ if (action === 'register') {
   if (!data?.email || !data?.password || !data?.businessName || !data?.contactName) {
     return NextResponse.json({ error: 'Fyll i alla obligatoriska fält' }, { status: 400 })
   }
-  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode } = data
+  const { email, password, businessName, displayName, contactName, phone, branch, serviceArea, referralCode, orgNumber, bankgiro, plusgiro, bankAccount } = data
 
   // 1. Skapa auth user via admin API (skippar e-postverifiering)
   const supabaseAdmin = getServerSupabase()
@@ -79,6 +79,10 @@ if (action === 'register') {
       phone_number: phone,
       branch: branch,
       service_area: serviceArea || null,
+      org_number: orgNumber || null,
+      bankgiro: bankgiro || null,
+      plusgiro: plusgiro || null,
+      bank_account_number: bankAccount || null,
       subscription_status: 'trial',
       subscription_plan: 'starter',
       trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
