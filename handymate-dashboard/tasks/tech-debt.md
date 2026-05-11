@@ -815,3 +815,31 @@ Hundratals träffar förväntade. Sweep-PR per domän (portal först eftersom de
 **Trigger för att bygga:** A är värt att göra direkt (få minuters arbete, eliminerar duplicering). B kan göras inkrementellt när andra routes rörs. C kräver lint-konfiguration vilket är scope för en separat utvecklarverktygs-PR.
 
 **Relaterat:** TD-12 (mobile/dashboard typed-shape sync) — om Supabase typed-gen körs systematiskt skulle column-name-mismatch fångas vid build-tid istället för runtime. Den lösningen är överlägsen long-term; TD-22 är defensive-programming-fallback tills typed-gen är på plats.
+
+---
+
+## TD-23 (2026-05-11) — "Dag X av Y" på dashboard projekt-hero kräver booking-sekvens-fetch
+
+**Plats:** [app/dashboard/projects/[id]/page.tsx](handymate-dashboard/app/dashboard/projects/[id]/page.tsx) hero-meta-rad.
+
+**Idag:** Mockup-spec för projekt-detalj-hero visar "dag X av Y" i meta-raden (colored-dot + stage + dag-räkning). Project-tabellen saknar dag-räkning som koncept — det är ett booking-sekvens-derivat (mobile final-day-flödet använder det via `kind='standard'`-bokningar). Commit `cce54bc0` använder `progress_percent` som v1-fallback.
+
+**Konsekvens:** Projekt utan booking-koppling visar bara `{status} · {progress_percent}%`. För projekt med bokningar är det `{status} · {progress_percent}%` istället för det förväntade `{status} · dag X av Y`. Inte felaktigt men inte mockup-troget.
+
+**Implementation v2:**
+
+1. I `fetchProjectData()` (eller separat hook), hämta bokningar för projektet:
+   ```ts
+   const { data: projectBookings } = await supabase
+     .from('booking')
+     .select('booking_id, scheduled_start, scheduled_end, kind')
+     .eq('project_id', projectId)
+     .eq('business_id', businessId)
+     .order('scheduled_start', { ascending: true })
+   ```
+2. Återanvänd [lib/bookings/day-progress.ts](handymate-dashboard/lib/bookings/day-progress.ts) — `computeBookingDayProgress(currentBookingId, projectBookings)`. "Aktuell" booking är den som matchar idag eller senast passerade.
+3. Hero-meta: visa `dag X av Y` om bokningar finns, annars fall tillbaka på `progress_percent`.
+
+**Estimat:** ~30 min. Helpern och endpointen finns redan från mobile-arbetet (Etapp 1 — `4a1e6107` + `e211d0fc`). Bara att integrera i dashboard-hero-rendering.
+
+**Trigger för att bygga:** När projekt-detaljsidan polish:as för pilot-demo eller när Christoffer kommenterar att meta-raden inte stämmer med vad han ser i mobilen.
