@@ -951,3 +951,116 @@ Layout-skiss:
 **Estimat:** ~1h onboarding-validering + ~30min pre-flight + 15min SQL-script.
 
 **Trigger:** Innan första pilot-hantverkare faktiskt klickar "Skicka faktura" i produktion. Måste vara på plats innan invoice-preview-flödet aktiveras för pilot.
+
+---
+
+## TD-28 (2026-05-11) — Read-only MCP-access för Claude Code mot Supabase + Vercel
+
+**Plats:** Andreas dev-miljö (`.claude/mcp.json` eller motsvarande Claude Code-config). Inte i repo:t.
+
+**Idag:** Claude Code i denna repo har bara Bash + filsystems-tools. Schema-frågor löses via grep mot `sql/`-mappen + Explore-agent (som rapporterade fel om `invoice.items` JSONB under TD-22-/Track C-arbetet). Deploy-debugging kräver att Andreas kör curl manuellt och rapporterar tillbaka — vi förlorade ~30 min på 42703-debuggen i invoice-preview-endpoint för att stale-deploy inte gick att verifiera från min sida.
+
+**Konsekvens:** För varje feature med schema-tunga API-routes (Track C har 2 till av dem kvar — POST create-final-invoice, plus framtida Fortnox-sync) återkommer samma friktion. Schema-audit tar 5-10 min via Explore-agent vs ~30 sek via direkt query. Deploy-status kan inte verifieras utan Andreas-i-loopen.
+
+**Föreslagen konfiguration (read-only):**
+
+1. **Supabase MCP** — read-only mot `information_schema` + utvalda app-tabeller. Användning: schema-verifiering före route-implementation, query-test i dev-miljön. **Inga** writes, **inga** migrations — den regeln i CLAUDE.md ("SQL-migrationer körs manuellt i Supabase SQL Editor") står fast.
+2. **Vercel MCP** — read-only deploys + logs. Användning: verifiera att senaste git-push har deployats, läsa function-logs när en endpoint failar i prod. Inga deploy-actions (`rollback`, `env rm`, `redeploy`).
+3. **GitHub MCP** — read-only PRs + issues + actions. Marginellt värde idag (Bash-`gh` räcker), men nyttigt för PR-review-flöden. Inga merges/closes.
+
+**Risk-mitigation:** Tokens scopas till read-only. Lagras i `.claude/`-config utanför repo:t. Roteras kvartalsvis.
+
+**Estimat:** ~1h setup totalt — MCP-server-install + token-provisioning + testning av varje server isolerat. Engångsinvestering.
+
+**Trigger:** När friktion blir kostsam nog. Idag handterbar, men om Track C utvecklas till fler features med liknande pattern (Fortnox-sync, faktura-PDF-generering, ROT/RUT-rapportering till Skatteverket) är värdet ~5-10 min sparad debug-tid per feature. Bryt-punkt: ~3 features till så är investeringen redan vunnen.
+
+---
+
+## TD-29 (2026-05-11) — create-final-invoice är inte atomic (INSERT invoice + UPDATE project_change)
+
+**Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~330-360.
+
+**Idag:** Routen kör två separata Supabase-operationer i sekvens:
+
+1. `INSERT INTO invoice` (med items JSONB + totals)
+2. `UPDATE project_change SET status='invoiced', invoice_id, invoiced_at WHERE change_id IN (...)`
+
+Om steg 2 failar (RLS, network, timeout) är vi i half-state: fakturan finns men signerade ÄTA är inte markerade `invoiced` → samma ÄTA kan auto-pullas till en ny faktura och dubbel-faktureras kunden.
+
+**Mitigation v1 (kvar):** Routen loggar `CRITICAL: project_change update failed after invoice insert` med invoice_id, invoice_number och change_ids. Andreas/support kan manuellt köra UPDATE i Supabase SQL Editor. Returnerar varning-fält i response så frontend kan visa "Faktura skapades men kontakta support".
+
+**Konsekvens om mitigation används:** Risk för dubbel-fakturering om Andreas inte ser warning eller missar manuell kompensering. Pilot-skala (få fakturor/dag) är riskabelt men hanterbart. Skalar inte.
+
+**Implementation v2 — Postgres RPC för sann atomicitet:**
+
+```sql
+CREATE OR REPLACE FUNCTION create_final_invoice(
+  p_business_id TEXT,
+  p_invoice_data JSONB,
+  p_change_ids TEXT[]
+) RETURNS TABLE(invoice_id TEXT, invoice_number TEXT)
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_invoice_id TEXT;
+BEGIN
+  -- INSERT invoice
+  INSERT INTO invoice (...) VALUES (...) RETURNING invoice_id INTO v_invoice_id;
+
+  -- UPDATE project_change i samma transaktion
+  UPDATE project_change
+  SET status = 'invoiced', invoice_id = v_invoice_id, invoiced_at = NOW()
+  WHERE change_id = ANY(p_change_ids) AND business_id = p_business_id;
+
+  RETURN QUERY SELECT v_invoice_id, (p_invoice_data->>'invoice_number')::TEXT;
+END;
+$$;
+```
+
+Routen anropar `supabase.rpc('create_final_invoice', {...})` istället. Antingen lyckas båda eller ingen — Postgres-transaktion garanterar atomicitet.
+
+**Estimat:** ~1.5h — SQL-migration + route-refactor + testning av rollback-scenario (kasta exception i UPDATE-steget, verifiera att INSERT också rullas tillbaka).
+
+**Trigger:** Andreas ser första warning-loggen i prod (Vercel function logs). Eller proaktivt innan publik launch — pilot kan klara sig på manuell kompensering, publika kunder kan inte.
+
+---
+
+## TD-30 (2026-05-11) — invoice_number-bump är inte atomic (race condition vid samtidiga POST)
+
+**Plats:** [app/api/projects/[id]/create-final-invoice/route.ts](handymate-dashboard/app/api/projects/[id]/create-final-invoice/route.ts) rad ~315-325. Samma anti-pattern i [app/api/invoices/route.ts:328-331](handymate-dashboard/app/api/invoices/route.ts) (befintlig invoice POST-route).
+
+**Idag:**
+
+```ts
+// 1. Read
+const { data: businessConfig } = await supabase
+  .from('business_config')
+  .select('next_invoice_number')
+  ...
+const nextNum = businessConfig.next_invoice_number  // ex. 5
+
+// 2. ... bygg invoice med invoice_number = 'FV-2026-005' ...
+
+// 3. Write
+await supabase
+  .from('business_config')
+  .update({ next_invoice_number: nextNum + 1 })  // = 6
+  .eq('business_id', business.business_id)
+```
+
+Två samtidiga POST-requests läser båda `next_invoice_number = 5`, båda skapar `FV-2026-005` → primary key collision på `invoice_number` (om constraint finns) eller dubbel-användning av samma nummer (om constraint saknas — vilket är värre, Skatteverket kräver unik löpande sekvens per kalenderår).
+
+**Konsekvens:** Pilot med 1-3 användare i taget = aldrig en bug. Vid större volymer eller team-business där flera användare skapar fakturor parallellt = oundviklig kollision.
+
+**Implementation v2-alternativ:**
+
+a) **Postgres sequence** — `CREATE SEQUENCE invoice_number_seq_{business_id}`, anropa `nextval()` i transaktion. Naturlig atomicitet, men kräver dynamisk sequence-skapande per business (eller en delad sequence + business_id-prefix).
+
+b) **Advisory lock** — `pg_advisory_xact_lock(hashtext(business_id))` i en RPC innan read + update. Serialiserar `nextNum`-bumpar per business utan globala locks.
+
+c) **Returning + retry** — `UPDATE business_config SET next_invoice_number = next_invoice_number + 1 WHERE business_id = ? RETURNING next_invoice_number`. Atomic increment + returner värdet. Använd det som invoice_number. Detta är den enklaste fixen och löser race condition utan ny infrastruktur.
+
+**Förslag:** (c) — enkel single-query fix. Refactora både routen i denna PR och `app/api/invoices/route.ts:328`.
+
+**Estimat:** ~30min — byt read-then-write mot UPDATE...RETURNING i båda routes + verifiera att invoice_number sätts från resultatet, inte från en pre-read.
+
+**Trigger:** När team-businesses börjar onboardas (flera användare med `create_invoices`-permission per business). Eller om Andreas ser unique-constraint-fel på invoice_number i Vercel-loggar.
