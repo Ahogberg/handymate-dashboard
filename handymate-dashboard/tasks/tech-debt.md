@@ -909,3 +909,45 @@ Layout-skiss:
 **Estimat:** ~20 min. En extra Supabase-query + en ändring i IIFE-init.
 
 **Trigger:** Första pilot-användare reporterar avvikelse mellan totalsumma-kort och faktura-underlag, eller när `quote`-tabellen används aktivt i produktion (idag mest synk-mottagare från mobilen).
+
+---
+
+## TD-26 (2026-05-11) — ROT/RUT-stöd på ÄTA-items
+
+**Plats:** Mobile `CreateAtaSheet` (skapa ÄTA-flödet) + dashboard `app/api/invoice-preview` (eller motsvarande faktura-underlag som plockar upp ÄTA-items).
+
+**Idag:** ÄTA-items skapade via mobilen saknar `is_rot_eligible`-flagga på item-nivå (jämför med vanliga `project_item` som har det fältet). V1-beteende: alla ÄTA-items behandlas som ROT-/RUT-ineligible vid faktura-generering — full moms, ingen skattereduktion.
+
+**Konsekvens:** Hantverkare som lägger ÄTA-arbete på ett ROT-projekt (ex. extra elinstallation under badrumsrenovering) får ingen automatisk ROT-avdrag-rad på fakturan. Manuell efter-redigering krävs i faktura-flödet, eller så missar de avdraget helt. För BRF/företagskund (RUT/ROT-ineligible projekt från början) är detta inget problem — men för privatkund med ROT-projekt blir det fel default.
+
+**Implementation v2:**
+
+1. **Schema:** lägg till `is_rot_eligible BOOLEAN DEFAULT false` på `project_change_item` (eller var ÄTA-items lagras — verifiera schema först, kan vara i `project_change.items` JSONB).
+2. **Mobile (`CreateAtaSheet`):** lägg till en toggle per item-rad — "ROT-berättigad?" med default = projekt-default (om projekt har `is_rot_project=true` → default `true`, annars `false`). Visuellt subtilt — bara om projektet är ROT/RUT.
+3. **Dashboard faktura-flöde:** när items pullas till faktura-preview, gruppera ROT-eligible items separat så fakturan kan generera korrekt ROT-avdrags-rad (50% av arbetskostnad, max-tak per kund/år).
+4. **Backward-compat:** befintliga ÄTA utan flaggan default:ar till `false` — ingen tyst skattekonsekvens på gamla rader.
+
+**Estimat:** ~3-4h totalt — schema-migration + mobile-UI-toggle + dashboard-pull-logik + verifiering mot Skatteverkets ROT-regler.
+
+**Trigger:** Första pilot-hantverkare med privatkund-ROT-projekt skickar faktura med ÄTA-rader → ringer support för att ROT-avdraget saknas. Eller proaktivt innan publik launch om vi vet att ROT-projekt är vanligt segment.
+
+---
+
+## TD-27 (2026-05-11) — business_config saknar org_number/bankgiro/plusgiro hos pilot-businesses
+
+**Plats:** [app/dashboard/projects/[id]/invoice-preview/page.tsx](handymate-dashboard/app/dashboard/projects/[id]/invoice-preview/page.tsx) — invoice-document-header.
+
+**Idag:** Endpoint [/api/projects/[id]/invoice-preview](handymate-dashboard/app/api/projects/[id]/invoice-preview/route.ts) hämtar `business_config.org_number`, `business_config.bankgiro` och `business_config.plusgiro` för att rendera fakturahuvudet (företagsnamn + org.nr + Bg). I test-business (`biz_al7pjuu5smi`) är dessa fält tomma — endpoint returnerar `org_number: null` etc. Page-komponenten visar "Org.nr saknas" i amber som fallback.
+
+**Konsekvens:** Skickas en faktura utan org.nr eller bankgiro/plusgiro blir den **icke-giltig som fakturahandling i Sverige** — Bokföringslagen kräver org.nr och en betalmottagare. Pilot-hantverkare som klickar "Skicka faktura" utan dessa fält ifyllda skickar tekniskt sett ogiltiga fakturor till sina kunder.
+
+**Implementation:**
+
+1. **Onboarding-validering (steg 4 eller ny):** kräv `org_number` + minst en av `bankgiro`/`plusgiro`/`bank_account_number` innan onboarding markeras klar. Idag är dessa fält frivilliga i onboarding-flödet.
+2. **Inställnings-sidan (`/dashboard/settings/business`):** visa varning-banner om något av kärnfälten saknas, med direkt-länk till input.
+3. **Pre-flight-check i create-final-invoice (commit 4):** route POST ska returnera 400 med fält-pekare om `business_name`/`org_number`/betalmottagare saknas — samma pattern som vi gjorde för ÄTA-send med business_name.
+4. **Migration för befintliga pilot-businesses:** SQL-script som listar businesses med null-fält i `business_config` så Andreas kan ringa pilotkunder och fylla i.
+
+**Estimat:** ~1h onboarding-validering + ~30min pre-flight + 15min SQL-script.
+
+**Trigger:** Innan första pilot-hantverkare faktiskt klickar "Skicka faktura" i produktion. Måste vara på plats innan invoice-preview-flödet aktiveras för pilot.
