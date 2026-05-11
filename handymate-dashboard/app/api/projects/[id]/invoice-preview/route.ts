@@ -187,9 +187,12 @@ export async function GET(
     }
 
     // ── 5. project_change (ÄTA) — split by status ───────────────
+    // project_change har INTE invoice_number-kolumn — bara invoice_id
+    // (FK TEXT via v10_ata.sql:32) + invoiced_at. Joinas via two-query
+    // pattern (TD-7) mot invoice-tabellen för att resolva invoice_number.
     const { data: allChanges, error: changesError } = await supabase
       .from('project_change')
-      .select('change_id, ata_number, description, change_type, status, total, items, signed_at, signed_by_name, invoice_id, invoice_number, created_at')
+      .select('change_id, ata_number, description, change_type, status, total, items, signed_at, signed_by_name, invoice_id, invoiced_at, created_at')
       .eq('project_id', params.id)
       .eq('business_id', business.business_id)
       .order('ata_number', { ascending: true })
@@ -236,17 +239,51 @@ export async function GET(
         total: Number(c.total) || 0,
       }))
 
-    const invoicedAtas = (allChanges || [])
-      .filter(c => invoicedStatuses.has(c.status))
-      .map(c => ({
-        change_id: c.change_id,
-        ata_number: c.ata_number,
-        description: c.description,
-        change_type: c.change_type,
-        invoice_id: c.invoice_id,
-        invoice_number: c.invoice_number,
-        total: Number(c.total) || 0,
-      }))
+    // Two-query pattern (TD-7): hämta invoice_number för invoiced-ÄTA
+    // via separat lookup mot invoice-tabellen. project_change har bara
+    // invoice_id (TEXT FK), inte invoice_number.
+    const invoicedRaw = (allChanges || []).filter(c => invoicedStatuses.has(c.status))
+    const invoiceIds = Array.from(
+      new Set(invoicedRaw.map(c => c.invoice_id).filter((id): id is string => !!id)),
+    )
+
+    const invoiceNumberMap: Record<string, string | null> = {}
+    if (invoiceIds.length > 0) {
+      const { data: invoices, error: invoicesError } = await supabase
+        .from('invoice')
+        .select('invoice_id, invoice_number')
+        .in('invoice_id', invoiceIds)
+        .eq('business_id', business.business_id)
+
+      if (invoicesError) {
+        console.error('[invoice-preview] invoice lookup error:', invoicesError)
+        return NextResponse.json(
+          {
+            error: invoicesError.message,
+            code: invoicesError.code,
+            details: invoicesError.details,
+            hint: invoicesError.hint,
+            stage: 'invoice_number_lookup',
+          },
+          { status: 500 },
+        )
+      }
+
+      for (const inv of invoices || []) {
+        invoiceNumberMap[inv.invoice_id] = inv.invoice_number
+      }
+    }
+
+    const invoicedAtas = invoicedRaw.map(c => ({
+      change_id: c.change_id,
+      ata_number: c.ata_number,
+      description: c.description,
+      change_type: c.change_type,
+      invoice_id: c.invoice_id,
+      invoice_number: c.invoice_id ? invoiceNumberMap[c.invoice_id] ?? null : null,
+      invoiced_at: c.invoiced_at,
+      total: Number(c.total) || 0,
+    }))
 
     // ── 6. Server-side totals ───────────────────────────────────
     // Quote-total: prioritera summa av quote_items, fall tillbaka på
