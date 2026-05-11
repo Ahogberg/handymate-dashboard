@@ -134,10 +134,53 @@ export default function InvoicePreviewPage() {
   const [error, setError] = useState<string | null>(null)
   const [pendingDismissed, setPendingDismissed] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
+  const [sending, setSending] = useState(false)
+  const [validationError, setValidationError] = useState<{ message: string; fields: string[] } | null>(null)
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
     setToast({ message, type })
     window.setTimeout(() => setToast(null), 3500)
+  }
+
+  const handleSendInvoice = async () => {
+    if (!projectId || sending) return
+    setSending(true)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/create-final-invoice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const body = await res.json().catch(() => ({}))
+
+      // Pre-flight-fel (TD-27) — visa dialog med fält-lista istället för toast
+      if (res.status === 400 && Array.isArray(body.fields) && body.fields.length > 0) {
+        setValidationError({
+          message: body.error || 'Företaget saknar uppgifter',
+          fields: body.fields,
+        })
+        setSending(false)
+        return
+      }
+
+      if (!res.ok || body.error) {
+        showToast(body.error || 'Kunde inte skapa faktura', 'error')
+        setSending(false)
+        return
+      }
+
+      // TD-29-warning: faktura skapad men ÄTA-status-update failade.
+      // Visa toast + redirect så Andreas ser meddelandet i invoice-vyn.
+      if (body.warning) {
+        console.warn('[invoice-preview] create-final-invoice warning:', body.warning)
+        showToast(body.warning, 'error')
+      }
+
+      router.push(`/dashboard/invoices/${body.invoice_id}`)
+    } catch (e: any) {
+      console.error('[invoice-preview] send invoice error:', e)
+      showToast(e?.message || 'Något gick fel — försök igen', 'error')
+      setSending(false)
+    }
   }
 
   useEffect(() => {
@@ -239,9 +282,20 @@ export default function InvoicePreviewPage() {
             pendingDismissed={pendingDismissed}
             onDismissPending={() => setPendingDismissed(true)}
             onShowToast={showToast}
+            sending={sending}
+            onSendInvoice={handleSendInvoice}
           />
         </div>
       </div>
+
+      {/* Validation-error dialog (pre-flight-fel från TD-27) */}
+      {validationError && (
+        <ValidationErrorDialog
+          message={validationError.message}
+          fields={validationError.fields}
+          onClose={() => setValidationError(null)}
+        />
+      )}
 
       {/* Toast */}
       {toast && (
@@ -564,11 +618,15 @@ function InvoiceSidebar({
   pendingDismissed,
   onDismissPending,
   onShowToast,
+  sending,
+  onSendInvoice,
 }: {
   data: InvoicePreviewData
   pendingDismissed: boolean
   onDismissPending: () => void
   onShowToast: (message: string, type?: 'success' | 'error' | 'info') => void
+  sending: boolean
+  onSendInvoice: () => void
 }) {
   const customerName = data.customer?.name || 'kunden'
   const projectId = data.project.project_id
@@ -683,16 +741,21 @@ function InvoiceSidebar({
 
       {/* CTA — Skicka faktura */}
       <button
-        onClick={() =>
-          onShowToast(
-            'POST-route till create-final-invoice byggs i commit 4–5',
-            'info',
-          )
-        }
-        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold shadow-sm transition-colors"
+        onClick={onSendInvoice}
+        disabled={sending}
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary-700 hover:bg-primary-800 disabled:bg-primary-700 disabled:cursor-not-allowed text-white text-sm font-semibold shadow-sm transition-colors"
       >
-        <Send className="w-4 h-4" />
-        Skicka faktura till {customerName}
+        {sending ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Skapar faktura…
+          </>
+        ) : (
+          <>
+            <Send className="w-4 h-4" />
+            Skicka faktura till {customerName}
+          </>
+        )}
       </button>
 
       {/* Ghost — Redigera */}
@@ -709,5 +772,83 @@ function InvoiceSidebar({
         Redigera fakturan
       </button>
     </aside>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Validation-error dialog (pre-flight-fail från TD-27)
+// Visas när create-final-invoice POST returnerar 400 med fields-array.
+// ─────────────────────────────────────────────────────────────────
+
+const FIELD_LABELS: Record<string, string> = {
+  business_name: 'Företagsnamn',
+  org_number: 'Org.nummer',
+  'betalmottagare (bankgiro/plusgiro/bankkonto)':
+    'Betalmottagare (bankgiro, plusgiro eller bankkonto)',
+}
+
+function ValidationErrorDialog({
+  message,
+  fields,
+  onClose,
+}: {
+  message: string
+  fields: string[]
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm px-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-amber-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base font-bold text-slate-900 mb-1">
+              Innan du kan skicka fakturan
+            </h3>
+            <p className="text-sm text-slate-600">
+              Företagsinställningarna saknar uppgifter som krävs för en
+              giltig fakturahandling.
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-5">
+          <div className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+            Behöver fyllas i
+          </div>
+          <ul className="space-y-1.5">
+            {fields.map(field => (
+              <li key={field} className="flex items-start gap-2 text-sm text-slate-700">
+                <span className="text-amber-600 flex-shrink-0 mt-0.5">•</span>
+                <span>{FIELD_LABELS[field] || field}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/settings"
+            className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold transition-colors"
+          >
+            Gå till inställningar
+          </Link>
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-sm font-medium transition-colors"
+          >
+            Stäng
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
