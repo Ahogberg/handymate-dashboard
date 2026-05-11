@@ -2,6 +2,11 @@
 
 .body {
   flex: 1; min-height: 0;
+  /* height: 100% krävs eftersom parent-divet i pipeline/page.tsx är
+   * "flex-1 overflow-hidden" (block, inte flex) — då har flex:1 ingen
+   * effekt och .body skulle annars falla tillbaka till content-höjd, vilket
+   * gör att inre paneler aldrig hittar någon viewport att scrolla mot. */
+  height: 100%;
   display: grid;
   position: relative;
   overflow: hidden;
