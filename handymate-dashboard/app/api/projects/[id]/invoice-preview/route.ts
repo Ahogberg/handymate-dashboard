@@ -355,7 +355,12 @@ export async function GET(
     const nextInvoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
 
     // ── 10. Response ────────────────────────────────────────────
+    // _deployVersion: deploy-marker så vi kan verifiera VILKEN commit
+    // som faktiskt körs i prod. Om responsen saknar fältet → stale
+    // Vercel-deploy. Om fältet finns men är "v3-two-query" så vet vi
+    // att tvåfråge-lookupen för invoiced ÄTA är aktiv.
     return NextResponse.json({
+      _deployVersion: 'v3-two-query-2026-05-11',
       project: {
         project_id: project.project_id,
         name: project.name,
