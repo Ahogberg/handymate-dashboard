@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 
+// Force-dynamic så Vercel Edge inte cachar respons. Token-baserade publika
+// routes är cache-känsliga (samma URL = samma key) och nyligen ändrade rader
+// kan missas. Safe default oavsett om cache faktiskt är boven i nuvarande
+// debug-session.
+export const dynamic = 'force-dynamic'
+
 async function getCustomerFromToken(token: string) {
   const supabase = getServerSupabase()
   const { data, error } = await supabase
@@ -118,6 +124,23 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
         error_message: ataRes.error?.message,
         error_code: ataRes.error?.code,
         error_details: ataRes.error?.details,
+      })
+
+      // Separat count-query — om count_from_server > rows_received är det
+      // klienten som tappar rader. Om count = rows_received är det server
+      // som faktiskt returnerar färre rader. { head: true } skickar bara
+      // count-header, ingen data.
+      const { count: ataCountFromServer, error: ataCountError } = await supabase
+        .from('project_change')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', p.project_id)
+        .in('status', ['sent', 'signed', 'approved'])
+
+      console.log('[portal/projects] ata count check:', {
+        project_id: p.project_id,
+        rows_received: ataRes.data?.length ?? 0,
+        count_from_server: ataCountFromServer,
+        count_error: ataCountError?.message,
       })
 
       return {
