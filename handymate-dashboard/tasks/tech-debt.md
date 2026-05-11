@@ -843,3 +843,69 @@ Hundratals träffar förväntade. Sweep-PR per domän (portal först eftersom de
 **Estimat:** ~30 min. Helpern och endpointen finns redan från mobile-arbetet (Etapp 1 — `4a1e6107` + `e211d0fc`). Bara att integrera i dashboard-hero-rendering.
 
 **Trigger för att bygga:** När projekt-detaljsidan polish:as för pilot-demo eller när Christoffer kommenterar att meta-raden inte stämmer med vad han ser i mobilen.
+
+---
+
+## TD-24 (2026-05-11) — Totals-card stack v2: proportional bars istället för list-rows
+
+**Plats:** [app/dashboard/projects/[id]/page.tsx](handymate-dashboard/app/dashboard/projects/[id]/page.tsx) — höger-kolumns TotalsCard.
+
+**Idag:** Commit 2 av dashboard project-detail-rebuild (denna PR) renderar ÄTA-stacken som list-rows: en rad per ÄTA med statusprick + label + belopp. Snabbt att läsa, men ger ingen visuell känsla för proportion mellan original-belopp och ÄTA-summor.
+
+**Konsekvens:** Två projekt med samma grand total men radikalt olika ÄTA/original-fördelning ser identiska ut i kortet — användaren får ingen visuell signal om att "60% av projektet är ÄTA" vs "5% av projektet är ÄTA".
+
+**Implementation v2:**
+
+Byt list-rows mot horizontella proportional bars staplade ovanpå varandra. Varje bar:
+
+- Bredd = `(|belopp| / grandTotal) * 100%`
+- Färg = statusfärg (teal-700 signed, blue-500 sent, purple-500 invoiced, slate-400 quote-original, red-500 avgår)
+- Höjd ~28-32px, rounded-md, inline label + belopp om bredden tillåter
+
+Layout-skiss:
+
+```
+┌──────────────────────────────────────┐
+│ ▓▓▓▓▓▓▓▓▓▓▓▓ Offert     45 000 kr   │ (slate)
+├──────────────────────────────────────┤
+│ ▓▓▓▓▓ ÄTA-1               12 500 kr │ (teal)
+├──────────────────────────────────────┤
+│ ▓▓ ÄTA-2                   3 200 kr │ (blue, sent)
+└──────────────────────────────────────┘
+```
+
+**Estimat:** ~45 min. Behöver bara byta JSX i TotalsCard-IIFE — datalogiken (tillagg/avgar/pendingTotal) finns redan.
+
+**Trigger:** Användarfeedback om att stacken är platt/svår att skanna, eller pilot-demo där proportionell visualisering är värdefullt.
+
+---
+
+## TD-25 (2026-05-11) — Totals-card: prioritera `quote.total` över `project.budget_amount`
+
+**Plats:** [app/dashboard/projects/[id]/page.tsx](handymate-dashboard/app/dashboard/projects/[id]/page.tsx) — TotalsCard `original`-källa.
+
+**Idag:** Commit 2 läser `project.budget_amount` som "original offert-belopp". `budget_amount` är fritextfält som hantverkaren kan sätta manuellt vid projektskapande och inte alltid matchar den faktiska offert som kunden signerade.
+
+**Korrekt källa:** `quote.total` från senaste `quote`-rad med `status='accepted'` (eller `signed`) för projektet — det är beloppet kunden faktiskt accepterade och som ÄTA-summor ska jämföras mot.
+
+**Konsekvens idag:** Om `budget_amount` är `null` → "Saknar offert-grund" + bara ÄTA-summa visas (edge case-fallback). Om `budget_amount` är satt men avviker från `quote.total` → grand total stämmer inte med faktura-underlaget.
+
+**Implementation v2:**
+
+1. I `fetchProjectData()` — hämta senaste accepterade quote:
+   ```ts
+   const { data: quote } = await supabase
+     .from('quote')
+     .select('quote_id, total, status, accepted_at')
+     .eq('project_id', projectId)
+     .eq('business_id', businessId)
+     .in('status', ['accepted', 'signed'])
+     .order('accepted_at', { ascending: false })
+     .limit(1)
+     .maybeSingle()
+   ```
+2. I TotalsCard-IIFE — byt `project.budget_amount` mot `quote?.total ?? project.budget_amount ?? null`. Prioritets-ordning: signerad offert > manuell budget > null (visa "Saknar offert-grund").
+
+**Estimat:** ~20 min. En extra Supabase-query + en ändring i IIFE-init.
+
+**Trigger:** Första pilot-användare reporterar avvikelse mellan totalsumma-kort och faktura-underlag, eller när `quote`-tabellen används aktivt i produktion (idag mest synk-mottagare från mobilen).

@@ -49,6 +49,7 @@ import {
   Copy,
   FileSignature,
   ChevronRight,
+  Lock,
   MapPin,
   Phone,
   Printer,
@@ -1791,10 +1792,113 @@ export default function ProjectDetailPage() {
             </div>
           </div>
 
-          {/* Right column — totals-card kommer i commit 2 */}
-          <div className="hidden lg:block">
-            {/* TODO commit 2: <ProjectTotalsCard project={project} atas={changes} /> */}
-          </div>
+          {/* Right column — Totals-card med stack */}
+          <aside className="hidden lg:block">
+            {(() => {
+              const atas = changes || []
+              const signedStatuses = ['signed', 'invoiced']
+              const isConfirmed = (a: any) => signedStatuses.includes(a.status)
+              const isAddition = (a: any) => a.change_type !== 'removal'
+              const isRemoval = (a: any) => a.change_type === 'removal'
+              const sentPending = atas.filter(a => a.status === 'sent')
+
+              const tillagg = atas
+                .filter(a => isConfirmed(a) && isAddition(a))
+                .reduce((s, a) => s + Math.abs(a.total || 0), 0)
+              const avgar = atas
+                .filter(a => isConfirmed(a) && isRemoval(a))
+                .reduce((s, a) => s + Math.abs(a.total || 0), 0)
+              const pendingTotal = sentPending.reduce((s, a) => {
+                const v = Math.abs(a.total || 0)
+                return s + (isRemoval(a) ? -v : v)
+              }, 0)
+
+              const original = typeof project.budget_amount === 'number' ? project.budget_amount : null
+              const grandTotal = (original ?? 0) + tillagg - avgar
+              const hasOriginal = original !== null
+
+              const fmt = (n: number) => formatCurrency(n)
+
+              const statusDot = (status: string) => {
+                if (status === 'invoiced') return 'bg-purple-500'
+                if (status === 'signed') return 'bg-primary-700'
+                if (status === 'sent') return 'bg-blue-500'
+                if (status === 'declined') return 'bg-red-500'
+                return 'bg-slate-400'
+              }
+
+              return (
+                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                    Aktuell totalsumma
+                  </div>
+                  <div className="text-3xl font-bold text-slate-900 tabular-nums tracking-tight">
+                    {fmt(grandTotal)}
+                  </div>
+
+                  {/* Breakdown */}
+                  <div className="text-xs text-slate-500 mt-2 leading-relaxed">
+                    {hasOriginal ? (
+                      <>
+                        Original {fmt(original)}
+                        {tillagg > 0 && (
+                          <> <span className="text-emerald-600 font-semibold">+ {fmt(tillagg)}</span> tillägg</>
+                        )}
+                        {avgar > 0 && (
+                          <> <span className="text-red-600 font-semibold">− {fmt(avgar)}</span> avgår</>
+                        )}
+                      </>
+                    ) : (
+                      <span className="italic text-slate-400">Saknar offert-grund · bara ÄTA-summa</span>
+                    )}
+                  </div>
+
+                  {sentPending.length > 0 && (
+                    <div className="text-[11px] text-slate-400 mt-1">
+                      {pendingTotal >= 0 ? '+' : '−'} {fmt(Math.abs(pendingTotal))} väntar på signering
+                    </div>
+                  )}
+
+                  {/* Stack — list-rad-stil (TD-24: proportional bars v2) */}
+                  {atas.length > 0 && (
+                    <div className="mt-4 space-y-1.5">
+                      {atas.map(a => {
+                        const sign = isRemoval(a) ? '−' : '+'
+                        const colorClass = isRemoval(a) ? 'text-red-700' : 'text-emerald-700'
+                        return (
+                          <div
+                            key={a.change_id}
+                            className="flex items-center gap-2.5 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg"
+                          >
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot(a.status)}`} />
+                            <span className="flex-1 text-xs text-slate-700 font-medium truncate">
+                              ÄTA-{a.ata_number || '?'} · {a.description || 'Utan rubrik'}
+                            </span>
+                            <span className={`text-xs font-bold tabular-nums ${colorClass}`}>
+                              {sign}{fmt(Math.abs(a.total || 0))}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Lockad original-rad */}
+                  {hasOriginal && (
+                    <div className="mt-2 px-3 py-2.5 bg-slate-100 border border-dashed border-slate-300 rounded-lg flex items-center gap-2.5">
+                      <Lock className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                      <span className="flex-1 text-xs text-slate-500 font-medium">
+                        Original-offert · signerad
+                      </span>
+                      <span className="text-xs font-bold text-slate-700 tabular-nums">
+                        {fmt(original)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </aside>
         </div>
 
         {/* Close dropdown when clicking outside */}
