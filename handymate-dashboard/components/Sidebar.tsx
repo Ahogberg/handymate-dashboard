@@ -26,6 +26,7 @@ import {
   MessageSquare,
   Megaphone,
   CheckSquare,
+  Globe,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -111,6 +112,7 @@ const NAV: NavItem[] = [
 // Bottom section: Inställningar + Bjud in kollega (rendered below separator)
 const BOTTOM_NAV: NavItem[] = [
   { type: 'link', key: 'settings', label: 'Inställningar', icon: Settings, href: '/dashboard/settings', paths: ['/dashboard/settings', '/dashboard/billing', '/dashboard/automations'] },
+  { type: 'link', key: 'website_widget', label: 'AI på hemsidan', icon: Globe, href: '/dashboard/settings/website-widget' },
   { type: 'link', key: 'referral', label: 'Bjud in en vän', icon: Gift, href: '/dashboard/referral' },
 ]
 
