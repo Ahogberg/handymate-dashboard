@@ -1096,3 +1096,49 @@ Sedan: rad 356 i create-final-invoice INSERT återinför `project_id: projectId`
 **Estimat:** ~45min — SQL-migration (10min) + backfill-test mot pilot-data (10min) + route-updates i 2-3 filer (25min).
 
 **Trigger:** Andreas behöver lista alla fakturor (delfaktura + slutfaktura) för ett pilot-projekt och stöter på saknad direkt-koppling. Eller när delfakturor implementeras (på roadmap).
+
+---
+
+## TD-32 (2026-05-12) — customer_complaints-tabell saknas, filtrering utelämnas i review-request-cron
+
+**Plats:** [app/api/cron/review-requests/route.ts](handymate-dashboard/app/api/cron/review-requests/route.ts) rad ~3 i specifikationen.
+
+**Idag:** Sprint A4 cron-routen skulle enligt ursprungsspecen filtrera bort projekt där kunden har klagat senaste 30d (innan completed_at). Vi vill inte be missnöjda kunder om recension. Men `customer_complaints`-tabell finns INTE i schemat — sökte via grep, hittas bara i Lisas system-prompt som koncept. Cron-routen utelämnar därför check:en v1.
+
+**Konsekvens:** Om en kund ringer in och klagar 2 dagar innan projekt-completion → 7 dagar senare skapas en review_request-approval automatiskt. Christoffer ser approval, antingen avvisar manuellt (extra friktion) eller godkänner av misstag → kunden får SMS som ber om Google-recension efter att hen klagat. Risk för 1-stjärna.
+
+**Implementation v2 — två alternativ:**
+
+a) **Skapa customer_complaints-tabell** med fält `complaint_id`, `customer_id`, `business_id`, `project_id?`, `description`, `severity` (low/medium/high), `created_at`, `resolved_at`, `resolved_note`. Lisas Voice-flöde + manuell knapp i kund-vyn för att registrera. Cron filtrerar på `severity != low` inom 30d.
+
+b) **Använd `sms_log` + Haiku-classification** som proxy: senaste 30d inkommande SMS från kunden → klassificera tone (klagomål / fråga / OK) → om "klagomål" detected → skippa approval. Mindre exakt men ingen ny tabell behövs.
+
+**Förslag:** (a) — riktiga klagomål är värdefull data oavsett, inte bara för review-filter (Lisa kan referera tillbaka, Andreas kan se trends i dashboard, etc.).
+
+**Estimat:** ~3h schema + 1h cron-filter + 2h UI för att registrera klagomål.
+
+**Trigger:** Första pilot där en kund får review-request efter klagomål och vi förlorar förtroende. Eller proaktivt innan flera businesses onboardas till review-flödet.
+
+---
+
+## TD-33 (2026-05-12) — Review-request-SMS signering inkonsekvent ("/Företag" vs "Mvh, Företag")
+
+**Plats:** [app/api/cron/review-requests/route.ts](handymate-dashboard/app/api/cron/review-requests/route.ts) — SMS-text-byggandet.
+
+**Idag:** Cron-routen bygger SMS som slutar på `/${businessName}` (slash + namn). Andra SMS i systemet (ÄTA-send, on-my-way, etc.) använder olika signeringsformat — vissa har `/Företag`, vissa `Mvh, Företag`, vissa ingenting alls.
+
+**Konsekvens:** Inkonsekvent kund-upplevelse. "/Företag" är kortfattat (sparar tecken på 160-budget) men ser informellt ut för många hantverkare. "Mvh, Företag" är mer professionellt men äter 4 extra tecken.
+
+**Förslag:** Centralisera signerings-template i `lib/sms-templates.ts` eller business-config:
+
+```ts
+function smsSignature(businessName: string, format: 'short' | 'formal' = 'short'): string {
+  return format === 'formal' ? `Med vänlig hälsning,\n${businessName}` : `/${businessName}`
+}
+```
+
+Eventuellt utöka `business_config` med `sms_signature_format` (TEXT, default 'short') så varje business kan välja stil i Inställningar.
+
+**Estimat:** ~1h att skapa template + refactora alla SMS-byggandet på 4-5 platser.
+
+**Trigger:** När pilot-feedback indikerar att signeringen inte matchar Christoffers branding. Cosmetic, ej blocker.

@@ -184,6 +184,75 @@ async function executeApprovalPayload(
         return { action: 'create_booking', ok: res.ok }
       }
 
+      case 'review_request': {
+        // A4 — auto-recensionsbegäran efter projekt-completion.
+        // SMS direkt via 46elks (sendSmsViaElks) — inte internal fetch
+        // mot /api/sms/send (TD-lärdom: relativ URL fungerar inte server-
+        // side i Next-routes, plus rate-limit/billing/auth-check är inte
+        // relevant för system-triggade SMS).
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const supabase = (await import('@/lib/supabase')).getServerSupabase()
+
+        const phone = payload.to as string | undefined
+        const message = payload.message as string | undefined
+        const customerId = (payload.customer_id as string | undefined) || null
+        const projectId = (payload.project_id as string | undefined) || null
+
+        if (!phone || !message) {
+          return { action: 'review_request', error: 'payload saknar to eller message' }
+        }
+
+        // Hämta business_name för SMS-sender (max 11 tecken på 46elks-from).
+        // Best-effort — sendSmsViaElks default:ar till 'Handymate' om saknas.
+        const { data: bizCfg } = await supabase
+          .from('business_config')
+          .select('business_name')
+          .eq('business_id', businessId)
+          .maybeSingle()
+
+        const smsResult = await sendSmsViaElks({
+          supabase,
+          businessId,
+          businessName: bizCfg?.business_name || null,
+          to: phone,
+          message,
+          customerId,
+          relatedId: projectId,
+          messageType: 'review_request',
+        })
+
+        if (!smsResult.success) {
+          return {
+            action: 'review_request',
+            sms_sent: false,
+            error: smsResult.error || 'SMS kunde inte skickas',
+            sms_status: smsResult.status,
+          }
+        }
+
+        // Markera kunden så cron inte triggar igen inom 180d.
+        // Non-blocking om UPDATE failar — SMS är redan ute, customer.flag
+        // är spam-skydd. Logga warning men håll success-state.
+        if (customerId) {
+          const { error: updateErr } = await supabase
+            .from('customer')
+            .update({ review_request_sent_at: new Date().toISOString() })
+            .eq('customer_id', customerId)
+            .eq('business_id', businessId)
+
+          if (updateErr) {
+            console.warn('[review_request] customer.review_request_sent_at update failed (SMS already sent):', updateErr)
+          }
+        }
+
+        return {
+          action: 'review_request',
+          sms_sent: true,
+          sms_id: smsResult.smsId,
+          elks_id: smsResult.elksId,
+        }
+      }
+
       case 'autopilot_package': {
         const packageData = approval.package_data
         if (!packageData?.actions) return { action: 'autopilot_package', skipped: 'no package_data' }
