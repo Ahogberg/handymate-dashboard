@@ -237,6 +237,18 @@ export default function KnowledgeBasePage() {
         </div>
 
         <div className="space-y-6">
+          {/* Säkerhets-varning — knowledge-base lakar in i widget-prompt + AI-svar publikt */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="text-amber-600 text-xl leading-none mt-0.5">⚠️</div>
+            <div className="flex-1 text-sm text-amber-900 leading-relaxed">
+              <strong className="font-semibold">Allt du skriver här syns för besökare via AI-chatten.</strong>{' '}
+              Om du har AI-chatbot aktiverad på hemsidan får besökare svar baserat på
+              detta innehåll. Lägg <strong>INTE</strong> in leverantörspriser, marginaler,
+              anställdas privata uppgifter eller konkurrentinformation — bara info du är
+              OK med att alla på internet kan läsa.
+            </div>
+          </div>
+
           {/* Bransch */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">

@@ -596,6 +596,24 @@ export default function WebsiteWidgetPage() {
 
       {activeTab === 'install' && (
         <div className="space-y-6">
+          {/* Säkerhets-varning ovanför embed-koden — TD-34/35-mitigation */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="text-amber-600 text-xl leading-none mt-0.5">⚠️</div>
+            <div className="flex-1 text-sm text-amber-900 leading-relaxed">
+              <strong className="font-semibold">Tänk på vad du skriver i kunskapsbasen.</strong>{' '}
+              AI-chatten visar din kunskapsbas och prislista för besökare. Lägg{' '}
+              <strong>INTE</strong> in leverantörspriser, marginaler, anställdas privata
+              uppgifter eller konkurrentinformation. Skriv bara info du är OK med att
+              alla på internet ser.{' '}
+              <a
+                href="/dashboard/settings/knowledge"
+                className="underline font-medium hover:text-amber-700"
+              >
+                Granska kunskapsbasen
+              </a>
+            </div>
+          </div>
+
           {/* Embed code */}
           <div className="bg-white border border-[#E2E8F0] rounded-xl p-6">
             <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2">
