@@ -3389,6 +3389,80 @@ export default function SettingsPage() {
                   <p className="text-sm text-gray-500">Genererar din widget-nyckel...</p>
                 </div>
               )}
+
+              {/* Cross-link: AI-chatbot-alternativet (Commit B + D) */}
+              <div className="mt-6 p-5 bg-gradient-to-br from-primary-50 to-white border border-primary-200 rounded-xl">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="p-2 rounded-lg bg-primary-100 flex-shrink-0">
+                    <Bot className="w-5 h-5 text-primary-700" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base font-semibold text-gray-900 mb-1">
+                      Vill du ha AI-chatbot istället?
+                    </h3>
+                    <p className="text-sm text-gray-600 leading-relaxed">
+                      Du kan välja mellan ett enkelt kontaktformulär (ovan) eller en AI-driven chatbot som svarar på frågor om dina tjänster, ger prisuppskattningar och samlar leads — båda funkar med samma installations-snippet på din hemsida.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Jämförelse-tabell — form vs chatbot */}
+                <div className="bg-white rounded-lg border border-[#E2E8F0] overflow-hidden mb-4">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-[#E2E8F0]">
+                      <tr>
+                        <th className="text-left p-3 font-medium text-gray-700">Funktion</th>
+                        <th className="text-center p-3 font-medium text-gray-700">Kontaktformulär</th>
+                        <th className="text-center p-3 font-medium text-primary-700">AI-chatbot</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      <tr>
+                        <td className="p-3 text-gray-600">Tar emot leads</td>
+                        <td className="text-center p-3">✓</td>
+                        <td className="text-center p-3 text-primary-700">✓</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 text-gray-600">Svarar på kundfrågor automatiskt</td>
+                        <td className="text-center p-3 text-gray-300">—</td>
+                        <td className="text-center p-3 text-primary-700">✓</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 text-gray-600">Ger prisuppskattningar</td>
+                        <td className="text-center p-3 text-gray-300">—</td>
+                        <td className="text-center p-3 text-primary-700">✓</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 text-gray-600">Konversation 24/7</td>
+                        <td className="text-center p-3 text-gray-300">—</td>
+                        <td className="text-center p-3 text-primary-700">✓</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 text-gray-600">Visar din kunskapsbas publikt</td>
+                        <td className="text-center p-3 text-gray-300">—</td>
+                        <td className="text-center p-3 text-amber-600">⚠️ Ja</td>
+                      </tr>
+                      <tr>
+                        <td className="p-3 text-gray-600">Kräver setup</td>
+                        <td className="text-center p-3 text-emerald-700">Minimal</td>
+                        <td className="text-center p-3 text-gray-600">~5 min</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="text-xs text-gray-500 mb-4">
+                  <strong>Tumregel:</strong> Använd kontaktformulär om du vill ha enkel lead-fångst. Använd AI-chatbot om du vill att kunder ska kunna ställa frågor och få svar innan de bokar — fungerar bäst när du har en uppdaterad kunskapsbas + prislista.
+                </p>
+
+                <Link
+                  href="/dashboard/settings/website-widget"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-800 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <Bot className="w-4 h-4" />
+                  Konfigurera AI-chatbot
+                </Link>
+              </div>
             </div>
 
             {/* Grossist-kopplingar */}
