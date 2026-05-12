@@ -20,6 +20,7 @@ import {
   Package,
   Phone,
   ExternalLink,
+  Star,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -36,13 +37,16 @@ const AGENT_INFO: Record<string, { name: string; role: string; color: string; in
 }
 
 function getAgentFromApproval(approval: Approval): { name: string; role: string; color: string; initials: string } | null {
+  // Explicit routing via payload (cron-skapade approvals sätter detta)
+  const routedAgent = (approval.payload?.routed_agent as string) || null
+  if (routedAgent && AGENT_INFO[routedAgent]) return AGENT_INFO[routedAgent]
   const agentId = (approval.payload?.agent_id as string) || null
   if (agentId && AGENT_INFO[agentId]) return AGENT_INFO[agentId]
 
   // Infer from approval_type
   const type = approval.approval_type
   if (type.includes('invoice') || type.includes('payment') || type === 'profitability_warning') return AGENT_INFO.karin
-  if (type.includes('campaign') || type.includes('neighbour') || type.includes('reactivat')) return AGENT_INFO.hanna
+  if (type.includes('campaign') || type.includes('neighbour') || type.includes('reactivat') || type.includes('review')) return AGENT_INFO.hanna
   if (type.includes('quote') || type.includes('lead') || type.includes('pipeline')) return AGENT_INFO.daniel
   if (type.includes('booking') || type.includes('project') || type.includes('dispatch') || type.includes('job_report') || type.includes('warranty')) return AGENT_INFO.lars
   if (type.includes('call') || type.includes('sms')) return AGENT_INFO.lisa
@@ -91,6 +95,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-sky-50', textColor: 'text-sky-600' },
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
+  review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
