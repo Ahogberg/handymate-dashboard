@@ -83,8 +83,27 @@ export async function POST(request: NextRequest) {
         .in('endpoint', staleEndpoints)
     }
 
-    // Also send to Expo (mobile app) — fire and forget
-    sendExpoPushNotification(business_id, title, body || '').catch(() => {})
+    // Also send to Expo (mobile app) — fire-and-forget pga serverless-kontext.
+    // data-fält passas vidare till Expo så att mobile-app:en kan deep-linka
+    // via notification.data.url (tap → öppna rätt skärm). Tidigare ignorerades
+    // url + tag helt vid Expo-anrop = mobile-deep-links bröts trots att infra
+    // stödde dem.
+    //
+    // Felhantering loggar istället för att svälja exception:s tyst (TD-22-
+    // mönstret som vi vill bort från). Påverkar inte web-push-success-state
+    // som rapporteras till caller.
+    const expoData: Record<string, unknown> = {
+      url: url || '/dashboard',
+      tag: tag || 'handymate',
+    }
+    sendExpoPushNotification(business_id, title, body || '', expoData)
+      .catch((err: unknown) => {
+        console.error('[push/send] Expo push error:', {
+          business_id,
+          title,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
 
     return NextResponse.json({ success: true, sent })
   } catch (error: any) {
