@@ -1,11 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { checkRateLimitDb } from '@/lib/rate-limit-db'
+import { createHash } from 'crypto'
 import Anthropic from '@anthropic-ai/sdk'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+// Privacy: hash IP istället för lagra raw — samma pattern som
+// app/api/quotes/track/route.ts. Salt + 16-char slice räcker för
+// rate-limit-buckets utan att kunna reverse:a tillbaka till IP.
+function hashIp(ip: string): string {
+  return createHash('sha256').update(ip + 'hm-widget-salt').digest('hex').slice(0, 16)
+}
+
+function getClientIp(request: NextRequest): string {
+  const fwd = request.headers.get('x-forwarded-for')
+  if (fwd) return fwd.split(',')[0].trim()
+  return request.headers.get('x-real-ip') || 'unknown'
 }
 
 export async function OPTIONS() {
@@ -19,6 +34,32 @@ export async function POST(request: NextRequest) {
 
     if (!business_id || !session_id || !message) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400, headers: CORS_HEADERS })
+    }
+
+    // IP-rate-limit (anti-abuse + cost-protection) — TD-34/35-mitigation.
+    // Mäter ANROP per IP per dag, inte unika sessions. Spec sa
+    // "10 sessions per IP per dag" men anrops-baserad rate-limit täcker
+    // samma anti-spam-mål utan att kräva schema-ändring för IP↔session-
+    // mappning. 50 anrop = ~10 sessions vid normalt 3-7 msg/session.
+    const ipHash = hashIp(getClientIp(request))
+    const rateCheck = await checkRateLimitDb(`widget-chat:ip:${ipHash}`, {
+      maxRequests: 50,
+      windowMs: 24 * 60 * 60 * 1000,
+    })
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          reply: 'För många försök från din anslutning. Vänta tills imorgon eller kontakta oss direkt.',
+        },
+        {
+          status: 429,
+          headers: {
+            ...CORS_HEADERS,
+            'Retry-After': String(Math.max(1, Math.ceil((rateCheck.resetAt - Date.now()) / 1000))),
+          },
+        },
+      )
     }
 
     const supabase = getServerSupabase()
