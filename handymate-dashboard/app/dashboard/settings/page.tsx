@@ -594,6 +594,7 @@ export default function SettingsPage() {
           working_hours: workingHours,
           greeting_script: config.greeting_script,
           org_number: (config as any).org_number || null,
+          google_place_id: (config as any).google_place_id?.trim() || null,
           // Fakturainställningar
           default_payment_days: config.default_payment_days || 30,
           bankgiro: config.bankgiro || null,
@@ -1584,6 +1585,45 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-400 mt-1">Visas på offerter och fakturor</p>
               </div>
             </div>
+
+            {/* Google Place ID — för auto-recensionsbegäran (A4) */}
+            {(() => {
+              const placeId = (config as any).google_place_id || ''
+              const trimmed = placeId.trim()
+              const showWarning = trimmed.length > 0 && !trimmed.startsWith('ChIJ')
+              return (
+                <div className="mb-6">
+                  <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
+                    Google Place ID
+                    <span className="text-xs text-gray-400">(valfritt)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={placeId}
+                    onChange={(e) => setConfig({ ...config, google_place_id: e.target.value } as any)}
+                    placeholder="ChIJ..."
+                    className={`w-full px-4 py-3 bg-white border rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] ${showWarning ? 'border-amber-300' : 'border-[#E2E8F0]'}`}
+                  />
+                  {showWarning ? (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Place ID ska normalt börja med <code className="font-mono">ChIJ</code> — dubbelkolla värdet.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Behövs för automatiska recensionsbegäran via Hanna.{' '}
+                      <a
+                        href="https://developers.google.com/maps/documentation/places/web-service/place-id"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary-700 hover:text-primary-800 underline"
+                      >
+                        Hitta ditt Place ID
+                      </a>
+                    </p>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Länk till prislista */}
             <Link
