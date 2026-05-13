@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 /**
  * GET /api/ata/sign/[token] — Hämta ÄTA via publik signeringslänk (ingen auth)
@@ -127,26 +128,36 @@ export async function POST(
       // Hem-skärmens ApprovalCard renderar denna automatiskt — ingen ny
       // mobile-kod behövs. Non-blocking så decline-flödet lyckas även
       // om approval-insert failar.
+      const declinePayload = {
+        change_id: ata.change_id,
+        ata_number: ata.ata_number,
+        project_id: ata.project_id,
+        total: ata.total,
+        declined_at: declinedAt,
+        declined_reason: reason || null,
+      }
+
       try {
         await supabase.from('pending_approvals').insert({
           business_id: ata.business_id,
           approval_type: 'ata_declined_notification',
           title: `ÄTA-${ata.ata_number} avböjd`,
           description: `Kund avböjde tilläggsarbete${reason ? `: "${reason}"` : ''} (${ata.total} kr) på projekt ${ata.project_id}`,
-          payload: {
-            change_id: ata.change_id,
-            ata_number: ata.ata_number,
-            project_id: ata.project_id,
-            total: ata.total,
-            declined_at: declinedAt,
-            declined_reason: reason || null,
-          },
+          payload: declinePayload,
           status: 'pending',
           risk_level: 'low',
         })
       } catch (notifyErr) {
         console.error('[ata/sign] decline pending_approvals insert failed (non-blocking):', notifyErr)
       }
+
+      // Push-notis (fire-and-forget, helpern loggar fel internt).
+      // Mobile får tap → /projects/{project_id} via Expo data.url.
+      void sendApprovalPush({
+        business_id: ata.business_id,
+        approval_type: 'ata_declined_notification',
+        payload: declinePayload,
+      })
 
       return NextResponse.json({ success: true })
     }
@@ -179,26 +190,36 @@ export async function POST(
     // Hem-skärmens ApprovalCard renderar denna automatiskt — Christoffer
     // ser ÄTA-signeringen utan att manuellt kolla projektet. Non-blocking
     // så sign-flödet lyckas även om approval-insert failar.
+    const signedPayload = {
+      change_id: ata.change_id,
+      ata_number: ata.ata_number,
+      project_id: ata.project_id,
+      signed_by_name: name,
+      total: ata.total,
+      signed_at: signedAt,
+    }
+
     try {
       await supabase.from('pending_approvals').insert({
         business_id: ata.business_id,
         approval_type: 'ata_signed_notification',
         title: `ÄTA-${ata.ata_number} signerad`,
         description: `${name} har godkänt tilläggsarbete (${ata.total} kr) på projekt ${ata.project_id}`,
-        payload: {
-          change_id: ata.change_id,
-          ata_number: ata.ata_number,
-          project_id: ata.project_id,
-          signed_by_name: name,
-          total: ata.total,
-          signed_at: signedAt,
-        },
+        payload: signedPayload,
         status: 'pending',
         risk_level: 'low',
       })
     } catch (notifyErr) {
       console.error('[ata/sign] signed pending_approvals insert failed (non-blocking):', notifyErr)
     }
+
+    // Push-notis (fire-and-forget, helpern loggar fel internt).
+    // Mobile får tap → /projects/{project_id} via Expo data.url.
+    void sendApprovalPush({
+      business_id: ata.business_id,
+      approval_type: 'ata_signed_notification',
+      payload: signedPayload,
+    })
 
     // Fire event (non-blocking) — automation-engine reagerar inte på
     // 'ata_signed' i nuläget men eventet behålls för framtida rules.
