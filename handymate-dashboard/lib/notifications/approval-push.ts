@@ -31,6 +31,25 @@ function formatKr(value: unknown): string {
   return `${num.toLocaleString('sv-SE')} kr`
 }
 
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  matte: 'Matte',
+  karin: 'Karin',
+  daniel: 'Daniel',
+  lars: 'Lars',
+  hanna: 'Hanna',
+  lisa: 'Lisa',
+}
+
+function agentName(agentId?: unknown): string {
+  const id = typeof agentId === 'string' ? agentId.toLowerCase() : ''
+  return AGENT_DISPLAY_NAMES[id] || 'AI-teamet'
+}
+
+function truncate(text: unknown, max: number): string {
+  const s = (text || '').toString()
+  return s.length > max ? s.slice(0, max - 1).trimEnd() + '…' : s
+}
+
 /**
  * Bygg push-template per approval_type. Returnerar null om typen
  * inte ska generera push (default-case för okända typer).
@@ -86,6 +105,28 @@ function buildPushTemplate(
           : payload.quote_id
           ? `/quotes/${payload.quote_id}`
           : '/dashboard',
+      }
+    }
+
+    case 'agent_observation': {
+      // Observation med konkret suggestion → approval-rad skapad → action krävs.
+      // Mobile-tap → /approvals?filter=agent_observation för granskning.
+      const name = agentName(payload.agent_id)
+      return {
+        title: `${name} har en observation`,
+        body: `${truncate(payload.observation || payload.title, 80)} — vill du agera?`,
+        url: '/approvals?filter=agent_observation',
+      }
+    }
+
+    case 'agent_insight': {
+      // Ren info utan action — ingen approval-rad. Push triggas direkt
+      // från cron med syntetiskt approval-objekt.
+      const name = agentName(payload.agent_id)
+      return {
+        title: `${name} märkte något`,
+        body: truncate(payload.observation || payload.title, 100),
+        url: '/dashboard/insights',
       }
     }
 
