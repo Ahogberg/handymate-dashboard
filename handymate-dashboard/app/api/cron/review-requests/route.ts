@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 export const dynamic = 'force-dynamic'
 
@@ -187,6 +188,23 @@ export async function GET(request: NextRequest) {
 
       const expiresAt = new Date(now.getTime() + 14 * 86400000)
 
+      const reviewPayload = {
+        project_id: project.project_id,
+        project_name: projectName,
+        completed_at: project.completed_at,
+        customer_id: customer.customer_id,
+        customer_name: customer.name,
+        customer_phone: customer.phone_number,
+        google_place_id: placeId,
+        review_url: reviewUrl,
+        suggested_sms_text: smsText,
+        // Agent-routing för approval-UI: Hanna äger detta
+        routed_agent: 'hanna',
+        // Behövs av approve-endpoint för att skicka via sendSmsViaElks:
+        to: customer.phone_number,
+        message: smsText,
+      }
+
       const { error: insertError } = await supabase
         .from('pending_approvals')
         .insert({
@@ -194,22 +212,7 @@ export async function GET(request: NextRequest) {
           approval_type: 'review_request',
           title: `Be ${firstName || 'kunden'} om recension`,
           description: `Projektet "${projectName}" slutfördes ${new Date(project.completed_at).toLocaleDateString('sv-SE')}. Hanna har förberett ett SMS — godkänn för att skicka.`,
-          payload: {
-            project_id: project.project_id,
-            project_name: projectName,
-            completed_at: project.completed_at,
-            customer_id: customer.customer_id,
-            customer_name: customer.name,
-            customer_phone: customer.phone_number,
-            google_place_id: placeId,
-            review_url: reviewUrl,
-            suggested_sms_text: smsText,
-            // Agent-routing för approval-UI: Hanna äger detta
-            routed_agent: 'hanna',
-            // Behövs av approve-endpoint för att skicka via sendSmsViaElks:
-            to: customer.phone_number,
-            message: smsText,
-          },
+          payload: reviewPayload,
           status: 'pending',
           risk_level: 'low',
           expires_at: expiresAt.toISOString(),
@@ -224,6 +227,15 @@ export async function GET(request: NextRequest) {
       }
 
       approvalsCreated++
+
+      // Push-notis (fire-and-forget, helpern loggar fel internt).
+      // Mobile-tap → /approvals?filter=review_request enligt template
+      // i lib/notifications/approval-push.ts.
+      void sendApprovalPush({
+        business_id: biz.business_id,
+        approval_type: 'review_request',
+        payload: reviewPayload,
+      })
 
       // Logga till v3_automation_logs (best-effort, non-blocking)
       try {
