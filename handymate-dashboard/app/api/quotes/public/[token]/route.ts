@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 /**
  * GET /api/quotes/public/[token] - Hämta offert via publik signeringslänk
@@ -204,6 +205,21 @@ export async function POST(
           total: quote.total || 0,
         })
       } catch { /* non-blocking */ }
+
+      // Push-notis till Christoffer — quote_signed har INGEN pending_approval-rad
+      // (info, inte action — kunden behöver veta att offerten signerats, inte agera).
+      // Anropas med "syntetiskt" approval-objekt så helpern kan återanvända
+      // template-logiken. Fire-and-forget, helpern loggar fel internt.
+      void sendApprovalPush({
+        business_id: quote.business_id,
+        approval_type: 'quote_signed',
+        payload: {
+          customer_name: (quote.customer as any)?.name || 'Kund',
+          quote_id: quote.quote_id,
+          project_id: (quote as any).project_id || null,
+          total: quote.total || 0,
+        },
+      })
 
       try {
         const { handleProjectEvent } = await import('@/lib/project-ai-engine')
