@@ -149,7 +149,7 @@ KONTEXT OM VERKSAMHETEN:
 ${JSON.stringify(businessContext, null, 2)}`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: isJobbuddyMode ? 800 : 400,
       system: systemPrompt,
       messages: [

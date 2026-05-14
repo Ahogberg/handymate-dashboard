@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     const anthropic = getAnthropic()
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       system: `Du är en expert på hantverksarbete i Sverige. Du analyserar bilder av jobb som behöver göras och ger praktisk information.
 
