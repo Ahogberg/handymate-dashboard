@@ -1,29 +1,21 @@
 /**
- * Karins observation-pipeline — Väg 1 Commit 3.
+ * Karins observation-pipeline — Väg 1 Commit 3 (hypotes-driven revised).
  *
- * Extraherar prompt + data-aggregation + Claude-anrop från
- * /api/cron/agent-observations till denna fil. Cron-routen blir tunn
- * wrapper. Test-endpoint i commit 5 anropar runKarinObservation()
- * direkt utan att gå via cron-routen.
+ * Skiftar från generisk "tänk noga"-prompt till hypotes-driven analys
+ * baserad på kvalificerade hypoteser om svenska hantverkar-verksamheter.
+ * Karin får fyra konkreta fokus-områden att leta i:
+ *   1. Betalningsmönster per kund-typ (BRF/privat/företag)
+ *   2. Lönsamhets-trender (material-tunga vs arbetskraft-tunga projekt)
+ *   3. Pricing-möjligheter (timpris-stagnation, kund-elasticitet)
+ *   4. Cash flow-risker (specifika kunder på gränsen)
  *
- * Två förbättringar mot commit 2 inline-versionen:
+ * Tre-nivåer fallback baserat på data-mognad:
+ *   - 0-4 fakturor: skip ('insufficient_data')
+ *   - 5-9 fakturor: 'early_stage' — relation-byggande observation
+ *   - 10+ fakturor: 'full_analysis' — hypotes-driven djupanalys
  *
- * 1. Extended-thinking via raw Anthropic API (SDK 0.17.0 i repot är
- *    för gammal för thinking-parametern — använd raw fetch istället
- *    för att inte kräva SDK-uppgradering som kan bryta andra delar).
- *    Sonnet 4 (claude-sonnet-4-20250514) stödjer extended-thinking
- *    utan beta-header.
- *
- * 2. Utökad data-aggregation:
- *    - 90d invoice base (som tidigare)
- *    - Senaste-30d vs föregående-30d trend (month-over-month)
- *    - Per-customer-type-split (private/company/brf) med DSO + payment-rate
- *    - Sent-pending breakdown (totalvärde + snitt-dagar gammalt)
- *
- *    Project-profitability skippas v1 — kräver join på project +
- *    quotes + project_change + project_material + time_entry per
- *    projekt. Lägg till i v2 om Karin visar att hon kan vara
- *    värdefull på de simpler aggregaten först.
+ * Extended-thinking budget 8000 tokens via raw fetch (SDK 0.17.0 i
+ * repot är för gammal för thinking-parametern).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -44,7 +36,9 @@ export interface KarinObservation {
 
 export interface KarinRunResult {
   skipped?: string
+  reason?: string
   aggregate?: KarinAggregate
+  data_maturity?: 'early_stage' | 'full_analysis'
   observations_total?: number
   saved?: number
   approvals_created?: number
@@ -62,6 +56,32 @@ interface InvoiceRow {
   due_date: string | null
   paid_at: string | null
   status: string
+  rot_work_cost: number | null
+  rot_rut_deduction: number | null
+  rot_rut_type: string | null
+}
+
+interface ProjectRow {
+  project_id: string
+  name: string | null
+  customer_id: string | null
+  status: string
+  budget_hours: number | null
+  budget_amount: number | null
+  actual_hours: number | null
+  actual_labor_cost: number | null
+  actual_material_cost: number | null
+  profitability_status: string | null
+  completed_at: string | null
+}
+
+interface QuoteRow {
+  quote_id: string
+  status: string
+  total: number | null
+  signed_at: string | null
+  accepted_at: string | null
+  created_at: string
 }
 
 interface InvoiceStats {
@@ -74,6 +94,8 @@ interface InvoiceStats {
   sent_pending_count: number
   avg_days_to_payment: number | null
   payment_rate_percent: number
+  rot_invoiced_kr: number
+  rot_count: number
 }
 
 export interface KarinAggregate {
@@ -89,7 +111,36 @@ export interface KarinAggregate {
     total_outstanding_kr: number
     avg_days_old: number | null
     oldest_days: number | null
+    oldest_invoice_number: string | null
   }
+  projects_90d: {
+    total_count: number
+    completed_count: number
+    over_budget_count: number
+    at_risk_count: number
+    over_budget_samples: Array<{
+      project_id: string
+      name: string
+      budget_amount: number
+      actual_total_cost: number
+      pct_over: number
+    }>
+    avg_margin_pct: number | null
+  }
+  quotes_90d: {
+    total_count: number
+    sent_count: number
+    accepted_count: number
+    declined_count: number
+    acceptance_rate_pct: number
+    avg_days_to_acceptance: number | null
+    accepted_total_kr: number
+  }
+  cash_flow_3mo: Array<{
+    month: string
+    paid_kr: number
+    pending_due_kr: number
+  }>
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -115,6 +166,9 @@ function computeInvoiceStats(invoices: InvoiceRow[]): InvoiceStats {
     avgDso = Math.round(totalDays / paid.length)
   }
 
+  const rotInvoices = invoices.filter(i => (Number(i.rot_work_cost) || 0) > 0)
+  const rotTotal = rotInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
+
   return {
     count,
     total_invoiced_kr: Math.round(totalInvoiced),
@@ -125,7 +179,13 @@ function computeInvoiceStats(invoices: InvoiceRow[]): InvoiceStats {
     sent_pending_count: sent.length,
     avg_days_to_payment: avgDso,
     payment_rate_percent: count > 0 ? Math.round((paid.length / count) * 100) : 0,
+    rot_invoiced_kr: Math.round(rotTotal),
+    rot_count: rotInvoices.length,
   }
+}
+
+function ymKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 async function buildAggregate(
@@ -137,27 +197,28 @@ async function buildAggregate(
   const sixtyDaysAgo = new Date(now - 60 * 86400000)
   const thirtyDaysAgo = new Date(now - 30 * 86400000)
 
-  const { data: invoices, error } = await supabase
+  // ── Invoices (90d) ─────────────────────────────────────────
+  const { data: invoicesData, error: invoicesError } = await supabase
     .from('invoice')
-    .select('invoice_id, invoice_number, customer_id, total, invoice_date, due_date, paid_at, status')
+    .select('invoice_id, invoice_number, customer_id, total, invoice_date, due_date, paid_at, status, rot_work_cost, rot_rut_deduction, rot_rut_type')
     .eq('business_id', businessId)
     .gte('invoice_date', ninetyDaysAgo.toISOString())
 
-  if (error) {
-    console.error('[karin/aggregate] invoice query error:', error)
+  if (invoicesError) {
+    console.error('[karin/aggregate] invoice query error:', invoicesError)
     return null
   }
 
-  if (!invoices || invoices.length === 0) {
+  if (!invoicesData || invoicesData.length === 0) {
     return null
   }
 
-  const rows = invoices as InvoiceRow[]
-  const last90d = computeInvoiceStats(rows)
+  const invoices = invoicesData as InvoiceRow[]
+  const last90d = computeInvoiceStats(invoices)
 
-  // Trend: senaste 30d vs föregående 30d (dvs 30-60d back)
-  const last30d = rows.filter(i => new Date(i.invoice_date) >= thirtyDaysAgo)
-  const prev30d = rows.filter(i => {
+  // Trend 30d vs prev 30d
+  const last30d = invoices.filter(i => new Date(i.invoice_date) >= thirtyDaysAgo)
+  const prev30d = invoices.filter(i => {
     const d = new Date(i.invoice_date)
     return d >= sixtyDaysAgo && d < thirtyDaysAgo
   })
@@ -166,25 +227,31 @@ async function buildAggregate(
   const pctChange =
     prev30Total > 0 ? Math.round(((last30Total - prev30Total) / prev30Total) * 100) : null
 
-  // Per-customer-type split — hämta customer_type för alla unika customer_ids
+  // ── Customer types ─────────────────────────────────────────
   const customerIds = Array.from(
-    new Set(rows.map(r => r.customer_id).filter((id): id is string => !!id)),
+    new Set(invoices.map(r => r.customer_id).filter((id): id is string => !!id)),
   )
 
   const customerTypeMap: Record<string, string> = {}
+  const customerNameMap: Record<string, string> = {}
   if (customerIds.length > 0) {
     const { data: customers } = await supabase
       .from('customer')
-      .select('customer_id, customer_type')
+      .select('customer_id, customer_type, name')
       .in('customer_id', customerIds)
       .eq('business_id', businessId)
     for (const c of customers || []) {
-      customerTypeMap[c.customer_id] = c.customer_type || 'private'
+      // Härled BRF från namn-mönster om customer_type saknas
+      const declaredType = c.customer_type
+      const name = (c.name || '').toLowerCase()
+      const likelyBrf = !declaredType && (name.includes('brf') || name.includes('bostadsrätts'))
+      customerTypeMap[c.customer_id] = declaredType || (likelyBrf ? 'brf' : 'private')
+      customerNameMap[c.customer_id] = c.name || ''
     }
   }
 
   const byType: Record<string, InvoiceRow[]> = {}
-  for (const r of rows) {
+  for (const r of invoices) {
     const type = r.customer_id ? customerTypeMap[r.customer_id] || 'unknown' : 'no_customer'
     if (!byType[type]) byType[type] = []
     byType[type].push(r)
@@ -194,16 +261,115 @@ async function buildAggregate(
     byCustomerType[type] = computeInvoiceStats(rs)
   }
 
-  // Sent-pending breakdown — hur gammal är den utestående portföljen?
-  const sentPending = rows.filter(i => i.status === 'sent')
+  // ── Sent-pending breakdown ─────────────────────────────────
+  const sentPending = invoices.filter(i => i.status === 'sent')
   const totalOutstanding = sentPending.reduce((s, i) => s + Number(i.total || 0), 0)
   let avgAgeDays: number | null = null
   let oldestDays: number | null = null
+  let oldestInvoiceNumber: string | null = null
   if (sentPending.length > 0) {
-    const ages = sentPending.map(i => (now - new Date(i.invoice_date).getTime()) / 86400000)
-    avgAgeDays = Math.round(ages.reduce((s, a) => s + a, 0) / ages.length)
-    oldestDays = Math.round(Math.max(...ages))
+    const withAges = sentPending.map(i => ({
+      i,
+      age: (now - new Date(i.invoice_date).getTime()) / 86400000,
+    }))
+    avgAgeDays = Math.round(withAges.reduce((s, x) => s + x.age, 0) / withAges.length)
+    const oldest = withAges.reduce((m, x) => (x.age > m.age ? x : m), withAges[0])
+    oldestDays = Math.round(oldest.age)
+    oldestInvoiceNumber = oldest.i.invoice_number
   }
+
+  // ── Projects (90d) ─────────────────────────────────────────
+  const { data: projectsData } = await supabase
+    .from('project')
+    .select('project_id, name, customer_id, status, budget_hours, budget_amount, actual_hours, actual_labor_cost, actual_material_cost, profitability_status, completed_at, created_at')
+    .eq('business_id', businessId)
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .limit(200)
+
+  const projects = (projectsData || []) as Array<ProjectRow & { created_at: string }>
+  const completedProjects = projects.filter(p => p.status === 'completed')
+  const overBudget = projects.filter(p => p.profitability_status === 'over_budget')
+  const atRisk = projects.filter(p => p.profitability_status === 'at_risk')
+
+  const overBudgetSamples = overBudget
+    .map(p => {
+      const totalCost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
+      const budget = Number(p.budget_amount || 0)
+      const pctOver = budget > 0 ? Math.round(((totalCost - budget) / budget) * 100) : 0
+      return {
+        project_id: p.project_id,
+        name: p.name || '(namnlöst)',
+        budget_amount: Math.round(budget),
+        actual_total_cost: Math.round(totalCost),
+        pct_over: pctOver,
+      }
+    })
+    .sort((a, b) => b.pct_over - a.pct_over)
+    .slice(0, 5)
+
+  let avgMarginPct: number | null = null
+  const completedWithBudget = completedProjects.filter(p => Number(p.budget_amount || 0) > 0)
+  if (completedWithBudget.length > 0) {
+    const margins = completedWithBudget.map(p => {
+      const cost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
+      const budget = Number(p.budget_amount || 0)
+      return budget > 0 ? ((budget - cost) / budget) * 100 : 0
+    })
+    avgMarginPct = Math.round(margins.reduce((s, m) => s + m, 0) / margins.length)
+  }
+
+  // ── Quotes (90d) ───────────────────────────────────────────
+  const { data: quotesData } = await supabase
+    .from('quotes')
+    .select('quote_id, status, total, signed_at, accepted_at, created_at')
+    .eq('business_id', businessId)
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .limit(200)
+
+  const quotes = (quotesData || []) as QuoteRow[]
+  const acceptedQuotes = quotes.filter(q => q.status === 'accepted' || q.status === 'signed')
+  const declinedQuotes = quotes.filter(q => q.status === 'declined')
+  const sentQuotes = quotes.filter(q => q.status === 'sent')
+  const acceptedTotal = acceptedQuotes.reduce((s, q) => s + Number(q.total || 0), 0)
+  const evaluatedQuotes = acceptedQuotes.length + declinedQuotes.length
+  const acceptanceRate = evaluatedQuotes > 0
+    ? Math.round((acceptedQuotes.length / evaluatedQuotes) * 100)
+    : 0
+
+  let avgDaysToAcceptance: number | null = null
+  const acceptedWithDates = acceptedQuotes.filter(q => q.accepted_at && q.created_at)
+  if (acceptedWithDates.length > 0) {
+    const days = acceptedWithDates.map(q =>
+      (new Date(q.accepted_at as string).getTime() - new Date(q.created_at).getTime()) / 86400000,
+    )
+    avgDaysToAcceptance = Math.round(days.reduce((s, d) => s + d, 0) / days.length)
+  }
+
+  // ── Cash flow per månad (senaste 3) ────────────────────────
+  const monthBuckets: Record<string, { paid: number; pendingDue: number }> = {}
+  for (let i = 0; i < 3; i++) {
+    const d = new Date(now)
+    d.setMonth(d.getMonth() - i)
+    monthBuckets[ymKey(d)] = { paid: 0, pendingDue: 0 }
+  }
+
+  for (const inv of invoices) {
+    if (inv.status === 'paid' && inv.paid_at) {
+      const key = ymKey(new Date(inv.paid_at))
+      if (monthBuckets[key]) monthBuckets[key].paid += Number(inv.total || 0)
+    }
+    if (inv.status === 'sent' && inv.due_date) {
+      const key = ymKey(new Date(inv.due_date))
+      if (monthBuckets[key]) monthBuckets[key].pendingDue += Number(inv.total || 0)
+    }
+  }
+  const cashFlow3Mo = Object.entries(monthBuckets)
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([month, v]) => ({
+      month,
+      paid_kr: Math.round(v.paid),
+      pending_due_kr: Math.round(v.pendingDue),
+    }))
 
   return {
     period_days: 90,
@@ -218,64 +384,118 @@ async function buildAggregate(
       total_outstanding_kr: Math.round(totalOutstanding),
       avg_days_old: avgAgeDays,
       oldest_days: oldestDays,
+      oldest_invoice_number: oldestInvoiceNumber,
     },
+    projects_90d: {
+      total_count: projects.length,
+      completed_count: completedProjects.length,
+      over_budget_count: overBudget.length,
+      at_risk_count: atRisk.length,
+      over_budget_samples: overBudgetSamples,
+      avg_margin_pct: avgMarginPct,
+    },
+    quotes_90d: {
+      total_count: quotes.length,
+      sent_count: sentQuotes.length,
+      accepted_count: acceptedQuotes.length,
+      declined_count: declinedQuotes.length,
+      acceptance_rate_pct: acceptanceRate,
+      avg_days_to_acceptance: avgDaysToAcceptance,
+      accepted_total_kr: Math.round(acceptedTotal),
+    },
+    cash_flow_3mo: cashFlow3Mo,
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Hypotes-driven prompt
+// ─────────────────────────────────────────────────────────────────
+
+function buildSystemPrompt(businessName: string, maturity: 'early_stage' | 'full_analysis'): string {
+  if (maturity === 'early_stage') {
+    return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Du är ny på företaget och har precis fått tillgång till siffrorna.
+
+Du ser att det finns lite data — färre än 10 fakturor. Det räcker inte för djupanalys, men det är dags att presentera sig och bygga relation.
+
+Generera EXAKT 1 observation av typen "early-stage relation-byggande". Säg ungefär:
+- "Jag börjar förstå din verksamhet — hittills har jag sett X fakturor till Y kunder. Säg till om något specifikt jag bör hålla extra koll på."
+
+Anpassa siffror till verkliga aggregatet du får. Var vänlig, professionell, kort.
+
+REGLER:
+- 1 observation, inte fler.
+- knowledge_type: 'insight'
+- suggestion: null (ren introduktion, ingen action)
+- confidence: 0.9 (du är säker på att du är ny)
+- data_basis: { period_days, invoice_count, customer_count, note: 'early_stage_introduction' }
+
+Returnera EXAKT JSON-array, ingen prolog eller efterord.`
+  }
+
+  return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Analysera datan med dessa konkreta hypoteser om svenska hantverkar-verksamheter:
+
+1. **Betalningsmönster per kund-typ:**
+   - Betalar BRF-kunder senare än privatkunder? Hur många dagar i snitt?
+   - Är det en specifik kund som drar upp BRF-snittet?
+   - Behöver förfallodatum justeras per kund-typ?
+
+2. **Lönsamhets-trender:**
+   - Är material-tunga projekt mindre lönsamma än arbetskraft-tunga?
+   - Vilka projekt har gått 20%+ över estimat (ÄTA-kandidater)?
+   - Finns kund-typer med systematiskt lägre marginal?
+
+3. **Pricing-möjligheter:**
+   - När justerades timpris senast? (Indirekt: har avg pris/h ökat eller stått stilla?)
+   - Har material-kostnader ökat utan motsvarande prisjustering?
+   - Finns återkommande kunder som kan tåla 5-7% prisjustering?
+
+4. **Cash flow-risker:**
+   - Vilken månad har störst cash flow-dipp på grund av sena betalningar?
+   - Finns specifika kunder som alltid ligger på gränsen?
+
+Generera 1-3 KORTA observationer (max 2 meningar var) med konkret suggestion när det är vettigt.
+
+Var inte trivial. "Du har X förfallna fakturor" = data, inte observation.
+"BRF Lindgården betalar 12d senare än snittet — vill du justera deras förfallodatum till 45 dagar?" = observation.
+
+REGLER FÖR OUTPUT:
+- 1-3 observationer max. Färre är bättre om du inte ser något viktigt.
+- Returnera EXAKT JSON-array, ingen prolog eller efterord.
+- "title" max 80 tecken, konkret.
+- "observation" max 2 meningar, första-person, vänlig ton.
+- "suggestion" konkret action max 1 mening ELLER null om bara info.
+- "confidence" 0-1, var ärlig. Under 0.5 om du gissar.
+- "data_basis" objekt med period_days + metric-namn + relevanta tal/IDs som ligger till grund.
+- "knowledge_type" en av: insight, pattern, anomaly, recommendation.
+
+Om allt ser bra ut — säg det med 1 positiv observation. Återhåll dig från att hitta på problem.`
 }
 
 // ─────────────────────────────────────────────────────────────────
 // Claude-anrop med extended-thinking
 // ─────────────────────────────────────────────────────────────────
 
-const KARIN_SYSTEM_PROMPT = `Du är Karin, ekonom hos hantverkarens företag. Du har studerat företagets siffror senaste 90 dagarna och har 1-3 observationer att dela.
-
-Du är inte en data-rapport. Du är en riktig anställd som lägger märke till saker och föreslår åtgärder.
-
-Skriv som du pratar:
-- "Jag märker att..."
-- "Jag tror vi borde..."
-- "Det här ser inte rätt ut..."
-- "Det är värt att kolla..."
-
-Inte: "Analys visar att..." eller bullet-listor eller stela företags-fraser.
-
-Tänk noga innan du svarar:
-- Vad är det verkligt INTRESSANTA i datan? Inte vad som är obvious.
-- Skiljer sig olika kundtyper? Hur?
-- Är det någon trend som accelererar i fel riktning?
-- Finns sent-pending-fakturor som börjar bli oroväckande gamla?
-- Om allt ser bra ut — säg det. Återhåll dig från att hitta på problem.
-
-REGLER FÖR OUTPUT:
-- 1-3 observationer max. Färre är bättre om du inte ser något viktigt.
-- Returnera EXAKT JSON-array, ingen prolog eller efterord.
-- "title" max 80 tecken, korta och tydliga.
-- "observation" 2-4 meningar, första-person, vänlig professionell ton.
-- "suggestion" konkret action max 1 mening ELLER null om bara info.
-- "confidence" 0-1, var ärlig. Under 0.5 om du gissar baserat på lite data.
-- "data_basis" objekt med period_days + metric-namn + relevanta tal.
-- "knowledge_type" en av: insight, pattern, anomaly, recommendation.
-
-Skillnad observation vs suggestion:
-- Observation: "Jag märker att kassaflödet ökade 18% senaste 30 dagarna" → suggestion: null (ren info)
-- Observation: "Tre BRF-fakturor är över 60 dagar gamla" → suggestion: "Skicka manuell påminnelse till BRF Solgården" (konkret action)`
-
 async function callKarinWithThinking(
   businessName: string,
   aggregate: KarinAggregate,
+  maturity: 'early_stage' | 'full_analysis',
 ): Promise<{ observations: KarinObservation[]; thinkingPreview: string }> {
   if (!process.env.ANTHROPIC_API_KEY) {
     console.warn('[karin/call] ANTHROPIC_API_KEY not set')
     return { observations: [], thinkingPreview: '' }
   }
 
+  const systemPrompt = buildSystemPrompt(businessName, maturity)
   const userMessage = `Här är ${businessName}s siffror senaste 90 dagarna:
 
 ${JSON.stringify(aggregate, null, 2)}
 
-Tänk igenom det och returnera JSON-array med 1-3 observationer.`
+Tänk igenom det och returnera JSON-array.`
 
   // Raw fetch — SDK 0.17.0 är för gammal för thinking-parametern.
   // Sonnet 4 stödjer extended-thinking utan beta-header.
+  // Budget 8000 av total max 12000 = generöst tankearbete för
+  // hypotes-driven analys.
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -285,9 +505,9 @@ Tänk igenom det och returnera JSON-array med 1-3 observationer.`
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
-      thinking: { type: 'enabled', budget_tokens: 2000 },
-      system: KARIN_SYSTEM_PROMPT,
+      max_tokens: 12000,
+      thinking: { type: 'enabled', budget_tokens: 8000 },
+      system: systemPrompt,
       messages: [{ role: 'user', content: userMessage }],
     }),
   })
@@ -308,7 +528,7 @@ Tänk igenom det och returnera JSON-array med 1-3 observationer.`
   const thinkingBlock = blocks.find(b => b.type === 'thinking')
   const textBlock = blocks.find(b => b.type === 'text')
 
-  const thinkingPreview = thinkingBlock?.thinking?.slice(0, 200) || ''
+  const thinkingPreview = thinkingBlock?.thinking?.slice(0, 300) || ''
   const text = textBlock?.text || '[]'
 
   const match = text.match(/\[[\s\S]*\]/)
@@ -330,7 +550,7 @@ Tänk igenom det och returnera JSON-array med 1-3 observationer.`
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Save + push (samma logik som inline-versionen i commit 2)
+// Save + push
 // ─────────────────────────────────────────────────────────────────
 
 async function saveAndPush(
@@ -439,15 +659,39 @@ export async function runKarinObservation(
     return { skipped: 'no_invoices_last_90d' }
   }
 
-  const { observations, thinkingPreview } = await callKarinWithThinking(businessName, aggregate)
+  // 3-nivåer fallback baserat på data-mognad
+  const invoiceCount = aggregate.last_90d.count
+  if (invoiceCount < 5) {
+    return {
+      skipped: 'insufficient_data',
+      reason: 'fewer_than_5_invoices',
+      aggregate,
+    }
+  }
+
+  const maturity: 'early_stage' | 'full_analysis' =
+    invoiceCount < 10 ? 'early_stage' : 'full_analysis'
+
+  const { observations, thinkingPreview } = await callKarinWithThinking(
+    businessName,
+    aggregate,
+    maturity,
+  )
+
   if (observations.length === 0) {
-    return { skipped: 'no_observations_returned', aggregate, thinking_preview: thinkingPreview }
+    return {
+      skipped: 'no_observations_returned',
+      aggregate,
+      data_maturity: maturity,
+      thinking_preview: thinkingPreview,
+    }
   }
 
   const counts = await saveAndPush(supabase, businessId, observations)
 
   return {
     aggregate,
+    data_maturity: maturity,
     observations_total: observations.length,
     thinking_preview: thinkingPreview,
     ...counts,

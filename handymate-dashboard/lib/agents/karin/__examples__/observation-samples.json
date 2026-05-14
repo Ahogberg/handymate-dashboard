@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "purpose": "Förväntad output-kvalitet från Karin vid rik dataset. Används som referens för prompt-tuning och som test-fixture för UI-rendering innan vi har riktig pilot-data.",
+    "generated": "2026-05-14",
+    "model": "claude-sonnet-4-20250514 + extended-thinking (budget 8000)",
+    "data_basis": "simulerat 90d-aggregate för fiktivt hantverkarföretag 'Bromma Bygg AB'"
+  },
+
+  "scenario_a_full_analysis": {
+    "description": "Business med 45 fakturor, blandad kund-portfölj, en BRF som sticker ut, ett över-budget-projekt",
+    "expected_observations": [
+      {
+        "knowledge_type": "pattern",
+        "title": "BRF-kunder betalar 11d senare än privatkunder",
+        "observation": "Jag märker att BRF-kunderna betalar i snitt 38 dagar, medan privatkunder ligger på 27 dagar. BRF Lindgården är värst — de drar upp snittet med över två veckor.",
+        "suggestion": "Sätt 45 dagars förfallodatum för BRF-kunder framöver så vi slipper kassaflödes-överraskningar.",
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "avg_days_to_payment_by_customer_type",
+          "brf_avg_dso": 38,
+          "private_avg_dso": 27,
+          "brf_invoice_count": 8,
+          "outlier_customer": "BRF Lindgården"
+        }
+      },
+      {
+        "knowledge_type": "anomaly",
+        "title": "Solna-badrum 23% över budget",
+        "observation": "Badrum Solna ligger 23% över budget enligt tidrapporterna — vi har redan jobbat 87 timmar mot budget 70. Vanligt mönster vid kakel-tunga projekt.",
+        "suggestion": "Skicka ÄTA-utkast till kund nu innan tidplanen sprider sig ytterligare.",
+        "confidence": 0.92,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "project_actual_vs_budget",
+          "project_id": "proj_xxxxxxxx",
+          "budget_amount": 70000,
+          "actual_total_cost": 86100,
+          "pct_over": 23,
+          "profitability_status": "over_budget"
+        }
+      },
+      {
+        "knowledge_type": "insight",
+        "title": "Cash flow ökade 18% senaste månaden",
+        "observation": "Det här ser bra ut — vi fakturerade 312 000 kr senaste 30 dagarna, upp från 264 000 kr månaden innan. Två nya projekt drog upp volymen.",
+        "suggestion": null,
+        "confidence": 0.95,
+        "data_basis": {
+          "period_days": 60,
+          "metric": "trend_30d_vs_prev_30d",
+          "last_30d_invoiced_kr": 312000,
+          "prev_30d_invoiced_kr": 264000,
+          "pct_change": 18
+        }
+      }
+    ]
+  },
+
+  "scenario_b_pricing_recommendation": {
+    "description": "Business med stabil omsättning men oförändrat timpris på 12+ månader (härleds via avg pris/h-jämförelse mellan tidiga och sena projekt)",
+    "expected_observations": [
+      {
+        "knowledge_type": "recommendation",
+        "title": "Du har inte höjt timpriset på över ett år",
+        "observation": "Snittet på arbetskraft-faktureringen ligger fortfarande på 720 kr/h, samma som för 90 dagar sedan. Material-kostnader har däremot ökat — marginalen krymper.",
+        "suggestion": "Höj timpriset med 5-7% för nya offerter, gärna med start nästa månad.",
+        "confidence": 0.7,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "avg_hourly_rate_trend",
+          "current_avg_hourly_rate": 720,
+          "ninety_days_ago_avg_hourly_rate": 720,
+          "note": "indirekt observation från fakturerad arbetstid"
+        }
+      }
+    ]
+  },
+
+  "scenario_c_all_good": {
+    "description": "Business med stark dataset där Karin inte hittar något oroväckande — ska säga det istället för att hitta på problem",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Allt rullar på fint",
+        "observation": "Jag har gått igenom siffrorna och allt ser stabilt ut — 92% payment-rate, DSO på 24 dagar, inga projekt över budget. Du kan luta dig tillbaka denna vecka.",
+        "suggestion": null,
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "overall_health_check",
+          "payment_rate_percent": 92,
+          "avg_dso": 24,
+          "over_budget_count": 0
+        }
+      }
+    ]
+  },
+
+  "scenario_d_early_stage": {
+    "description": "Business med 7 fakturor totalt — för tunn data för djupanalys, men inte tom. Karin presenterar sig istället.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Jag börjar förstå din verksamhet",
+        "observation": "Hittills har jag sett 7 fakturor till 4 kunder under de senaste 90 dagarna — det räcker för att börja känna mönstret. Säg till om något specifikt du vill att jag håller extra koll på.",
+        "suggestion": null,
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 90,
+          "invoice_count": 7,
+          "customer_count": 4,
+          "note": "early_stage_introduction"
+        }
+      }
+    ]
+  },
+
+  "scenario_e_insufficient_data": {
+    "description": "Business med < 5 fakturor. Karin skippar helt och returnerar tom array med reason.",
+    "expected_result": {
+      "skipped": "insufficient_data",
+      "reason": "fewer_than_5_invoices",
+      "observations": []
+    }
+  }
+}
