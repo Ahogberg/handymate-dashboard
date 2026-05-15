@@ -126,13 +126,18 @@ export async function GET(request: NextRequest) {
     )
   }
 
+  const debugMode = url.searchParams.get('debug') === 'true'
+
   try {
-    const result = await runKarinObservation(supabase, businessId, businessName)
+    const result = await runKarinObservation(supabase, businessId, businessName, {
+      includeDebug: debugMode,
+    })
     return NextResponse.json({
       ok: true,
       business_id: businessId,
       business_name: businessName,
       agent_id: agentId,
+      debug_mode: debugMode,
       result,
     })
   } catch (err: any) {

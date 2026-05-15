@@ -45,6 +45,29 @@ export interface KarinRunResult {
   insights_pushed?: number
   thinking_preview?: string
   error?: string
+  debug?: KarinDebugInfo
+}
+
+export interface KarinDebugInfo {
+  prompt_maturity: 'early_stage' | 'full_analysis'
+  system_prompt_length: number
+  user_message_length: number
+  api_status: number
+  api_status_text?: string
+  api_error_body?: string
+  stop_reason?: string
+  content_block_count: number
+  content_block_types: string[]
+  thinking_full?: string
+  raw_text?: string
+  raw_text_length: number
+  regex_match_found: boolean
+  matched_substring?: string
+  parse_error?: string
+  parsed_count: number
+  validation_dropped: number
+  validation_drop_reasons?: string[]
+  parsed_observations?: KarinObservation[]
 }
 
 interface InvoiceRow {
@@ -479,12 +502,11 @@ async function callKarinWithThinking(
   businessName: string,
   aggregate: KarinAggregate,
   maturity: 'early_stage' | 'full_analysis',
-): Promise<{ observations: KarinObservation[]; thinkingPreview: string }> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[karin/call] ANTHROPIC_API_KEY not set')
-    return { observations: [], thinkingPreview: '' }
-  }
-
+): Promise<{
+  observations: KarinObservation[]
+  thinkingPreview: string
+  debug: KarinDebugInfo
+}> {
   const systemPrompt = buildSystemPrompt(businessName, maturity)
   const userMessage = `Här är ${businessName}s siffror senaste 90 dagarna:
 
@@ -492,8 +514,27 @@ ${JSON.stringify(aggregate, null, 2)}
 
 Tänk igenom det och returnera JSON-array.`
 
+  const debug: KarinDebugInfo = {
+    prompt_maturity: maturity,
+    system_prompt_length: systemPrompt.length,
+    user_message_length: userMessage.length,
+    api_status: 0,
+    content_block_count: 0,
+    content_block_types: [],
+    raw_text_length: 0,
+    regex_match_found: false,
+    parsed_count: 0,
+    validation_dropped: 0,
+  }
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    console.warn('[karin/call] ANTHROPIC_API_KEY not set')
+    debug.api_error_body = 'ANTHROPIC_API_KEY not configured'
+    return { observations: [], thinkingPreview: '', debug }
+  }
+
   // Raw fetch — SDK 0.17.0 är för gammal för thinking-parametern.
-  // Sonnet 4 stödjer extended-thinking utan beta-header.
+  // Sonnet 4.6 stödjer extended-thinking utan beta-header.
   // Budget 8000 av total max 12000 = generöst tankearbete för
   // hypotes-driven analys.
   const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -512,40 +553,99 @@ Tänk igenom det och returnera JSON-array.`
     }),
   })
 
+  debug.api_status = response.status
+  debug.api_status_text = response.statusText
+
   if (!response.ok) {
     const errText = await response.text().catch(() => '')
     console.error('[karin/call] Anthropic API error:', {
       status: response.status,
       body: errText.slice(0, 500),
     })
-    return { observations: [], thinkingPreview: `error: ${response.status}` }
+    debug.api_error_body = errText.slice(0, 1000)
+    return { observations: [], thinkingPreview: `error: ${response.status}`, debug }
   }
 
   const data: any = await response.json()
   const blocks: Array<{ type: string; text?: string; thinking?: string }> =
     data.content || []
 
+  debug.stop_reason = data.stop_reason
+  debug.content_block_count = blocks.length
+  debug.content_block_types = blocks.map(b => b.type)
+
   const thinkingBlock = blocks.find(b => b.type === 'thinking')
   const textBlock = blocks.find(b => b.type === 'text')
 
-  const thinkingPreview = thinkingBlock?.thinking?.slice(0, 300) || ''
-  const text = textBlock?.text || '[]'
+  const thinkingFull = thinkingBlock?.thinking || ''
+  const thinkingPreview = thinkingFull.slice(0, 300)
+  debug.thinking_full = thinkingFull
+
+  // VIKTIGT: använd undefined-check istället för `|| '[]'`-fallback.
+  // Den gamla fallbacken maskerade att text-blocket saknades helt —
+  // '[]'-string passerar regex-match och JSON.parse, vilket gav tom
+  // array istället för tydligt fel. Vi vill veta om Claude faktiskt
+  // skickade text eller bara thinking.
+  const text = textBlock?.text
+  debug.raw_text = text
+  debug.raw_text_length = text?.length || 0
+
+  // ALWAYS-on diagnostic-logg så Vercel ser hela bilden vid varje run
+  console.log('[karin/call] response shape:', {
+    stop_reason: data.stop_reason,
+    block_count: blocks.length,
+    block_types: blocks.map(b => b.type),
+    thinking_length: thinkingFull.length,
+    text_present: !!text,
+    text_length: text?.length || 0,
+    text_preview: text?.slice(0, 200),
+  })
+
+  if (!text) {
+    console.error('[karin/call] no text block in response — model returned only thinking?')
+    return { observations: [], thinkingPreview, debug }
+  }
 
   const match = text.match(/\[[\s\S]*\]/)
   if (!match) {
-    console.error('[karin/call] no JSON array in response:', text.slice(0, 200))
-    return { observations: [], thinkingPreview }
+    console.error('[karin/call] no JSON array in response text:', text.slice(0, 300))
+    return { observations: [], thinkingPreview, debug }
   }
+
+  debug.regex_match_found = true
+  debug.matched_substring = match[0].slice(0, 1000)
 
   try {
     const parsed = JSON.parse(match[0]) as KarinObservation[]
-    const valid = parsed.filter(o =>
-      o.knowledge_type && o.title && o.observation && typeof o.confidence === 'number',
-    )
-    return { observations: valid, thinkingPreview }
+    debug.parsed_count = Array.isArray(parsed) ? parsed.length : 0
+    debug.parsed_observations = parsed
+
+    const dropReasons: string[] = []
+    const valid = parsed.filter(o => {
+      const missing: string[] = []
+      if (!o.knowledge_type) missing.push('knowledge_type')
+      if (!o.title) missing.push('title')
+      if (!o.observation) missing.push('observation')
+      if (typeof o.confidence !== 'number') missing.push('confidence(non-number)')
+      if (missing.length > 0) {
+        dropReasons.push(`obs[${dropReasons.length}]: missing ${missing.join(',')}`)
+        return false
+      }
+      return true
+    })
+    debug.validation_dropped = parsed.length - valid.length
+    debug.validation_drop_reasons = dropReasons
+
+    if (valid.length === 0 && parsed.length > 0) {
+      console.warn('[karin/call] parsed observations but all dropped at validation:', dropReasons)
+    }
+
+    return { observations: valid, thinkingPreview, debug }
   } catch (parseErr) {
-    console.error('[karin/call] JSON parse failed:', parseErr, text.slice(0, 200))
-    return { observations: [], thinkingPreview }
+    const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr)
+    console.error('[karin/call] JSON parse failed:', errMsg, match[0].slice(0, 300))
+    debug.parse_error = errMsg
+    return { observations: [], thinkingPreview, debug }
   }
 }
 
@@ -653,6 +753,7 @@ export async function runKarinObservation(
   supabase: SupabaseClient,
   businessId: string,
   businessName: string,
+  options: { includeDebug?: boolean } = {},
 ): Promise<KarinRunResult> {
   const aggregate = await buildAggregate(supabase, businessId)
   if (!aggregate) {
@@ -672,7 +773,7 @@ export async function runKarinObservation(
   const maturity: 'early_stage' | 'full_analysis' =
     invoiceCount < 10 ? 'early_stage' : 'full_analysis'
 
-  const { observations, thinkingPreview } = await callKarinWithThinking(
+  const { observations, thinkingPreview, debug } = await callKarinWithThinking(
     businessName,
     aggregate,
     maturity,
@@ -684,6 +785,7 @@ export async function runKarinObservation(
       aggregate,
       data_maturity: maturity,
       thinking_preview: thinkingPreview,
+      ...(options.includeDebug ? { debug } : {}),
     }
   }
 
@@ -695,5 +797,6 @@ export async function runKarinObservation(
     observations_total: observations.length,
     thinking_preview: thinkingPreview,
     ...counts,
+    ...(options.includeDebug ? { debug } : {}),
   }
 }
