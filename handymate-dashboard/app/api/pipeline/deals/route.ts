@@ -100,6 +100,19 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      // Hämta customer_type för alla berörda kunder så Flödet-vyn kan
+      // filtrera projekt på kundtyp (private/company/brf).
+      const customerTypeById: Record<string, string | null> = {}
+      if (customerIds.size > 0) {
+        const { data: customerTypes } = await supabase
+          .from('customer')
+          .select('customer_id, customer_type')
+          .in('customer_id', Array.from(customerIds))
+        for (const c of customerTypes || []) {
+          customerTypeById[c.customer_id] = (c.customer_type as string) || null
+        }
+      }
+
       // Hämta senaste AI-aktivitet per projekt från v3_automation_logs.
       // Prioriterar context.project_id (korrekt en-till-en mapping). Faller
       // tillbaka till context.customer_id för äldre loggar som saknar
@@ -175,6 +188,7 @@ export async function GET(request: NextRequest) {
           current_workflow_stage_id: p.current_workflow_stage_id || null,
           workflow_stage_entered_at: p.workflow_stage_entered_at || null,
           current_stage: p.current_workflow_stage_id ? stageMeta[p.current_workflow_stage_id] || null : null,
+          customer_type: cid ? customerTypeById[cid] || null : null,
           latest_automation: latest || null,
         }
       }
@@ -218,15 +232,17 @@ export async function GET(request: NextRequest) {
           currentStage = stage || null
         }
 
-        // Hämta kundnamn för UI
+        // Hämta kundnamn + kundtyp för UI/filter
         let customerName: string | null = null
+        let customerType: string | null = null
         if (p.customer_id) {
           const { data: c } = await supabase
             .from('customer')
-            .select('name')
+            .select('name, customer_type')
             .eq('customer_id', p.customer_id)
             .maybeSingle()
           customerName = c?.name || null
+          customerType = (c?.customer_type as string) || null
         }
 
         return {
@@ -235,6 +251,7 @@ export async function GET(request: NextRequest) {
           status: p.status,
           customer_id: p.customer_id,
           customer_name: customerName,
+          customer_type: customerType,
           start_date: p.start_date,
           end_date: p.end_date,
           progress_percent: p.progress_percent ?? 0,
