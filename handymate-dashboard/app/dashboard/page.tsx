@@ -37,6 +37,7 @@ import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import IdentityPill from '@/components/IdentityPill'
+import TeamObservationsCard from '@/components/dashboard/TeamObservationsCard'
 
 interface Booking {
   booking_id: string
@@ -604,6 +605,11 @@ export default function DashboardPage() {
               </>
             )}
           </p>
+        </div>
+
+        {/* AI-team observationer — Karin v1, övriga agenter följer */}
+        <div className="mb-4 sm:mb-6">
+          <TeamObservationsCard />
         </div>
 
         {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h */}
