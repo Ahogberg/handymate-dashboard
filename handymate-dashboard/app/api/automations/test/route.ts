@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
           success: true,
           message: 'AI-analys är aktiv och konfigurerad korrekt',
           details: {
-            model: 'claude-sonnet-4-5-20250929',
+            model: 'claude-sonnet-4-6',
             api_key_configured: !!process.env.ANTHROPIC_API_KEY,
           },
         }
