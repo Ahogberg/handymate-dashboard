@@ -2,7 +2,7 @@
   "_meta": {
     "purpose": "Förväntad output-kvalitet från Karin vid rik dataset. Används som referens för prompt-tuning och som test-fixture för UI-rendering innan vi har riktig pilot-data.",
     "generated": "2026-05-14",
-    "model": "claude-sonnet-4-20250514 + extended-thinking (budget 8000)",
+    "model": "claude-sonnet-4-6 + extended-thinking (budget 8000)",
     "data_basis": "simulerat 90d-aggregate för fiktivt hantverkarföretag 'Bromma Bygg AB'"
   },
 
