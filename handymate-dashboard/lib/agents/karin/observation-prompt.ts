@@ -48,7 +48,12 @@ export interface KarinRunResult {
   debug?: KarinDebugInfo
 }
 
+// Bump denna sträng vid varje meningsfull ändring av observation-pipeline.
+// Syns i debug-response så vi direkt kan verifiera att rätt deploy kör.
+export const KARIN_CODE_VERSION = 'fix-normalizer-v2-2026-05-15'
+
 export interface KarinDebugInfo {
+  code_version: string
   prompt_maturity: 'early_stage' | 'full_analysis'
   system_prompt_length: number
   user_message_length: number
@@ -65,6 +70,8 @@ export interface KarinDebugInfo {
   matched_substring?: string
   parse_error?: string
   parsed_count: number
+  normalize_success: number
+  normalize_dropped: number
   validation_dropped: number
   validation_drop_reasons?: string[]
   parsed_observations?: KarinObservation[]
@@ -566,6 +573,7 @@ ${JSON.stringify(aggregate, null, 2)}
 Tänk igenom det och returnera JSON-array.`
 
   const debug: KarinDebugInfo = {
+    code_version: KARIN_CODE_VERSION,
     prompt_maturity: maturity,
     system_prompt_length: systemPrompt.length,
     user_message_length: userMessage.length,
@@ -575,6 +583,8 @@ Tänk igenom det och returnera JSON-array.`
     raw_text_length: 0,
     regex_match_found: false,
     parsed_count: 0,
+    normalize_success: 0,
+    normalize_dropped: 0,
     validation_dropped: 0,
   }
 
@@ -668,15 +678,22 @@ Tänk igenom det och returnera JSON-array.`
 
   try {
     const parsedRaw = JSON.parse(match[0]) as unknown[]
-    debug.parsed_count = Array.isArray(parsedRaw) ? parsedRaw.length : 0
-    debug.parsed_observations = parsedRaw as KarinObservation[]
+    const parsedArray: any[] = Array.isArray(parsedRaw) ? (parsedRaw as any[]) : []
+    debug.parsed_count = parsedArray.length
+    debug.parsed_observations = parsedArray as KarinObservation[]
+
+    console.log('[karin/call] before normalize:', {
+      version: KARIN_CODE_VERSION,
+      count: parsedArray.length,
+      first_keys: parsedArray[0] ? Object.keys(parsedArray[0]) : [],
+    })
 
     const normalizeNotes: string[] = []
     const dropReasons: string[] = []
     const valid: KarinObservation[] = []
 
-    for (let i = 0; i < (parsedRaw as any[]).length; i++) {
-      const raw = (parsedRaw as any[])[i]
+    for (let i = 0; i < parsedArray.length; i++) {
+      const raw = parsedArray[i]
       const normalized = normalizeObservation(raw, i, normalizeNotes)
       if (normalized) {
         valid.push(normalized)
@@ -685,10 +702,21 @@ Tänk igenom det och returnera JSON-array.`
       }
     }
 
-    debug.validation_dropped = (parsedRaw as any[]).length - valid.length
+    debug.normalize_success = valid.length
+    debug.normalize_dropped = parsedArray.length - valid.length
+    debug.validation_dropped = debug.normalize_dropped // legacy field, samma värde
     debug.validation_drop_reasons = [...dropReasons, ...normalizeNotes]
 
-    if (valid.length === 0 && (parsedRaw as any[]).length > 0) {
+    console.log('[karin/call] after normalize:', {
+      version: KARIN_CODE_VERSION,
+      survived: valid.length,
+      dropped: debug.normalize_dropped,
+      normalize_notes_count: normalizeNotes.length,
+      first_drop: dropReasons[0],
+      first_note: normalizeNotes[0],
+    })
+
+    if (valid.length === 0 && parsedArray.length > 0) {
       console.warn('[karin/call] parsed observations but all dropped:', dropReasons)
     }
     if (normalizeNotes.length > 0) {
