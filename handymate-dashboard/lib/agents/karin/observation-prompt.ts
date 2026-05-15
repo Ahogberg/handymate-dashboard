@@ -434,16 +434,32 @@ async function buildAggregate(
 // Hypotes-driven prompt
 // ─────────────────────────────────────────────────────────────────
 
+const SCHEMA_BLOCK = `═══ SCHEMA — STRIKT, FÖLJ EXAKT ═══
+
+Returnera ENDAST en JSON-array. Varje observation MÅSTE ha exakt dessa fält:
+
+{
+  "knowledge_type": "insight" | "pattern" | "anomaly" | "recommendation",
+  "title": string,              // max 60 tecken, kort sammanfattning
+  "observation": string,         // 2-3 meningar, full beskrivning
+  "suggestion": string | null,   // konkret nästa-steg ELLER null om ren info
+  "confidence": number,          // 0-1
+  "data_basis": object           // metadata: period_days, metric, relevanta IDs/tal
+}
+
+FÖRBJUDNA FÄLT: använd INTE "message", "text", "body", "description", "summary"
+eller andra synonyma fält. Den enda "långa" texten heter "observation".
+
+Returnera ARRAY, inte ett enskilt objekt eller en wrapper med "observations"-key.
+Ingen prolog, ingen efterord, ingen markdown-fence — bara raw JSON.`
+
 function buildSystemPrompt(businessName: string, maturity: 'early_stage' | 'full_analysis'): string {
   if (maturity === 'early_stage') {
     return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Du är ny på företaget och har precis fått tillgång till siffrorna.
 
 Du ser att det finns lite data — färre än 10 fakturor. Det räcker inte för djupanalys, men det är dags att presentera sig och bygga relation.
 
-Generera EXAKT 1 observation av typen "early-stage relation-byggande". Säg ungefär:
-- "Jag börjar förstå din verksamhet — hittills har jag sett X fakturor till Y kunder. Säg till om något specifikt jag bör hålla extra koll på."
-
-Anpassa siffror till verkliga aggregatet du får. Var vänlig, professionell, kort.
+Generera EXAKT 1 observation av typen "early-stage relation-byggande". Anpassa siffrorna till verkliga aggregatet du får. Var vänlig, professionell, kort.
 
 REGLER:
 - 1 observation, inte fler.
@@ -452,7 +468,25 @@ REGLER:
 - confidence: 0.9 (du är säker på att du är ny)
 - data_basis: { period_days, invoice_count, customer_count, note: 'early_stage_introduction' }
 
-Returnera EXAKT JSON-array, ingen prolog eller efterord.`
+${SCHEMA_BLOCK}
+
+EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
+
+[
+  {
+    "knowledge_type": "insight",
+    "title": "Jag börjar förstå din verksamhet",
+    "observation": "Hej! Jag är Karin, din nya ekonomi-ansvarig. Hittills har jag sett 7 fakturor till 4 kunder de senaste 90 dagarna — det räcker för att börja känna mönstret. Säg gärna till om något specifikt du vill att jag håller extra koll på framöver.",
+    "suggestion": null,
+    "confidence": 0.9,
+    "data_basis": {
+      "period_days": 90,
+      "invoice_count": 7,
+      "customer_count": 4,
+      "note": "early_stage_introduction"
+    }
+  }
+]`
   }
 
   return `Du är Karin, ekonomi-ansvarig hos ${businessName}. Analysera datan med dessa konkreta hypoteser om svenska hantverkar-verksamheter:
@@ -481,17 +515,34 @@ Generera 1-3 KORTA observationer (max 2 meningar var) med konkret suggestion nä
 Var inte trivial. "Du har X förfallna fakturor" = data, inte observation.
 "BRF Lindgården betalar 12d senare än snittet — vill du justera deras förfallodatum till 45 dagar?" = observation.
 
-REGLER FÖR OUTPUT:
+REGLER:
 - 1-3 observationer max. Färre är bättre om du inte ser något viktigt.
-- Returnera EXAKT JSON-array, ingen prolog eller efterord.
-- "title" max 80 tecken, konkret.
-- "observation" max 2 meningar, första-person, vänlig ton.
+- "title" max 60 tecken, konkret.
+- "observation" max 2-3 meningar, första-person, vänlig ton.
 - "suggestion" konkret action max 1 mening ELLER null om bara info.
 - "confidence" 0-1, var ärlig. Under 0.5 om du gissar.
-- "data_basis" objekt med period_days + metric-namn + relevanta tal/IDs som ligger till grund.
-- "knowledge_type" en av: insight, pattern, anomaly, recommendation.
 
-Om allt ser bra ut — säg det med 1 positiv observation. Återhåll dig från att hitta på problem.`
+Om allt ser bra ut — säg det med 1 positiv observation. Återhåll dig från att hitta på problem.
+
+${SCHEMA_BLOCK}
+
+EXAKT EXEMPEL — kopiera strukturen:
+
+[
+  {
+    "knowledge_type": "pattern",
+    "title": "BRF betalar 11d senare än privatkunder",
+    "observation": "Jag märker att BRF-kunderna betalar i snitt 38 dagar, medan privatkunder ligger på 27 dagar. BRF Lindgården är värst — de drar upp snittet med över två veckor.",
+    "suggestion": "Sätt 45 dagars förfallodatum för BRF-kunder framöver.",
+    "confidence": 0.85,
+    "data_basis": {
+      "period_days": 90,
+      "metric": "avg_days_to_payment_by_customer_type",
+      "brf_avg_dso": 38,
+      "private_avg_dso": 27
+    }
+  }
+]`
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -616,28 +667,32 @@ Tänk igenom det och returnera JSON-array.`
   debug.matched_substring = match[0].slice(0, 1000)
 
   try {
-    const parsed = JSON.parse(match[0]) as KarinObservation[]
-    debug.parsed_count = Array.isArray(parsed) ? parsed.length : 0
-    debug.parsed_observations = parsed
+    const parsedRaw = JSON.parse(match[0]) as unknown[]
+    debug.parsed_count = Array.isArray(parsedRaw) ? parsedRaw.length : 0
+    debug.parsed_observations = parsedRaw as KarinObservation[]
 
+    const normalizeNotes: string[] = []
     const dropReasons: string[] = []
-    const valid = parsed.filter(o => {
-      const missing: string[] = []
-      if (!o.knowledge_type) missing.push('knowledge_type')
-      if (!o.title) missing.push('title')
-      if (!o.observation) missing.push('observation')
-      if (typeof o.confidence !== 'number') missing.push('confidence(non-number)')
-      if (missing.length > 0) {
-        dropReasons.push(`obs[${dropReasons.length}]: missing ${missing.join(',')}`)
-        return false
-      }
-      return true
-    })
-    debug.validation_dropped = parsed.length - valid.length
-    debug.validation_drop_reasons = dropReasons
+    const valid: KarinObservation[] = []
 
-    if (valid.length === 0 && parsed.length > 0) {
-      console.warn('[karin/call] parsed observations but all dropped at validation:', dropReasons)
+    for (let i = 0; i < (parsedRaw as any[]).length; i++) {
+      const raw = (parsedRaw as any[])[i]
+      const normalized = normalizeObservation(raw, i, normalizeNotes)
+      if (normalized) {
+        valid.push(normalized)
+      } else {
+        dropReasons.push(`obs[${i}]: no salvageable observation/message field`)
+      }
+    }
+
+    debug.validation_dropped = (parsedRaw as any[]).length - valid.length
+    debug.validation_drop_reasons = [...dropReasons, ...normalizeNotes]
+
+    if (valid.length === 0 && (parsedRaw as any[]).length > 0) {
+      console.warn('[karin/call] parsed observations but all dropped:', dropReasons)
+    }
+    if (normalizeNotes.length > 0) {
+      console.log('[karin/call] schema normalization applied:', normalizeNotes)
     }
 
     return { observations: valid, thinkingPreview, debug }
@@ -646,6 +701,87 @@ Tänk igenom det och returnera JSON-array.`
     console.error('[karin/call] JSON parse failed:', errMsg, match[0].slice(0, 300))
     debug.parse_error = errMsg
     return { observations: [], thinkingPreview, debug }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Normalizer — räddar observations där Claude använt fel fält-namn
+// ─────────────────────────────────────────────────────────────────
+
+const VALID_KNOWLEDGE_TYPES = new Set(['insight', 'pattern', 'anomaly', 'recommendation'])
+
+function normalizeObservation(
+  raw: any,
+  index: number,
+  notes: string[],
+): KarinObservation | null {
+  if (!raw || typeof raw !== 'object') {
+    notes.push(`obs[${index}]: not an object`)
+    return null
+  }
+
+  // observation: acceptera synonyma fält
+  let observation: string | undefined =
+    raw.observation || raw.message || raw.text || raw.body || raw.description || raw.summary
+  if (!observation || typeof observation !== 'string' || observation.trim().length === 0) {
+    return null
+  }
+  observation = observation.trim()
+  if (!raw.observation) {
+    notes.push(`obs[${index}]: used fallback field for observation`)
+  }
+
+  // title: härled från observation om saknas
+  let title: string = (raw.title || '').toString().trim()
+  if (!title) {
+    // Första meningen (period eller frågetecken eller utropstecken)
+    const sentenceMatch = observation.match(/^[^.!?\n]+[.!?]?/)
+    title = (sentenceMatch ? sentenceMatch[0] : observation).trim()
+    if (title.length > 60) {
+      title = title.slice(0, 57).trimEnd() + '…'
+    }
+    notes.push(`obs[${index}]: title härledd från observation`)
+  } else if (title.length > 80) {
+    title = title.slice(0, 77).trimEnd() + '…'
+  }
+
+  // knowledge_type: default 'insight'
+  let knowledgeType = (raw.knowledge_type || raw.type || 'insight').toString().toLowerCase()
+  if (!VALID_KNOWLEDGE_TYPES.has(knowledgeType)) {
+    notes.push(`obs[${index}]: knowledge_type '${knowledgeType}' okänd, faller till 'insight'`)
+    knowledgeType = 'insight'
+  }
+
+  // confidence: default 0.5 (medium-osäker)
+  let confidence: number
+  if (typeof raw.confidence === 'number') {
+    confidence = Math.max(0, Math.min(1, raw.confidence))
+  } else if (typeof raw.confidence === 'string' && !isNaN(parseFloat(raw.confidence))) {
+    confidence = Math.max(0, Math.min(1, parseFloat(raw.confidence)))
+    notes.push(`obs[${index}]: confidence string → number`)
+  } else {
+    confidence = 0.5
+    notes.push(`obs[${index}]: confidence saknades, default 0.5`)
+  }
+
+  // suggestion: null tolereras, tomt sträng → null
+  let suggestion: string | null = null
+  const rawSugg = raw.suggestion ?? raw.action ?? raw.next_step
+  if (typeof rawSugg === 'string' && rawSugg.trim().length > 0) {
+    suggestion = rawSugg.trim()
+  }
+
+  // data_basis: tom object om saknas
+  const dataBasis: Record<string, unknown> =
+    raw.data_basis && typeof raw.data_basis === 'object' ? raw.data_basis : {}
+
+  return {
+    knowledge_type: knowledgeType as KarinObservation['knowledge_type'],
+    title,
+    observation,
+    suggestion,
+    confidence,
+    data_basis: dataBasis,
   }
 }
 
