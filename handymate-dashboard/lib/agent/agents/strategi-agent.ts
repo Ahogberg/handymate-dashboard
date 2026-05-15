@@ -9,7 +9,7 @@
 import { toolDefinitions } from '@/app/api/agent/trigger/tool-definitions'
 import { BusinessContext } from './shared'
 
-export const STRATEGI_MODEL = 'claude-sonnet-4-20250514'
+export const STRATEGI_MODEL = 'claude-sonnet-4-6'
 export const STRATEGI_MAX_STEPS = 10
 
 export function getStrategiTools() {
