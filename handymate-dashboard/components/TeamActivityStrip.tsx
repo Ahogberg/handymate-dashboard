@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { TEAM, getAgentById } from '@/lib/agents/team'
+import Link from 'next/link'
+import { Sparkles, Check, X, ArrowRight, Loader2 } from 'lucide-react'
+import { getAgentById } from '@/lib/agents/team'
 
 interface AgentActivity {
   id: string
@@ -24,6 +26,32 @@ interface TeamActivityResponse {
   }
 }
 
+interface Observation {
+  id: string
+  agent_id: string
+  knowledge_type: 'insight' | 'pattern' | 'anomaly' | 'recommendation'
+  title: string
+  observation: string
+  suggestion: string | null
+  confidence: number
+  related_approval_id: string | null
+  created_at: string
+}
+
+const TYPE_LABEL: Record<string, string> = {
+  insight: 'Insikt',
+  pattern: 'Mönster',
+  anomaly: 'Avvikelse',
+  recommendation: 'Förslag',
+}
+
+const TYPE_BADGE_CLASS: Record<string, string> = {
+  insight: 'bg-slate-100 text-slate-600',
+  pattern: 'bg-blue-50 text-blue-700',
+  anomaly: 'bg-amber-50 text-amber-700',
+  recommendation: 'bg-primary-50 text-primary-700',
+}
+
 export function buildSummaryText(summary: TeamActivityResponse['summary']): string {
   const parts: string[] = []
   if (summary.total_calls > 0) parts.push(`${summary.total_calls} kundsamtal`)
@@ -43,25 +71,68 @@ interface TeamActivityStripProps {
 
 /**
  * Vertikal lista över AI-teamets aktivitet senaste 24h.
- * Visar bara aktiva agenter (idle filtreras bort) — Matte exkluderas eftersom
- * han representeras av docken nere till höger.
+ *
+ * Om en agent har en aktiv observation (insikt/mönster/avvikelse/förslag i
+ * business_knowledge) renderas den inline ovanpå standardstatusen — annars
+ * visas den vanliga aktivitetsraden. Action-knappar (Agera/Avfärda) visas
+ * bara när observation har en suggestion + related_approval_id.
+ *
+ * Matte exkluderas eftersom han representeras av docken nere till höger.
  */
 export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) {
   const [data, setData] = useState<TeamActivityResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [observations, setObservations] = useState<Observation[]>([])
+  const [dismissing, setDismissing] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    fetch('/api/dashboard/team-activity')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d) {
-          setData(d)
-          onLoaded?.(d.summary)
+    let cancelled = false
+    Promise.all([
+      fetch('/api/dashboard/team-activity').then(r => (r.ok ? r.json() : null)),
+      fetch('/api/observations?limit=20').then(r => (r.ok ? r.json() : { observations: [] })),
+    ])
+      .then(([activityData, observationsData]) => {
+        if (cancelled) return
+        if (activityData) {
+          setData(activityData as TeamActivityResponse)
+          onLoaded?.(activityData.summary)
         }
+        setObservations((observationsData?.observations || []) as Observation[])
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => {
+        if (cancelled) return
+        setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [onLoaded])
+
+  async function handleDismiss(id: string) {
+    if (dismissing.has(id)) return
+    setDismissing(prev => new Set(prev).add(id))
+    const original = observations
+    setObservations(obs => obs.filter(o => o.id !== id))
+    try {
+      const res = await fetch(`/api/observations/${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dismiss' }),
+      })
+      if (!res.ok) {
+        setObservations(original)
+      }
+    } catch {
+      setObservations(original)
+    } finally {
+      setDismissing(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -93,6 +164,15 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
   const visibleAgents = data.agents.filter(a => a.id !== 'matte')
   const activeCount = visibleAgents.filter(a => !a.idle).length
 
+  // Plocka senaste observation per agent (max 1) — listan är redan sorterad
+  // DESC från /api/observations, så första träffen per agent är senaste.
+  const observationByAgent = new Map<string, Observation>()
+  for (const obs of observations) {
+    if (!observationByAgent.has(obs.agent_id)) {
+      observationByAgent.set(obs.agent_id, obs)
+    }
+  }
+
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
@@ -107,8 +187,16 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
           const agent = getAgentById(activity.id)
           if (!agent) return null
 
+          const obs = observationByAgent.get(activity.id)
+          const isDismissing = obs ? dismissing.has(obs.id) : false
+          const typeLabel = obs ? (TYPE_LABEL[obs.knowledge_type] || 'Notering') : null
+          const typeBadge = obs ? (TYPE_BADGE_CLASS[obs.knowledge_type] || 'bg-slate-100 text-slate-600') : null
+
           return (
-            <div key={activity.id} className="flex items-center gap-3 py-2.5">
+            <div
+              key={activity.id}
+              className={`flex items-start gap-3 py-2.5 ${isDismissing ? 'opacity-50' : ''}`}
+            >
               <div className="relative flex-shrink-0">
                 {agent.avatar ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -131,24 +219,65 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
-                  {activity.idle && (
+                  {activity.idle && !obs && (
                     <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                       Standby
                     </span>
                   )}
-                </div>
-                <p className="text-xs text-gray-600 leading-snug mt-0.5">
-                  {activity.stat && (
-                    <span className="font-semibold text-gray-900">{activity.stat} </span>
+                  {obs && typeLabel && typeBadge && (
+                    <span className={`inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${typeBadge}`}>
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {typeLabel}
+                    </span>
                   )}
-                  {activity.action}
-                </p>
+                </div>
+
+                {obs ? (
+                  <>
+                    <div className="text-sm font-medium text-gray-900 mt-1">{obs.title}</div>
+                    <p className="text-xs text-gray-600 leading-snug mt-0.5">{obs.observation}</p>
+                    {obs.suggestion && (
+                      <p className="text-xs text-primary-700 mt-1.5 italic">💡 {obs.suggestion}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      {obs.suggestion && obs.related_approval_id && (
+                        <Link
+                          href="/dashboard/approvals?filter=agent_observation"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-700 hover:bg-primary-800 text-white text-[11px] font-medium transition-colors"
+                        >
+                          <Check className="w-3 h-3" />
+                          Agera
+                          <ArrowRight className="w-2.5 h-2.5" />
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => handleDismiss(obs.id)}
+                        disabled={isDismissing}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 border border-[#E2E8F0] text-[11px] font-medium transition-colors disabled:opacity-50"
+                      >
+                        {isDismissing ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                          <X className="w-3 h-3" />
+                        )}
+                        Avfärda
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-600 leading-snug mt-0.5">
+                    {activity.stat && (
+                      <span className="font-semibold text-gray-900">{activity.stat} </span>
+                    )}
+                    {activity.action}
+                  </p>
+                )}
               </div>
 
-              {activity.meta && !activity.idle && (
-                <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">
+              {activity.meta && !activity.idle && !obs && (
+                <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap pt-0.5">
                   {activity.meta}
                 </span>
               )}
