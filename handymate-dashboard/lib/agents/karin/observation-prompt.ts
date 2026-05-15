@@ -50,7 +50,13 @@ export interface KarinRunResult {
 
 // Bump denna sträng vid varje meningsfull ändring av observation-pipeline.
 // Syns i debug-response så vi direkt kan verifiera att rätt deploy kör.
-export const KARIN_CODE_VERSION = 'fix-normalizer-v2-2026-05-15'
+// v3 (2026-05-15 deploy-check): bumpa för att verifiera att Vercel faktiskt
+// deployar denna fil. Test-endpoint visar fortfarande gammal validator-text
+// "missing title,observation" som inte finns någonstans i nuvarande kod —
+// indikerar att Vercel kör äldre commit. Trigga test-endpoint efter push och
+// kolla result.debug.code_version: matchar = ny kod kör; matchar inte =
+// deploy-problem (kolla Vercel dashboard, build-status, branch-konfiguration).
+export const KARIN_CODE_VERSION = 'fix-normalizer-v3-2026-05-15-deploy-check'
 
 export interface KarinDebugInfo {
   code_version: string
@@ -919,6 +925,10 @@ export async function runKarinObservation(
   businessName: string,
   options: { includeDebug?: boolean } = {},
 ): Promise<KarinRunResult> {
+  // Otvetydig entry-log så Vercel function logs direkt visar att den nya
+  // koden faktiskt exekveras. Om denna rad inte syns i loggarna kör Vercel
+  // en äldre commit — då är frågan deploy/cache, inte normalizer-bugg.
+  console.log(`[karin/run] entry version=${KARIN_CODE_VERSION} business=${businessId}`)
   const aggregate = await buildAggregate(supabase, businessId)
   if (!aggregate) {
     return { skipped: 'no_invoices_last_90d' }
