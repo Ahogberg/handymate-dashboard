@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     // Step 1: Analyse the image with Claude Vision
     const visionResponse = await anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       system: 'Du är en erfaren hantverkare och offertspecialist. Analysera bilden och returnera ENDAST JSON utan markdown:\n{"job_type":"string","scope":"string","materials":["string"],"complexity":"low|medium|high","notes":"string"}',
       messages: [

@@ -150,7 +150,7 @@ export async function analyzeJobImage(
   const anthropic = getAnthropic()
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 1000,
     messages: [
       {
@@ -380,7 +380,7 @@ Svara ENDAST med JSON (ingen markdown):
   })
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userContent }]
