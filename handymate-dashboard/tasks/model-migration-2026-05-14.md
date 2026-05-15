@@ -132,8 +132,10 @@ Testning sker mot prod efter deploy (Vercel auto-deploys per push). Eftersom des
 
 ### TD-41 — Supabase edge-function `agent/index.ts` verifiering
 **Plats:** `supabase/functions/agent/index.ts:34`
-**Status:** Öppen, väntar på dashboard-check.
-**Action:** Andreas kollar invocations senaste 30 dagar i Supabase dashboard. Om 0 → DEAD CODE, delete. Om >0 → migrera till sonnet-4-6.
+**Status:** ✅ RESOLVED 2026-05-15 — dead code deleted.
+**Verifiering:** Andreas bekräftade 0 invocations senaste 30d i Supabase dashboard. Inga aktiva consumers (bara kommentar-referenser "Mirrors..." i app/api/agent/trigger). Inga deploy-scripts i package.json eller workflows.
+**Action:** Hela mappen `supabase/functions/agent/` raderad (7 filer: index.ts, system-prompt.ts, tool-definitions.ts + tools/{communications,crm,operations,pipeline}.ts).
+**Commit:** se nedan i Commits-historia.
 
 ### TD-42 — `lib/ai.ts` dead code
 **Plats:** `lib/ai.ts` — funktionerna `getAIInsights` + `askCopilot`
