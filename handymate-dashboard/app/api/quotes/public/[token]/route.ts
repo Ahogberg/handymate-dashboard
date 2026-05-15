@@ -45,7 +45,7 @@ export async function GET(
     // Fetch business info
     const { data: business } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, org_number, f_skatt_registered')
+      .select('business_name, contact_name, contact_email, phone_number, org_number, f_skatt_registered, logo_url, accent_color')
       .eq('business_id', quote.business_id)
       .single()
 
@@ -64,6 +64,8 @@ export async function GET(
         phone: business?.phone_number || '',
         org_number: business?.org_number || '',
         f_skatt: business?.f_skatt_registered || false,
+        logo_url: business?.logo_url || null,
+        accent_color: business?.accent_color || null,
       },
       alreadySigned,
     })

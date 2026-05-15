@@ -37,6 +37,8 @@ interface BusinessInfo {
   phone: string
   org_number: string
   f_skatt: boolean
+  logo_url?: string | null
+  accent_color?: string | null
 }
 
 interface QuoteData {
@@ -591,8 +593,28 @@ export default function QuoteSignPage() {
       <div className="relative max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-600/10">
-            <Zap className="w-8 h-8 text-white" />
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden text-white font-bold text-2xl"
+            style={{ background: business?.accent_color || '#0F766E' }}
+          >
+            {business?.logo_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={business.logo_url}
+                alt={business.name}
+                className="w-full h-full object-contain bg-white"
+                onError={(e) => {
+                  const parent = e.currentTarget.parentElement
+                  if (parent) {
+                    parent.textContent = (business.name || 'H').charAt(0).toUpperCase()
+                  }
+                }}
+              />
+            ) : business?.name ? (
+              <span>{business.name.charAt(0).toUpperCase()}</span>
+            ) : (
+              <Zap className="w-8 h-8 text-white" />
+            )}
           </div>
           <h1 className="text-3xl font-bold">
             <span className="text-primary-700">{business?.name || 'Offert'}</span>

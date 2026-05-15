@@ -131,6 +131,26 @@ export default function NewQuotePage() {
   // ─── Loading / global state ─────────────────────────────────────────
   const [customers, setCustomers] = useState<Customer[]>([])
   const [pricingSettings, setPricingSettings] = useState<PricingSettings | null>(null)
+  // Live preview behöver fält som inte ligger på useBusiness()-objektet (logo_url m.fl.)
+  // Hämtas från business_config i fetchData() och används i liveTemplateData.
+  const [businessConfig, setBusinessConfig] = useState<{
+    business_name: string | null
+    contact_name: string | null
+    contact_email: string | null
+    phone_number: string | null
+    address: string | null
+    website: string | null
+    org_number: string | null
+    f_skatt_registered: boolean | null
+    bankgiro: string | null
+    plusgiro: string | null
+    swish_number: string | null
+    vat_number: string | null
+    accent_color: string | null
+    logo_url: string | null
+    tagline: string | null
+    service_area: string | null
+  } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -425,21 +445,21 @@ export default function NewQuotePage() {
 
     return {
       business: {
-        name: business.business_name || 'Företag',
-        orgNumber: (business as any).org_number || '',
-        address: (business as any).address || '',
-        contactName: business.contact_name || '',
-        phone: (business as any).phone_number || '',
-        email: business.contact_email || '',
-        website: (business as any).website || null,
-        bankgiro: (business as any).bankgiro || null,
-        plusgiro: (business as any).plusgiro || null,
-        swish: (business as any).swish_number || null,
-        fSkatt: !!(business as any).f_skatt_registered,
-        momsRegnr: (business as any).vat_number || null,
-        accentColor: (business as any).accent_color || '#0F766E',
-        logoUrl: (business as any).logo_url || null,
-        tagline: (business as any).tagline || (business as any).service_area || null,
+        name: businessConfig?.business_name || business.business_name || 'Företag',
+        orgNumber: businessConfig?.org_number || '',
+        address: businessConfig?.address || '',
+        contactName: businessConfig?.contact_name || business.contact_name || '',
+        phone: businessConfig?.phone_number || '',
+        email: businessConfig?.contact_email || business.contact_email || '',
+        website: businessConfig?.website || null,
+        bankgiro: businessConfig?.bankgiro || null,
+        plusgiro: businessConfig?.plusgiro || null,
+        swish: businessConfig?.swish_number || null,
+        fSkatt: !!businessConfig?.f_skatt_registered,
+        momsRegnr: businessConfig?.vat_number || null,
+        accentColor: businessConfig?.accent_color || '#0F766E',
+        logoUrl: businessConfig?.logo_url || null,
+        tagline: businessConfig?.tagline || businessConfig?.service_area || null,
       },
       customer: {
         name: selectedCustomerObj?.name || 'Kund',
@@ -481,7 +501,7 @@ export default function NewQuotePage() {
         notIncluded: notIncluded || null,
       },
     }
-  }, [business, selectedCustomerObj, title, items, validDays, discountPercent, vatRate, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
+  }, [business, businessConfig, selectedCustomerObj, title, items, validDays, discountPercent, vatRate, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
@@ -565,7 +585,7 @@ export default function NewQuotePage() {
       fetch('/api/customers').then(r => r.json()),
       supabase
         .from('business_config')
-        .select('pricing_settings, quote_template_style')
+        .select('pricing_settings, quote_template_style, business_name, contact_name, contact_email, phone_number, address, website, org_number, f_skatt_registered, bankgiro, plusgiro, swish_number, vat_number, accent_color, logo_url, tagline, service_area')
         .eq('business_id', business.business_id)
         .single(),
     ])
@@ -577,6 +597,27 @@ export default function NewQuotePage() {
     const defaultStyle = settingsRes.data?.quote_template_style as 'modern' | 'premium' | 'friendly' | undefined
     if (defaultStyle && ['modern', 'premium', 'friendly'].includes(defaultStyle)) {
       setBusinessDefaultStyle(defaultStyle)
+    }
+    if (settingsRes.data) {
+      const cfg = settingsRes.data as Record<string, unknown>
+      setBusinessConfig({
+        business_name: (cfg.business_name as string | null) ?? null,
+        contact_name: (cfg.contact_name as string | null) ?? null,
+        contact_email: (cfg.contact_email as string | null) ?? null,
+        phone_number: (cfg.phone_number as string | null) ?? null,
+        address: (cfg.address as string | null) ?? null,
+        website: (cfg.website as string | null) ?? null,
+        org_number: (cfg.org_number as string | null) ?? null,
+        f_skatt_registered: (cfg.f_skatt_registered as boolean | null) ?? null,
+        bankgiro: (cfg.bankgiro as string | null) ?? null,
+        plusgiro: (cfg.plusgiro as string | null) ?? null,
+        swish_number: (cfg.swish_number as string | null) ?? null,
+        vat_number: (cfg.vat_number as string | null) ?? null,
+        accent_color: (cfg.accent_color as string | null) ?? null,
+        logo_url: (cfg.logo_url as string | null) ?? null,
+        tagline: (cfg.tagline as string | null) ?? null,
+        service_area: (cfg.service_area as string | null) ?? null,
+      })
     }
     setPricingSettings(
       settingsRes.data?.pricing_settings || {
