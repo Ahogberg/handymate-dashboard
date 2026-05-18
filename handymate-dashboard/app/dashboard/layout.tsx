@@ -119,9 +119,11 @@ function ImpersonationBanner() {
 
   return (
     <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between text-sm z-50 sticky top-0">
-      <span>Du impersonerar <strong>{businessName}</strong></span>
+      <span>
+        👁️ READ-only — du visar <strong>{businessName}</strong>s dashboard
+      </span>
       <button onClick={endImpersonation} className="px-3 py-1 bg-white text-red-600 rounded-lg font-medium text-xs hover:bg-red-50">
-        Avsluta impersonering
+        Avsluta
       </button>
     </div>
   )

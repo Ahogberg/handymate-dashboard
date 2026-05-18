@@ -275,6 +275,37 @@ export default function AdminDashboardPage() {
     } catch { /* ignore */ }
   }
 
+  /**
+   * Full magic-link-impersonation: logga in som target user på riktigt.
+   * Skillnaden mot impersonateBusiness (READ-only): du blir 100% target i
+   * Supabase-sessionen, kan slutföra Fortnox-OAuth, skicka SMS, allt.
+   * Med risk att alla actions blir verkliga.
+   */
+  async function loginAsBusiness(businessId: string, businessName: string) {
+    const confirmed = window.confirm(
+      `VARNING — du loggas in som ${businessName} på riktigt.\n\n` +
+      `Du blir 100% den användaren i 2h. Alla actions (skicka faktura, SMS, ` +
+      `koppla integrationer, ändra inställningar) går på riktigt och påverkar ` +
+      `deras kunder.\n\n` +
+      `Använd bara för Fortnox-OAuth-test eller andra "agera som"-flöden.\n\n` +
+      `Är du säker?`
+    )
+    if (!confirmed) return
+    try {
+      const res = await fetch(`/api/admin/impersonate/${businessId}`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok && data.impersonationUrl) {
+        window.location.href = data.impersonationUrl
+      } else if (data.method === 'manual') {
+        setToast(`Tabellen saknas — kör sql/v3_superadmin.sql först. Användarens email: ${data.userEmail}`)
+      } else {
+        setToast(`Fel: ${data.error || 'Kunde inte logga in som'}`)
+      }
+    } catch {
+      setToast('Tekniskt fel — försök igen')
+    }
+  }
+
   async function setEnterpriseAll(businessId: string) {
     try {
       const res = await fetch('/api/admin/customers', {
@@ -463,8 +494,14 @@ export default function AdminDashboardPage() {
                               </button>
                             )}
                             <button onClick={() => impersonateBusiness(c.business_id, c.business_name)}
+                              title="READ-only — du ser deras dashboard men agerar som dig själv"
                               className="px-2.5 py-1 text-xs font-medium bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
-                              Impersonera
+                              👁️ Visa som
+                            </button>
+                            <button onClick={() => loginAsBusiness(c.business_id, c.business_name)}
+                              title="Full magic-link — du blir target user. Använd för Fortnox-OAuth m.m."
+                              className="px-2.5 py-1 text-xs font-medium bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200 transition-colors">
+                              🔓 Logga in som
                             </button>
                           </div>
                         </td>
