@@ -12,6 +12,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { runKarinObservation } from './karin/observation-prompt'
 import { runDanielObservation } from './daniel/observation-prompt'
+import { runLarsObservation } from './lars/observation-prompt'
 
 export type AgentObservationRunner = (
   supabase: SupabaseClient,
@@ -23,7 +24,7 @@ export type AgentObservationRunner = (
 export const AGENT_RUNNERS: Record<string, AgentObservationRunner> = {
   karin: runKarinObservation as AgentObservationRunner,
   daniel: runDanielObservation as AgentObservationRunner,
-  // lars:   tillkommer i Phase C1
+  lars: runLarsObservation as AgentObservationRunner,
   // hanna:  tillkommer i Phase D1
 }
 
