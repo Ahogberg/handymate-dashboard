@@ -23,6 +23,66 @@ function getClientIp(request: NextRequest): string {
   return request.headers.get('x-real-ip') || 'unknown'
 }
 
+interface KnowledgeBaseJson {
+  industry?: string
+  services?: Array<{ name?: string; description?: string; price_indication?: string; typical_duration?: string }>
+  faqs?: Array<{ question?: string; answer?: string }>
+  emergency_situations?: string[]
+  policies?: { quote?: string; payment?: string; warranty?: string; cancellation?: string }
+}
+
+/**
+ * Konverterar knowledge_base-JSONB från business_config till naturligt språk
+ * för injektion i Claude-systemprompten. Hoppar över tomma sektioner så
+ * prompten inte fylls med rubriker utan innehåll.
+ */
+function formatKnowledgeBase(kb: KnowledgeBaseJson | null | undefined): string {
+  if (!kb || typeof kb !== 'object') return ''
+  const sections: string[] = []
+
+  if (kb.industry) {
+    sections.push(`Bransch: ${kb.industry}`)
+  }
+
+  if (Array.isArray(kb.services) && kb.services.length > 0) {
+    const lines = kb.services
+      .filter(s => s && s.name)
+      .map(s => {
+        const parts: string[] = []
+        if (s.description) parts.push(s.description)
+        if (s.price_indication) parts.push(`Pris: ${s.price_indication}`)
+        if (s.typical_duration) parts.push(`Tid: ${s.typical_duration}`)
+        const detail = parts.length > 0 ? ` (${parts.join(', ')})` : ''
+        return `- ${s.name}${detail}`
+      })
+    if (lines.length > 0) sections.push(`Tjänster vi erbjuder:\n${lines.join('\n')}`)
+  }
+
+  if (Array.isArray(kb.faqs) && kb.faqs.length > 0) {
+    const lines = kb.faqs
+      .filter(f => f && f.question && f.answer)
+      .map(f => `- F: ${f.question}\n  S: ${f.answer}`)
+    if (lines.length > 0) sections.push(`Vanliga frågor och svar:\n${lines.join('\n')}`)
+  }
+
+  if (Array.isArray(kb.emergency_situations) && kb.emergency_situations.length > 0) {
+    const lines = kb.emergency_situations.filter(s => s && s.trim()).map(s => `- ${s}`)
+    if (lines.length > 0) sections.push(`Akuta situationer (be kunden ringa direkt):\n${lines.join('\n')}`)
+  }
+
+  if (kb.policies) {
+    const p = kb.policies
+    const policyLines: string[] = []
+    if (p.quote) policyLines.push(`- Offert: ${p.quote}`)
+    if (p.payment) policyLines.push(`- Betalning: ${p.payment}`)
+    if (p.warranty) policyLines.push(`- Garanti: ${p.warranty}`)
+    if (p.cancellation) policyLines.push(`- Avbokning: ${p.cancellation}`)
+    if (policyLines.length > 0) sections.push(`Policyer:\n${policyLines.join('\n')}`)
+  }
+
+  return sections.join('\n\n')
+}
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: CORS_HEADERS })
 }
@@ -64,10 +124,11 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Get business config
+    // Get business config — knowledge_base är JSONB med vad knowledge-sidan sparar
+    // ({ industry, services[], faqs[], emergency_situations[], policies }).
     const { data: config } = await supabase
       .from('business_config')
-      .select('business_id, business_name, display_name, service_area, widget_enabled, widget_max_estimate, widget_collect_contact, widget_give_estimates, widget_ask_budget, widget_bot_name')
+      .select('business_id, business_name, display_name, service_area, widget_enabled, widget_max_estimate, widget_collect_contact, widget_give_estimates, widget_ask_budget, widget_bot_name, knowledge_base')
       .eq('business_id', business_id)
       .single()
 
@@ -137,31 +198,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get knowledge base and price list
-    let knowledgeText = ''
+    // Get knowledge base from business_config.knowledge_base JSONB — samma källa
+    // som /dashboard/settings/knowledge skriver till. Tidigare läste vi från en
+    // separat 'knowledge_base'-tabell som aldrig fanns i prod → chatten kördes
+    // utan kunskap trots att kunden fyllt i allt.
+    const knowledgeText = formatKnowledgeBase(config.knowledge_base)
+
+    // Price list från price_list-tabellen om den finns. Vi loggar fel istället
+    // för att svälja dem tyst så vi fångar liknande disconnects framöver.
     let priceListText = ''
-
-    try {
-      const { data: knowledge } = await supabase
-        .from('knowledge_base')
-        .select('title, content, category')
-        .eq('business_id', business_id)
-        .limit(20)
-      if (knowledge && knowledge.length > 0) {
-        knowledgeText = knowledge.map((k: any) => `[${k.category || 'Allmänt'}] ${k.title}: ${k.content}`).join('\n')
-      }
-    } catch { /* table may not exist */ }
-
-    try {
-      const { data: prices } = await supabase
-        .from('price_list')
-        .select('name, category, unit, unit_price')
-        .eq('business_id', business_id)
-        .limit(50)
-      if (prices && prices.length > 0) {
-        priceListText = prices.map((p: any) => `${p.name} (${p.category}): ${p.unit_price} kr/${p.unit}`).join('\n')
-      }
-    } catch { /* table may not exist */ }
+    const { data: prices, error: priceErr } = await supabase
+      .from('price_list')
+      .select('name, category, unit, unit_price')
+      .eq('business_id', business_id)
+      .limit(50)
+    if (priceErr) {
+      console.warn('[widget/chat] price_list query failed:', priceErr.message)
+    } else if (prices && prices.length > 0) {
+      priceListText = prices.map((p: any) => `${p.name} (${p.category}): ${p.unit_price} kr/${p.unit}`).join('\n')
+    }
 
     // Build conversation history for Claude
     const existingMessages = (conversation.messages || []) as { role: string; content: string }[]
