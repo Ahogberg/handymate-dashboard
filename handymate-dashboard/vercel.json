@@ -30,7 +30,7 @@
       "schedule": "0 9 * * *"
     },
     {
-      "path": "/api/cron/agent-observations",
+      "path": "/api/cron/agent-observations/karin",
       "schedule": "0 6 * * 0,3"
     },
     {
