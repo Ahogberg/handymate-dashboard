@@ -20,19 +20,20 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { SCHEMA_BLOCK } from '@/lib/agents/shared/schema-block'
+import {
+  normalizeObservation,
+  type AgentObservation,
+} from '@/lib/agents/shared/normalize'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
 // ─────────────────────────────────────────────────────────────────
 
-export interface KarinObservation {
-  knowledge_type: 'insight' | 'pattern' | 'anomaly' | 'recommendation'
-  title: string
-  observation: string
-  suggestion: string | null
-  confidence: number
-  data_basis: Record<string, unknown>
-}
+// KarinObservation är ett alias för den delade AgentObservation-typen.
+// Behålls som re-export för bakåt-kompatibilitet med call-sites som
+// importerar KarinObservation direkt.
+export type KarinObservation = AgentObservation
 
 export interface KarinRunResult {
   skipped?: string
@@ -56,7 +57,7 @@ export interface KarinRunResult {
 // indikerar att Vercel kör äldre commit. Trigga test-endpoint efter push och
 // kolla result.debug.code_version: matchar = ny kod kör; matchar inte =
 // deploy-problem (kolla Vercel dashboard, build-status, branch-konfiguration).
-export const KARIN_CODE_VERSION = 'fix-normalizer-v3-2026-05-15-deploy-check'
+export const KARIN_CODE_VERSION = 'shared-extract-A1-2026-05-18'
 
 export interface KarinDebugInfo {
   code_version: string
@@ -445,26 +446,8 @@ async function buildAggregate(
 
 // ─────────────────────────────────────────────────────────────────
 // Hypotes-driven prompt
+// SCHEMA_BLOCK importerad från lib/agents/shared/schema-block.ts
 // ─────────────────────────────────────────────────────────────────
-
-const SCHEMA_BLOCK = `═══ SCHEMA — STRIKT, FÖLJ EXAKT ═══
-
-Returnera ENDAST en JSON-array. Varje observation MÅSTE ha exakt dessa fält:
-
-{
-  "knowledge_type": "insight" | "pattern" | "anomaly" | "recommendation",
-  "title": string,              // max 60 tecken, kort sammanfattning
-  "observation": string,         // 2-3 meningar, full beskrivning
-  "suggestion": string | null,   // konkret nästa-steg ELLER null om ren info
-  "confidence": number,          // 0-1
-  "data_basis": object           // metadata: period_days, metric, relevanta IDs/tal
-}
-
-FÖRBJUDNA FÄLT: använd INTE "message", "text", "body", "description", "summary"
-eller andra synonyma fält. Den enda "långa" texten heter "observation".
-
-Returnera ARRAY, inte ett enskilt objekt eller en wrapper med "observations"-key.
-Ingen prolog, ingen efterord, ingen markdown-fence — bara raw JSON.`
 
 function buildSystemPrompt(businessName: string, maturity: 'early_stage' | 'full_analysis'): string {
   if (maturity === 'early_stage') {
@@ -738,86 +721,8 @@ Tänk igenom det och returnera JSON-array.`
   }
 }
 
-// ─────────────────────────────────────────────────────────────────
-// Normalizer — räddar observations där Claude använt fel fält-namn
-// ─────────────────────────────────────────────────────────────────
-
-const VALID_KNOWLEDGE_TYPES = new Set(['insight', 'pattern', 'anomaly', 'recommendation'])
-
-function normalizeObservation(
-  raw: any,
-  index: number,
-  notes: string[],
-): KarinObservation | null {
-  if (!raw || typeof raw !== 'object') {
-    notes.push(`obs[${index}]: not an object`)
-    return null
-  }
-
-  // observation: acceptera synonyma fält
-  let observation: string | undefined =
-    raw.observation || raw.message || raw.text || raw.body || raw.description || raw.summary
-  if (!observation || typeof observation !== 'string' || observation.trim().length === 0) {
-    return null
-  }
-  observation = observation.trim()
-  if (!raw.observation) {
-    notes.push(`obs[${index}]: used fallback field for observation`)
-  }
-
-  // title: härled från observation om saknas
-  let title: string = (raw.title || '').toString().trim()
-  if (!title) {
-    // Första meningen (period eller frågetecken eller utropstecken)
-    const sentenceMatch = observation.match(/^[^.!?\n]+[.!?]?/)
-    title = (sentenceMatch ? sentenceMatch[0] : observation).trim()
-    if (title.length > 60) {
-      title = title.slice(0, 57).trimEnd() + '…'
-    }
-    notes.push(`obs[${index}]: title härledd från observation`)
-  } else if (title.length > 80) {
-    title = title.slice(0, 77).trimEnd() + '…'
-  }
-
-  // knowledge_type: default 'insight'
-  let knowledgeType = (raw.knowledge_type || raw.type || 'insight').toString().toLowerCase()
-  if (!VALID_KNOWLEDGE_TYPES.has(knowledgeType)) {
-    notes.push(`obs[${index}]: knowledge_type '${knowledgeType}' okänd, faller till 'insight'`)
-    knowledgeType = 'insight'
-  }
-
-  // confidence: default 0.5 (medium-osäker)
-  let confidence: number
-  if (typeof raw.confidence === 'number') {
-    confidence = Math.max(0, Math.min(1, raw.confidence))
-  } else if (typeof raw.confidence === 'string' && !isNaN(parseFloat(raw.confidence))) {
-    confidence = Math.max(0, Math.min(1, parseFloat(raw.confidence)))
-    notes.push(`obs[${index}]: confidence string → number`)
-  } else {
-    confidence = 0.5
-    notes.push(`obs[${index}]: confidence saknades, default 0.5`)
-  }
-
-  // suggestion: null tolereras, tomt sträng → null
-  let suggestion: string | null = null
-  const rawSugg = raw.suggestion ?? raw.action ?? raw.next_step
-  if (typeof rawSugg === 'string' && rawSugg.trim().length > 0) {
-    suggestion = rawSugg.trim()
-  }
-
-  // data_basis: tom object om saknas
-  const dataBasis: Record<string, unknown> =
-    raw.data_basis && typeof raw.data_basis === 'object' ? raw.data_basis : {}
-
-  return {
-    knowledge_type: knowledgeType as KarinObservation['knowledge_type'],
-    title,
-    observation,
-    suggestion,
-    confidence,
-    data_basis: dataBasis,
-  }
-}
+// normalizeObservation importerad från lib/agents/shared/normalize.ts —
+// returnerar AgentObservation som är typ-alias för KarinObservation.
 
 // ─────────────────────────────────────────────────────────────────
 // Save + push
