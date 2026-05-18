@@ -287,7 +287,8 @@ export default function AdminDashboardPage() {
       `Du blir 100% den användaren i 2h. Alla actions (skicka faktura, SMS, ` +
       `koppla integrationer, ändra inställningar) går på riktigt och påverkar ` +
       `deras kunder.\n\n` +
-      `Använd bara för Fortnox-OAuth-test eller andra "agera som"-flöden.\n\n` +
+      `OBS: En ny flik öppnas så din admin-session inte krockar med target-` +
+      `sessionen. Stäng nya fliken när du är klar — din admin-flik är orörd.\n\n` +
       `Är du säker?`
     )
     if (!confirmed) return
@@ -295,7 +296,15 @@ export default function AdminDashboardPage() {
       const res = await fetch(`/api/admin/impersonate/${businessId}`, { method: 'POST' })
       const data = await res.json()
       if (res.ok && data.impersonationUrl) {
-        window.location.href = data.impersonationUrl
+        // Öppna i ny tab så Supabase session-state inte krockar med admin-sessionen.
+        // (Original-tabben har admin-session i localStorage + cookies; ny tab är ren.)
+        const newTab = window.open(data.impersonationUrl, '_blank')
+        if (newTab) {
+          setToast(`Öppnar ${businessName}-session i ny flik...`)
+        } else {
+          // Popup blocker stoppade window.open — visa URL för manuell click
+          setToast(`Popup blockerad — öppna manuellt: ${data.impersonationUrl}`)
+        }
       } else if (data.method === 'manual') {
         setToast(`Tabellen saknas — kör sql/v3_superadmin.sql först. Användarens email: ${data.userEmail}`)
       } else {
