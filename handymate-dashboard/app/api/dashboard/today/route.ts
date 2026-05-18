@@ -214,22 +214,24 @@ export async function GET(req: NextRequest) {
       })
     }
 
-    // 5. Förfallna fakturor
+    // 5. Förfallna fakturor — `customer_name` finns inte direkt på invoice-
+    // tabellen, hämtas via FK-join på customer-tabellen (customer.name).
     const { data: overdueInvoices } = await supabase
-      .from('invoices')
-      .select('id, invoice_number, customer_name, total_amount, due_date')
+      .from('invoice')
+      .select('id:invoice_id, invoice_number, total_amount:total, due_date, customer:customer_id(name)')
       .eq('business_id', bizId)
       .eq('status', 'sent')
       .lt('due_date', todayStr)
       .order('due_date', { ascending: true })
       .limit(5)
 
-    for (const inv of (overdueInvoices || [])) {
+    for (const inv of (overdueInvoices || []) as any[]) {
+      const customerName = inv.customer?.name || 'Okänd kund'
       items.push({
         id: `inv_${inv.id}`,
         type: 'overdue_invoice',
         title: `Faktura #${inv.invoice_number} förfallen`,
-        subtitle: `${inv.customer_name} · ${Number(inv.total_amount).toLocaleString('sv-SE')} kr`,
+        subtitle: `${customerName} · ${Number(inv.total_amount).toLocaleString('sv-SE')} kr`,
         due: inv.due_date,
         priority: 'high',
         status: 'pending',

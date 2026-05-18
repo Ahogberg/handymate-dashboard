@@ -408,8 +408,8 @@ export default function DashboardPage() {
     // Ekonomisammanfattning — läser från business_config
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
     Promise.all([
-      supabase.from('invoices').select('total_amount').eq('business_id', business.business_id).neq('status', 'draft').gte('created_at', startOfMonth),
-      supabase.from('invoices').select('id, total_amount').eq('business_id', business.business_id).eq('status', 'sent'),
+      supabase.from('invoice').select('total_amount:total').eq('business_id', business.business_id).neq('status', 'draft').gte('created_at', startOfMonth),
+      supabase.from('invoice').select('id:invoice_id, total_amount:total').eq('business_id', business.business_id).eq('status', 'sent'),
       supabase.from('business_config').select('overhead_monthly_sek, margin_target_percent').eq('business_id', business.business_id).single(),
     ]).then(([invRes, unpaidRes, bizRes]) => {
       const invoiced = (invRes.data || []).reduce((s: number, i: any) => s + (Number(i.total_amount) || 0), 0)

@@ -279,8 +279,8 @@ export default function CustomerDetailPage() {
 
     // Hämta fakturor
     const { data: invoiceData } = await supabase
-      .from('invoices')
-      .select('id, invoice_number, status, total_amount, due_date, paid_at, created_at')
+      .from('invoice')
+      .select('id:invoice_id, invoice_number, status, total_amount:total, due_date, paid_at, created_at')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
 

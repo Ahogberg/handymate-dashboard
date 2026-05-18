@@ -16,13 +16,13 @@ export async function GET(req: NextRequest) {
   try {
     const [invRes, unpaidRes, bizRes, monthlyRes, timeRes] = await Promise.all([
       // Fakturerat denna månad
-      supabase.from('invoices').select('total_amount').eq('business_id', businessId).neq('status', 'draft').gte('created_at', startOfMonth),
+      supabase.from('invoice').select('total_amount:total').eq('business_id', businessId).neq('status', 'draft').gte('created_at', startOfMonth),
       // Obetalda
-      supabase.from('invoices').select('id, total_amount').eq('business_id', businessId).eq('status', 'sent'),
+      supabase.from('invoice').select('id:invoice_id, total_amount:total').eq('business_id', businessId).eq('status', 'sent'),
       // Ekonomi-inställningar från business_config
       supabase.from('business_config').select('pricing_settings, overhead_monthly_sek, margin_target_percent').eq('business_id', businessId).single(),
       // Senaste 6 månader
-      supabase.from('invoices').select('total_amount, created_at').eq('business_id', businessId).neq('status', 'draft').gte('created_at', sixMonthsAgo).order('created_at', { ascending: true }),
+      supabase.from('invoice').select('total_amount:total, created_at').eq('business_id', businessId).neq('status', 'draft').gte('created_at', sixMonthsAgo).order('created_at', { ascending: true }),
       // Tid denna månad
       supabase.from('time_entry').select('duration_minutes').eq('business_id', businessId).gte('created_at', startOfMonth),
     ])
