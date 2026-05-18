@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { isSuperAdmin, readImpersonationCookie } from '@/lib/auth/superadmin'
 
 function getSupabase() {
   return createClient(
@@ -26,6 +27,15 @@ export interface AuthenticatedBusiness {
   industry: string | null
   bankgiro: string | null
   services_offered: string[] | null
+  /**
+   * Om denna business returneras via superadmin-impersonation snarare än
+   * användarens egen koppling. API-routes kan kolla denna för att blockera
+   * skriv-operationer i impersonation-läge (v1: read-only).
+   */
+  _impersonation?: {
+    admin_user_id: string
+    admin_email: string
+  } | null
 }
 
 /**
@@ -77,6 +87,31 @@ export async function getAuthenticatedBusiness(
 
     if (userError || !user) {
       return null
+    }
+
+    // ── Impersonation: om user är superadmin OCH impersonation-cookie finns,
+    //    returnera target business istället för admin's egen. Annars normal path.
+    if (isSuperAdmin(user)) {
+      const impersonatedBusinessId = readImpersonationCookie(request)
+      if (impersonatedBusinessId) {
+        const { data: targetBusiness, error: targetError } = await supabase
+          .from('business_config')
+          .select('*')
+          .eq('business_id', impersonatedBusinessId)
+          .single()
+
+        if (!targetError && targetBusiness) {
+          return {
+            ...(targetBusiness as AuthenticatedBusiness),
+            _impersonation: {
+              admin_user_id: user.id,
+              admin_email: user.email || '',
+            },
+          }
+        }
+        // Cookie pekar på okänd business — falla igenom till normal auth path
+        console.warn(`[auth/impersonation] cookie pointed to unknown business: ${impersonatedBusinessId}`)
+      }
     }
 
     // Hämta business_config för användaren (som ägare)
