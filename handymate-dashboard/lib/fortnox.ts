@@ -41,13 +41,28 @@ interface FortnoxConfig {
 }
 
 /**
- * Generate the Fortnox OAuth authorization URL
+ * Generate the Fortnox OAuth authorization URL.
+ *
+ * Scope-strategi v1: begär bara MINIMAL set som finns i alla Fortnox-plans
+ * (även gratis/basic). Andreas pilot-test 2026-05-18 fick
+ * 'error_missing_license' eftersom test-Fortnox-kontot saknade
+ * prenumeration för `article`-scope. Bee Services riktiga Fortnox-konto
+ * har sannolikt full licens — men för att tryggt fungera mot ALLA
+ * pilot-kunder begränsar vi till bas-scopes som funkar överallt.
+ *
+ * Utöka scope-listan i en separat sprint när vi vet vilka moduler
+ * pilot-kunder faktiskt har, eller bygg en plan-aware scope-selection.
+ *
+ * TD-49: Article + Payment + Bookkeeping + Project + Time scopes
+ * kräver Fortnox-moduler som inte alla kunder har. Vid 'error_missing_license'
+ * måste vi kunna återanvända koppling med reducerade scopes.
  */
 export function getFortnoxAuthUrl(state: string): string {
   const params = new URLSearchParams({
     client_id: FORTNOX_CLIENT_ID,
     redirect_uri: FORTNOX_REDIRECT_URI,
-    scope: 'invoice customer article companyinformation',
+    // Minimal scope-set som finns i alla Fortnox-plans:
+    scope: 'invoice customer companyinformation',
     state: state,
     response_type: 'code',
     access_type: 'offline'
