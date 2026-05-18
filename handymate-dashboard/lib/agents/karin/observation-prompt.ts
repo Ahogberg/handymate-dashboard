@@ -19,12 +19,21 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { SCHEMA_BLOCK } from '@/lib/agents/shared/schema-block'
+import { type AgentObservation } from '@/lib/agents/shared/normalize'
 import {
-  normalizeObservation,
-  type AgentObservation,
-} from '@/lib/agents/shared/normalize'
+  InvoiceRow,
+  ProjectRow,
+  QuoteRow,
+  InvoiceStats,
+  computeInvoiceStats,
+  ymKey,
+} from '@/lib/agents/shared/business-aggregate'
+import {
+  callAgentWithThinking,
+  type AgentDebugInfo,
+} from '@/lib/agents/shared/thinking-call'
+import { saveAndPush } from '@/lib/agents/shared/save-and-push'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -57,83 +66,14 @@ export interface KarinRunResult {
 // indikerar att Vercel kör äldre commit. Trigga test-endpoint efter push och
 // kolla result.debug.code_version: matchar = ny kod kör; matchar inte =
 // deploy-problem (kolla Vercel dashboard, build-status, branch-konfiguration).
-export const KARIN_CODE_VERSION = 'shared-extract-A1-2026-05-18'
+export const KARIN_CODE_VERSION = 'shared-extract-A2-2026-05-18'
 
-export interface KarinDebugInfo {
-  code_version: string
-  prompt_maturity: 'early_stage' | 'full_analysis'
-  system_prompt_length: number
-  user_message_length: number
-  api_status: number
-  api_status_text?: string
-  api_error_body?: string
-  stop_reason?: string
-  content_block_count: number
-  content_block_types: string[]
-  thinking_full?: string
-  raw_text?: string
-  raw_text_length: number
-  regex_match_found: boolean
-  matched_substring?: string
-  parse_error?: string
-  parsed_count: number
-  normalize_success: number
-  normalize_dropped: number
-  validation_dropped: number
-  validation_drop_reasons?: string[]
-  parsed_observations?: KarinObservation[]
-}
+// KarinDebugInfo är ett alias för AgentDebugInfo från shared.
+// Behålls som re-export för bakåt-kompatibilitet.
+export type KarinDebugInfo = AgentDebugInfo
 
-interface InvoiceRow {
-  invoice_id: string
-  invoice_number: string | null
-  customer_id: string | null
-  total: number
-  invoice_date: string
-  due_date: string | null
-  paid_at: string | null
-  status: string
-  rot_work_cost: number | null
-  rot_rut_deduction: number | null
-  rot_rut_type: string | null
-}
-
-interface ProjectRow {
-  project_id: string
-  name: string | null
-  customer_id: string | null
-  status: string
-  budget_hours: number | null
-  budget_amount: number | null
-  actual_hours: number | null
-  actual_labor_cost: number | null
-  actual_material_cost: number | null
-  profitability_status: string | null
-  completed_at: string | null
-}
-
-interface QuoteRow {
-  quote_id: string
-  status: string
-  total: number | null
-  signed_at: string | null
-  accepted_at: string | null
-  created_at: string
-}
-
-interface InvoiceStats {
-  count: number
-  total_invoiced_kr: number
-  total_paid_kr: number
-  total_overdue_kr: number
-  paid_count: number
-  overdue_count: number
-  sent_pending_count: number
-  avg_days_to_payment: number | null
-  payment_rate_percent: number
-  rot_invoiced_kr: number
-  rot_count: number
-}
+// InvoiceRow, ProjectRow, QuoteRow, InvoiceStats, computeInvoiceStats, ymKey
+// importerade från @/lib/agents/shared/business-aggregate (Phase A2).
 
 export interface KarinAggregate {
   period_days: 90
@@ -181,49 +121,9 @@ export interface KarinAggregate {
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Aggregation
+// Aggregation (Karin-specifik — invoice + projects + quotes + cash flow)
+// computeInvoiceStats + ymKey importerade från shared/business-aggregate
 // ─────────────────────────────────────────────────────────────────
-
-function computeInvoiceStats(invoices: InvoiceRow[]): InvoiceStats {
-  const count = invoices.length
-  const totalInvoiced = invoices.reduce((s, i) => s + Number(i.total || 0), 0)
-  const paid = invoices.filter(i => i.status === 'paid' && i.paid_at)
-  const overdue = invoices.filter(i => i.status === 'overdue')
-  const sent = invoices.filter(i => i.status === 'sent')
-
-  const totalPaid = paid.reduce((s, i) => s + Number(i.total || 0), 0)
-  const totalOverdue = overdue.reduce((s, i) => s + Number(i.total || 0), 0)
-
-  let avgDso: number | null = null
-  if (paid.length > 0) {
-    const totalDays = paid.reduce((s, i) => {
-      const days = (new Date(i.paid_at as string).getTime() - new Date(i.invoice_date).getTime()) / 86400000
-      return s + days
-    }, 0)
-    avgDso = Math.round(totalDays / paid.length)
-  }
-
-  const rotInvoices = invoices.filter(i => (Number(i.rot_work_cost) || 0) > 0)
-  const rotTotal = rotInvoices.reduce((s, i) => s + Number(i.total || 0), 0)
-
-  return {
-    count,
-    total_invoiced_kr: Math.round(totalInvoiced),
-    total_paid_kr: Math.round(totalPaid),
-    total_overdue_kr: Math.round(totalOverdue),
-    paid_count: paid.length,
-    overdue_count: overdue.length,
-    sent_pending_count: sent.length,
-    avg_days_to_payment: avgDso,
-    payment_rate_percent: count > 0 ? Math.round((paid.length / count) * 100) : 0,
-    rot_invoiced_kr: Math.round(rotTotal),
-    rot_count: rotInvoices.length,
-  }
-}
-
-function ymKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
 
 async function buildAggregate(
   supabase: SupabaseClient,
@@ -542,18 +442,15 @@ EXAKT EXEMPEL — kopiera strukturen:
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Claude-anrop med extended-thinking
+// Claude-anrop + save+push: tunna wrappers kring shared-helpers.
+// callAgentWithThinking och saveAndPush importerade från shared/.
 // ─────────────────────────────────────────────────────────────────
 
 async function callKarinWithThinking(
   businessName: string,
   aggregate: KarinAggregate,
   maturity: 'early_stage' | 'full_analysis',
-): Promise<{
-  observations: KarinObservation[]
-  thinkingPreview: string
-  debug: KarinDebugInfo
-}> {
+) {
   const systemPrompt = buildSystemPrompt(businessName, maturity)
   const userMessage = `Här är ${businessName}s siffror senaste 90 dagarna:
 
@@ -561,263 +458,13 @@ ${JSON.stringify(aggregate, null, 2)}
 
 Tänk igenom det och returnera JSON-array.`
 
-  const debug: KarinDebugInfo = {
-    code_version: KARIN_CODE_VERSION,
-    prompt_maturity: maturity,
-    system_prompt_length: systemPrompt.length,
-    user_message_length: userMessage.length,
-    api_status: 0,
-    content_block_count: 0,
-    content_block_types: [],
-    raw_text_length: 0,
-    regex_match_found: false,
-    parsed_count: 0,
-    normalize_success: 0,
-    normalize_dropped: 0,
-    validation_dropped: 0,
-  }
-
-  if (!process.env.ANTHROPIC_API_KEY) {
-    console.warn('[karin/call] ANTHROPIC_API_KEY not set')
-    debug.api_error_body = 'ANTHROPIC_API_KEY not configured'
-    return { observations: [], thinkingPreview: '', debug }
-  }
-
-  // Raw fetch — SDK 0.17.0 är för gammal för thinking-parametern.
-  // Sonnet 4.6 stödjer extended-thinking utan beta-header.
-  // Budget 8000 av total max 12000 = generöst tankearbete för
-  // hypotes-driven analys.
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 12000,
-      thinking: { type: 'enabled', budget_tokens: 8000 },
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
+  return callAgentWithThinking({
+    agentId: 'karin',
+    codeVersion: KARIN_CODE_VERSION,
+    promptMaturity: maturity,
+    systemPrompt,
+    userMessage,
   })
-
-  debug.api_status = response.status
-  debug.api_status_text = response.statusText
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '')
-    console.error('[karin/call] Anthropic API error:', {
-      status: response.status,
-      body: errText.slice(0, 500),
-    })
-    debug.api_error_body = errText.slice(0, 1000)
-    return { observations: [], thinkingPreview: `error: ${response.status}`, debug }
-  }
-
-  const data: any = await response.json()
-  const blocks: Array<{ type: string; text?: string; thinking?: string }> =
-    data.content || []
-
-  debug.stop_reason = data.stop_reason
-  debug.content_block_count = blocks.length
-  debug.content_block_types = blocks.map(b => b.type)
-
-  const thinkingBlock = blocks.find(b => b.type === 'thinking')
-  const textBlock = blocks.find(b => b.type === 'text')
-
-  const thinkingFull = thinkingBlock?.thinking || ''
-  const thinkingPreview = thinkingFull.slice(0, 300)
-  debug.thinking_full = thinkingFull
-
-  // VIKTIGT: använd undefined-check istället för `|| '[]'`-fallback.
-  // Den gamla fallbacken maskerade att text-blocket saknades helt —
-  // '[]'-string passerar regex-match och JSON.parse, vilket gav tom
-  // array istället för tydligt fel. Vi vill veta om Claude faktiskt
-  // skickade text eller bara thinking.
-  const text = textBlock?.text
-  debug.raw_text = text
-  debug.raw_text_length = text?.length || 0
-
-  // ALWAYS-on diagnostic-logg så Vercel ser hela bilden vid varje run
-  console.log('[karin/call] response shape:', {
-    stop_reason: data.stop_reason,
-    block_count: blocks.length,
-    block_types: blocks.map(b => b.type),
-    thinking_length: thinkingFull.length,
-    text_present: !!text,
-    text_length: text?.length || 0,
-    text_preview: text?.slice(0, 200),
-  })
-
-  if (!text) {
-    console.error('[karin/call] no text block in response — model returned only thinking?')
-    return { observations: [], thinkingPreview, debug }
-  }
-
-  const match = text.match(/\[[\s\S]*\]/)
-  if (!match) {
-    console.error('[karin/call] no JSON array in response text:', text.slice(0, 300))
-    return { observations: [], thinkingPreview, debug }
-  }
-
-  debug.regex_match_found = true
-  debug.matched_substring = match[0].slice(0, 1000)
-
-  try {
-    const parsedRaw = JSON.parse(match[0]) as unknown[]
-    const parsedArray: any[] = Array.isArray(parsedRaw) ? (parsedRaw as any[]) : []
-    debug.parsed_count = parsedArray.length
-    debug.parsed_observations = parsedArray as KarinObservation[]
-
-    console.log('[karin/call] before normalize:', {
-      version: KARIN_CODE_VERSION,
-      count: parsedArray.length,
-      first_keys: parsedArray[0] ? Object.keys(parsedArray[0]) : [],
-    })
-
-    const normalizeNotes: string[] = []
-    const dropReasons: string[] = []
-    const valid: KarinObservation[] = []
-
-    for (let i = 0; i < parsedArray.length; i++) {
-      const raw = parsedArray[i]
-      const normalized = normalizeObservation(raw, i, normalizeNotes)
-      if (normalized) {
-        valid.push(normalized)
-      } else {
-        dropReasons.push(`obs[${i}]: no salvageable observation/message field`)
-      }
-    }
-
-    debug.normalize_success = valid.length
-    debug.normalize_dropped = parsedArray.length - valid.length
-    debug.validation_dropped = debug.normalize_dropped // legacy field, samma värde
-    debug.validation_drop_reasons = [...dropReasons, ...normalizeNotes]
-
-    console.log('[karin/call] after normalize:', {
-      version: KARIN_CODE_VERSION,
-      survived: valid.length,
-      dropped: debug.normalize_dropped,
-      normalize_notes_count: normalizeNotes.length,
-      first_drop: dropReasons[0],
-      first_note: normalizeNotes[0],
-    })
-
-    if (valid.length === 0 && parsedArray.length > 0) {
-      console.warn('[karin/call] parsed observations but all dropped:', dropReasons)
-    }
-    if (normalizeNotes.length > 0) {
-      console.log('[karin/call] schema normalization applied:', normalizeNotes)
-    }
-
-    return { observations: valid, thinkingPreview, debug }
-  } catch (parseErr) {
-    const errMsg = parseErr instanceof Error ? parseErr.message : String(parseErr)
-    console.error('[karin/call] JSON parse failed:', errMsg, match[0].slice(0, 300))
-    debug.parse_error = errMsg
-    return { observations: [], thinkingPreview, debug }
-  }
-}
-
-// normalizeObservation importerad från lib/agents/shared/normalize.ts —
-// returnerar AgentObservation som är typ-alias för KarinObservation.
-
-// ─────────────────────────────────────────────────────────────────
-// Save + push
-// ─────────────────────────────────────────────────────────────────
-
-async function saveAndPush(
-  supabase: SupabaseClient,
-  businessId: string,
-  observations: KarinObservation[],
-): Promise<{ saved: number; approvals_created: number; insights_pushed: number }> {
-  let saved = 0
-  let approvalsCreated = 0
-  let insightsPushed = 0
-
-  for (const obs of observations) {
-    const { data: savedRow, error: saveErr } = await supabase
-      .from('business_knowledge')
-      .insert({
-        business_id: businessId,
-        agent_id: 'karin',
-        knowledge_type: obs.knowledge_type,
-        title: obs.title,
-        observation: obs.observation,
-        suggestion: obs.suggestion,
-        confidence: obs.confidence,
-        data_basis: obs.data_basis,
-        status: 'active',
-      })
-      .select('id')
-      .single()
-
-    if (saveErr) {
-      console.error('[karin/save] insert error:', saveErr)
-      continue
-    }
-    saved++
-
-    const knowledgeId = savedRow?.id || null
-
-    if (obs.suggestion && obs.suggestion.trim().length > 0) {
-      const { data: approval } = await supabase
-        .from('pending_approvals')
-        .insert({
-          business_id: businessId,
-          approval_type: 'agent_observation',
-          title: obs.title,
-          description: obs.observation,
-          payload: {
-            agent_id: 'karin',
-            business_knowledge_id: knowledgeId,
-            observation: obs.observation,
-            suggestion: obs.suggestion,
-            confidence: obs.confidence,
-            data_basis: obs.data_basis,
-            knowledge_type: obs.knowledge_type,
-            routed_agent: 'karin',
-          },
-          status: 'pending',
-          risk_level: obs.confidence > 0.8 ? 'medium' : 'low',
-        })
-        .select('id')
-        .single()
-
-      if (approval?.id && knowledgeId) {
-        await supabase
-          .from('business_knowledge')
-          .update({ related_approval_id: approval.id })
-          .eq('id', knowledgeId)
-      }
-
-      void sendApprovalPush({
-        business_id: businessId,
-        approval_type: 'agent_observation',
-        payload: {
-          agent_id: 'karin',
-          title: obs.title,
-          observation: obs.observation,
-        },
-      })
-      approvalsCreated++
-    } else {
-      void sendApprovalPush({
-        business_id: businessId,
-        approval_type: 'agent_insight',
-        payload: {
-          agent_id: 'karin',
-          title: obs.title,
-          observation: obs.observation,
-        },
-      })
-      insightsPushed++
-    }
-  }
-
-  return { saved, approvals_created: approvalsCreated, insights_pushed: insightsPushed }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -868,7 +515,7 @@ export async function runKarinObservation(
     }
   }
 
-  const counts = await saveAndPush(supabase, businessId, observations)
+  const counts = await saveAndPush(supabase, businessId, 'karin', observations)
 
   return {
     aggregate,
