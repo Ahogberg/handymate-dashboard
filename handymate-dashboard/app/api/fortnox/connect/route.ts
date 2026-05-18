@@ -1,46 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { createClient } from '@supabase/supabase-js'
-import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getFortnoxAuthUrl } from '@/lib/fortnox'
 
 /**
  * GET /api/fortnox/connect
- * Initiate Fortnox OAuth flow
+ * Initiate Fortnox OAuth flow.
+ *
+ * Auth via getAuthenticatedBusiness (lib/auth.ts) som hanterar både
+ * Supabase v2-cookies (sb-{ref}-auth-token JSON-array) OCH impersonation
+ * (hm_impersonate-cookie för superadmins). Tidigare läste denna route bara
+ * sb-access-token / supabase-auth-token (v1-format) vilket inte fungerar
+ * sedan Supabase v2-migrationen — alla användare fick login-redirect vid
+ * klick på "Koppla Fortnox" oavsett session-status.
+ *
+ * State-format: `${business_id}:${random}` — callback verifierar mot cookie.
  */
 export async function GET(request: NextRequest) {
   try {
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.redirect(
+        new URL('/login?redirect=/dashboard/settings', request.url)
+      )
+    }
+
     const cookieStore = await cookies()
-    const supabase = getServerSupabase()
-
-    // Get user from auth cookie
-    const authCookie = cookieStore.get('sb-access-token')?.value ||
-                       cookieStore.get('supabase-auth-token')?.value
-
-    if (!authCookie) {
-      return NextResponse.redirect(new URL('/login?redirect=/dashboard/settings', request.url))
-    }
-
-    // Parse the auth token to get user ID
-    const { data: { user }, error: authError } = await createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    ).auth.getUser(authCookie)
-
-    if (authError || !user) {
-      return NextResponse.redirect(new URL('/login?redirect=/dashboard/settings', request.url))
-    }
-
-    // Get business_id for this user
-    const { data: business, error: businessError } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('user_id', user.id)
-      .single()
-
-    if (businessError || !business) {
-      return NextResponse.json({ error: 'Business not found' }, { status: 404 })
-    }
 
     // Generate state parameter (business_id + random string)
     const stateRandom = Math.random().toString(36).substring(2, 15)
@@ -52,7 +37,7 @@ export async function GET(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 10, // 10 minutes
-      path: '/'
+      path: '/',
     })
 
     // Redirect to Fortnox OAuth
