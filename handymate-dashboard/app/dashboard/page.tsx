@@ -37,6 +37,7 @@ import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import IdentityPill from '@/components/IdentityPill'
+import TeamObservationsCard from '@/components/dashboard/TeamObservationsCard'
 
 interface Booking {
   booking_id: string
@@ -606,9 +607,14 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h.
-            Observationer (insikter, mönster, avvikelser, förslag) renderas
-            inline per agent-rad istället för i ett separat kort. */}
+        {/* AI-team observationer — Karin v1, övriga agenter följer.
+            Separat kort ovanför aktivitets-strip:en så Christoffer ser
+            "vad teamet noterar idag" före "vad teamet gjort senaste 24h". */}
+        <div className="mb-4 sm:mb-6">
+          <TeamObservationsCard />
+        </div>
+
+        {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h */}
         <TeamActivityStrip onLoaded={(summary) => setTeamSummaryText(buildSummaryText(summary))} />
 
         {/* Welcome popup — visas bara en gång */}
