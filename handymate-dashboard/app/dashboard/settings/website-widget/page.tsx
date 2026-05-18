@@ -22,11 +22,17 @@ import {
   Users,
   TrendingUp,
   Target,
+  BookOpen,
+  Shield,
+  AlertCircle,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
 import UpgradePrompt from '@/components/UpgradePrompt'
+import KnowledgeEditor, { type KnowledgeBase } from '@/components/widget/KnowledgeEditor'
+import GuardrailsEditor, { type WidgetGuardrails } from '@/components/widget/GuardrailsEditor'
+import { canActivateWidget } from '@/lib/widget-activation'
 
 interface WidgetConfig {
   widget_enabled: boolean
@@ -93,11 +99,16 @@ export default function WebsiteWidgetPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [config, setConfig] = useState<WidgetConfig>(DEFAULT_CONFIG)
-  const [activeTab, setActiveTab] = useState<'analytics' | 'appearance' | 'behavior' | 'install' | 'preview'>('appearance')
+  const [activeTab, setActiveTab] = useState<'knowledge' | 'boundaries' | 'analytics' | 'appearance' | 'behavior' | 'install' | 'preview'>('knowledge')
   const [copied, setCopied] = useState(false)
   const [newQuestion, setNewQuestion] = useState('')
   const [analytics, setAnalytics] = useState<WidgetAnalytics | null>(null)
   const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  // Gating-state: KnowledgeEditor + GuardrailsEditor uppdaterar dessa via
+  // onChange-callbacks. canActivateWidget(knowledge, guardrails) avgör om
+  // widget_enabled-toggle får sättas till true.
+  const [knowledge, setKnowledge] = useState<KnowledgeBase | null>(null)
+  const [guardrails, setGuardrails] = useState<WidgetGuardrails | null>(null)
 
   useEffect(() => {
     if (business.business_id) fetchConfig()
@@ -236,13 +247,22 @@ export default function WebsiteWidgetPage() {
 
   const botName = config.widget_bot_name || `${business.business_name}s assistent`
 
+  // Kunskap + Boundaries först eftersom de krävs för aktivering.
+  // Sätter användarens fokus på "vad ska boten kunna och inte" innan styling.
   const tabs = [
-    { key: 'analytics' as const, label: 'Statistik', icon: BarChart3 },
+    { key: 'knowledge' as const, label: 'Kunskap', icon: BookOpen },
+    { key: 'boundaries' as const, label: 'Boundaries', icon: Shield },
     { key: 'appearance' as const, label: 'Utseende', icon: Palette },
     { key: 'behavior' as const, label: 'Beteende', icon: Settings },
-    { key: 'install' as const, label: 'Installation', icon: Code },
     { key: 'preview' as const, label: 'Förhandsgranska', icon: Eye },
+    { key: 'install' as const, label: 'Installation', icon: Code },
+    { key: 'analytics' as const, label: 'Statistik', icon: BarChart3 },
   ]
+
+  const activation = canActivateWidget(knowledge, guardrails)
+  // Toggle blockeras bara när användaren försöker AKTIVERA en widget som inte
+  // möter villkoren. Redan aktiverade widgets kan alltid stängas av.
+  const canEnable = config.widget_enabled || activation.ok
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -258,13 +278,20 @@ export default function WebsiteWidgetPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Enable toggle */}
+          {/* Enable toggle — gated av canActivateWidget(knowledge, guardrails) */}
           <button
-            onClick={() => setConfig(prev => ({ ...prev, widget_enabled: !prev.widget_enabled }))}
+            onClick={() => {
+              if (!canEnable) return
+              setConfig(prev => ({ ...prev, widget_enabled: !prev.widget_enabled }))
+            }}
+            disabled={!canEnable}
+            title={!canEnable ? 'Fyll i Kunskap + Boundaries först — se checklistan nedan' : undefined}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
               config.widget_enabled
                 ? 'bg-green-50 border-green-200 text-green-700'
-                : 'bg-gray-50 border-gray-200 text-gray-500'
+                : !canEnable
+                  ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
             }`}
           >
             {config.widget_enabled ? (
@@ -292,13 +319,43 @@ export default function WebsiteWidgetPage() {
         </div>
       </div>
 
+      {/* Activation-checklist — visas bara när widget INTE är aktiverad och
+          något saknas. Deep-links till respektive tab så det är ett klick
+          för användaren att fixa varje punkt. */}
+      {!config.widget_enabled && !activation.ok && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="text-sm font-semibold text-amber-900 mb-2">
+                För att kunna aktivera chattboten behöver följande fyllas i:
+              </div>
+              <ul className="space-y-1.5">
+                {activation.missing.map((m, i) => (
+                  <li key={i} className="text-sm text-amber-900 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0" />
+                    <span>{m.message}</span>
+                    <button
+                      onClick={() => setActiveTab(m.area === 'knowledge' ? 'knowledge' : 'boundaries')}
+                      className="ml-auto text-xs px-2 py-0.5 bg-white border border-amber-300 rounded text-amber-700 hover:bg-amber-100"
+                    >
+                      Gå till {m.area === 'knowledge' ? 'Kunskap' : 'Boundaries'} →
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+      <div className="flex gap-1 bg-gray-100 p-1 rounded-lg overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`flex-1 min-w-fit flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
               activeTab === tab.key
                 ? 'bg-white text-gray-900'
                 : 'text-gray-500 hover:text-gray-700'
@@ -311,6 +368,20 @@ export default function WebsiteWidgetPage() {
       </div>
 
       {/* Tab Content */}
+      {activeTab === 'knowledge' && (
+        <KnowledgeEditor
+          businessId={business.business_id}
+          onKnowledgeChange={setKnowledge}
+        />
+      )}
+
+      {activeTab === 'boundaries' && (
+        <GuardrailsEditor
+          businessId={business.business_id}
+          onGuardrailsChange={setGuardrails}
+        />
+      )}
+
       {activeTab === 'analytics' && (
         <div className="space-y-6">
           {analyticsLoading ? (
