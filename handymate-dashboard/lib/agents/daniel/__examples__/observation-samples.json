@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "purpose": "Förväntad output-kvalitet från Daniel vid olika datasets. Används som referens för prompt-tuning + test-fixture för UI-rendering innan vi har riktig pilot-data.",
+    "generated": "2026-05-18",
+    "model": "claude-sonnet-4-6 + extended-thinking (budget 8000)",
+    "agent_id": "daniel",
+    "agent_role": "Säljare — spotting opportunities, lead-källor, stale-opens, pris-elasticitet"
+  },
+
+  "scenario_a_full_analysis_brf_wins": {
+    "description": "Business med 18 offerter senaste 90d. BRF accepterar 92%, privatkunder bara 35%. Stark BRF-konvertering — Daniel ska upptäcka och rekommendera fokus.",
+    "expected_observations": [
+      {
+        "knowledge_type": "pattern",
+        "title": "BRF accepterar 92% — högst av alla kund-typer",
+        "observation": "BRF-kunder har accepterat 11 av 12 offerter senaste 90 dagarna och snittbeloppet ligger 18% högre än privatkund-snittet (47 500 kr vs 40 250 kr). Privatkunder bara 35% acceptans-rate.",
+        "suggestion": "Prioritera BRF-leads i pipelinen och leta aktivt efter fler bostadsrättsföreningar.",
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "acceptance_rate_by_customer_type",
+          "brf_acceptance_rate": 92,
+          "brf_avg_accepted_kr": 47500,
+          "private_acceptance_rate": 35,
+          "private_avg_accepted_kr": 40250,
+          "brf_count": 12,
+          "private_count": 6
+        }
+      }
+    ]
+  },
+
+  "scenario_b_stale_opens": {
+    "description": "Tre offerter har öppnats 3+ gånger men inte signerats. Heta kunder som tvekar — Daniel flaggar för follow-up.",
+    "expected_observations": [
+      {
+        "knowledge_type": "anomaly",
+        "title": "BRF Lindgården öppnat ÄTA-22 fem gånger utan signering",
+        "observation": "BRF Lindgården har öppnat din offert på badrumsrenovering (47 500 kr) fem gånger sedan 14 dagar tillbaka. Hett intresse men något bromsar — kanske pris eller scope.",
+        "suggestion": "Ring BRF Lindgården direkt och fråga vad som behövs för att de ska bestämma sig.",
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "stale_quote_views",
+          "quote_id": "qte_xxxxxxxxxxxx",
+          "customer_name": "BRF Lindgården",
+          "open_count": 5,
+          "days_since_created": 14,
+          "total_kr": 47500
+        }
+      },
+      {
+        "knowledge_type": "recommendation",
+        "title": "2 andra offerter på samma 3+ visnings-mönster",
+        "observation": "Förutom BRF Lindgården har Anders Eriksson (28 500 kr) och Maria Lindqvist (62 000 kr) öppnat sina offerter 3-4 gånger utan att svara. Båda är värda en personlig påringning.",
+        "suggestion": "Boka in 15 min för att ringa de tre stale-kandidaterna denna vecka.",
+        "confidence": 0.75,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "stale_quote_views_secondary",
+          "stale_count": 2,
+          "total_pending_kr": 90500
+        }
+      }
+    ]
+  },
+
+  "scenario_c_lead_source_insight": {
+    "description": "Webform-leads har 70% win rate, SMS-leads 15%. Daniel ska upptäcka att webform är guldgruva.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Webform-leads vinner 70% — bäst av alla källor",
+        "observation": "Senaste 90 dagarna har webform-leads gett 7 vinster av 10 (70%), medan SMS-leads bara stänger 2 av 14 (14%). Webform-kunderna är researcha:de och beslutsmogna när de skickar in.",
+        "suggestion": "Lägg mer marknadsbudget på att driva trafik till webform — eller bygg formuläret mer synligt på hemsidan.",
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "win_rate_by_lead_source",
+          "webform_win_rate": 70,
+          "webform_count": 10,
+          "sms_win_rate": 14,
+          "sms_count": 14
+        }
+      }
+    ]
+  },
+
+  "scenario_d_early_stage": {
+    "description": "Business med 7 offerter totalt. Daniel presenterar sig istället för djupanalys.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Jag börjar förstå försäljningsflödet",
+        "observation": "Tjena! Jag är Daniel, din säljare. Hittills har jag sett 7 offerter till 4 kunder de senaste 90 dagarna — inte massor men nog för att börja känna mönstret. Säg gärna till vilka deals du vill att jag håller extra koll på framöver.",
+        "suggestion": null,
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 90,
+          "quote_count": 7,
+          "customer_count": 4,
+          "note": "early_stage_introduction"
+        }
+      }
+    ]
+  },
+
+  "scenario_e_all_good": {
+    "description": "Stark dataset utan oroväckande mönster. Daniel ska säga det istället för att hitta på problem.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Pipelinen rullar på bra",
+        "observation": "Senaste 90 dagarna har du landat 14 offerter av 18 (78% acceptance) med snittbelopp 52 000 kr. Inga stale-opens, ingen kund-typ underpresterar. Bra läge — håll i.",
+        "suggestion": null,
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "overall_pipeline_health",
+          "acceptance_rate_pct": 78,
+          "avg_accepted_kr": 52000,
+          "stale_count": 0
+        }
+      }
+    ]
+  },
+
+  "scenario_f_insufficient_data": {
+    "description": "Business med < 5 offerter. Daniel skippar helt och returnerar tom array med reason.",
+    "expected_result": {
+      "skipped": "insufficient_data",
+      "reason": "fewer_than_5_quotes",
+      "observations": []
+    }
+  }
+}
