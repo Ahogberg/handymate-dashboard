@@ -19,6 +19,14 @@ export interface AgentObservation {
   suggestion: string | null
   confidence: number
   data_basis: Record<string, unknown>
+  /**
+   * Frivillig nyckel för cross-run dedup. Sätts inte av agenter i v1 —
+   * härleds istället från (agent_id, knowledge_type, normalized_title) i
+   * lib/agents/shared/dedup.ts. Reserverad för v2 där agenter kan sätta
+   * semantisk nyckel (t.ex. "stale_quote:${quote_id}") för bättre dedup-
+   * precision på samma fenomen över olika title-formuleringar.
+   */
+  dedup_key?: string
 }
 
 export const VALID_KNOWLEDGE_TYPES = new Set([
@@ -100,6 +108,12 @@ export function normalizeObservation(
   const dataBasis: Record<string, unknown> =
     raw.data_basis && typeof raw.data_basis === 'object' ? raw.data_basis : {}
 
+  // dedup_key: frivilligt — agenten har möjlighet att sätta semantisk nyckel
+  const dedupKey =
+    typeof raw.dedup_key === 'string' && raw.dedup_key.trim().length > 0
+      ? raw.dedup_key.trim()
+      : undefined
+
   return {
     knowledge_type: knowledgeType as AgentObservation['knowledge_type'],
     title,
@@ -107,5 +121,6 @@ export function normalizeObservation(
     suggestion,
     confidence,
     data_basis: dataBasis,
+    ...(dedupKey ? { dedup_key: dedupKey } : {}),
   }
 }
