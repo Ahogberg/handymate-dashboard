@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
+import { isSuperAdmin, IMPERSONATION_COOKIE } from '@/lib/auth/superadmin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -272,15 +273,34 @@ if (action === 'login') {
       // Hämta business_config (owner) eller via business_users (teammedlem)
       let business: any = null
 
-      const { data: directBusiness } = await getServerSupabase()
-        .from('business_config')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single()
+      // Impersonation: om user är admin och hm_impersonate-cookien finns,
+      // returnera target business istället för admin's egen. Konsekvent
+      // med getAuthenticatedBusiness() i lib/auth.ts.
+      if (isSuperAdmin(session.user)) {
+        const cookieStore = await cookies()
+        const impersonateBusinessId = cookieStore.get(IMPERSONATION_COOKIE)?.value
+        if (impersonateBusinessId) {
+          const { data: targetBusiness } = await getServerSupabase()
+            .from('business_config')
+            .select('*')
+            .eq('business_id', impersonateBusinessId)
+            .single()
+          if (targetBusiness) business = targetBusiness
+        }
+      }
 
-      if (directBusiness) {
-        business = directBusiness
-      } else {
+      // Om inte impersonating — hämta admin's egen business
+      if (!business) {
+        const { data: directBusiness } = await getServerSupabase()
+          .from('business_config')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .single()
+
+        if (directBusiness) business = directBusiness
+      }
+
+      if (!business) {
         // Fallback: teammedlem → sök business_users → hämta business_config
         const { data: bu } = await getServerSupabase()
           .from('business_users')
