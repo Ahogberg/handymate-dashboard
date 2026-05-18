@@ -363,6 +363,8 @@ REGLER:
 - suggestion: null (ren introduktion, ingen action)
 - confidence: 0.9 (du är säker på att du är ny)
 - data_basis: { period_days, invoice_count, customer_count, note: 'early_stage_introduction' }
+- dedup_key: "karin_early_stage_intro" (OBLIGATORISK i denna prompt — så denna introduktion
+  inte upprepas vid nästa körning även om du formulerar titeln lite annorlunda)
 
 ${SCHEMA_BLOCK}
 
@@ -380,7 +382,8 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
       "invoice_count": 7,
       "customer_count": 4,
       "note": "early_stage_introduction"
-    }
+    },
+    "dedup_key": "karin_early_stage_intro"
   }
 ]`
   }

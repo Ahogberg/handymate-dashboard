@@ -7,7 +7,7 @@
  */
 export const SCHEMA_BLOCK = `═══ SCHEMA — STRIKT, FÖLJ EXAKT ═══
 
-Returnera ENDAST en JSON-array. Varje observation MÅSTE ha exakt dessa fält:
+Returnera ENDAST en JSON-array. Varje observation MÅSTE ha dessa fält:
 
 {
   "knowledge_type": "insight" | "pattern" | "anomaly" | "recommendation",
@@ -16,6 +16,12 @@ Returnera ENDAST en JSON-array. Varje observation MÅSTE ha exakt dessa fält:
   "suggestion": string | null,   // konkret nästa-steg ELLER null om ren info
   "confidence": number,          // 0-1
   "data_basis": object           // metadata: period_days, metric, relevanta IDs/tal
+}
+
+VALFRITT fält (sätt bara när du blir instruerad):
+{
+  "dedup_key": string            // semantisk nyckel för att skippa duplikater
+                                  // över körningar — t.ex. "karin_early_stage_intro"
 }
 
 FÖRBJUDNA FÄLT: använd INTE "message", "text", "body", "description", "summary"

@@ -368,6 +368,8 @@ REGLER:
 - suggestion: null (ren introduktion, ingen action)
 - confidence: 0.9
 - data_basis: { period_days, project_count, completed_count, note: 'early_stage_introduction' }
+- dedup_key: "lars_early_stage_intro" (OBLIGATORISK i denna prompt — så denna introduktion
+  inte upprepas vid nästa körning även om du formulerar titeln lite annorlunda)
 
 ${SCHEMA_BLOCK}
 
@@ -385,7 +387,8 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
       "project_count": 7,
       "completed_count": 3,
       "note": "early_stage_introduction"
-    }
+    },
+    "dedup_key": "lars_early_stage_intro"
   }
 ]`
   }
