@@ -2,7 +2,13 @@ import { createClient } from '@supabase/supabase-js'
 
 const FORTNOX_CLIENT_ID = process.env.FORTNOX_CLIENT_ID!
 const FORTNOX_CLIENT_SECRET = process.env.FORTNOX_CLIENT_SECRET!
-const FORTNOX_REDIRECT_URI = process.env.FORTNOX_REDIRECT_URI || 'https://handymate.se/api/fortnox/callback'
+// FORTNOX_REDIRECT_URI saknas typiskt i env — fallback bygger från
+// NEXT_PUBLIC_APP_URL (vilket sätts av Vercel/lokal config) snarare än
+// hård-kodad 'handymate.se' (utan app.-subdomän) som inte matchar
+// produktion. Måste matcha exakt det som är registrerat i Fortnox
+// developer console för respektive app.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+const FORTNOX_REDIRECT_URI = process.env.FORTNOX_REDIRECT_URI || `${APP_URL}/api/fortnox/callback`
 const FORTNOX_API_BASE = 'https://api.fortnox.se/3'
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
 
