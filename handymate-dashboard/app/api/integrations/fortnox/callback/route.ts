@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { saveFortnoxTokens, getFortnoxCompanyInfo } from '@/lib/fortnox'
+import { logFortnoxApi } from '@/lib/fortnox/api-log'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
@@ -16,6 +17,38 @@ function settingsUrl(params: Record<string, string>): string {
 }
 
 /**
+ * Logga callback-attempt till fortnox_api_log med endpoint='oauth_callback'.
+ * Non-blocking — fel sväljs. business_id är obligatoriskt; om okänt vid
+ * total-failure faller vi tillbaka på console.error utan DB-rad.
+ */
+async function logCallback(
+  businessId: string | null,
+  outcome: 'success' | 'error',
+  errorMessage: string | null,
+  statusCode: number | null = null,
+  metadata: Record<string, unknown> | null = null,
+): Promise<void> {
+  const prefix = `[fortnox/callback] ${outcome.toUpperCase()}`
+  const ctx = businessId ? `business=${businessId}` : 'business=UNKNOWN'
+  if (outcome === 'error') {
+    console.error(`${prefix} ${ctx}: ${errorMessage}`)
+  } else {
+    console.log(`${prefix} ${ctx}`)
+  }
+
+  if (!businessId) return // fortnox_api_log.business_id är NOT NULL
+
+  await logFortnoxApi({
+    business_id: businessId,
+    endpoint: 'oauth_callback',
+    method: 'GET',
+    status_code: statusCode,
+    error_message: errorMessage,
+    request_payload: metadata,
+  })
+}
+
+/**
  * GET /api/integrations/fortnox/callback
  *
  * Tar emot ?code= från Fortnox och växlar mot tokens. Egen exchange (ej
@@ -24,25 +57,44 @@ function settingsUrl(params: Record<string, string>): string {
  *
  * Sparar tokens via saveFortnoxTokens() vilken också sätter
  * fortnox_connected = true (v46).
+ *
+ * Varje fail-point loggas till fortnox_api_log med endpoint='oauth_callback'
+ * + framgång loggas också, så vi kan se i DB om en business försökt koppla
+ * (även om token-exchange failade och fortnox_connected fortfarande är false).
  */
 export async function GET(request: NextRequest) {
+  const cookieStore = await cookies()
+  const params = request.nextUrl.searchParams
+
+  const code = params.get('code')
+  const state = params.get('state')
+  const oauthError = params.get('error')
+  const errorDescription = params.get('error_description')
+
+  // Extrahera businessId från state tidigt — så vi kan logga även OAuth-errors
+  // där tokens aldrig sparas men användaren faktiskt försökte.
+  const businessIdFromState: string | null = state ? (state.split(':')[0] || null) : null
+
   try {
-    const cookieStore = await cookies()
-    const params = request.nextUrl.searchParams
-
-    const code = params.get('code')
-    const state = params.get('state')
-    const oauthError = params.get('error')
-    const errorDescription = params.get('error_description')
-
     if (oauthError) {
-      console.error('[fortnox/callback] OAuth error:', oauthError, errorDescription)
+      await logCallback(
+        businessIdFromState,
+        'error',
+        `OAuth error from Fortnox: ${oauthError}${errorDescription ? ` — ${errorDescription}` : ''}`,
+        null,
+        { oauth_error: oauthError, oauth_error_description: errorDescription },
+      )
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: errorDescription || oauthError })
       )
     }
 
     if (!code || !state) {
+      await logCallback(
+        businessIdFromState,
+        'error',
+        `Missing required params: code=${!!code}, state=${!!state}`,
+      )
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: 'Missing code or state' })
       )
@@ -50,14 +102,21 @@ export async function GET(request: NextRequest) {
 
     const storedState = cookieStore.get('fortnox_oauth_state')?.value
     if (!storedState || storedState !== state) {
-      console.error('[fortnox/callback] state mismatch')
+      await logCallback(
+        businessIdFromState,
+        'error',
+        `State mismatch — cookie ${storedState ? 'present but differs' : 'missing'}`,
+        null,
+        { cookie_present: !!storedState },
+      )
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: 'Ogiltig state — försök igen' })
       )
     }
 
-    const [businessId] = state.split(':')
+    const businessId = businessIdFromState
     if (!businessId) {
+      await logCallback(null, 'error', 'Invalid state format — no business_id')
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: 'Invalid state format' })
       )
@@ -67,6 +126,7 @@ export async function GET(request: NextRequest) {
     const clientId = process.env.FORTNOX_CLIENT_ID || 'HByzoLM8GB66'
     const clientSecret = process.env.FORTNOX_CLIENT_SECRET
     if (!clientSecret) {
+      await logCallback(businessId, 'error', 'FORTNOX_CLIENT_SECRET missing in environment')
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: 'FORTNOX_CLIENT_SECRET saknas i miljön' })
       )
@@ -87,7 +147,12 @@ export async function GET(request: NextRequest) {
 
     if (!tokenRes.ok) {
       const text = await tokenRes.text()
-      console.error('[fortnox/callback] token exchange failed:', text)
+      await logCallback(
+        businessId,
+        'error',
+        `Token exchange failed: ${text.slice(0, 500)}`,
+        tokenRes.status,
+      )
       return NextResponse.redirect(
         settingsUrl({ fortnox: 'error', message: 'Token-utbyte misslyckades' })
       )
@@ -104,9 +169,20 @@ export async function GET(request: NextRequest) {
 
     cookieStore.delete('fortnox_oauth_state')
 
+    await logCallback(businessId, 'success', null, 200, {
+      company_name: companyInfo?.CompanyName || null,
+      has_refresh_token: !!tokens.refresh_token,
+    })
+
     return NextResponse.redirect(settingsUrl({ fortnox: 'connected' }))
   } catch (err: any) {
-    console.error('[fortnox/callback] error:', err)
+    await logCallback(
+      businessIdFromState,
+      'error',
+      `Uncaught error: ${err?.message || 'unknown'}`,
+      null,
+      { stack: err?.stack?.slice(0, 1000) },
+    )
     return NextResponse.redirect(
       settingsUrl({ fortnox: 'error', message: err?.message || 'Callback failed' })
     )
