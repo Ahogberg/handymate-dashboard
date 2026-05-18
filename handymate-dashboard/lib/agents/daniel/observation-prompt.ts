@@ -1,0 +1,467 @@
+/**
+ * Daniels observation-pipeline — Säljare med fokus på offert-konvertering,
+ * lead-källor, stale-opens och pris-elasticitet per kund-typ.
+ *
+ * Klonad från Karin-mönstret 2026-05-18 (Phase B1). Använder shared:
+ * - lib/agents/shared/schema-block (SCHEMA_BLOCK)
+ * - lib/agents/shared/normalize (AgentObservation + normalizeObservation)
+ * - lib/agents/shared/thinking-call (callAgentWithThinking + AgentDebugInfo)
+ * - lib/agents/shared/save-and-push (saveAndPush med agentId='daniel')
+ *
+ * Tre-nivåer fallback:
+ *   - 0 quotes 90d: skip 'no_quotes_last_90d'
+ *   - 1-4 quotes: skip 'insufficient_data'
+ *   - 5-9 quotes: 'early_stage' — relation-byggande
+ *   - 10+ quotes: 'full_analysis' — hypotes-driven djupanalys
+ */
+
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { SCHEMA_BLOCK } from '@/lib/agents/shared/schema-block'
+import { type AgentObservation } from '@/lib/agents/shared/normalize'
+import {
+  callAgentWithThinking,
+  type AgentDebugInfo,
+} from '@/lib/agents/shared/thinking-call'
+import { saveAndPush } from '@/lib/agents/shared/save-and-push'
+
+// ─────────────────────────────────────────────────────────────────
+// Public types
+// ─────────────────────────────────────────────────────────────────
+
+export type DanielObservation = AgentObservation
+export type DanielDebugInfo = AgentDebugInfo
+
+export const DANIEL_CODE_VERSION = 'daniel-v1-2026-05-18'
+
+export interface DanielRunResult {
+  skipped?: string
+  reason?: string
+  aggregate?: DanielAggregate
+  data_maturity?: 'early_stage' | 'full_analysis'
+  observations_total?: number
+  saved?: number
+  approvals_created?: number
+  insights_pushed?: number
+  thinking_preview?: string
+  error?: string
+  debug?: DanielDebugInfo
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Aggregate-typer
+// ─────────────────────────────────────────────────────────────────
+
+interface QuoteRow {
+  quote_id: string
+  status: string
+  total: number | null
+  signed_at: string | null
+  accepted_at: string | null
+  created_at: string
+  view_count: number | null
+  customer_id: string | null
+  title: string | null
+}
+
+interface LeadRow {
+  lead_id: string
+  source: string | null
+  score: number | null
+  status: string
+  created_at: string
+}
+
+interface QuoteStats {
+  count: number
+  total_value_kr: number
+  accepted_count: number
+  declined_count: number
+  open_count: number
+  acceptance_rate_pct: number
+  avg_total_kr: number | null
+  avg_accepted_total_kr: number | null
+}
+
+export interface DanielAggregate {
+  period_days: 90
+  last_90d: QuoteStats
+  by_customer_type: Record<string, QuoteStats>
+  stale_opens: Array<{
+    quote_id: string
+    title: string | null
+    customer_name: string | null
+    customer_type: string
+    open_count: number
+    total_kr: number
+    days_since_created: number
+  }>
+  leads_by_source: Record<
+    string,
+    {
+      count: number
+      avg_score: number | null
+      won_count: number
+      lost_count: number
+      open_count: number
+      win_rate_pct: number | null
+    }
+  >
+  hot_leads: Array<{
+    lead_id: string
+    source: string | null
+    score: number | null
+    days_in_pipeline: number
+  }>
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Aggregation
+// ─────────────────────────────────────────────────────────────────
+
+function computeQuoteStats(quotes: QuoteRow[]): QuoteStats {
+  const accepted = quotes.filter(q => q.status === 'accepted' || q.status === 'signed')
+  const declined = quotes.filter(q => q.status === 'declined')
+  // "Open" = sent/draft/anything other than accepted/declined/expired
+  const open = quotes.filter(
+    q => !['accepted', 'signed', 'declined', 'expired'].includes(q.status),
+  )
+
+  const totalValue = quotes.reduce((s, q) => s + Number(q.total || 0), 0)
+  const acceptedValue = accepted.reduce((s, q) => s + Number(q.total || 0), 0)
+  const evaluated = accepted.length + declined.length
+  const acceptanceRate = evaluated > 0
+    ? Math.round((accepted.length / evaluated) * 100)
+    : 0
+
+  return {
+    count: quotes.length,
+    total_value_kr: Math.round(totalValue),
+    accepted_count: accepted.length,
+    declined_count: declined.length,
+    open_count: open.length,
+    acceptance_rate_pct: acceptanceRate,
+    avg_total_kr: quotes.length > 0 ? Math.round(totalValue / quotes.length) : null,
+    avg_accepted_total_kr: accepted.length > 0 ? Math.round(acceptedValue / accepted.length) : null,
+  }
+}
+
+async function buildDanielAggregate(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<DanielAggregate | null> {
+  const now = Date.now()
+  const ninetyDaysAgo = new Date(now - 90 * 86400000)
+
+  // ── Quotes (90d) ───────────────────────────────────────────
+  const { data: quotesData, error: quotesError } = await supabase
+    .from('quotes')
+    .select('quote_id, status, total, signed_at, accepted_at, created_at, view_count, customer_id, title')
+    .eq('business_id', businessId)
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .limit(300)
+
+  if (quotesError) {
+    console.error('[daniel/aggregate] quotes query error:', quotesError)
+    return null
+  }
+
+  if (!quotesData || quotesData.length === 0) {
+    return null
+  }
+
+  const quotes = quotesData as QuoteRow[]
+  const last90d = computeQuoteStats(quotes)
+
+  // ── Customer types ─────────────────────────────────────────
+  const customerIds = Array.from(
+    new Set(quotes.map(q => q.customer_id).filter((id): id is string => !!id)),
+  )
+
+  const customerTypeMap: Record<string, string> = {}
+  const customerNameMap: Record<string, string> = {}
+  if (customerIds.length > 0) {
+    const { data: customers } = await supabase
+      .from('customer')
+      .select('customer_id, customer_type, name')
+      .in('customer_id', customerIds)
+      .eq('business_id', businessId)
+    for (const c of customers || []) {
+      const declaredType = c.customer_type
+      const name = (c.name || '').toLowerCase()
+      const likelyBrf = !declaredType && (name.includes('brf') || name.includes('bostadsrätts'))
+      customerTypeMap[c.customer_id] = declaredType || (likelyBrf ? 'brf' : 'private')
+      customerNameMap[c.customer_id] = c.name || ''
+    }
+  }
+
+  const byType: Record<string, QuoteRow[]> = {}
+  for (const q of quotes) {
+    const type = q.customer_id ? customerTypeMap[q.customer_id] || 'unknown' : 'no_customer'
+    if (!byType[type]) byType[type] = []
+    byType[type].push(q)
+  }
+  const byCustomerType: Record<string, QuoteStats> = {}
+  for (const [type, qs] of Object.entries(byType)) {
+    byCustomerType[type] = computeQuoteStats(qs)
+  }
+
+  // ── Stale opens (3+ views utan signering) ──────────────────
+  const staleOpens = quotes
+    .filter(q => {
+      const views = Number(q.view_count || 0)
+      const isUndetermined = !['accepted', 'signed', 'declined', 'expired'].includes(q.status)
+      return views >= 3 && isUndetermined
+    })
+    .map(q => ({
+      quote_id: q.quote_id,
+      title: q.title,
+      customer_name: q.customer_id ? customerNameMap[q.customer_id] || null : null,
+      customer_type: q.customer_id ? customerTypeMap[q.customer_id] || 'unknown' : 'no_customer',
+      open_count: Number(q.view_count || 0),
+      total_kr: Math.round(Number(q.total || 0)),
+      days_since_created: Math.round((now - new Date(q.created_at).getTime()) / 86400000),
+    }))
+    .sort((a, b) => b.open_count - a.open_count)
+    .slice(0, 5)
+
+  // ── Leads-källor (90d) ─────────────────────────────────────
+  const { data: leadsData } = await supabase
+    .from('leads')
+    .select('lead_id, source, score, status, created_at')
+    .eq('business_id', businessId)
+    .gte('created_at', ninetyDaysAgo.toISOString())
+    .limit(300)
+
+  const leads = (leadsData || []) as LeadRow[]
+
+  const bySource: Record<string, LeadRow[]> = {}
+  for (const l of leads) {
+    const src = l.source || 'unknown'
+    if (!bySource[src]) bySource[src] = []
+    bySource[src].push(l)
+  }
+
+  const leadsBySource: DanielAggregate['leads_by_source'] = {}
+  for (const [src, ls] of Object.entries(bySource)) {
+    const won = ls.filter(l => l.status === 'won' || l.status === 'completed')
+    const lost = ls.filter(l => l.status === 'lost')
+    const open = ls.filter(l => !['won', 'completed', 'lost'].includes(l.status))
+    const evaluated = won.length + lost.length
+    const scoreSum = ls.reduce((s, l) => s + Number(l.score || 0), 0)
+    const avgScore = ls.length > 0 ? Math.round(scoreSum / ls.length) : null
+    leadsBySource[src] = {
+      count: ls.length,
+      avg_score: avgScore,
+      won_count: won.length,
+      lost_count: lost.length,
+      open_count: open.length,
+      win_rate_pct: evaluated > 0 ? Math.round((won.length / evaluated) * 100) : null,
+    }
+  }
+
+  // ── Hot leads (score >= 7, not closed) ─────────────────────
+  const hotLeads = leads
+    .filter(l => Number(l.score || 0) >= 7 && !['won', 'completed', 'lost'].includes(l.status))
+    .map(l => ({
+      lead_id: l.lead_id,
+      source: l.source,
+      score: Number(l.score || 0),
+      days_in_pipeline: Math.round((now - new Date(l.created_at).getTime()) / 86400000),
+    }))
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, 5)
+
+  return {
+    period_days: 90,
+    last_90d: last90d,
+    by_customer_type: byCustomerType,
+    stale_opens: staleOpens,
+    leads_by_source: leadsBySource,
+    hot_leads: hotLeads,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Hypotes-driven prompt
+// ─────────────────────────────────────────────────────────────────
+
+function buildDanielSystemPrompt(
+  businessName: string,
+  maturity: 'early_stage' | 'full_analysis',
+): string {
+  if (maturity === 'early_stage') {
+    return `Du är Daniel, säljare hos ${businessName}. Du är ny på företaget och har precis fått tillgång till offert-flödet.
+
+Du ser att det finns lite data — färre än 10 offerter senaste 90 dagarna. Det räcker inte för djupanalys, men det är dags att presentera sig och flagga vad du tänker hålla extra koll på.
+
+Generera EXAKT 1 observation av typen "early-stage relation-byggande". Anpassa siffrorna till verkliga aggregatet. Var energisk men inte säljig — du är en lagspelare som vill veta vilka deals som är viktigast för hantverkaren just nu.
+
+REGLER:
+- 1 observation, inte fler.
+- knowledge_type: 'insight'
+- suggestion: null (ren introduktion, ingen action)
+- confidence: 0.9
+- data_basis: { period_days, quote_count, customer_count, note: 'early_stage_introduction' }
+
+${SCHEMA_BLOCK}
+
+EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
+
+[
+  {
+    "knowledge_type": "insight",
+    "title": "Jag börjar förstå försäljningsflödet",
+    "observation": "Tjena! Jag är Daniel, din säljare. Hittills har jag sett 7 offerter till 4 kunder de senaste 90 dagarna — inte massor men nog för att börja känna mönstret. Säg gärna till vilka deals du vill att jag håller extra koll på framöver.",
+    "suggestion": null,
+    "confidence": 0.9,
+    "data_basis": {
+      "period_days": 90,
+      "quote_count": 7,
+      "customer_count": 4,
+      "note": "early_stage_introduction"
+    }
+  }
+]`
+  }
+
+  return `Du är Daniel, säljare hos ${businessName}. Du har ögon för spotting opportunities och spårar pipeline-mönster som inte är obvious. Du analyserar senaste 90 dagarnas offerter och leads med dessa konkreta hypoteser:
+
+1. **Offert-konvertering per kund-typ:**
+   - Vilken kund-typ (privat / brf / företag) accepterar oftast?
+   - Vilken typ har lägst acceptance-rate — är det offerten eller pris?
+   - Finns det en kund-typ vi underskattar i vår jakt?
+
+2. **Stale-offerter (öppnade men inte signerade):**
+   - Vilka offerter har 3+ visningar utan signering? Det är heta kunder som tvekar.
+   - Hur länge har de legat? Värt en personlig follow-up?
+   - Vilka beloppsklasser fastnar mest?
+
+3. **Lead-källor med högst konvertering:**
+   - Vilken källa (sms/voice/webform/partners/manual) ger flest vinster?
+   - Var lägger vi tid på leads som aldrig stänger?
+   - Finns en kanal vi underinvesterar i?
+
+4. **Pris-elasticitet per kund-typ:**
+   - Vilken kund-typ accepterar de högsta beloppen?
+   - Skiljer accepterad vs avvisad snittsumma per typ?
+   - Vilket prisspann ger högst acceptans?
+
+Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
+
+Var inte trivial. "Du har X offerter ute" = data, inte observation.
+"BRF Lindgården har öppnat offert ÄTA-22 fem gånger men inte signerat — värt en personlig påringning?" = observation.
+
+Använd KONKRETA kund-namn och deal-titlar när du refererar till stale_opens eller hot_leads.
+
+REGLER:
+- 1-3 observationer max. Färre är bättre om du inte ser något viktigt.
+- "title" max 60 tecken, konkret.
+- "observation" max 2-3 meningar, första-person, säljarens energi (men ej överdrivet).
+- "suggestion" konkret action max 1 mening ELLER null om bara info.
+- "confidence" 0-1, var ärlig. Under 0.5 om du gissar.
+
+Om allt ser bra ut — säg det med 1 positiv observation. Återhåll dig från att hitta på problem.
+
+${SCHEMA_BLOCK}
+
+EXAKT EXEMPEL — kopiera strukturen:
+
+[
+  {
+    "knowledge_type": "pattern",
+    "title": "BRF accepterar 92% av offerterna",
+    "observation": "BRF-kunder har accepterat 11 av 12 offerter senaste 90 dagarna — högst konvertering av alla kund-typer. Snittbeloppet är dessutom 18% högre än privatkund-snittet.",
+    "suggestion": "Prioritera BRF-leads i pipelinen och bjud in fler liknande föreningar.",
+    "confidence": 0.9,
+    "data_basis": {
+      "period_days": 90,
+      "metric": "acceptance_rate_by_customer_type",
+      "brf_acceptance_rate": 92,
+      "brf_avg_accepted_kr": 47500,
+      "private_avg_accepted_kr": 40250
+    }
+  }
+]`
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Claude-anrop
+// ─────────────────────────────────────────────────────────────────
+
+async function callDanielWithThinking(
+  businessName: string,
+  aggregate: DanielAggregate,
+  maturity: 'early_stage' | 'full_analysis',
+) {
+  const systemPrompt = buildDanielSystemPrompt(businessName, maturity)
+  const userMessage = `Här är ${businessName}s offert- och lead-data senaste 90 dagarna:
+
+${JSON.stringify(aggregate, null, 2)}
+
+Tänk igenom det och returnera JSON-array.`
+
+  return callAgentWithThinking({
+    agentId: 'daniel',
+    codeVersion: DANIEL_CODE_VERSION,
+    promptMaturity: maturity,
+    systemPrompt,
+    userMessage,
+  })
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Public entry-point
+// ─────────────────────────────────────────────────────────────────
+
+export async function runDanielObservation(
+  supabase: SupabaseClient,
+  businessId: string,
+  businessName: string,
+  options: { includeDebug?: boolean } = {},
+): Promise<DanielRunResult> {
+  console.log(`[daniel/run] entry version=${DANIEL_CODE_VERSION} business=${businessId}`)
+
+  const aggregate = await buildDanielAggregate(supabase, businessId)
+  if (!aggregate) {
+    return { skipped: 'no_quotes_last_90d' }
+  }
+
+  const quoteCount = aggregate.last_90d.count
+  if (quoteCount < 5) {
+    return {
+      skipped: 'insufficient_data',
+      reason: 'fewer_than_5_quotes',
+      aggregate,
+    }
+  }
+
+  const maturity: 'early_stage' | 'full_analysis' =
+    quoteCount < 10 ? 'early_stage' : 'full_analysis'
+
+  const { observations, thinkingPreview, debug } = await callDanielWithThinking(
+    businessName,
+    aggregate,
+    maturity,
+  )
+
+  if (observations.length === 0) {
+    return {
+      skipped: 'no_observations_returned',
+      aggregate,
+      data_maturity: maturity,
+      thinking_preview: thinkingPreview,
+      ...(options.includeDebug ? { debug } : {}),
+    }
+  }
+
+  const counts = await saveAndPush(supabase, businessId, 'daniel', observations)
+
+  return {
+    aggregate,
+    data_maturity: maturity,
+    observations_total: observations.length,
+    thinking_preview: thinkingPreview,
+    ...counts,
+    ...(options.includeDebug ? { debug } : {}),
+  }
+}
