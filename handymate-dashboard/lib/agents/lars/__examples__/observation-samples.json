@@ -1,0 +1,141 @@
+{
+  "_meta": {
+    "purpose": "Förväntad output-kvalitet från Lars vid olika datasets. Används som referens för prompt-tuning + test-fixture för UI-rendering innan vi har riktig pilot-data.",
+    "generated": "2026-05-18",
+    "model": "claude-sonnet-4-6 + extended-thinking (budget 8000)",
+    "agent_id": "lars",
+    "agent_role": "Projektledare — scope-creep, lönsamhet, ÄTA-flöde, booking-completion"
+  },
+
+  "scenario_a_scope_creep": {
+    "description": "12 färdiga projekt senaste 90d. 4 av dem gick 20%+ över budget-timmar — alla badrum eller kakel-tunga. Lars upptäcker mönster.",
+    "expected_observations": [
+      {
+        "knowledge_type": "pattern",
+        "title": "Badrum drar 26% över budget-timmar i snitt",
+        "observation": "Av 8 färdiga badrums-projekt senaste 90 dagarna gick 5 över 120% av estimerade timmar — snittet ligger på 126% av budget. Material-byten (kakel-läggning) verkar vara den största tids-tjuven.",
+        "suggestion": "Lägg in 20% buffert på badrums-offerter framöver, eller flagga material-omfattning tydligare för kund.",
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "avg_actual_vs_budget_hours_by_project_type",
+          "badrum_count": 8,
+          "badrum_over_120_pct_count": 5,
+          "avg_pct_actual_vs_budget": 126,
+          "category": "scope_creep"
+        }
+      }
+    ]
+  },
+
+  "scenario_b_over_budget_specific": {
+    "description": "Tre aktiva projekt visar profitability_status='over_budget'. Lars flaggar dem konkret med project-namn.",
+    "expected_observations": [
+      {
+        "knowledge_type": "anomaly",
+        "title": "Badrum Solna 28% över budget — ÄTA bör skickas",
+        "observation": "Badrum Solna har nu kostat 89 000 kr mot budget 70 000 kr — 27% över. Två andra aktiva projekt ligger också över: Kök Bromma (15% över) och Tak Sundbyberg (12% över).",
+        "suggestion": "Skicka ÄTA-utkast till BRF Solna före slutbesiktning, granska de andra två.",
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "active_projects_over_budget",
+          "primary_project_id": "proj_xxxxxxxx",
+          "primary_project_name": "Badrum Solna",
+          "primary_pct_over": 27,
+          "total_over_budget_count": 3
+        }
+      }
+    ]
+  },
+
+  "scenario_c_size_profitability": {
+    "description": "Små projekt (<50k) har 12% marginal, stora projekt (>50k) har 28% marginal. Lars upptäcker att smått kostar dyrt.",
+    "expected_observations": [
+      {
+        "knowledge_type": "pattern",
+        "title": "Små projekt bara 12% marginal — stora ger 28%",
+        "observation": "Senaste 90 dagarna gav små projekt under 50 000 kr i snitt 12% marginal — stora projekt över 50k landar på 28%. Fasta omkostnader äter upp små jobb proportionellt mer.",
+        "suggestion": "Höj timpriset på små projekt med 8-10% eller sätt minimum-jobb-storlek.",
+        "confidence": 0.8,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "margin_by_project_size",
+          "small_count": 7,
+          "small_avg_margin_pct": 12,
+          "large_count": 5,
+          "large_avg_margin_pct": 28
+        }
+      }
+    ]
+  },
+
+  "scenario_d_ata_flow": {
+    "description": "8 ÄTA skickade, bara 2 signerade. Sign-rate 25% — låg. Lars flaggar bromsen i flödet.",
+    "expected_observations": [
+      {
+        "knowledge_type": "anomaly",
+        "title": "ÄTA-sign-rate bara 25% — något hindrar signering",
+        "observation": "Av 8 ÄTA skickade till kund senaste 90 dagarna har bara 2 signerats — 25%. Snittvärde 8 400 kr per signerad ÄTA. Antingen är ÄTA-texten otydlig eller följs det inte upp efter utskick.",
+        "suggestion": "Granska ÄTA-mallen + lägg in 3-dagars-påminnelse om kunden inte signerat.",
+        "confidence": 0.75,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "ata_sign_rate",
+          "sent_count": 8,
+          "signed_count": 2,
+          "sign_rate_pct": 25,
+          "avg_signed_value_kr": 8400
+        }
+      }
+    ]
+  },
+
+  "scenario_e_early_stage": {
+    "description": "Business med 7 projekt totalt. Lars presenterar sig istället för djupanalys.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Jag börjar förstå projekt-flödet",
+        "observation": "Hej! Lars här, din projektledare. Hittills har jag sett 7 projekt — 3 färdiga och 4 aktiva — de senaste 90 dagarna. Det räcker för att börja känna takten, men berätta gärna vilka projekt du vill att jag håller extra koll på framöver.",
+        "suggestion": null,
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 90,
+          "project_count": 7,
+          "completed_count": 3,
+          "note": "early_stage_introduction"
+        }
+      }
+    ]
+  },
+
+  "scenario_f_all_smooth": {
+    "description": "Stark dataset utan oroväckande mönster. Lars säger det istället för att hitta på problem.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Projekt-flödet rullar på",
+        "observation": "Senaste 90 dagarna har 11 av 12 projekt landat inom budget och 22 av 23 bokningar slutförts som planerat. ÄTA-flödet följer signing-rate på 78%. Allt rullar — håll i.",
+        "suggestion": null,
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 90,
+          "metric": "overall_operations_health",
+          "on_budget_pct": 92,
+          "booking_completion_pct": 96,
+          "ata_sign_rate_pct": 78
+        }
+      }
+    ]
+  },
+
+  "scenario_g_insufficient_data": {
+    "description": "Business med < 5 projekt. Lars skippar helt och returnerar tom array med reason.",
+    "expected_result": {
+      "skipped": "insufficient_data",
+      "reason": "fewer_than_5_projects",
+      "observations": []
+    }
+  }
+}
