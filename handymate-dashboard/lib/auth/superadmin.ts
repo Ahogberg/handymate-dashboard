@@ -27,14 +27,33 @@ export interface ImpersonationContext {
 // Superadmin-detection
 // ─────────────────────────────────────────────────────────────────
 
+// Email-baserad fallback (samma logik som lib/admin-auth.ts isAdmin)
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map(e => e.trim().toLowerCase())
+  .filter(Boolean)
+
 /**
- * Kollar om en authenticated Supabase user är markerad som superadmin
- * i app_metadata. app_metadata kan endast skrivas av service_role.
+ * Kollar om en authenticated Supabase user är markerad som superadmin.
+ *
+ * Tre metoder (i prioritetsordning):
+ * 1. user.app_metadata.is_superadmin === true (service_role-skyddat, säkrast)
+ * 2. user.email slutar på @handymate.se
+ * 3. user.email finns i ADMIN_EMAILS env-var (komma-separerad)
+ *
+ * Metod 2 + 3 är konsekvent med befintlig lib/admin-auth.ts isAdmin().
  */
 export function isSuperAdmin(user: User | null | undefined): boolean {
   if (!user) return false
+  // Primary: app_metadata (säkrast — kan endast sättas via service_role)
   const appMeta = (user.app_metadata || {}) as Record<string, unknown>
-  return appMeta.is_superadmin === true
+  if (appMeta.is_superadmin === true) return true
+  // Fallback: email-baserad
+  const email = (user.email || '').toLowerCase()
+  if (!email) return false
+  if (email.endsWith('@handymate.se')) return true
+  if (ADMIN_EMAILS.includes(email)) return true
+  return false
 }
 
 // ─────────────────────────────────────────────────────────────────
