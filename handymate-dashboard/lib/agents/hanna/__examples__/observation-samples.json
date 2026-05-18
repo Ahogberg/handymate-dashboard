@@ -1,0 +1,141 @@
+{
+  "_meta": {
+    "purpose": "Förväntad output-kvalitet från Hanna vid olika datasets. Används som referens för prompt-tuning + test-fixture för UI-rendering innan vi har riktig pilot-data.",
+    "generated": "2026-05-18",
+    "model": "claude-sonnet-4-6 + extended-thinking (budget 8000)",
+    "agent_id": "hanna",
+    "agent_role": "Marknadsansvarig — reaktivering, säsongs-trender, recension-coverage, repeat-customers"
+  },
+
+  "scenario_a_reactivation_opportunities": {
+    "description": "Fyra högt-värde-kunder har varit tysta 60+ dagar. Hanna spottar reaktiverings-fönstret.",
+    "expected_observations": [
+      {
+        "knowledge_type": "recommendation",
+        "title": "BRF Lindgården tyst i 90 dagar — värt en check-in",
+        "observation": "BRF Lindgården har LTV 47 000 kr men ingen kontakt på 90 dagar. Tre andra högt-värde-kunder har också blivit tysta (snitt-LTV 32 000 kr). Hösten är högsäsong för underhåll — rätt timing för reaktivering.",
+        "suggestion": "Skicka personlig check-in till de fyra reaktiverings-kandidaterna denna vecka.",
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 180,
+          "metric": "reactivation_candidates",
+          "candidate_count": 4,
+          "highest_ltv_candidate_kr": 47000,
+          "avg_days_since_contact": 78
+        }
+      }
+    ]
+  },
+
+  "scenario_b_seasonal_lead_dip": {
+    "description": "Lead-inflow har dippat 40% senaste tre månader jämfört med tidigare. Hanna flaggar säsongs-mönstret.",
+    "expected_observations": [
+      {
+        "knowledge_type": "pattern",
+        "title": "Lead-inflow 40% lägre senaste 90 dagarna",
+        "observation": "Mars-april-maj gav i snitt 18 leads/månad. Senaste 90 dagarna landar på 11 leads/månad — 40% lägre. Win-rate är dock stabil på 35%, så det är inflow:en som tappat fart, inte kvaliteten.",
+        "suggestion": "Granska SEO/annonsering — eller skicka ut höst-kampanj till tidigare kunder.",
+        "confidence": 0.8,
+        "data_basis": {
+          "period_days": 180,
+          "metric": "monthly_lead_inflow_trend",
+          "early_period_avg": 18,
+          "recent_period_avg": 11,
+          "delta_pct": -40,
+          "win_rate_stable_pct": 35
+        }
+      }
+    ]
+  },
+
+  "scenario_c_review_coverage_low": {
+    "description": "Bara 3 av 11 eligible kunder har fått recensionsbegäran. 27% coverage. Hanna flaggar missade Google-stjärnor.",
+    "expected_observations": [
+      {
+        "knowledge_type": "anomaly",
+        "title": "Recension-coverage 27% — 8 kunder utan förfrågan",
+        "observation": "Av 11 kunder som fått klart jobb senaste 180 dagarna har bara 3 fått recensionsbegäran — 27% coverage. Åtta kunder med slutförda projekt har aldrig blivit tillfrågade om Google-recension.",
+        "suggestion": "Aktivera auto-recensions-flödet eller skicka manuellt till de 8 missade kunderna.",
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 180,
+          "metric": "review_request_coverage",
+          "sent_count": 3,
+          "eligible_count": 11,
+          "pending_review_count": 8,
+          "coverage_pct": 27
+        }
+      }
+    ]
+  },
+
+  "scenario_d_high_repeat_rate": {
+    "description": "65% av faktura-kunderna har kommit tillbaka 2+ gånger. Stark relation-vård. Hanna ger positiv feedback.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "65% repeat-rate — stark kundrelation",
+        "observation": "13 av 20 faktura-kunder senaste 180 dagarna har kommit tillbaka för fler jobb — 65% repeat-rate. Snitt 2.4 fakturor per återkommande kund. Det är bra över branschsnittet och pekar på stark relation-vård.",
+        "suggestion": null,
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 180,
+          "metric": "repeat_customer_rate",
+          "customers_with_invoices": 20,
+          "repeat_count": 13,
+          "repeat_rate_pct": 65,
+          "avg_invoices_per_repeat": 2.4
+        }
+      }
+    ]
+  },
+
+  "scenario_e_early_stage": {
+    "description": "Business med 7 kunder totalt. Hanna presenterar sig istället för djupanalys.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Jag börjar förstå kund-flödet",
+        "observation": "Hej! Hanna här, er marknadsansvariga. Jag har nu tittat på 7 kunder från senaste 180 dagarna — 3 har redan kommit tillbaka och beställt mer. Det är ett litet underlag men det finns ett mönster att bygga vidare på. Säg gärna till vilka kund-segment du vill att jag spanar mer på.",
+        "suggestion": null,
+        "confidence": 0.9,
+        "data_basis": {
+          "period_days": 180,
+          "customer_count": 7,
+          "repeat_count": 3,
+          "note": "early_stage_introduction"
+        }
+      }
+    ]
+  },
+
+  "scenario_f_all_smooth": {
+    "description": "Stark dataset utan oroväckande mönster. Hanna säger det istället för att hitta på problem.",
+    "expected_observations": [
+      {
+        "knowledge_type": "insight",
+        "title": "Kund-relationerna rullar på",
+        "observation": "Senaste 180 dagarna: 22 kunder, 58% repeat-rate, recensions-coverage på 78% och stadig lead-inflow på 15-17/månad. Inga tysta högt-värde-kunder att jaga. Marknadsföringen levererar — håll i.",
+        "suggestion": null,
+        "confidence": 0.85,
+        "data_basis": {
+          "period_days": 180,
+          "metric": "overall_marketing_health",
+          "customer_count": 22,
+          "repeat_rate_pct": 58,
+          "review_coverage_pct": 78,
+          "monthly_lead_avg": 16
+        }
+      }
+    ]
+  },
+
+  "scenario_g_insufficient_data": {
+    "description": "Business med < 5 kunder. Hanna skippar helt och returnerar tom array med reason.",
+    "expected_result": {
+      "skipped": "insufficient_data",
+      "reason": "fewer_than_5_customers",
+      "observations": []
+    }
+  }
+}
