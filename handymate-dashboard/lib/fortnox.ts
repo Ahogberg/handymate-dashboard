@@ -205,7 +205,13 @@ export async function clearFortnoxConnection(businessId: string): Promise<void> 
 }
 
 /**
- * Refresh token if it expires within 1 hour
+ * Refresh token if it expires within 1 hour.
+ *
+ * Vid refresh-failure (token revokerad på Fortnox-sidan, refresh_token
+ * utgånget, eller Fortnox-API-fel): rensar fortnox_connected = false så
+ * UI inte fortsätter visa 'Kopplad'-status. Detta förebygger den 'ghost-
+ * connected'-bugg som funnits sedan v46 — kunder såg grön status men
+ * synkar fungerade aldrig.
  */
 export async function refreshTokenIfNeeded(businessId: string): Promise<string | null> {
   const config = await getFortnoxConfig(businessId)
@@ -231,7 +237,29 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
     await saveFortnoxTokens(businessId, newTokens)
     return newTokens.access_token
   } catch (error) {
-    console.error('Token refresh failed:', error)
+    console.error(`[fortnox/refresh] failed for ${businessId} — marking disconnected:`, error)
+
+    // Logga till fortnox_api_log med pseudo-endpoint så audit-trail visar
+    // exakt när vi förlorade anslutningen + varför (Fortnox returnerar
+    // typiskt 'invalid_grant' när refresh_token är revokerad).
+    try {
+      const { logFortnoxApi } = await import('@/lib/fortnox/api-log')
+      await logFortnoxApi({
+        business_id: businessId,
+        endpoint: 'token_refresh',
+        method: 'POST',
+        error_message: error instanceof Error ? error.message : 'Unknown refresh error',
+      })
+    } catch { /* logging är non-blocking */ }
+
+    // Markera business som disconnected så cron-routes hoppar över den
+    // + UI uppdaterar status vid nästa /api/fortnox/status-anrop.
+    try {
+      await clearFortnoxConnection(businessId)
+    } catch (clearErr) {
+      console.error(`[fortnox/refresh] failed to mark disconnected for ${businessId}:`, clearErr)
+    }
+
     return null
   }
 }
