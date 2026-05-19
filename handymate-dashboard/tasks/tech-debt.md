@@ -1241,3 +1241,54 @@ har inget skyddsnät annat än Anthropics inbyggda alignment (Claude Sonnet är 
 **Estimat:** ~4-6h — Haiku-classifier-prompt (1h) + integration i chat-route (1h) + post-filter regex (1h) + logging + UI för att se incidents (2h).
 
 **Trigger:** Antingen första bekräftade exfiltration-incident (= reaktivt) eller proaktivt innan publik launch om enterprise-businesses börjar onboardas (deras tröskel för säkerhetsfel är högre än pilot-hantverkare).
+
+---
+
+## TD-50 (2026-05-19) — Voice-pipeline-arkitektur (Vapi-webhook vs Next.js voice-routes)
+
+**Plats:** `app/api/voice/*`, `app/api/incoming/*`, lib/vapi-* (om finns), 46elks-integration
+
+**Problem:** Idag finns två potentiella voice-flöden parallellt:
+
+1. **46elks-direkt-flöde** — `app/api/voice/incoming/route.ts` tar emot 46elks-webhooks, routar till Lisa-agent
+2. **Vapi-webhook-flöde** (om aktivt) — Vapi sköter samtals-AI, vi tar emot bara final transcript
+
+Otydligt vilket av dessa som faktiskt används i prod, vilket är dead code, och vilken arkitektur som är optimal för pilot/launch.
+
+**Risk:** Om båda är aktiva → duplicate calls, race conditions, inkonsekvent agent-beteende. Om bara en är aktiv → den andras kod är dead weight + förvirrar utvecklare.
+
+**Audit-frågor:**
+1. Vilken voice-pipeline används faktiskt när Christoffer får samtal idag?
+2. Finns Vapi-config i Vercel-env? Är webhooks pekade rätt?
+3. Vilken är skalbar långsiktigt — egen pipeline mot 46elks-rådata eller Vapi-managed?
+4. Latency-skillnader (Vapi har egen STT-pipeline, vi har Claude)?
+5. Cost per minute för respektive flöde?
+
+**Trigger:** Imorgon (2026-05-20) — utred innan launch så vi vet vilken som måste fungera + vilken som ska raderas.
+
+**Estimat:** 1-2h utredning + ev. rensning av oanvänd kod.
+
+---
+
+## TD-51 (2026-05-19) — Onboarding default-template fyller mock-data
+
+**Plats:** `app/onboarding/components/*`, sql-migrations som seedar default-värden, `lib/knowledge-defaults.ts`
+
+**Problem:** Onboarding-flowen fyller business_config med default-mall-data som inte matchar kundens verklighet:
+- Default arbetstider (måndag-fredag 08:00-17:00) — många hantverkare har avvikande
+- Default greeting_script — generisk
+- Default knowledge_base via `getKnowledgeForBranch(branch)` — branch-mall, inte kund-specifik
+- Default services_offered, working_hours, call_mode — alla samma
+
+**Risk:** Christoffer (och framtida kunder) får dashboard med "konstgjord" data som ser ut som riktig konfiguration. När Lisa svarar med fel öppettider eller fel tjänster → kund-förtroende skadat.
+
+**Bättre v2:**
+
+1. **Opt-in templates** — kunden får välja "Använd standard-mall för hantverkare" ELLER "Konfigurera själv från noll"
+2. **AI-extraherad konfiguration** — onboarding tar in fritext ("Berätta om ditt företag") → Claude extraherar branch, services, working_hours, tone — sätter EFTER kund-godkännande
+3. **Tydlig visuell markering** vid default-värden ("Detta är en mall — anpassa innan första kunden")
+4. **Validation gate** — onboarding-flow kan inte completas tills minst N default-värden är aktivt valda av kunden
+
+**Trigger:** Post-launch när vi ser hur många kunder lever med default-mock vs anpassade värden.
+
+**Estimat:** 4-8h v2 implementation (AI-extraktion är största jobbet).
