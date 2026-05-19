@@ -123,6 +123,16 @@ export default function DashboardPage() {
     context?: { type: 'project' | 'deal'; label: string; link: string }
   }[]>([])
   const [todayLoaded, setTodayLoaded] = useState(false)
+  const [dashboardErrorSections, setDashboardErrorSections] = useState<Set<string>>(new Set())
+  const markSectionError = (section: string) => {
+    setDashboardErrorSections(prev => {
+      if (prev.has(section)) return prev
+      const next = new Set(prev)
+      next.add(section)
+      console.error(`[dashboard] section failed to load: ${section}`)
+      return next
+    })
+  }
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [dismissedReminders, setDismissedReminders] = useState<Set<string>>(new Set())
   const [projectsAtRisk, setProjectsAtRisk] = useState<{ project_id: string; name: string; ai_health_score: number | null; ai_health_summary: string | null; status: string }[]>([])
@@ -373,37 +383,44 @@ export default function DashboardPage() {
         }
         setScheduleLoaded(true)
       })
-      .catch(() => setScheduleLoaded(true))
+      .catch(() => { markSectionError('schedule'); setScheduleLoaded(true) })
 
     const pipelinePromise = fetch('/api/pipeline/stats')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setPipelineStats(data)
+        else markSectionError('pipeline')
         setPipelineLoaded(true)
       })
-      .catch(() => setPipelineLoaded(true))
+      .catch(() => { markSectionError('pipeline'); setPipelineLoaded(true) })
 
     const statsPromise = fetch(`/api/dashboard/stats?businessId=${business.business_id}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setStats(data)
+        else markSectionError('stats')
         setStatsLoaded(true)
       })
-      .catch(() => setStatsLoaded(true))
+      .catch(() => { markSectionError('stats'); setStatsLoaded(true) })
 
     const profitPromise = fetch('/api/dashboard/profitability')
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setProfitProjects(data.projects || [])
+        else markSectionError('profitability')
         setProfitLoaded(true)
       })
-      .catch(() => setProfitLoaded(true))
+      .catch(() => { markSectionError('profitability'); setProfitLoaded(true) })
 
     // Att göra idag
     fetch('/api/dashboard/today')
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setTodayItems(data.items || []); setTodayLoaded(true) })
-      .catch(() => setTodayLoaded(true))
+      .then(data => {
+        if (data) setTodayItems(data.items || [])
+        else markSectionError('today')
+        setTodayLoaded(true)
+      })
+      .catch(() => { markSectionError('today'); setTodayLoaded(true) })
 
     // Ekonomisammanfattning — läser från business_config
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
@@ -587,6 +604,24 @@ export default function DashboardPage() {
       </div>
 
       <div className="relative">
+        {/* Dashboard-error-banner: visas om någon sektion failade att laddas
+            så Christoffer ser direkt att det är ett tekniskt problem istället
+            för att tro att data är tom. */}
+        {dashboardErrorSections.size > 0 && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
+            <p className="text-sm">
+              ⚠️ Vissa delar av dashboarden kunde inte laddas just nu.
+              {dashboardErrorSections.size > 1 && ` (${dashboardErrorSections.size} sektioner)`}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-sm font-medium underline whitespace-nowrap hover:text-amber-900"
+            >
+              Ladda om
+            </button>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-6 sm:mb-8">
           <IdentityPill />
