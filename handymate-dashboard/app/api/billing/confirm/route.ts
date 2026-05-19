@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const trialEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('business_config')
       .update({
         subscription_plan: planId,
@@ -38,6 +38,26 @@ export async function POST(request: NextRequest) {
         trial_ends_at: trialEnd,
       })
       .eq('business_id', business.business_id)
+
+    if (updateError) {
+      // Kritiskt: Stripe-setup lyckades men vi kunde inte spara subscription-
+      // status. Returnera 500 + setupIntentId så support kan recover manuellt
+      // istället för att tyst returnera success och låta kunden hamna på
+      // dashboard utan aktiv trial → redirect till billing-page "expired".
+      console.error('[billing/confirm] business_config UPDATE failed:', {
+        business_id: business.business_id,
+        setupIntentId,
+        error: updateError,
+      })
+      return NextResponse.json(
+        {
+          error: 'Kunde inte spara prenumeration. Kontakta support — din betalning är registrerad.',
+          setup_intent_id: setupIntentId,
+          recovery_hint: 'support_can_manually_set_subscription_status_trialing',
+        },
+        { status: 500 },
+      )
+    }
 
     // Provisionera telefonnummer nu när betalning är bekräftad
     let assignedPhone: string | null = null

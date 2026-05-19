@@ -108,6 +108,18 @@ export async function POST(
     // If approved or edited, execute the payload action
     let executionResult: Record<string, unknown> | null = null
     if (action === 'approve' || action === 'edit') {
+      // Defense-in-depth: approval hämtades redan med .eq('business_id', business.business_id)
+      // så detta ska aldrig kunna trigga, men explicit check förebygger framtida regressioner
+      // där fetch-logiken ändras utan att vi tänker på cross-business-säkerhet.
+      if (approval.business_id !== business.business_id) {
+        console.error(
+          `[approvals/${params.id}] CRITICAL: business_id mismatch — approval.business_id=${approval.business_id}, session=${business.business_id}`,
+        )
+        return NextResponse.json(
+          { error: 'Approval business mismatch — säkerhetsfel' },
+          { status: 403 },
+        )
+      }
       const approvalWithPayload = { ...approval, payload: finalPayload }
       executionResult = await executeApprovalPayload(
         approvalWithPayload,
