@@ -1,6 +1,8 @@
 // System prompt builder for Next.js runtime
 // Mirrors supabase/functions/agent/system-prompt.ts
 
+import { formatKnowledgeForPrompt } from '@/lib/widget-activation'
+
 /** +46761234567 → 076-123 45 67 */
 function formatAgentPhoneHint(phone: string): string {
   let digits = phone.replace(/\D/g, '')
@@ -17,10 +19,24 @@ interface BusinessContext {
   phone_number: string
   assigned_phone_number: string
   pricing_settings: { hourly_rate?: number; vat_rate?: number } | null
+  // knowledge_base schema matchar vad KnowledgeEditor i settings/widget sparar
+  // (industry, services med price_indication+typical_duration, faqs, emergency_situations[], policies).
+  // Tidigare typ förväntade priceRange + emergencyInfo som aldrig matchade vad
+  // som faktiskt lagrades → Lisa fick tom services-prompt och svarade enligt
+  // industry-default. Acceptera båda field-namn för backwards-compat.
   knowledge_base: {
-    services?: Array<{ name: string; description: string; priceRange: string }>
-    faqs?: Array<{ question: string; answer: string }>
-    emergencyInfo?: string
+    industry?: string
+    services?: Array<{
+      name?: string
+      description?: string
+      price_indication?: string
+      typical_duration?: string
+      priceRange?: string  // legacy
+    }>
+    faqs?: Array<{ question?: string; answer?: string }>
+    emergency_situations?: string[]
+    emergencyInfo?: string  // legacy
+    policies?: { quote?: string; payment?: string; warranty?: string; cancellation?: string }
   } | null
   working_hours: Record<string, { active: boolean; start: string; end: string }> | null
   // Google integration status
@@ -91,11 +107,62 @@ export function buildSystemPrompt(
   const hourlyRate = business.pricing_settings?.hourly_rate || 695
   const vatRate = business.pricing_settings?.vat_rate || 25
 
-  const servicesBlock = business.knowledge_base?.services?.length
-    ? business.knowledge_base.services
-        .map((s) => `- ${s.name}: ${s.description} (${s.priceRange})`)
-        .join('\n')
-    : 'Ej specificerat'
+  // Använd den delade formatteraren från lib/widget-activation.ts så Lisa,
+  // widget-chat och andra surfaces alla bygger knowledge-blocket från samma
+  // schema. Mappar både gamla (priceRange/emergencyInfo) och nya
+  // (price_indication/emergency_situations[]) field-namn.
+  const kb = business.knowledge_base
+  const knowledgeBlock = kb
+    ? formatKnowledgeForPrompt({
+        industry: kb.industry,
+        services: kb.services?.map((s) => ({
+          name: s.name,
+          description: s.description,
+          price_indication: s.price_indication || s.priceRange,
+          typical_duration: s.typical_duration,
+        })),
+        faqs: kb.faqs?.filter((f): f is { question: string; answer: string } => !!(f.question && f.answer)),
+        emergency_situations: kb.emergency_situations
+          ?? (kb.emergencyInfo ? [kb.emergencyInfo] : undefined),
+        policies: kb.policies,
+      })
+    : ''
+
+  // Default-template-skydd: om knowledge_base.industry inte matchar business.branch
+  // (t.ex. industry='elektriker' men branch='snickare') signalerar det att kunden
+  // sitter på onboarding-default som aldrig anpassats. Bättre att inte mata
+  // Lisa med fel verksamhetsdata än att svara enligt el-template för en snickare.
+  const branchToIndustry: Record<string, string[]> = {
+    electrician: ['elektriker'],
+    plumber: ['vvs', 'vatten', 'avlopp'],
+    carpenter: ['snickare'],
+    painter: ['malare', 'målare'],
+    hvac: ['vvs'],
+    locksmith: ['lassmed', 'låssmed'],
+    cleaning: ['stadning', 'städning'],
+  }
+  const industryLower = (kb?.industry || '').toLowerCase()
+  const expectedIndustries = branchToIndustry[business.branch] || []
+  const isDefaultTemplateMismatch =
+    !!industryLower &&
+    expectedIndustries.length > 0 &&
+    !expectedIndustries.includes(industryLower)
+
+  // servicesSection ersätter det gamla "## Tjänster"-blocket. När knowledge är
+  // ifyllt och inte är default-template-mismatch → injicera hela
+  // verksamhetsinformationen. Annars → fallback med "Ej specificerat" så
+  // Claude vet att hon ska be kunden beskriva sitt behov istället för att gissa.
+  let servicesSection: string
+  if (knowledgeBlock && !isDefaultTemplateMismatch) {
+    servicesSection = `## Verksamhetsinformation om denna firma\n${knowledgeBlock}`
+  } else if (isDefaultTemplateMismatch) {
+    console.warn(
+      `[system-prompt] knowledge_base.industry='${industryLower}' matchar inte branch='${business.branch}' — använder fallback för att undvika fel-template-svar`,
+    )
+    servicesSection = `## Tjänster\n(Knowledge-base ej anpassad för denna firma — använd bara generell företagsinfo ovan och fråga kunden om deras specifika behov)`
+  } else {
+    servicesSection = `## Tjänster\nEj specificerat`
+  }
 
   const dayNames: Record<string, string> = {
     monday: 'Mån', tuesday: 'Tis', wednesday: 'Ons', thursday: 'Tors',
@@ -132,8 +199,7 @@ Du är en professionell affärsassistent som hjälper ${business.contact_name ||
 - **Timpris:** ${hourlyRate} kr/tim (exkl. moms)
 - **Moms:** ${vatRate}%
 
-## Tjänster
-${servicesBlock}
+${servicesSection}
 
 ## Arbetstider
 ${hoursBlock}
