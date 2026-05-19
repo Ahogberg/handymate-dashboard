@@ -696,7 +696,7 @@ export default function DashboardPage() {
                   <div className="w-1 h-8 rounded-full bg-primary-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
-                      {(booking.customer as any)?.name || 'Kund'}
+                      {((booking.customer as { name?: string } | null)?.name) || 'Kund'}
                     </p>
                     <p className="text-xs text-gray-400 truncate">
                       {getServiceFromNotes(booking.notes)}
@@ -1201,8 +1201,8 @@ export default function DashboardPage() {
                     <div className="mt-0.5 shrink-0">{getActivityIcon(activity.activity_type)}</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-800 truncate">{activity.title}</p>
-                      {activity.customer && (
-                        <p className="text-xs text-gray-400 truncate">{(activity.customer as any).name}</p>
+                      {activity.customer && (activity.customer as { name?: string }).name && (
+                        <p className="text-xs text-gray-400 truncate">{(activity.customer as { name: string }).name}</p>
                       )}
                     </div>
                     <span className="text-xs text-gray-300 shrink-0">
