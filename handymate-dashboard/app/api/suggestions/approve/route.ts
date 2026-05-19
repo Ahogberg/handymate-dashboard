@@ -225,7 +225,7 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
         status: 'draft',
         title: actionData.service || 'Offert',
         description: actionData.description || `Offert skapad från samtalsanalys`,
-        total_amount: actionData.estimated_price ? parseFloat(actionData.estimated_price) : null,
+        total: actionData.estimated_price ? parseFloat(actionData.estimated_price) : null,
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 dagar
         source: 'ai_suggestion'
       })

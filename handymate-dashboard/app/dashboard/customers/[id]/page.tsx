@@ -273,7 +273,7 @@ export default function CustomerDetailPage() {
     // Hämta offerter
     const { data: quoteData } = await supabase
       .from('quotes')
-      .select('id, title, status, total_amount, created_at, sent_at, signed_at, quote_number')
+      .select('id:quote_id, title, status, total_amount:total, created_at, sent_at, signed_at, quote_number')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
 

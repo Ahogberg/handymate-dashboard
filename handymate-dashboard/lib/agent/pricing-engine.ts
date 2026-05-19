@@ -115,9 +115,9 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
     // 1. Hämta alla offerter med belopp
     const { data: allQuotes, error: quotesError } = await supabase
       .from('quotes')
-      .select('quote_id, total_amount, status, job_type, outcome, created_at, title, description')
+      .select('quote_id, total_amount:total, status, job_type, outcome, created_at, title, description')
       .eq('business_id', businessId)
-      .not('total_amount', 'is', null)
+      .not('total', 'is', null)
       .order('created_at', { ascending: false })
       .limit(500)
 
@@ -193,9 +193,9 @@ export async function updatePricingIntelligence(businessId: string): Promise<{
     // 4. Re-fetch med uppdaterade job_types
     const { data: updatedQuotes } = await supabase
       .from('quotes')
-      .select('quote_id, total_amount, status, job_type, outcome, created_at')
+      .select('quote_id, total_amount:total, status, job_type, outcome, created_at')
       .eq('business_id', businessId)
-      .not('total_amount', 'is', null)
+      .not('total', 'is', null)
       .not('job_type', 'is', null)
       .order('created_at', { ascending: false })
       .limit(500)

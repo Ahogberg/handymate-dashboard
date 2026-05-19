@@ -126,7 +126,7 @@ export function DealTimeline({ dealId, customerId, businessId }: Props) {
       // 4. Quotes linked to this deal
       const { data: quotes } = await supabase
         .from('quotes')
-        .select('quote_id, status, title, total_amount, sent_at, accepted_at, created_at')
+        .select('quote_id, status, title, total_amount:total, sent_at, accepted_at, created_at')
         .eq('deal_id', dealId)
 
       quotes?.forEach((q: any) => {
