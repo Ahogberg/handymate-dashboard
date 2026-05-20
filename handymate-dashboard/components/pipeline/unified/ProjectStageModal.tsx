@@ -270,6 +270,41 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
 
               {/* Body */}
               <div className={styles.body}>
+                {/* Uppgifter-summary HÖGT UPP — pilot-verifiering 2026-05-20:
+                    Christoffer såg inte tasks-sektionen längre ner. Compact
+                    summary direkt under header garanterar synlighet + länk
+                    till full vy. Detaljerad sektion följer efter stages. */}
+                {(() => {
+                  const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled')
+                  return (
+                    <Link
+                      href={`/dashboard/projects/${data.project.id}?tab=tasks`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        padding: '10px 14px',
+                        marginBottom: 16,
+                        background: activeTasks.length > 0 ? '#FEF3C7' : '#F8FAFC',
+                        border: `1px solid ${activeTasks.length > 0 ? '#FCD34D' : '#E2E8F0'}`,
+                        borderRadius: 10,
+                        textDecoration: 'none',
+                        color: '#0f172a',
+                        fontSize: 13,
+                      }}
+                    >
+                      <span style={{ fontWeight: 600 }}>
+                        {activeTasks.length === 0
+                          ? '✓ Inga aktiva uppgifter på detta projekt'
+                          : `📋 ${activeTasks.length} aktiv${activeTasks.length === 1 ? '' : 'a'} uppgift${activeTasks.length === 1 ? '' : 'er'}`}
+                      </span>
+                      <span style={{ color: '#0d9488', fontSize: 12, fontWeight: 500 }}>
+                        Se alla →
+                      </span>
+                    </Link>
+                  )
+                })()}
                 <h3 className={styles.sectionLabel}>Projekt-tidslinje · {data.stages.length} stages</h3>
                 <div className={styles.stageList}>
                   {data.stages.map(stage => {
