@@ -156,11 +156,14 @@
   font-size: 10px; color: #64748b; margin-left: auto;
   font-weight: 600;
 }
-.dealCust {
+/* dealTitle = primär rubrik (dealens titel) — stor + bold + mörk.
+   dealCust = sekundär (kund-namn) — mindre + grå. Bytt 2026-05-20:
+   tidigare var kund-namnet primärt. */
+.dealTitle {
   font-size: 13px; font-weight: 600; color: #0f172a;
   letter-spacing: -0.01em; line-height: 1.2;
 }
-.dealTitle {
+.dealCust {
   font-size: 11.5px; color: #64748b; margin-top: 1px; line-height: 1.3;
 }
 .dealRowBot {

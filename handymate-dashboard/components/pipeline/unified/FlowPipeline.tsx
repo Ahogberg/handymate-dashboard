@@ -409,8 +409,8 @@ function DealCard({
         )}
         {deal.deal_number && <span className={styles.dealRefNum}>#{deal.deal_number}</span>}
       </div>
+      <div className={styles.dealTitle}>{deal.title || 'Utan titel'}</div>
       <div className={styles.dealCust}>{deal.customer?.name || 'Okänd kund'}</div>
-      <div className={styles.dealTitle}>{deal.title}</div>
       <div className={styles.dealRowBot}>
         <span className={styles.dealAmount}>{fmtKr(deal.value)}</span>
         <span className={styles.timePill}>
