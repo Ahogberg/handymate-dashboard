@@ -36,10 +36,35 @@ export function CustomerModal({
 }: CustomerModalProps) {
   if (!open) return null
 
+  // Backdrop-click skyddas: om kund-form har ifylld data (ny kund), kräv
+  // explicit bekräftelse innan modalen stängs. Pilot-rapport 2026-05-19:
+  // användare råkade klicka utanför och tappade allt utan varning.
+  // Edit-mode + tom form stänger direkt (ingen data att förlora).
+  const hasFormData = !editingCustomer && !!(
+    form.name?.trim() ||
+    form.phone_number?.trim() ||
+    form.email?.trim() ||
+    form.address_line?.trim() ||
+    form.org_number?.trim() ||
+    form.contact_person?.trim() ||
+    form.personal_number?.trim() ||
+    form.property_designation?.trim()
+  )
+
+  const handleBackdropClose = () => {
+    if (hasFormData) {
+      const confirmed = window.confirm(
+        'Du har fyllt i kund-data som inte sparats. Vill du verkligen stänga utan att skapa kunden?'
+      )
+      if (!confirmed) return
+    }
+    onClose()
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 backdrop-blur-sm sm:p-4"
-      onClick={onClose}
+      onClick={handleBackdropClose}
     >
       <div
         className="bg-white border border-slate-200 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[90vh] overflow-y-auto shadow-xl"
