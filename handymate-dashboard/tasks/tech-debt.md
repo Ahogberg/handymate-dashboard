@@ -1342,3 +1342,43 @@ Otydligt vilket av dessa som faktiskt används i prod, vilket är dead code, och
 **Trigger:** OMEDELBART efter launch — innan vi onboardar fler pilot-kunder. Inom första veckan post 25/5.
 
 **Estimat:** 4-8h audit + 4-8h external-action-guard-implementation + 2-4h dokumentation. Total ~12-20h.
+
+---
+
+## 2026-05-20 — Dölj-fält per artikelrad i faktura (TD-55)
+
+**Plats:** `lib/types/invoice.ts` `InvoiceItem`, `lib/pdf-generator.ts`, faktura-edit-UI.
+
+**Pilot-feedback:** Andreas vill ha kryssruta per artikelrad i fakturan där hantverkaren kan dölja antal, à-pris, enhet, summa per rad. Christoffer-fall: vid fastpris-jobb vill man ofta dölja unit_price/quantity och bara visa totalsumma per rad ("Renovering badrum — 95 000 kr") utan att avslöja den interna kalkylen.
+
+**Krav:** SQL-migration som lägger till nya boolean-kolumner på `invoice_items` (eller en ny JSONB `visibility`). Sannolikt:
+- `hide_quantity boolean default false`
+- `hide_unit_price boolean default false`
+- `hide_unit boolean default false`
+- `hide_total boolean default false`
+
+Sedan UI-rendering i fakturarad + PDF-template + invoice-view-skärm respekterar flaggorna.
+
+**Varför TD nu:** Tier 3 UI-polish-sprint 2026-05-20 — explicit hård-stopp på SQL-migrationer från Andreas. Behöver granskning + migration-fil + manuell körning i Supabase SQL Editor innan kod-implementation.
+
+**Estimat:** 1-2h SQL + 4-6h UI/PDF-implementation + 2h test. Total ~7-10h.
+
+**Trigger:** Beslutas post-launch när vi vet om pilot-feedback är generaliserbar — Christoffer-case är klart, men frågan är om alla fastpris-hantverkare har samma behov.
+
+---
+
+## 2026-05-20 — Konsolidera ProjectStageInline ↔ ProjectStageModal (TD-56)
+
+**Plats:** `components/projects/ProjectStageInline.tsx`, `components/pipeline/unified/ProjectStageModal.tsx`.
+
+**Problem:** Två komponenter renderar samma 8-fas-tidslinje med samma data från `/api/projects/[id]/workflow`. Skapades 2026-05-20 när Tier 3 punkt 8 krävde inline-version på projekt-detalj-sidan. Modal-versionen används inte längre från pipeline-page (onProjectClick → router.push istället) men finns kvar.
+
+**Risker om vi inte konsoliderar:**
+- Buggar fixas i en men inte andra (vi har sett detta mönster med QuoteNewItemsSection vs QuoteEditItemsSection).
+- Stage-styling/copy divergerar över tid.
+
+**Lösning:** Bryt ut den gemensamma stage-list-rendringen till en delad sub-komponent (t.ex. `components/projects/StageTimeline.tsx`) som båda inline och modal-varianten använder. Modal blir tunn wrapper runt sub-komponenten.
+
+**Trigger:** Post-launch när vi ändå rör stage-koden. Inte akut — båda fungerar idag.
+
+**Estimat:** 2-3h.
