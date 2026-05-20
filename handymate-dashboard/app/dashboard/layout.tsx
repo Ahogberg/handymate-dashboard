@@ -16,6 +16,7 @@ import BillingStatusBanner from '@/components/BillingStatusBanner'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import { ToastProvider } from '@/components/Toast'
 import { useAuth } from '@/lib/useAuth'
+import { useSessionKeepalive } from '@/lib/hooks/useSessionKeepalive'
 import { BusinessContext } from '@/lib/BusinessContext'
 import { CurrentUserProvider } from '@/lib/CurrentUserContext'
 import { JobbuddyProvider } from '@/lib/JobbuddyContext'
@@ -26,6 +27,9 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const { business, loading, logout } = useAuth(true)
+  // Refresha JWT i bakgrunden var 45 min så save-actions inte failar pga
+  // expirad session efter idle. Se lib/hooks/useSessionKeepalive.ts.
+  useSessionKeepalive()
   const router = useRouter()
   const pathname = usePathname()
 

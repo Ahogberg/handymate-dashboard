@@ -4,8 +4,20 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
 // Client-side Supabase client (for use in React components)
+//
+// Explicit auth-config för att garantera att JWT-tokens auto-refreshas i
+// bakgrunden. Default är true i v2 men explicit konfig förebygger framtida
+// regressioner + dokumenterar avsikten. Cookies persistas så server-side
+// getAuthenticatedBusiness ser uppdaterade tokens. detectSessionInUrl
+// hanterar magic-link/OAuth-callbacks som kommer tillbaka med ?code=...
 export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    })
   : null as any
 
 // Server-side Supabase client with service role (for use in API routes)
