@@ -46,6 +46,15 @@ interface WorkflowResponse {
   } | null
 }
 
+interface ProjectTask {
+  id: string
+  title: string
+  status: 'pending' | 'in_progress' | 'done' | 'cancelled' | string
+  priority: 'low' | 'medium' | 'high' | string | null
+  due_date: string | null
+  assigned_user: { id: string; name: string; color: string } | null
+}
+
 interface ProjectStageModalProps {
   projectId: string | null
   onClose: () => void
@@ -68,6 +77,7 @@ function fmtDateRange(start: string | null, end: string | null): string {
 
 export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps) {
   const [data, setData] = useState<WorkflowResponse | null>(null)
+  const [tasks, setTasks] = useState<ProjectTask[]>([])
   const [loading, setLoading] = useState(false)
   const [advancing, setAdvancing] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
@@ -88,13 +98,32 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
     }
   }, [])
 
+  // Fetch tasks parallellt — visas i body-sektionen så Christoffer ser
+  // arbetsuppgifter + ansvarig direkt utan att öppna full projektvy.
+  const fetchTasks = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/tasks?project_id=${id}`)
+      if (!res.ok) {
+        setTasks([])
+        return
+      }
+      const payload = await res.json()
+      setTasks(Array.isArray(payload.tasks) ? payload.tasks : [])
+    } catch (err) {
+      console.error('[ProjectStageModal] tasks fetch failed:', err)
+      setTasks([])
+    }
+  }, [])
+
   useEffect(() => {
     if (projectId) {
       fetchWorkflow(projectId)
+      fetchTasks(projectId)
     } else {
       setData(null)
+      setTasks([])
     }
-  }, [projectId, fetchWorkflow])
+  }, [projectId, fetchWorkflow, fetchTasks])
 
   // ESC stänger modalen
   useEffect(() => {
@@ -254,6 +283,121 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
                     )
                   })}
                 </div>
+
+                {/* Arbetsuppgifter — pilot-feedback 2026-05-19: Christoffer
+                    måste se uppgifter + ansvarig direkt i projektets översikt
+                    utan att öppna full projektvy. */}
+                {(() => {
+                  const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled')
+                  const visible = activeTasks.slice(0, 5)
+                  const hasMore = activeTasks.length > visible.length
+                  if (visible.length === 0 && tasks.length === 0) return null
+                  return (
+                    <div style={{ marginTop: 16 }}>
+                      <h3 className={styles.sectionLabel}>
+                        Uppgifter · {activeTasks.length} aktiva
+                        {tasks.length > activeTasks.length && (
+                          <span style={{ color: '#94a3b8', fontWeight: 400 }}>
+                            {' '}({tasks.length - activeTasks.length} klara)
+                          </span>
+                        )}
+                      </h3>
+                      {visible.length === 0 ? (
+                        <div style={{
+                          padding: '12px',
+                          fontSize: 12,
+                          color: '#94a3b8',
+                          fontStyle: 'italic',
+                          textAlign: 'center',
+                        }}>
+                          Inga aktiva uppgifter — alla klara!
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {visible.map(task => (
+                            <div
+                              key={task.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 10,
+                                padding: '8px 12px',
+                                background: '#F8FAFC',
+                                border: '1px solid #E2E8F0',
+                                borderRadius: 8,
+                                fontSize: 12,
+                              }}
+                            >
+                              <span style={{
+                                width: 6, height: 6, borderRadius: '50%',
+                                background: task.priority === 'high' ? '#ef4444'
+                                  : task.priority === 'medium' ? '#f59e0b'
+                                  : '#94a3b8',
+                                flexShrink: 0,
+                              }} />
+                              <span style={{
+                                flex: 1,
+                                color: '#0f172a',
+                                fontWeight: 500,
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {task.title}
+                              </span>
+                              {task.due_date && (
+                                <span style={{ color: '#64748b', fontSize: 11, flexShrink: 0 }}>
+                                  {fmtDate(task.due_date)}
+                                </span>
+                              )}
+                              {task.assigned_user ? (
+                                <span
+                                  style={{
+                                    width: 22, height: 22, borderRadius: '50%',
+                                    background: task.assigned_user.color || '#3B82F6',
+                                    color: 'white',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0,
+                                  }}
+                                  title={task.assigned_user.name}
+                                >
+                                  {task.assigned_user.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase()}
+                                </span>
+                              ) : (
+                                <span style={{
+                                  fontSize: 10,
+                                  color: '#94a3b8',
+                                  fontStyle: 'italic',
+                                  flexShrink: 0,
+                                }}>
+                                  Otilldelad
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {hasMore && (
+                            <Link
+                              href={`/dashboard/projects/${data.project.id}?tab=tasks`}
+                              style={{
+                                fontSize: 11,
+                                color: '#0d9488',
+                                textDecoration: 'underline',
+                                padding: '4px',
+                                textAlign: 'center',
+                              }}
+                            >
+                              Se alla {activeTasks.length} uppgifter →
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 {/* Latest AI automation */}
                 {data.latest_automation ? (
