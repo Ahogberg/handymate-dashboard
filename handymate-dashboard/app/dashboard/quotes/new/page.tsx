@@ -1345,10 +1345,10 @@ export default function NewQuotePage() {
               </div>
             </div>
 
-            {/* Snabbstart — visas bara när användaren har en tom offert OCH tom prislista */}
-            {items.length === 0 && productsCount === 0 && (
-              <QuoteQuickstartCard onAddRow={addQuickstartRow} />
-            )}
+            {/* Snabbstart-sektion borttagen 2026-05-20 per pilot-feedback —
+                tog upp onödig plats utan att ge värde. QuoteQuickstartCard-
+                komponenten finns kvar i _shared/ om vi vill återintroducera
+                den i framtiden med tydligare värde. */}
 
             <QuoteNewAIHelper
               open={showAiHelper}
