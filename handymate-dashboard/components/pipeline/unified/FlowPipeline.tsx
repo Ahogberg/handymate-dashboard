@@ -761,17 +761,94 @@ function ProjectRow({
         <AiActivityStrip latest={project.latest_automation} />
       )}
 
-      <button
-        type="button"
-        onClick={(e) => { e.stopPropagation(); onClick() }}
+      {/* Snabbåtgärder — pilot-feedback 2026-05-20: Christoffer vill ha
+          snabbåtgärds-knappar vid varje projekt (likt deal-cards i säljtratten).
+          Ring/SMS/Karta + Öppna projekt. e.stopPropagation så de inte
+          triggar row-expand. */}
+      <div
         style={{
-          background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-          color: '#0f766e', fontSize: 11, fontWeight: 600, marginTop: 8,
-          textAlign: 'left',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          marginTop: 8,
+          paddingTop: 8,
+          borderTop: '1px solid #f1f5f9',
         }}
+        onClick={(e) => e.stopPropagation()}
       >
-        Öppna projekt →
-      </button>
+        {deal?.customer?.phone_number && (
+          <>
+            <a
+              href={`tel:${deal.customer.phone_number}`}
+              title="Ring kund"
+              style={{
+                padding: '4px 8px',
+                fontSize: 10,
+                color: '#64748b',
+                textDecoration: 'none',
+                borderRadius: 6,
+                fontWeight: 500,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+            >
+              📞 Ring
+            </a>
+            <a
+              href={`sms:${deal.customer.phone_number}`}
+              title="SMS kund"
+              style={{
+                padding: '4px 8px',
+                fontSize: 10,
+                color: '#64748b',
+                textDecoration: 'none',
+                borderRadius: 6,
+                fontWeight: 500,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+            >
+              💬 SMS
+            </a>
+          </>
+        )}
+        {deal?.customer?.address_line && (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deal.customer.address_line)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={deal.customer.address_line}
+            style={{
+              padding: '4px 8px',
+              fontSize: 10,
+              color: '#64748b',
+              textDecoration: 'none',
+              borderRadius: 6,
+              fontWeight: 500,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f766e' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#64748b' }}
+          >
+            📍 Karta
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={() => onClick()}
+          style={{
+            marginLeft: 'auto',
+            background: 'transparent',
+            border: 'none',
+            padding: '4px 8px',
+            cursor: 'pointer',
+            color: '#0f766e',
+            fontSize: 11,
+            fontWeight: 600,
+          }}
+        >
+          Öppna projekt →
+        </button>
+      </div>
 
       {expanded && <ProjectExpandDetail currentStageId={currentStage.id} />}
     </div>
