@@ -120,7 +120,7 @@ export function PipelineHeader({ stats, mobileStageIndex, setMobileStageIndex }:
                   </span>
                 )}
               </button>
-              {showFilter && <PipelineFilters />}
+              {showFilter && <PipelineFilters anchorRef={filterRef} />}
             </div>
             <button onClick={toggleHideEmpty}
               className={`hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors ${hideEmpty ? 'bg-primary-50 text-primary-700 border-primary-200' : 'bg-white text-gray-500 border-gray-200 hover:text-gray-900'}`}
