@@ -284,14 +284,20 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
       })))
     : ''
 
-  // ── Introduction text ──
-  // Pilot-feedback 2026-05-20: 'Beskrivning' (quote.description) kom inte
-  // med i skickad offert. PDF visade bara introduction_text. Fallback till
-  // description om introduction_text saknas — Christoffer's primära text
-  // hamnar då i intro-sektionen.
-  const introContent = quote.introduction_text || quote.description || ''
-  const introHtml = introContent
-    ? `<div class="intro-text">${escapeHtml(introContent)}</div>`
+  // ── Description + Introduction text ──
+  // Pilot-feedback 2026-05-20 (verifierad): 'Beskrivning' (quote.description)
+  // kom inte med i skickad offert. Tidigare fix använde fallback
+  // (introduction_text || description) men det räcker INTE — om båda är fyllda
+  // (intro från template + beskrivning från textbox) visades bara intro.
+  //
+  // Korrekt: rendera BÅDE som separata sektioner. Description är primär
+  // beskrivning av jobbet (visas först), introduction_text är ev. template-
+  // inledning som följer efter.
+  const descriptionHtml = quote.description
+    ? `<div class="intro-text">${escapeHtml(quote.description)}</div>`
+    : ''
+  const introHtml = quote.introduction_text
+    ? `<div class="intro-text">${escapeHtml(quote.introduction_text)}</div>`
     : ''
 
   // ── Items table ──
@@ -451,6 +457,7 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
     titleHtml,
     metaRow,
     referencesHtml,
+    descriptionHtml,
     introHtml,
     imagesHtml,
     itemsTableHtml ? `<div class="section-title">Arbeten och material</div>` + itemsTableHtml : '',
