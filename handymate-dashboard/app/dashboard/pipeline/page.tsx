@@ -274,6 +274,7 @@ export default function PipelinePage() {
   const [filterCustomerType, setFilterCustomerType] = useState<string>('all')
   const [filterAssignedTo, setFilterAssignedTo] = useState<string>('all')
   const [filterSource, setFilterSource] = useState<string>('all')
+  const [filterCategory, setFilterCategory] = useState<string>('all')
   const [lostExpanded, setLostExpanded] = useState(false)
   const [mobileStageIndex, setMobileStageIndex] = useState(0)
   const [toast, setToast] = useState<Toast>({ show: false, message: '', type: 'info' })
@@ -1401,6 +1402,14 @@ export default function PipelinePage() {
         return false
       }
     }
+    if (filterCategory !== 'all') {
+      const cat = (d.category || '').toString()
+      if (filterCategory === 'unknown') {
+        if (cat !== '') return false
+      } else if (cat !== filterCategory) {
+        return false
+      }
+    }
     return true
   })
 
@@ -1411,7 +1420,8 @@ export default function PipelinePage() {
     (filterPriority !== 'all' ? 1 : 0) +
     (filterCustomerType !== 'all' ? 1 : 0) +
     (filterAssignedTo !== 'all' ? 1 : 0) +
-    (filterSource !== 'all' ? 1 : 0)
+    (filterSource !== 'all' ? 1 : 0) +
+    (filterCategory !== 'all' ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
   // Unika värden för filter-dropdowns
@@ -1420,6 +1430,10 @@ export default function PipelinePage() {
   ).sort()
   const sourceOptions = Array.from(
     new Set(deals.map(d => d.lead_source_platform || d.source || '').filter(Boolean))
+  ).sort()
+  // Yrkesgrupp/kategori — t.ex. "Badrum", "Tak", "El" — kommer från deal.category
+  const categoryOptions = Array.from(
+    new Set(deals.map(d => (d.category || '').toString()).filter(Boolean))
   ).sort()
 
   // Mänskliga etiketter för filter-dropdowns
@@ -1621,8 +1635,11 @@ export default function PipelinePage() {
     setFilterAssignedTo,
     filterSource,
     setFilterSource,
+    filterCategory,
+    setFilterCategory,
     customerTypeOptions,
     sourceOptions,
+    categoryOptions,
     customerTypeLabel,
     sourceLabel,
     hasActiveFilters,
@@ -1732,6 +1749,7 @@ export default function PipelinePage() {
               searchTerm={filterSearch}
               customerTypeFilter={filterCustomerType}
               assignedToFilter={filterAssignedTo}
+              categoryFilter={filterCategory}
             />
           ) : pipelineView === 'timeline' ? (
             <TimelineView

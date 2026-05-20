@@ -63,6 +63,7 @@ interface FlowPipelineProps {
   searchTerm?: string
   customerTypeFilter?: string
   assignedToFilter?: string
+  categoryFilter?: string
 }
 
 const SPLIT_STORAGE_KEY = 'verksamhetsoversikt.split'
@@ -95,6 +96,7 @@ export default function FlowPipeline({
   searchTerm = '',
   customerTypeFilter: customerTypeFilterProp = 'all',
   assignedToFilter = 'all',
+  categoryFilter = 'all',
 }: FlowPipelineProps) {
   // Filtrera bort lost-stage från unified-vyn — de visas i sin egen sidebar
   const activeStages = useMemo(() => stages.filter(s => !s.is_lost), [stages])
@@ -139,6 +141,13 @@ export default function FlowPipeline({
         return assignee === assignedToFilter
       })
     }
+    if (categoryFilter && categoryFilter !== 'all') {
+      result = result.filter(p => {
+        const cat = (p.deal?.category || (p.project as any).category || '').toString()
+        if (categoryFilter === 'unknown') return !cat
+        return cat === categoryFilter
+      })
+    }
     if (searchLower) {
       result = result.filter(p => {
         const projectName = (p.project.name || '').toLowerCase()
@@ -152,7 +161,7 @@ export default function FlowPipeline({
       })
     }
     return result
-  }, [allProjects, stageFilter, customerTypeFilterProp, assignedToFilter, searchLower])
+  }, [allProjects, stageFilter, customerTypeFilterProp, assignedToFilter, categoryFilter, searchLower])
 
   // Drag-resizable divider — säljtrattens andel av bredden i procent.
   const [splitPercent, setSplitPercent] = useState<number>(() => clampSplit(initialSplitPercent))

@@ -247,8 +247,11 @@ export interface PipelineContextValue {
   setFilterAssignedTo: Dispatch<SetStateAction<string>>
   filterSource: string
   setFilterSource: Dispatch<SetStateAction<string>>
+  filterCategory: string
+  setFilterCategory: Dispatch<SetStateAction<string>>
   customerTypeOptions: string[]
   sourceOptions: string[]
+  categoryOptions: string[]
   customerTypeLabel: (t: string) => string
   sourceLabel: (s: string) => string
   hasActiveFilters: boolean

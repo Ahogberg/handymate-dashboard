@@ -19,8 +19,11 @@ export function PipelineFilters() {
     setFilterAssignedTo,
     filterSource,
     setFilterSource,
+    filterCategory,
+    setFilterCategory,
     customerTypeOptions,
     sourceOptions,
+    categoryOptions,
     customerTypeLabel,
     sourceLabel,
     hasActiveFilters,
@@ -75,6 +78,19 @@ export function PipelineFilters() {
             ))}
           </select>
         </div>
+        {categoryOptions.length > 0 && (
+          <div>
+            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Yrkesgrupp</label>
+            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+              className="w-full px-3 py-2 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm focus:outline-none focus:border-primary-400">
+              <option value="all">Alla</option>
+              {categoryOptions.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+              <option value="unknown">Ingen yrkesgrupp angiven</option>
+            </select>
+          </div>
+        )}
         {sourceOptions.length > 0 && (
           <div>
             <label className="text-xs text-gray-400 uppercase tracking-wider mb-1 block">Källa</label>
@@ -96,6 +112,7 @@ export function PipelineFilters() {
               setFilterCustomerType('all')
               setFilterAssignedTo('all')
               setFilterSource('all')
+              setFilterCategory('all')
             }}
             className="text-xs text-primary-700 hover:underline font-medium"
           >
