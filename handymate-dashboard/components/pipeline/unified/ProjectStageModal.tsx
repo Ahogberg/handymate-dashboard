@@ -313,7 +313,9 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
                   const activeTasks = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled')
                   const visible = activeTasks.slice(0, 5)
                   const hasMore = activeTasks.length > visible.length
-                  if (visible.length === 0 && tasks.length === 0) return null
+                  // Visa ALLTID sektionen — om projektet har 0 uppgifter ska
+                  // användaren se det explicit + få "lägg till"-hint istället för
+                  // att sektionen försvinner (regression från första implementation).
                   return (
                     <div style={{ marginTop: 16 }}>
                       <h3 className={styles.sectionLabel}>
@@ -324,7 +326,25 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
                           </span>
                         )}
                       </h3>
-                      {visible.length === 0 ? (
+                      {tasks.length === 0 ? (
+                        <Link
+                          href={`/dashboard/projects/${data.project.id}?tab=tasks`}
+                          style={{
+                            display: 'block',
+                            padding: '12px',
+                            fontSize: 12,
+                            color: '#0d9488',
+                            fontStyle: 'italic',
+                            textAlign: 'center',
+                            background: '#F8FAFC',
+                            borderRadius: 8,
+                            border: '1px dashed #E2E8F0',
+                            textDecoration: 'none',
+                          }}
+                        >
+                          Inga uppgifter ännu — lägg till första via projektsidan →
+                        </Link>
+                      ) : visible.length === 0 ? (
                         <div style={{
                           padding: '12px',
                           fontSize: 12,
