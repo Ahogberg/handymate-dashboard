@@ -1292,3 +1292,53 @@ Otydligt vilket av dessa som faktiskt används i prod, vilket är dead code, och
 **Trigger:** Post-launch när vi ser hur många kunder lever med default-mock vs anpassade värden.
 
 **Estimat:** 4-8h v2 implementation (AI-extraktion är största jobbet).
+
+---
+
+## TD-52 (2026-05-20) — 🚨 HÖGPRIO: Audit alla externa agent-actions → bekräfta 100% approval-baserade
+
+**Plats:** systembrett — `lib/project-stages/automation-engine.ts`, `lib/projects/auto-invoice-on-complete.ts`, `lib/automation-engine.ts`, `app/api/cron/*`, `app/api/agent/trigger/tool-router.ts`, `lib/matte/*`, ev. fler.
+
+**Bakgrund:** Pilot-audit 2026-05-20 hittade **två konkreta bypass-buggar** där agenter utförde externa actions utan användarens godkännande:
+
+1. **`delay_hours = 0` bypass** (fixad i commit `19ded63a`, T2.7):
+   - `triggerStageAutomations()` körde `executeAutomation()` direkt → SMS skickades till kund utan approval om automation hade `delay_hours = 0`.
+   - Fix: alla automations går nu genom `scheduleApproval()`.
+
+2. **`autoInvoiceOnComplete` bypass** (lib/projects/auto-invoice-on-complete.ts):
+   - Triggas från `PUT /api/projects` när status sätts till 'completed' (rad 530-536 i route.ts).
+   - Skapar och skickar faktura AUTOMATISKT — Christoffer ser ingen approval-prompt.
+   - Stred mot premium-pris-policyn (2495-5995 kr/mån): kund förväntar sig kontroll över allt som lämnar systemet.
+
+**Misstänk fler bypass-platser:**
+
+- `fireEvent('job_completed')` i `/api/projects` → triggar `review-requests`-cron + `nurture`-cron → SMS/email till kund. Går de genom approval?
+- Cron-routes (gmail-poll, send-campaigns, send-reminders) → skickar de utskick direkt eller bara skapar approvals?
+- `tool-router.ts` 22 agent-tools — vilka är godkännande-pliktiga, vilka körs direkt? Inventering behövs.
+- Lisa (telefoni/SMS-svar) — svarar Lisa på inkommande SMS automatiskt utan approval? Är det önskat?
+- `lib/matte/*` — Matte-agent har action-knappar. Är de approval-baserade?
+
+**Audit-frågor när någon rör koden:**
+
+1. För varje action_type som existerar (send_sms, send_email, send_invoice, create_booking, send_quote, send_review_request, etc.) — kollar koden alltid att en `pending_approval` skapas innan extern API/tredjeparts-anrop?
+2. Finns det "system-initiated" actions där approval är medvetet skippat (cron-jobs som t.ex. fakturapåminnelse efter X dagar)? Dokumentera vilka och varför — så vi har klar gräns.
+3. När user toggle:ar "Auto-faktura vid projektslut" i settings — vad är default? Är default OFF (säkert) eller ON (riskabelt)?
+4. Är det möjligt att skapa egna automations via UI med `delay_hours=0` + send_sms? Om ja, blockera det.
+
+**Lösning v1 (akut, post-launch v1-2):**
+
+- Inventera ALLA externa-action-callsites (grep efter `fetch.*sms`, `fetch.*email`, `sendSMS`, `sendEmail`, `auto*`, etc.)
+- Per callsite: dokumentera "går genom approval / kringgår approval (med motivation)".
+- Skapa `lib/auth/external-action-guard.ts` som kräver explicit `approvalId` eller `system_initiated=true`-flagga för alla externa-action-helpers. Anrop utan flag → kasta error.
+- Audit-tabell `agent_external_action_log` som loggar varje extern action med approval-status, så vi kan retroaktivt se om något körts utan godkännande.
+
+**Lösning v2 (post-pilot):**
+
+- Per-business setting "Allow auto-actions" med Tier-modell (T1/T2/T3 från `tasks/agent-auto-actions-architecture.md` om vi skrivit den).
+- UI där hantverkare uttryckligen toggle:ar vilka action-typer som får köras utan approval (default: ingen).
+
+**Pilot-impact:** Direkt brand-/legal-risk. Christoffer kan ha fått SMS skickat i sitt namn till kunder utan att veta om det. GDPR/marknadsföringslag kräver dokumenterat samtycke från slutkund för auto-utskick.
+
+**Trigger:** OMEDELBART efter launch — innan vi onboardar fler pilot-kunder. Inom första veckan post 25/5.
+
+**Estimat:** 4-8h audit + 4-8h external-action-guard-implementation + 2-4h dokumentation. Total ~12-20h.
