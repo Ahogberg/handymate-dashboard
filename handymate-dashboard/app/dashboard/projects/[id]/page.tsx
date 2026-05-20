@@ -1354,6 +1354,11 @@ export default function ProjectDetailPage() {
     if (!project) return
     setSavingStatus(true)
     setStatusDropdownOpen(false)
+
+    // Optimistic UI — uppdatera status omedelbart så användaren ser feedback
+    const prevStatus = project.status
+    setProject({ ...project, status: newStatus })
+
     try {
       const res = await fetch('/api/projects', {
         method: 'PUT',
@@ -1361,11 +1366,28 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ project_id: project.project_id, status: newStatus })
       })
       if (!res.ok) throw new Error()
-      showToast(`Status andrad till ${STATUS_MAP[newStatus]}`, 'success')
+
+      const data = await res.json().catch(() => null)
+
+      // 4-eyes-check vid completed (budget > tröskel) — PUT returnerar 200
+      // men status uppdaterades INTE i DB. Approval skapad istället. Tidigare
+      // visade frontend felaktigt "Status ändrad"-toast trots att inget hänt.
+      if (data?.requires_approval) {
+        setProject({ ...project, status: prevStatus }) // rollback optimistic
+        showToast(
+          data.message || 'Projektstängning kräver admin-godkännande',
+          'error'
+        )
+        return
+      }
+
+      showToast(`Status ändrad till ${STATUS_MAP[newStatus]}`, 'success')
       // Invalidate profitability cache on status change
       setProfitability(null)
       await fetchProjectData()
     } catch {
+      // Rollback optimistic update
+      setProject({ ...project, status: prevStatus })
       showToast('Kunde inte uppdatera status', 'error')
     } finally {
       setSavingStatus(false)
