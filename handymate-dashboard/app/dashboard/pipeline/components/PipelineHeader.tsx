@@ -38,10 +38,19 @@ export function PipelineHeader({ stats, mobileStageIndex, setMobileStageIndex }:
   const [showFilter, setShowFilter] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
 
-  // Klick-utanför stänger filter-dropdownen
+  // Klick-utanför stänger filter-dropdownen. Dropdownen renderas nu via
+  // React Portal i document.body (för att kringgå CSS stacking context),
+  // så filterRef.contains(target) räcker inte — vi måste också tillåta
+  // clicks inom portal-elementet via data-attribut.
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(e.target as Node)) setShowFilter(false)
+      const target = e.target as Element | null
+      if (!target) return
+      // Click inom filter-button-containern (anchor)
+      if (filterRef.current?.contains(target)) return
+      // Click inom portal-dropdownen (kan ligga utanför DOM-trädet)
+      if (target.closest?.('[data-pipeline-filters-portal]')) return
+      setShowFilter(false)
     }
     if (showFilter) {
       document.addEventListener('mousedown', handleClickOutside)

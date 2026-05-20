@@ -77,6 +77,7 @@ export function PipelineFilters({ anchorRef }: PipelineFiltersProps) {
 
   return createPortal(
     <div
+      data-pipeline-filters-portal
       className="fixed w-80 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl"
       style={{ top: pos.top, right: pos.right, zIndex: 9999 }}
     >
