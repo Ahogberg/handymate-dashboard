@@ -4,11 +4,23 @@ import { useState } from 'react'
 import { ChevronDown, FileText, Plus } from 'lucide-react'
 import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import SharedItemRow from '@/components/quotes/ItemRow'
+import ItemRow from '@/components/quotes/ItemRow'
 import type { QuoteItem } from '@/lib/types/quote'
 import type { CustomCategory } from '@/lib/constants/categories'
 import { QuoteAddRowCombo } from '../../../_shared/QuoteAddRowCombo'
 import type { ProductSearchResult } from '../../../_shared/QuoteProductSearchModal'
+
+/**
+ * QuoteEditItemsSection — IDENTISK till QuoteNewItemsSection per pilot-feedback
+ * 2026-05-20. Christoffer: "Specifikation med artiklar ser annorlunda ut när
+ * man redigerar offerten jämfört med när man faktiskt skapar offerten första
+ * gången — utseendet och funktionaliteten måste vara IDENTISK."
+ *
+ * Lösning: edit-componentens kropp är en exakt kopia av new-component, plus
+ * stöd för inline kategori-skapande som tidigare bara fanns i new. Båda har
+ * nu samma UI/UX. TD post-launch: konsolidera till en delad komponent i
+ * _shared/ så de inte kan divergera igen.
+ */
 
 interface PriceItem {
   id: string
@@ -35,6 +47,13 @@ interface QuoteEditItemsSectionProps {
   onAddBlankRow: (description: string) => void
   onOpenGrossistSearch: () => void
   onSaveToProducts?: (item: QuoteItem) => void
+  // Inline-skapande av kategori (valfri — om inte passas saknas funktionen
+  // men UI:n förblir identisk).
+  onCreateCategory?: (label: string, itemId: string) => Promise<void> | void
+  showNewCategoryInput?: string | null
+  setShowNewCategoryInput?: (id: string | null) => void
+  newCategoryLabel?: string
+  setNewCategoryLabel?: (s: string) => void
 }
 
 export function QuoteEditItemsSection({
@@ -53,6 +72,11 @@ export function QuoteEditItemsSection({
   onAddBlankRow,
   onOpenGrossistSearch,
   onSaveToProducts,
+  onCreateCategory,
+  showNewCategoryInput,
+  setShowNewCategoryInput,
+  newCategoryLabel,
+  setNewCategoryLabel,
 }: QuoteEditItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
 
@@ -80,7 +104,9 @@ export function QuoteEditItemsSection({
       {items.length === 0 ? (
         <div className="border border-dashed border-slate-200 rounded-xl py-10 px-6 text-center mb-2">
           <FileText className="w-9 h-9 text-slate-300 mx-auto mb-3" strokeWidth={1.5} />
-          <p className="text-sm text-slate-500 mb-3">Inga rader ännu</p>
+          <p className="text-sm text-slate-500 mb-3">
+            Inga rader ännu — lägg till nedan eller använd AI-hjälp ovan
+          </p>
           <button
             type="button"
             onClick={() => onAddItem('item')}
@@ -95,7 +121,7 @@ export function QuoteEditItemsSection({
           <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-1">
               {items.map((item, index) => (
-                <SharedItemRow
+                <ItemRow
                   key={item.id}
                   item={item}
                   index={index}
@@ -105,6 +131,11 @@ export function QuoteEditItemsSection({
                   onRemove={onRemoveItem}
                   onMove={onMoveItem}
                   allCategories={allCategories}
+                  onCreateCategory={onCreateCategory}
+                  showNewCategoryInput={showNewCategoryInput}
+                  setShowNewCategoryInput={setShowNewCategoryInput}
+                  newCategoryLabel={newCategoryLabel}
+                  setNewCategoryLabel={setNewCategoryLabel}
                   onSaveToProducts={onSaveToProducts}
                 />
               ))}
@@ -115,62 +146,62 @@ export function QuoteEditItemsSection({
 
       {/* Add row — Combo-input för sök/lägg-till + Lägg till rad-knapp + Fler alternativ */}
       <div className="flex flex-wrap items-center gap-2 pt-3 mt-3 border-t border-slate-100">
-          <QuoteAddRowCombo onSelectProduct={onSelectProduct} onAddBlankRow={onAddBlankRow} />
+        <QuoteAddRowCombo onSelectProduct={onSelectProduct} onAddBlankRow={onAddBlankRow} />
 
+        <button
+          type="button"
+          onClick={() => onAddItem('item')}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-primary-700 border border-primary-200 hover:bg-primary-50 hover:border-primary-300 bg-white rounded-lg transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Lägg till tom rad
+        </button>
+
+        <div className="relative">
           <button
             type="button"
-            onClick={() => onAddItem('item')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-primary-700 border border-primary-200 hover:bg-primary-50 hover:border-primary-300 bg-white rounded-lg transition-colors"
+            onClick={() => setShowAdvancedTypes(!showAdvancedTypes)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Lägg till tom rad
+            Fler alternativ
+            <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedTypes ? 'rotate-180' : ''}`} />
           </button>
-
-          <div className="relative">
-            <button
-              type="button"
-              onClick={() => setShowAdvancedTypes(!showAdvancedTypes)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-            >
-              Fler alternativ
-              <ChevronDown className={`w-3 h-3 transition-transform ${showAdvancedTypes ? 'rotate-180' : ''}`} />
-            </button>
-            {showAdvancedTypes && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowAdvancedTypes(false)} />
-                <div className="absolute left-0 top-9 z-20 bg-white border border-slate-200 rounded-xl shadow-lg w-44 overflow-hidden py-1">
-                  {[
-                    { type: 'heading' as const, label: 'Rubrik' },
-                    { type: 'text' as const, label: 'Fritext' },
-                    { type: 'subtotal' as const, label: 'Delsumma' },
-                    { type: 'discount' as const, label: 'Rabatt' },
-                  ].map(opt => (
-                    <button
-                      key={opt.type}
-                      type="button"
-                      onClick={() => {
-                        onAddItem(opt.type)
-                        setShowAdvancedTypes(false)
-                      }}
-                      className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
+          {showAdvancedTypes && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowAdvancedTypes(false)} />
+              <div className="absolute left-0 top-9 z-20 bg-white border border-slate-200 rounded-xl shadow-lg w-44 overflow-hidden py-1">
+                {[
+                  { type: 'heading' as const, label: 'Rubrik' },
+                  { type: 'text' as const, label: 'Fritext' },
+                  { type: 'subtotal' as const, label: 'Delsumma' },
+                  { type: 'discount' as const, label: 'Rabatt' },
+                ].map(opt => (
                   <button
+                    key={opt.type}
                     type="button"
                     onClick={() => {
-                      onOpenGrossistSearch()
+                      onAddItem(opt.type)
                       setShowAdvancedTypes(false)
                     }}
-                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 border-t border-slate-100"
+                    className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
-                    Sök grossist
+                    {opt.label}
                   </button>
-                </div>
-              </>
-            )}
-          </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onOpenGrossistSearch()
+                    setShowAdvancedTypes(false)
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  Sök grossist
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Quick add from price list */}
