@@ -56,6 +56,9 @@ interface Customer {
   address_line: string
   personal_number?: string
   property_designation?: string
+  /** Pilot-feedback 2026-05-20: betalningsvillkor ska följa kundens
+      default_payment_days istället för hardcoded '30 dagar netto'. */
+  default_payment_days?: number | null
 }
 
 interface PricingSettings {
@@ -502,7 +505,10 @@ export default function NewQuotePage() {
         vatAmount,
         totalIncVat,
         amountToPay: totalIncVat,
-        paymentTerms: paymentTermsText || '30 dagar netto',
+        paymentTerms: paymentTermsText
+          || (selectedCustomerObj?.default_payment_days
+            ? `${selectedCustomerObj.default_payment_days} dagar`
+            : ''),
         warrantyText: null,
         introductionText: introductionText || null,
         conclusionText: conclusionText || null,

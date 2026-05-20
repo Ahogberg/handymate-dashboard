@@ -176,7 +176,14 @@ export function buildQuoteTemplateData(
       rotDeduction: rotDeduction > 0 ? rotDeduction : undefined,
       rutDeduction: rutDeduction > 0 ? rutDeduction : undefined,
       amountToPay,
-      paymentTerms: quote.payment_terms_text || config?.default_quote_terms || '30 dagar netto',
+      // Pilot-feedback 2026-05-20: ta bort hardcoded '30 dagar netto'-default.
+      // Använd quote.payment_terms_text (offert-specifik), annars customer's
+      // default_payment_days om finns ('X dagar'), annars business-default.
+      // Som SISTA fallback: tom — INTE '30 dagar netto' utan kontext.
+      paymentTerms: quote.payment_terms_text
+        || (quote.customer?.default_payment_days
+          ? `${quote.customer.default_payment_days} dagar`
+          : config?.default_quote_terms || ''),
       warrantyText: quote.warranty_text || null,
       introductionText: quote.introduction_text || null,
       conclusionText: quote.conclusion_text || null,
