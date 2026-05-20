@@ -168,13 +168,16 @@ async function triggerStageAutomations(
 
   for (const automation of automations) {
     try {
-      if (automation.delay_hours > 0) {
-        // Schemalagd action → skapa pending_approval med scheduled-marker i payload
-        await scheduleApproval(businessId, automation, project)
-      } else {
-        // Kör direkt
-        await executeAutomation(automation, project, businessId)
-      }
+      // SÄKERHETSFIX 2026-05-20 (T2.7 pilot-audit): tidigare körde
+      // delay_hours=0 automation DIREKT via executeAutomation → SMS gick
+      // ut till kunder utan användarens godkännande. Andreas-policy:
+      // alla agent-actions mot externa parter (SMS/email/faktura) MÅSTE
+      // gå genom pending_approvals för Christoffer-godkännande.
+      //
+      // Nu skapas ALLTID pending_approval, oavsett delay_hours. Schemalagd
+      // delay hanteras via approval.expires_at + cron som triggar
+      // notifikation närmare deadline.
+      await scheduleApproval(businessId, automation, project)
     } catch (err) {
       console.error('[project-stages] automation failed:', err)
     }
@@ -310,6 +313,13 @@ async function runDefaultAutomations(
   }
 }
 
+/**
+ * @deprecated 2026-05-20 (T2.7 security audit): executeAutomation kunde
+ * tidigare köra send_sms DIREKT utan approval om delay_hours=0. Det
+ * bröt principen att alla externa actions ska gå genom pending_approvals.
+ * Funktionen behålls för bakåtkompatibilitet men anropas INTE från
+ * triggerStageAutomations längre. Borttagen i framtida cleanup-sprint.
+ */
 async function executeAutomation(
   automation: any,
   project: any,
@@ -330,6 +340,9 @@ async function executeAutomation(
     // Fler action_types kan läggas till här (create_booking, send_invoice etc)
   }
 }
+
+// Suppress unused-warning eftersom funktionen är @deprecated men behållen.
+void executeAutomation
 
 async function sendSMS(phone: string, message: string, businessId: string) {
   try {
