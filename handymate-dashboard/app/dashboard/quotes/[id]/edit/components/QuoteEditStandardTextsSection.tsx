@@ -25,6 +25,10 @@ interface QuoteEditStandardTextsSectionProps {
   setAtaTerms: (s: string) => void
   paymentTermsText: string
   setPaymentTermsText: (s: string) => void
+  /** Egen 'Villkor'-text per offert — ersätter hardcoded default i templates.
+      Pilot-feedback 2026-05-20. Valfri prop för bakåt-kompatibilitet. */
+  termsText?: string
+  setTermsText?: (s: string) => void
 }
 
 export function QuoteEditStandardTextsSection({
@@ -47,6 +51,8 @@ export function QuoteEditStandardTextsSection({
   setAtaTerms,
   paymentTermsText,
   setPaymentTermsText,
+  termsText,
+  setTermsText,
 }: QuoteEditStandardTextsSectionProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -138,6 +144,16 @@ export function QuoteEditStandardTextsSection({
               picker={textsByType.payment_terms}
               onPick={setPaymentTermsText}
             />
+            {setTermsText && (
+              <TextField
+                label="Villkor (egen text)"
+                placeholder="Egen Villkor-text. Lämna tom för standard: 'Offerten gäller till X. Tilläggsarbete debiteras…'"
+                value={termsText || ''}
+                onChange={setTermsText}
+                picker={textsByType.terms}
+                onPick={setTermsText}
+              />
+            )}
           </div>
         </div>
       )}

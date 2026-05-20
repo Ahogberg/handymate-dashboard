@@ -205,6 +205,10 @@ export default function NewQuotePage() {
   const [notIncluded, setNotIncluded] = useState('')
   const [ataTerms, setAtaTerms] = useState('')
   const [paymentTermsText, setPaymentTermsText] = useState('')
+  // Egen 'Villkor'-text per offert (pilot-feedback 2026-05-20). Default-text
+  // 'Offerten gäller till X. Tilläggsarbete debiteras...' är hardcoded i
+  // templates — om termsText är fylld ersätts den.
+  const [termsText, setTermsText] = useState('')
 
   // Payment plan
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlanEntry[]>([])
@@ -411,6 +415,7 @@ export default function NewQuotePage() {
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
+        terms_text: termsText || null,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
         project_address: projectAddress || null,
@@ -1185,6 +1190,7 @@ export default function NewQuotePage() {
           not_included: notIncluded || null,
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
+          terms_text: termsText || null,
           payment_plan: paymentPlan.length > 0 ? calculatedPaymentPlan : null,
           reference_person: referencePerson || null,
           customer_reference: customerReference || null,
@@ -1239,6 +1245,7 @@ export default function NewQuotePage() {
           not_included: notIncluded || null,
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
+          terms_text: termsText || null,
           detail_level: detailLevel,
           show_unit_prices: showUnitPrices,
           show_quantities: showQuantities,
@@ -1451,6 +1458,8 @@ export default function NewQuotePage() {
               setAtaTerms={setAtaTerms}
               paymentTermsText={paymentTermsText}
               setPaymentTermsText={setPaymentTermsText}
+              termsText={termsText}
+              setTermsText={setTermsText}
             />
 
             <QuoteNewAttachmentsCard

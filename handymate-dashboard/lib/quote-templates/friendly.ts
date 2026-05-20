@@ -211,7 +211,9 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
     ${data.business.bankgiro ? `<div class="card pay-card"><div class="pay-icon">BG</div><div><div class="l">Bankgiro · ${escapeHtml(data.quote.paymentTerms)}</div><div class="v">${escapeHtml(data.business.bankgiro)}</div></div></div>` : ''}
   </section>
 
-  <p class="terms">Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning.${data.quote.warrantyText ? ' Garanti: ' + escapeHtml(data.quote.warrantyText) + '.' : ''}${data.quote.notIncluded ? ' Ej inkluderat: ' + escapeHtml(data.quote.notIncluded) + '.' : ''}</p>
+  <p class="terms">${data.quote.termsText
+    ? escapeHtml(data.quote.termsText)
+    : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning.`}${data.quote.warrantyText ? ' Garanti: ' + escapeHtml(data.quote.warrantyText) + '.' : ''}${data.quote.notIncluded ? ' Ej inkluderat: ' + escapeHtml(data.quote.notIncluded) + '.' : ''}</p>
 
   <section class="card footer-card">
     ${data.business.orgNumber ? `<div><div class="l">Org.nr</div><div class="v">${escapeHtml(data.business.orgNumber)}</div></div>` : ''}

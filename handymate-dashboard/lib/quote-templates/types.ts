@@ -64,6 +64,10 @@ export interface QuoteTemplateQuote {
   introductionText?: string | null
   conclusionText?: string | null
   notIncluded?: string | null
+  /** Egen 'Villkor'-text per offert. Om satt, ersätter hardcoded default
+      i templates (Offerten gäller till X. Tilläggsarbete debiteras...).
+      Pilot-feedback 2026-05-20. */
+  termsText?: string | null
 }
 
 export interface QuoteTemplateData {

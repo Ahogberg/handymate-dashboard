@@ -362,6 +362,7 @@ export async function POST(request: NextRequest) {
       not_included: body.not_included || null,
       ata_terms: body.ata_terms || null,
       payment_terms_text: body.payment_terms_text || null,
+      terms_text: body.terms_text || null,
       payment_plan: body.payment_plan || [],
       reference_person: body.reference_person || null,
       customer_reference: body.customer_reference || null,
@@ -509,6 +510,7 @@ export async function PUT(request: NextRequest) {
     if (body.introduction_text !== undefined) updates.introduction_text = body.introduction_text
     if (body.conclusion_text !== undefined) updates.conclusion_text = body.conclusion_text
     if (body.not_included !== undefined) updates.not_included = body.not_included
+    if (body.terms_text !== undefined) updates.terms_text = body.terms_text
     if (body.ata_terms !== undefined) updates.ata_terms = body.ata_terms
     if (body.payment_terms_text !== undefined) updates.payment_terms_text = body.payment_terms_text
     if (body.payment_plan !== undefined) updates.payment_plan = body.payment_plan

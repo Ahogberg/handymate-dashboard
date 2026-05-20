@@ -218,7 +218,9 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
   ${swishBox}
 
   <p class="terms">
-    <strong>Villkor.</strong> Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning. Alla priser är exkl. moms om inte annat anges.${data.quote.notIncluded ? `<br/><br/><strong>Ej inkluderat:</strong> ${escapeHtml(data.quote.notIncluded)}` : ''}${data.quote.warrantyText ? `<br/><br/><strong>Garanti:</strong> ${escapeHtml(data.quote.warrantyText)}` : ''}
+    <strong>Villkor.</strong> ${data.quote.termsText
+      ? escapeHtml(data.quote.termsText)
+      : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning. Alla priser är exkl. moms om inte annat anges.`}${data.quote.notIncluded ? `<br/><br/><strong>Ej inkluderat:</strong> ${escapeHtml(data.quote.notIncluded)}` : ''}${data.quote.warrantyText ? `<br/><br/><strong>Garanti:</strong> ${escapeHtml(data.quote.warrantyText)}` : ''}
   </p>
 
   <footer class="footer">

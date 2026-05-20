@@ -186,7 +186,9 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
     <div class="totals-grid">
       <div class="terms-card">
         <h3>Villkor &amp; garanti</h3>
-        <p><strong>Giltighet.</strong> Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. Tilläggsarbete debiteras enligt löpande räkning efter skriftligt godkännande.</p>
+        <p>${data.quote.termsText
+          ? escapeHtml(data.quote.termsText)
+          : `<strong>Giltighet.</strong> Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. Tilläggsarbete debiteras enligt löpande räkning efter skriftligt godkännande.`}</p>
         ${data.quote.warrantyText ? `<p><strong>Garanti.</strong> ${escapeHtml(data.quote.warrantyText)}</p>` : ''}
         ${data.quote.notIncluded ? `<p><strong>Ej inkluderat.</strong> ${escapeHtml(data.quote.notIncluded)}</p>` : ''}
       </div>

@@ -181,6 +181,7 @@ export function buildQuoteTemplateData(
       introductionText: quote.introduction_text || null,
       conclusionText: quote.conclusion_text || null,
       notIncluded: quote.not_included || null,
+      termsText: quote.terms_text || null,
     },
   }
 }

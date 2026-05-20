@@ -165,6 +165,7 @@ export default function EditQuotePage() {
   const [notIncluded, setNotIncluded] = useState('')
   const [ataTerms, setAtaTerms] = useState('')
   const [paymentTermsText, setPaymentTermsText] = useState('')
+  const [termsText, setTermsText] = useState('')
 
   // Payment plan
   const [paymentPlan, setPaymentPlan] = useState<PaymentPlanEntry[]>([])
@@ -313,6 +314,7 @@ export default function EditQuotePage() {
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
+        terms_text: termsText || null,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
         project_address: projectAddress || null,
@@ -450,6 +452,7 @@ export default function EditQuotePage() {
       setNotIncluded(quote.not_included || '')
       setAtaTerms(quote.ata_terms || '')
       setPaymentTermsText(quote.payment_terms_text || '')
+      setTermsText((quote as any).terms_text || '')
 
       const hasAnyStandardText =
         quote.introduction_text ||
@@ -559,6 +562,7 @@ export default function EditQuotePage() {
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,
+        terms_text: termsText || null,
         payment_plan: paymentPlan.length > 0 ? calculatePaymentPlan(totals.total, paymentPlan) : null,
         reference_person: referencePerson || null,
         customer_reference: customerReference || null,
@@ -786,6 +790,7 @@ export default function EditQuotePage() {
           not_included: notIncluded || null,
           ata_terms: ataTerms || null,
           payment_terms_text: paymentTermsText || null,
+        terms_text: termsText || null,
           detail_level: detailLevel,
           show_unit_prices: showUnitPrices,
           show_quantities: showQuantities,
@@ -938,6 +943,8 @@ export default function EditQuotePage() {
               setAtaTerms={setAtaTerms}
               paymentTermsText={paymentTermsText}
               setPaymentTermsText={setPaymentTermsText}
+              termsText={termsText}
+              setTermsText={setTermsText}
             />
 
             <QuoteEditPaymentPlanSection
