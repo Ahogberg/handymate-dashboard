@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   // 1. Projekt + kund
   const { data: project, error: projectError } = await supabase
     .from('project')
-    .select('project_id, name, customer_id, budget_amount, start_date, end_date, current_workflow_stage_id, workflow_stage_history, project_type')
+    .select('project_id, name, customer_id, budget_amount, start_date, end_date, current_workflow_stage_id, workflow_stage_history, project_type, project_number')
     .eq('project_id', projectId)
     .eq('business_id', business.business_id)
     .maybeSingle()
@@ -125,6 +125,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       start_date: project.start_date,
       end_date: project.end_date,
       category: project.project_type || null,
+      project_number: project.project_number || null,
     },
     current_stage: currentStage
       ? {

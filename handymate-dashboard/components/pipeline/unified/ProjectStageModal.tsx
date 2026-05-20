@@ -28,6 +28,7 @@ interface WorkflowResponse {
     start_date: string | null
     end_date: string | null
     category: string | null
+    project_number: string | number | null
   }
   current_stage: {
     id: string
@@ -234,7 +235,28 @@ export function ProjectStageModal({ projectId, onClose }: ProjectStageModalProps
                     </span>
                   )}
                 </div>
-                <h2 className={styles.title}>{data.project.name}</h2>
+                <h2 className={styles.title}>
+                  {data.project.project_number != null && (
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        marginRight: 10,
+                        padding: '2px 8px',
+                        background: '#F1F5F9',
+                        color: '#475569',
+                        borderRadius: 6,
+                        fontSize: '0.7em',
+                        fontFamily: 'ui-monospace, monospace',
+                        fontWeight: 600,
+                        verticalAlign: 'middle',
+                      }}
+                      title="Samma ID-nummer som dealen hade i säljtratten"
+                    >
+                      P-{data.project.project_number}
+                    </span>
+                  )}
+                  {data.project.name}
+                </h2>
                 <div className={styles.subtitle}>
                   {data.project.customer_name && <span>{data.project.customer_name}</span>}
                   {data.project.customer_name && data.project.amount != null && <span className={styles.sep}>·</span>}

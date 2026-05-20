@@ -709,7 +709,20 @@ function ProjectRow({
     >
       <div className={styles.projectRowTop}>
         <div className={styles.projectInfo}>
-          <div className={styles.projectInfoName}>{project.name}</div>
+          <div className={styles.projectInfoName}>
+            {/* ID-kontinuitet: samma N som dealens deal_number (v39-migrationen).
+                Christoffer ser P-1042 = samma jobb som #1042 i säljtratten. */}
+            {(project as any).project_number && (
+              <span
+                className={styles.dealRefNum}
+                style={{ marginLeft: 0, marginRight: 8 }}
+                title={deal?.deal_number ? `Tidigare Deal #${deal.deal_number}` : undefined}
+              >
+                P-{(project as any).project_number}
+              </span>
+            )}
+            {project.name}
+          </div>
           <div className={styles.projectInfoSub}>
             {customerName && <span>{customerName}</span>}
             {category && (
