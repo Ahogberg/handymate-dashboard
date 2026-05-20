@@ -1,8 +1,32 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, File as FileIcon, Loader2, Plus, Search, Upload, X } from 'lucide-react'
+import { CustomerModal } from '@/app/dashboard/customers/components/CustomerModal'
+import type { CustomerForm } from '@/app/dashboard/customers/components/types'
 import { usePipelineContext } from '../context'
+
+const EMPTY_CUSTOMER_FORM: CustomerForm = {
+  name: '',
+  phone_number: '',
+  email: '',
+  address_line: '',
+  personal_number: '',
+  property_designation: '',
+  customer_type: 'private',
+  org_number: '',
+  contact_person: '',
+  invoice_address: '',
+  visit_address: '',
+  reference: '',
+  apartment_count: '',
+  segment_id: '',
+  contract_type_id: '',
+  price_list_id: '',
+  default_payment_days: '30',
+  invoice_email: true,
+}
 
 /**
  * Skapa-ny-deal-modal — öppnas från PipelineHeaderns "Ny deal"-knapp.
@@ -41,6 +65,66 @@ export function NewDealModal() {
     showToast,
   } = usePipelineContext()
 
+  // Full CustomerModal-state (pilot-feedback 2026-05-20: "när man klickar
+  // [Ny kund] bör man få upp hela Ny kund-modalen där alla fält finns").
+  // Ersätter den tidigare inline-formuläret med 4 fält.
+  const [showFullCustomerModal, setShowFullCustomerModal] = useState(false)
+  const [fullCustomerForm, setFullCustomerForm] = useState<CustomerForm>(EMPTY_CUSTOMER_FORM)
+  const [fullCustomerSubmitting, setFullCustomerSubmitting] = useState(false)
+
+  async function handleCreateFullCustomer() {
+    if (!fullCustomerForm.name.trim()) {
+      showToast('Ange ett namn', 'error')
+      return
+    }
+    if (!fullCustomerForm.phone_number.trim()) {
+      showToast('Ange telefonnummer', 'error')
+      return
+    }
+    setFullCustomerSubmitting(true)
+    try {
+      const res = await fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fullCustomerForm.name.trim(),
+          phone_number: fullCustomerForm.phone_number.trim(),
+          email: fullCustomerForm.email.trim() || null,
+          address_line: fullCustomerForm.address_line.trim() || null,
+          customer_type: fullCustomerForm.customer_type,
+          org_number: fullCustomerForm.org_number.trim() || null,
+          contact_person: fullCustomerForm.contact_person.trim() || null,
+          invoice_address: fullCustomerForm.invoice_address.trim() || null,
+          reference: fullCustomerForm.reference.trim() || null,
+          apartment_count: fullCustomerForm.apartment_count ? Number(fullCustomerForm.apartment_count) : null,
+          personal_number: fullCustomerForm.personal_number.trim() || null,
+          property_designation: fullCustomerForm.property_designation.trim() || null,
+          segment_id: fullCustomerForm.segment_id || null,
+          contract_type_id: fullCustomerForm.contract_type_id || null,
+          price_list_id: fullCustomerForm.price_list_id || null,
+          default_payment_days: fullCustomerForm.default_payment_days ? Number(fullCustomerForm.default_payment_days) : 30,
+          invoice_email: fullCustomerForm.invoice_email,
+        }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const created = data.customer
+      setCustomers(prev => [
+        { customer_id: created.customer_id, name: created.name, phone_number: created.phone_number || '', email: created.email },
+        ...prev,
+      ])
+      setNewDealForm(prev => ({ ...prev, customer_id: created.customer_id }))
+      setCustomerSearch(created.name)
+      setShowFullCustomerModal(false)
+      setFullCustomerForm(EMPTY_CUSTOMER_FORM)
+      showToast('Kund skapad', 'success')
+    } catch {
+      showToast('Kunde inte skapa kund', 'error')
+    } finally {
+      setFullCustomerSubmitting(false)
+    }
+  }
+
   if (!showNewDeal) return null
 
   return (
@@ -61,13 +145,17 @@ export function NewDealModal() {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs text-gray-400 uppercase tracking-wider block">Kund</label>
-                {!newDealForm.customer_id && !showNewCustomerForm && (
+                {!newDealForm.customer_id && (
                   <button
                     onClick={() => {
-                      setShowNewCustomerForm(true)
+                      // Öppna full CustomerModal med pre-populated namn från
+                      // sökfältet, så Christoffer ser alla fält direkt.
                       setShowCustomerDropdown(false)
-                      const parts = customerSearch.trim().split(/\s+/)
-                      setNewCustomerForm({ firstName: parts[0] || '', lastName: parts.slice(1).join(' ') || '', phone: '', email: '' })
+                      setFullCustomerForm({
+                        ...EMPTY_CUSTOMER_FORM,
+                        name: customerSearch.trim() || '',
+                      })
+                      setShowFullCustomerModal(true)
                     }}
                     className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800 font-medium"
                   >
@@ -120,7 +208,10 @@ export function NewDealModal() {
                   )}
                 </div>
               )}
-              {showNewCustomerForm && !newDealForm.customer_id && (
+              {/* Tidigare inline ny-kund-form med 4 fält. Ersatt av full
+                  CustomerModal som renderas via setShowFullCustomerModal —
+                  se rendering i slutet av komponenten. */}
+              {false && showNewCustomerForm && !newDealForm.customer_id && (
                 <div className="mt-2 p-3 bg-primary-50/50 border border-[#E2E8F0] rounded-lg space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-primary-800">Ny kund</span>
@@ -305,6 +396,22 @@ export function NewDealModal() {
           </div>
         </div>
       </div>
+
+      {/* Full CustomerModal — triggas via "Ny kund"-knappen ovanför.
+          Renderas över NewDealModal (z-50 vs z-50 men senare DOM-ordning
+          vinner inom samma stacking context). */}
+      <CustomerModal
+        open={showFullCustomerModal}
+        editingCustomer={null}
+        form={fullCustomerForm}
+        setForm={setFullCustomerForm}
+        pricingSegments={[]}
+        pricingContractTypes={[]}
+        pricingPriceLists={[]}
+        actionLoading={fullCustomerSubmitting}
+        onClose={() => setShowFullCustomerModal(false)}
+        onSubmit={handleCreateFullCustomer}
+      />
     </>
   )
 }
