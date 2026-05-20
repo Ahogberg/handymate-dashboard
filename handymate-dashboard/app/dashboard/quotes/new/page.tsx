@@ -234,7 +234,10 @@ export default function NewQuotePage() {
   const [productsCount, setProductsCount] = useState<number | null>(null)
 
   // Collapsible sections
-  const [showStandardTexts, setShowStandardTexts] = useState(false)
+  // Pilot-feedback 2026-05-20: Villkor + Ej inkluderat fanns men låg i en
+  // collapsed sektion ('Referenser och texter') by default → Christoffer
+  // hittade dem aldrig. Öppen by default så fälten syns direkt vid skapande.
+  const [showStandardTexts, setShowStandardTexts] = useState(true)
   const [showPaymentPlan, setShowPaymentPlan] = useState(false)
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
 

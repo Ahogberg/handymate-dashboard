@@ -59,7 +59,7 @@ export function QuoteEditStandardTextsSection({
           <FileText className="w-4.5 h-4.5" />
         </div>
         <h2 className="font-heading text-base font-bold text-slate-900 tracking-tight flex-1">
-          Referenser och texter
+          Referenser, villkor & texter
         </h2>
         <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
