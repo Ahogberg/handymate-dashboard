@@ -1985,22 +1985,6 @@ export default function ProjectDetailPage() {
         {/* === TAB: Oversikt === */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Snabbnavigering */}
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => setActiveTab('material')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-                📦 Material
-              </button>
-              <button onClick={() => setActiveTab('economy')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-                💰 Ekonomi
-              </button>
-              <button onClick={() => setActiveTab('documents')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-                📄 Dokument
-              </button>
-              <button onClick={() => setActiveTab('time')} className="flex items-center gap-1.5 px-4 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-700 hover:bg-primary-50 hover:border-primary-200 hover:text-primary-700 transition-colors">
-                🕐 Tidrapporter
-              </button>
-            </div>
-
             {/* Project info card */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
               <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
