@@ -86,6 +86,7 @@ import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
+import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -1927,6 +1928,11 @@ export default function ProjectDetailPage() {
         {statusDropdownOpen && (
           <div className="fixed inset-0 z-10" onClick={() => setStatusDropdownOpen(false)} />
         )}
+
+        {/* 8-fas-tidslinje — pilot-feedback 2026-05-20: synlig direkt på projekt-detalj */}
+        <div className="mb-6">
+          <ProjectStageInline projectId={projectId} />
+        </div>
 
         {/* Mobile: horizontal scroll tabs */}
         <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 md:hidden">

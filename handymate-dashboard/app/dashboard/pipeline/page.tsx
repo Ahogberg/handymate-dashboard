@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   FolderKanban,
   Plus,
@@ -63,7 +63,6 @@ import TaskPresetPicker from '@/components/TaskPresetPicker'
 import SmartTaskTitleInput from '@/components/SmartTaskTitleInput'
 import { TimelineView } from './components/TimelineView'
 import FlowPipeline from '@/components/pipeline/unified/FlowPipeline'
-import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { PipelineStats as PipelineStatsView } from './components/PipelineStats'
 import { PipelineHeader } from './components/PipelineHeader'
 import { SiteVisitModal } from './components/SiteVisitModal'
@@ -118,6 +117,7 @@ const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas')
 
 export default function PipelinePage() {
   const business = useBusiness()
+  const router = useRouter()
   const searchParams = useSearchParams()
 
   const [stages, setStages] = useState<Stage[]>([])
@@ -131,8 +131,6 @@ export default function PipelinePage() {
   const [dragOverStageId, setDragOverStageId] = useState<string | null>(null)
 
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null)
-  // ProjectStageModal — projektet vars stage-tidslinje vi visar i en modal
-  const [openProjectStageId, setOpenProjectStageId] = useState<string | null>(null)
   const [detailActivities, setDetailActivities] = useState<Activity[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -1737,7 +1735,7 @@ export default function PipelinePage() {
               orphanProjects={orphanProjects}
               stages={stages}
               onDealClick={openDealDetail}
-              onProjectClick={(projectId) => setOpenProjectStageId(projectId)}
+              onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
               density="comfortable"
               draggingDealId={draggingDealId}
               dragOverStageId={dragOverStageId}
@@ -1804,11 +1802,6 @@ export default function PipelinePage() {
       </div>
 
       <DealModal />
-
-      <ProjectStageModal
-        projectId={openProjectStageId}
-        onClose={() => setOpenProjectStageId(null)}
-      />
 
       <NewDealModal />
 
