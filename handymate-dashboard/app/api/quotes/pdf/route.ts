@@ -285,8 +285,13 @@ function generateQuoteHTML(quote: any, business: any, config: any): string {
     : ''
 
   // ── Introduction text ──
-  const introHtml = quote.introduction_text
-    ? `<div class="intro-text">${escapeHtml(quote.introduction_text)}</div>`
+  // Pilot-feedback 2026-05-20: 'Beskrivning' (quote.description) kom inte
+  // med i skickad offert. PDF visade bara introduction_text. Fallback till
+  // description om introduction_text saknas — Christoffer's primära text
+  // hamnar då i intro-sektionen.
+  const introContent = quote.introduction_text || quote.description || ''
+  const introHtml = introContent
+    ? `<div class="intro-text">${escapeHtml(introContent)}</div>`
     : ''
 
   // ── Items table ──
