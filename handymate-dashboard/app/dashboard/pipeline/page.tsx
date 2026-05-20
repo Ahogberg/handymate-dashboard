@@ -1729,6 +1729,9 @@ export default function PipelinePage() {
               handleDragOver={handleDragOver}
               handleDragLeave={handleDragLeave}
               handleDrop={handleDrop}
+              searchTerm={filterSearch}
+              customerTypeFilter={filterCustomerType}
+              assignedToFilter={filterAssignedTo}
             />
           ) : pipelineView === 'timeline' ? (
             <TimelineView

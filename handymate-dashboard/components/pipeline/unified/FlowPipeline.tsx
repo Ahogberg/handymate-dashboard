@@ -55,6 +55,14 @@ interface FlowPipelineProps {
   handleDragOver: (e: React.DragEvent, stageId: string) => void
   handleDragLeave: (e: React.DragEvent) => void
   handleDrop: (e: React.DragEvent, stage: Stage) => void
+  /**
+   * Filter från PipelineHeader/PipelineFilters — sprids till BÅDE deals
+   * och projekt så sökning + kundtyp + ansvarig fungerar för hela vyn.
+   * Pilot-feedback 2026-05-19: Christoffer kunde bara söka på säljtratt.
+   */
+  searchTerm?: string
+  customerTypeFilter?: string
+  assignedToFilter?: string
 }
 
 const SPLIT_STORAGE_KEY = 'verksamhetsoversikt.split'
@@ -84,6 +92,9 @@ export default function FlowPipeline({
   handleDragOver,
   handleDragLeave,
   handleDrop,
+  searchTerm = '',
+  customerTypeFilter: customerTypeFilterProp = 'all',
+  assignedToFilter = 'all',
 }: FlowPipelineProps) {
   // Filtrera bort lost-stage från unified-vyn — de visas i sin egen sidebar
   const activeStages = useMemo(() => stages.filter(s => !s.is_lost), [stages])
@@ -103,19 +114,45 @@ export default function FlowPipeline({
     return [...fromDeals, ...fromOrphans]
   }, [deals, orphanProjects])
 
-  // Filter på höger panel — stage + customer_type (private/company/brf)
+  // Filter på höger panel — stage är projekt-lokal (workflow-position).
+  // Sök/kundtyp/ansvarig kommer från parent (PipelineHeader/Filters) så
+  // hela Verksamhetsöversikten respekterar samma filter konsekvent.
   const [stageFilter, setStageFilter] = useState<string | null>(null)
-  const [customerTypeFilter, setCustomerTypeFilter] = useState<string | null>(null)
+  const searchLower = searchTerm.trim().toLowerCase()
   const filteredProjects = useMemo(() => {
     let result = allProjects
     if (stageFilter) {
       result = result.filter(p => p.project.current_workflow_stage_id === stageFilter)
     }
-    if (customerTypeFilter) {
-      result = result.filter(p => (p.project.customer_type || null) === customerTypeFilter)
+    if (customerTypeFilterProp && customerTypeFilterProp !== 'all') {
+      // 'unknown' matchar projekt utan customer_type
+      result = result.filter(p => {
+        const ct = (p.project.customer_type || '').toString()
+        if (customerTypeFilterProp === 'unknown') return !ct
+        return ct === customerTypeFilterProp
+      })
+    }
+    if (assignedToFilter && assignedToFilter !== 'all') {
+      result = result.filter(p => {
+        const assignee = (p.deal?.assigned_to || (p.project as any).assigned_to || null) as string | null
+        if (assignedToFilter === 'unassigned') return !assignee
+        return assignee === assignedToFilter
+      })
+    }
+    if (searchLower) {
+      result = result.filter(p => {
+        const projectName = (p.project.name || '').toLowerCase()
+        const customerName = (p.deal?.customer?.name || (p.project as any).customer_name || '').toLowerCase()
+        const projectNumber = String((p.project as any).project_number || '').toLowerCase()
+        const dealNumber = String(p.deal?.deal_number || '').toLowerCase()
+        return projectName.includes(searchLower)
+          || customerName.includes(searchLower)
+          || projectNumber.includes(searchLower)
+          || dealNumber.includes(searchLower)
+      })
     }
     return result
-  }, [allProjects, stageFilter, customerTypeFilter])
+  }, [allProjects, stageFilter, customerTypeFilterProp, assignedToFilter, searchLower])
 
   // Drag-resizable divider — säljtrattens andel av bredden i procent.
   const [splitPercent, setSplitPercent] = useState<number>(() => clampSplit(initialSplitPercent))
@@ -202,8 +239,7 @@ export default function FlowPipeline({
         allProjectsCount={allProjects.length}
         stageFilter={stageFilter}
         onStageFilter={setStageFilter}
-        customerTypeFilter={customerTypeFilter}
-        onCustomerTypeFilter={setCustomerTypeFilter}
+        customerTypeFilter={customerTypeFilterProp === 'all' ? null : customerTypeFilterProp}
         availableCustomerTypes={Array.from(new Set(allProjects.map(p => p.project.customer_type).filter(Boolean) as string[]))}
         onProjectClick={onProjectClick}
         density={density}
@@ -498,7 +534,6 @@ function ProjectExecutionPane({
   stageFilter,
   onStageFilter,
   customerTypeFilter,
-  onCustomerTypeFilter,
   availableCustomerTypes,
   onProjectClick,
   density,
@@ -507,8 +542,8 @@ function ProjectExecutionPane({
   allProjectsCount: number
   stageFilter: string | null
   onStageFilter: (id: string | null) => void
+  /** Read-only — kundtyp-filter styrs nu av PipelineFilters i parent. */
   customerTypeFilter: string | null
-  onCustomerTypeFilter: (type: string | null) => void
   availableCustomerTypes: string[]
   onProjectClick: (projectId: string) => void
   density: 'comfortable' | 'compact'
@@ -533,32 +568,10 @@ function ProjectExecutionPane({
             {projects.length} {isFiltered ? `(${allProjectsCount} totalt)` : 'pågår'} · {fmtKr(totalValue)}
           </div>
         </div>
-        {/* Kundtyp-filter — bara om det finns 2+ kundtyper att välja mellan */}
-        {availableCustomerTypes.length >= 2 && (
-          <select
-            value={customerTypeFilter || ''}
-            onChange={e => onCustomerTypeFilter(e.target.value || null)}
-            style={{
-              fontSize: 11,
-              padding: '5px 8px',
-              borderRadius: 8,
-              border: '1px solid #e2e8f0',
-              background: '#fff',
-              color: customerTypeFilter ? '#0f766e' : '#64748b',
-              fontWeight: customerTypeFilter ? 600 : 500,
-              cursor: 'pointer',
-              outline: 'none',
-              flexShrink: 0,
-            }}
-            aria-label="Filtrera projekt på kundtyp"
-            title="Filtrera på kundtyp"
-          >
-            <option value="">Alla kundtyper</option>
-            {availableCustomerTypes.map(t => (
-              <option key={t} value={t}>{CUSTOMER_TYPE_LABEL[t] || t}</option>
-            ))}
-          </select>
-        )}
+        {/* Kundtyp-filter flyttat till PipelineFilters (Filter-knappen i
+            headern) per pilot-feedback 2026-05-19 — så filter är gemensamt
+            för säljtratt + projekt. availableCustomerTypes används inte
+            längre här men prop:en behålls för bakåt-kompatibilitet. */}
       </div>
 
       <ProjectStageFilter

@@ -29,7 +29,7 @@ export function PipelineFilters() {
   } = usePipelineContext()
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl z-50">
+    <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-[#E2E8F0] rounded-xl p-4 shadow-xl z-[100]">
       <div className="space-y-3">
         {/* Mobilversion av sökfältet */}
         <div className="sm:hidden">
