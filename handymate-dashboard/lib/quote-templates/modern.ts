@@ -237,8 +237,10 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 // ── Helpers ────────────────────────────────────────────────────
 
 function formatNumber(n: number): string {
-  if (Number.isInteger(n)) return String(n)
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+  if (Number.isInteger(n)) {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  }
+  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
 }
 
 /**

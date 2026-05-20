@@ -221,6 +221,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 }
 
 function formatNumber(n: number): string {
-  if (Number.isInteger(n)) return String(n)
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+  if (Number.isInteger(n)) {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  }
+  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
 }

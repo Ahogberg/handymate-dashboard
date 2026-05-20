@@ -28,11 +28,16 @@ export function escapeHtml(text: string | null | undefined): string {
 
 export function formatCurrency(amount: number | null | undefined): string {
   if (amount == null) return '0 kr'
+  // Intl.NumberFormat('sv-SE') producerar NBSP ( ) eller narrow nbsp
+  // ( ) som thousand-separator. PDF-renderer + vissa fonter kan visa
+  // det som "10000" istället för "10 000". Pilot-feedback 2026-05-20:
+  // 'Siffror i offerten ska alltid särskrivas enligt 10 000'. Ersätter
+  // alla typer av no-break-spaces med vanlig space ( ).
   return new Intl.NumberFormat('sv-SE', {
     style: 'decimal',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount) + ' kr'
+  }).format(amount).replace(/[  ]/g, ' ') + ' kr'
 }
 
 const SV_MONTHS = [

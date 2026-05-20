@@ -227,8 +227,13 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 }
 
 function formatNumber(n: number): string {
-  if (Number.isInteger(n)) return String(n)
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+  if (Number.isInteger(n)) {
+    // Manuell thousand-separator för integers (toLocaleString skulle bara
+    // ge "1000" utan separator, eller "1 000" med NBSP som PDF
+    // kanske inte renderar). Vanlig space garanterat.
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+  }
+  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
 }
 
 function mixWithWhite(hex: string, whitePct: number): string {
