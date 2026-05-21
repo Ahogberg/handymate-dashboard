@@ -150,7 +150,7 @@ export function QuoteEditStandardTextsSection({
                 placeholder="Egen Villkor-text. Lämna tom för standard: 'Offerten gäller till X. Tilläggsarbete debiteras…'"
                 value={termsText || ''}
                 onChange={setTermsText}
-                picker={textsByType.terms}
+                picker={textsByType.terms || []}
                 onPick={setTermsText}
               />
             )}

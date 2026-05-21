@@ -12,7 +12,7 @@ interface StandardTextPickerProps {
 export function StandardTextPicker({ texts, onSelect }: StandardTextPickerProps) {
   const [open, setOpen] = useState(false)
 
-  if (texts.length === 0) return null
+  if (!texts || texts.length === 0) return null
 
   return (
     <div className="relative inline-block">
