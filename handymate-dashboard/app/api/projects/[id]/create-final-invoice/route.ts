@@ -344,15 +344,14 @@ export async function POST(
     dueDate.setDate(dueDate.getDate() + dueDays)
 
     // ── 9. INSERT invoice ───────────────────────────────────────
-    // invoice-tabellen har INTE project_id-kolumn (TD-31). Projekt-
-    // koppling sker indirekt via quote_id → project.quote_id. För att
-    // hitta "alla fakturor för ett projekt" får man joina via quote.
-    // V2: ALTER TABLE invoice ADD COLUMN project_id TEXT.
+    // v52 (2026-05-20) la till invoice.project_id. Lars marginal-analys
+    // läser invoice WHERE project_id direkt.
     const { data: invoice, error: insertError } = await supabase
       .from('invoice')
       .insert({
         business_id: business.business_id,
         customer_id: project.customer_id,
+        project_id: projectId,
         quote_id: project.quote_id || null,
         invoice_number: invoiceNumber,
         invoice_type: 'final',
