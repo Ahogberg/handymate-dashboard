@@ -1447,3 +1447,34 @@ Två projekt skapade från samma offert (`quote_j0ejjprsv`) med 1 sekunds mellan
 
 **Estimat:** 2h granskning + 2h riktad UPDATE + 1-3h orphan-mapping per business. Total ~5-8h.
 
+
+---
+
+## 2026-05-21 — business_users.hourly_cost läcker via /api/team (TD-59)
+
+**Plats:** `app/api/team/route.ts` GET-handler (rad ~9-32).
+
+**Symtom:** GET `/api/team` returnerar `hourly_cost` (legacy-kolumn på business_users) öppet till alla autentiserade users i samma business. Etapp 2.0 (v53, 2026-05-21) lade till skydd för den nya `internal_hourly_cost`-kolumnen — strippas till null för icke-owner/admin — men ekvivalent skydd saknas för `hourly_cost`.
+
+**Konsekvens:** Om hantverkar-employee kallar GET /api/team direkt (eller via en framtida UI-komponent) ser de sin egen + kollegors `hourly_cost`. Värdet visas inte i nuvarande team-page-UI, men API-exponeringen är öppen.
+
+**Vad är `hourly_cost`?** Inte verifierat exakt — kolumnen är `NUMERIC nullable` på business_users.sql:19 utan kommentar. Två rimliga tolkningar:
+- (a) Legacy intern lönekostnad (= samma syfte som nya `internal_hourly_cost`)
+- (b) Något annat (kostnadspris för billable hours? Marginal-buffert per medlem?)
+
+Båda fallen är känslig data som inte ska exponeras till employees.
+
+**Förslag-lösningar:**
+
+1. **Strippa även `hourly_cost` i GET /api/team för icke-owner/admin** — samma defense-in-depth-mönster som vi gjorde för `internal_hourly_cost`. 5-rader-fix.
+
+2. **Utred om `hourly_cost` används någonstans** — sök efter `hourly_cost`-referenser i UI/backend. Om det visar sig vara död data → DROP COLUMN i en framtida migration. Om det används aktivt → dokumentera vad det betyder + skydda det.
+
+3. **Konsolidera** — om `hourly_cost` och `internal_hourly_cost` faktiskt är samma syfte (a-tolkningen), migrera över data från `hourly_cost` till `internal_hourly_cost` och drop:a den gamla.
+
+**Prio:** Medium. Inte aktiv brand idag eftersom inget UI exponerar fältet, men en framtida förändring kan göra det.
+
+**Estimat:** 1h för (1) strippning. 2-4h för (2) utredning + cleanup om obsolet.
+
+**Trigger:** När någon utvecklare nästa gång rör team-route ELLER när vi inspekterar permissioner mer brett.
+
