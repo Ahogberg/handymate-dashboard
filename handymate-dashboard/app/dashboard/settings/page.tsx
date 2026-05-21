@@ -41,6 +41,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusinessPlan } from '@/lib/useBusinessPlan'
 import UpgradePrompt from '@/components/UpgradePrompt'
 import dynamic from 'next/dynamic'
@@ -342,6 +343,7 @@ function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string
 
 export default function SettingsPage() {
   const business = useBusiness()
+  const { isOwnerOrAdmin } = useCurrentUser()
   const { hasFeature: canAccess } = useBusinessPlan()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -1326,6 +1328,12 @@ export default function SettingsPage() {
         { id: 'team', label: 'Team', icon: UsersRound },
         { id: 'time', label: 'Tidrapport', icon: Clock },
         { id: 'economics', label: 'Ekonomi', icon: TrendingUp },
+        // Intern timkostnad — endast owner/admin (v53, Etapp 2.0).
+        // Skydd även i page + API; här gömmer vi länken så icke-OWA
+        // inte ens ser att sidan existerar.
+        ...(isOwnerOrAdmin
+          ? [{ id: '_link_internal_costs', label: 'Intern timkostnad', icon: TrendingUp, href: '/dashboard/settings/internal-costs' }]
+          : []),
         { id: 'pipeline', label: 'Pipeline', icon: TrendingUp },
         { id: '_link_automations', label: 'Automationer', icon: Zap, href: '/dashboard/automations' },
         { id: '_link_leads', label: 'Lead-källor', icon: Link2, href: '/dashboard/settings/lead-sources' },
