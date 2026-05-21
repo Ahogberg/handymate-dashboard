@@ -91,12 +91,36 @@ export async function POST(request: NextRequest) {
     const dueDate = new Date(invoiceDate)
     dueDate.setDate(dueDate.getDate() + dueDays)
 
+    // Backlinka project_id via project.quote_id (Etapp 1, v52). Om en
+    // offert har blivit projekt kopplar vi fakturan dit direkt. Om flera
+    // projekt delar samma quote_id (TD-57 race condition) tar vi första
+    // och loggar warning så Lars-marginal inte fail:ar tyst.
+    const { data: projectMatches } = await supabase
+      .from('project')
+      .select('project_id, created_at')
+      .eq('quote_id', quote_id)
+      .eq('business_id', business_id)
+      .order('created_at', { ascending: true })
+      .limit(2)
+    let linkedProjectId: string | null = null
+    if (projectMatches && projectMatches.length > 0) {
+      linkedProjectId = projectMatches[0].project_id
+      if (projectMatches.length > 1) {
+        console.warn('[from-quote] flera projekt har samma quote_id', {
+          quote_id,
+          chosen: linkedProjectId,
+          alternatives: projectMatches.slice(1).map(p => p.project_id),
+        })
+      }
+    }
+
     const { data: invoice, error: insertError } = await supabase
       .from('invoice')
       .insert({
         business_id,
         customer_id: quote.customer_id,
         quote_id,
+        project_id: linkedProjectId,
         invoice_number: invoiceNumber,
         invoice_type: 'standard',
         status: 'draft',
