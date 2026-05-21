@@ -4,6 +4,17 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission, AuthError } from '@/lib/permissions'
 
 /**
+ * Rollskydd för intern lönekostnad (v53, Etapp 2.0).
+ * Endast owner/admin får se eller redigera `internal_hourly_cost`.
+ * Permission-helpern `see_financials` är medvetet INTE använd här —
+ * Andreas spec 2026-05-21: 'employee/PM/kalkylator ser ALDRIG' även
+ * om de har can_see_financials=true.
+ */
+function canSeeInternalCosts(role: string | null | undefined): boolean {
+  return role === 'owner' || role === 'admin'
+}
+
+/**
  * GET /api/team - Lista teammedlemmar
  */
 export async function GET(request: NextRequest) {
@@ -13,18 +24,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const currentUser = await getCurrentUser(request)
     const supabase = getServerSupabase()
 
     const { data: members, error } = await supabase
       .from('business_users')
-      .select('id, business_id, user_id, role, name, email, phone, title, hourly_cost, hourly_rate, color, avatar_url, is_active, can_see_all_projects, can_see_financials, can_manage_users, can_approve_time, can_create_invoices, specialties, invite_token, invite_expires_at, invited_at, accepted_at, last_login_at, created_at')
+      .select('id, business_id, user_id, role, name, email, phone, title, hourly_cost, hourly_rate, internal_hourly_cost, color, avatar_url, is_active, can_see_all_projects, can_see_financials, can_manage_users, can_approve_time, can_create_invoices, specialties, invite_token, invite_expires_at, invited_at, accepted_at, last_login_at, created_at')
       .eq('business_id', business.business_id)
       .order('role')
       .order('name')
 
     if (error) throw error
 
-    return NextResponse.json({ members: members || [] })
+    // Strippa internal_hourly_cost för icke-owner/admin innan response.
+    // Defense-in-depth utöver UI-rollskydd.
+    const canSee = canSeeInternalCosts(currentUser?.role)
+    const safeMembers = (members || []).map(m =>
+      canSee ? m : { ...m, internal_hourly_cost: null },
+    )
+
+    return NextResponse.json({ members: safeMembers })
 
   } catch (error: any) {
     console.error('Get team error:', error)
@@ -105,6 +124,14 @@ export async function PATCH(request: NextRequest) {
       if (body.can_approve_time !== undefined) updates.can_approve_time = body.can_approve_time
       if (body.can_create_invoices !== undefined) updates.can_create_invoices = body.can_create_invoices
       if (body.specialties !== undefined) updates.specialties = Array.isArray(body.specialties) ? body.specialties : []
+    }
+
+    // Intern lönekostnad — ENDAST owner/admin (v53, Etapp 2.0). Strikare
+    // än manage_users-gaten ovan. En admin med manage_users men ej
+    // 'admin'-roll skulle annars passera den breda gaten. Andreas spec:
+    // 'employee/PM/kalkylator ser ALDRIG' intern kostnad.
+    if (body.internal_hourly_cost !== undefined && canSeeInternalCosts(currentUser?.role)) {
+      updates.internal_hourly_cost = body.internal_hourly_cost
     }
 
     if (Object.keys(updates).length === 0) {
