@@ -249,34 +249,56 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0 }: ProjectEcono
           Marginal
         </h3>
         {marginal.arbetskostnad_konfigurerad && marginal.marginal_kr != null ? (
-          <>
-            <div className="flex items-baseline gap-3">
-              {marginal.marginal_kr >= 0 ? (
-                <TrendingUp className="w-5 h-5 text-emerald-600" />
-              ) : (
-                <TrendingDown className="w-5 h-5 text-red-600" />
-              )}
-              <div
-                className={`text-3xl font-bold tabular-nums ${
-                  marginal.marginal_kr >= 0 ? 'text-emerald-700' : 'text-red-700'
-                }`}
-              >
-                {marginal.marginal_kr >= 0 ? '+' : ''}{formatKr(marginal.marginal_kr)}
-              </div>
-              {marginal.marginal_pct != null && (
-                <div
-                  className={`text-base font-semibold ${
-                    marginal.marginal_pct >= 0 ? 'text-emerald-600' : 'text-red-600'
-                  }`}
-                >
-                  ({marginal.marginal_pct}%)
+          (() => {
+            // Färg-logik: grön = verifierad positiv, röd = negativ, grå =
+            // noll/noll (ingen verklig data ännu). Grön "+0 kr" är vilseledande
+            // när både intäkt och kostnad är 0 — signalerar lönsamhet utan grund.
+            const isZeroData = intakter.forvantad_intakt_kr === 0 && (kostnader.total_kr || 0) === 0
+            const isPositive = !isZeroData && marginal.marginal_kr > 0
+            const isNegative = marginal.marginal_kr < 0
+            const valueColor = isZeroData
+              ? 'text-slate-500'
+              : isPositive
+                ? 'text-emerald-700'
+                : isNegative
+                  ? 'text-red-700'
+                  : 'text-slate-600'
+            const pctColor = isZeroData
+              ? 'text-slate-400'
+              : isPositive
+                ? 'text-emerald-600'
+                : isNegative
+                  ? 'text-red-600'
+                  : 'text-slate-500'
+            return (
+              <>
+                <div className="flex items-baseline gap-3">
+                  {isZeroData ? (
+                    <TrendingUp className="w-5 h-5 text-slate-400" />
+                  ) : isPositive ? (
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                  ) : isNegative ? (
+                    <TrendingDown className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <TrendingUp className="w-5 h-5 text-slate-400" />
+                  )}
+                  <div className={`text-3xl font-bold tabular-nums ${valueColor}`}>
+                    {marginal.marginal_kr > 0 ? '+' : ''}{formatKr(marginal.marginal_kr)}
+                  </div>
+                  {marginal.marginal_pct != null && (
+                    <div className={`text-base font-semibold ${pctColor}`}>
+                      ({marginal.marginal_pct}%)
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-2">
-              Total budget − kostnad
-            </p>
-          </>
+                <p className="text-xs text-slate-500 mt-2">
+                  {isZeroData
+                    ? 'Ingen intäkt eller kostnad registrerad ännu'
+                    : 'Total budget − kostnad'}
+                </p>
+              </>
+            )
+          })()
         ) : (
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-start gap-3">
