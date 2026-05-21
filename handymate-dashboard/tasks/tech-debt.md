@@ -1478,3 +1478,33 @@ Båda fallen är känslig data som inte ska exponeras till employees.
 
 **Trigger:** När någon utvecklare nästa gång rör team-route ELLER när vi inspekterar permissioner mer brett.
 
+
+---
+
+## 2026-05-21 — UI-delar urkopplade vid economy-tab-omskrivning (TD-60)
+
+**Plats:** `app/dashboard/projects/[id]/page.tsx` + `app/api/projects/[id]/profitability/route.ts`.
+
+**Bakgrund:** Etapp 2.2 ersatte economy-tabbens innehåll med `ProjectEconomicsCard` som anropar nya `computeProjectEconomics`-helpern. Endpoint `/api/projects/[id]/profitability` returnerar nu ProjectEconomics-shape (en sanning per Andreas spec). I processen togs följande UI-delar bort eftersom de förlitade sig på gamla shapen och inte täcktes av specen:
+
+1. **Extra costs-sektion (project_cost-tabellen)** — manuella "underentreprenör"/"övrigt"-kostnader. UI (lista + lägg-till-modal + ta-bort-knapp) borttagen. Data i `project_cost` orörd. CostModal-funktionen + state borttagna helt.
+
+2. **Fakturera projekt-knapp** ("Skapa faktura för X kr ofakturerat"). UI borttagen. Användare når fortfarande fakturering via andra paths (offert→faktura, lev.faktura→delfaktura).
+
+3. **Budget usage bars** (separat sektion under cards). Den nya `ProjectEconomicsCard` har inte progress-barer för budget vs kostnad. Räknas vid behov in när 2.3-design utvärderas.
+
+4. **Lönsamhets-widget på Översikt-tab** — kompakt widget som visade budget/kostnad/timmar/material + status-emoji ("✅ Inom budget" osv). Förlitade sig på gamla shapen. Borttagen. Användare ser nu full ekonomi via Ekonomi-tabben.
+
+5. **Mobile profitability-endpoint** (`/api/projects/[id]/profitability/mobile/route.ts`) använder en separat lib (`lib/profitability`) och är OBETROFFLAD av endpoint-bytet. På sikt bör mobile-endpointen också gå via `computeProjectEconomics` för verklig "en sanning".
+
+**Återinför i Etapp 2.3:**
+
+- Extra costs-funktionalitet inkluderas i `computeProjectEconomics` (extra `extra_costs`-fält + UI för att lägga till).
+- Fakturera-projekt-knapp i `ProjectEconomicsCard` när `kvar_att_fakturera > 0` (eller separat sektion).
+- Eventuell mini-widget på Översikt-tab som visar förenklad marginal-snapshot (länkar till Ekonomi-tabben för detaljer).
+- Migrera mobile-endpoint till `computeProjectEconomics` när vi vågar bryta mobil-shape.
+
+**Estimat:** 4-6h för 2.3-arbete + 2h för mobile-migrering (separat).
+
+**Pilot-impact:** Låg. Bee Service har inga aktuella `project_cost`-poster i Bee Service-pilot (verifierat 2026-05-20 dry-run). Funktionen återinförs innan andra pilots börjar köra.
+

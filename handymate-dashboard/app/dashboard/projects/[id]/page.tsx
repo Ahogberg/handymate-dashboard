@@ -16,7 +16,6 @@ import {
   AlertTriangle,
   Calendar,
   FileText,
-  DollarSign,
   TrendingUp,
   BarChart3,
   Layers,
@@ -87,6 +86,7 @@ import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
+import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -211,26 +211,6 @@ interface Summary {
   ata_removals: number
   ata_net: number
   ata_hours: number
-}
-
-interface Profitability {
-  revenue: { quote_amount: number; ata_additions: number; ata_removals: number; material_sell: number; total: number }
-  costs: { actual_hours: number; actual_amount: number; material_purchase: number; subcontractor: number; other: number; total: number }
-  extra_costs: ExtraCost[]
-  budget: {
-    hours: number; hours_with_ata: number; amount: number; amount_with_ata: number
-    hours_usage_percent: number; amount_usage_percent: number
-  }
-  invoicing: { invoiced_amount: number; invoiced_hours: number; uninvoiced_hours: number; uninvoiced_amount: number; invoiced_material: number; uninvoiced_material: number }
-  margin: { amount: number; percent: number }
-}
-
-interface ExtraCost {
-  id: string
-  category: string
-  description: string | null
-  amount: number
-  date: string
 }
 
 type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'ai_log' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports' | 'tasks'
@@ -572,10 +552,12 @@ export default function ProjectDetailPage() {
   // Modals
   const [milestoneModal, setMilestoneModal] = useState<{ open: boolean; editing: Milestone | null }>({ open: false, editing: null })
   const [changeModal, setChangeModal] = useState<{ open: boolean; editing: Change | null }>({ open: false, editing: null })
-  const [costModal, setCostModal] = useState(false)
+  // Räknare som triggar ProjectEconomicsCard att refetcha när något
+  // utanför komponenten ändras (status, milestones, tid). Ersätter
+  // tidigare setEconomicsRefreshKey(k => k + 1)-mönster.
+  const [economicsRefreshKey, setEconomicsRefreshKey] = useState(0)
   const [sendingAtaId, setSendingAtaId] = useState<string | null>(null)
   const [expandedAtaId, setExpandedAtaId] = useState<string | null>(null)
-  const [deletingCostId, setDeletingCostId] = useState<string | null>(null)
 
   // Work orders
   const [workOrders, setWorkOrders] = useState<any[]>([])
@@ -612,10 +594,6 @@ export default function ProjectDetailPage() {
     is_billable: true
   })
   const [timeSaving, setTimeSaving] = useState(false)
-
-  // Profitability (lazy loaded)
-  const [profitability, setProfitability] = useState<Profitability | null>(null)
-  const [profitLoading, setProfitLoading] = useState(false)
 
   // Saving states
   const [savingStatus, setSavingStatus] = useState(false)
@@ -751,29 +729,14 @@ export default function ProjectDetailPage() {
     }
   }, [projectId])
 
-  const fetchProfitability = useCallback(async () => {
-    if (profitability) return
-    setProfitLoading(true)
-    try {
-      const res = await fetch(`/api/projects/${projectId}/profitability`)
-      if (res.ok) {
-        const data = await res.json()
-        setProfitability(data)
-      }
-    } catch {
-      showToast('Kunde inte ladda ekonomidata', 'error')
-    } finally {
-      setProfitLoading(false)
-    }
-  }, [projectId, profitability, showToast])
-
   useEffect(() => {
     fetchProjectData()
   }, [fetchProjectData])
 
   useEffect(() => {
     if (activeTab === 'economy') {
-      fetchProfitability()
+      // ProjectEconomicsCard hämtar /api/projects/[id]/profitability själv.
+      // supplier_invoices fetchas separat för leverantörer-tab.
       fetchSupplierInvoices()
     }
     if (activeTab === 'material' && projectPriceList.length === 0) {
@@ -784,7 +747,7 @@ export default function ProjectDetailPage() {
         .eq('is_active', true)
         .then(({ data }: { data: any }) => { if (data) setProjectPriceList(data) })
     }
-  }, [activeTab, fetchProfitability])
+  }, [activeTab])
 
   const fetchProjectTeam = useCallback(async () => {
     try {
@@ -1383,8 +1346,8 @@ export default function ProjectDetailPage() {
       }
 
       showToast(`Status ändrad till ${STATUS_MAP[newStatus]}`, 'success')
-      // Invalidate profitability cache on status change
-      setProfitability(null)
+      // Trigga ProjectEconomicsCard att refetcha vid statusbyte
+      setEconomicsRefreshKey(k => k + 1)
       await fetchProjectData()
     } catch {
       // Rollback optimistic update
@@ -1406,7 +1369,7 @@ export default function ProjectDetailPage() {
         body: JSON.stringify({ milestone_id: milestone.milestone_id, status: nextStatus })
       })
       if (!res.ok) throw new Error()
-      setProfitability(null)
+      setEconomicsRefreshKey(k => k + 1)
       await fetchProjectData()
     } catch {
       showToast('Kunde inte uppdatera delmoment', 'error')
@@ -1477,7 +1440,7 @@ export default function ProjectDetailPage() {
         throw new Error(data.error || 'Error')
       }
       showToast(status === 'approved' ? 'ÄTA godkänd' : 'ÄTA avslagen', 'success')
-      setProfitability(null)
+      setEconomicsRefreshKey(k => k + 1)
       await fetchProjectData()
     } catch (err: any) {
       showToast(err.message || 'Kunde inte uppdatera ÄTA', 'error')
@@ -1495,7 +1458,7 @@ export default function ProjectDetailPage() {
         throw new Error(data.error || 'Error')
       }
       showToast('ÄTA borttagen', 'success')
-      setProfitability(null)
+      setEconomicsRefreshKey(k => k + 1)
       await fetchProjectData()
     } catch (err: any) {
       showToast(err.message || 'Kunde inte ta bort', 'error')
@@ -2031,56 +1994,7 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            {/* Lönsamhets-widget (V25) */}
-            {profitability && profitability.budget.amount > 0 && (() => {
-              const costPct = profitability.budget.amount_usage_percent
-              const budgetTotal = profitability.budget.amount_with_ata
-              const costTotal = profitability.costs.total
-              const hoursPct = profitability.budget.hours_usage_percent
-              const barColor = costPct > 95 ? 'bg-red-500' : costPct > 75 ? 'bg-amber-500' : 'bg-primary-600'
-              const statusLabel = costPct > 95 ? '🔴 Över budget' : costPct > 75 ? '⚠️ Håll koll' : '✅ Inom budget'
-              const projectedCost = hoursPct > 10 ? Math.round(costTotal / (hoursPct / 100)) : costTotal
-              return (
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                  <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-secondary-700" />
-                    Lönsamhet
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-400">Budget</p>
-                      <p className="text-lg font-bold text-gray-900">{formatCurrency(budgetTotal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Kostnad</p>
-                      <p className="text-lg font-bold text-gray-900">{formatCurrency(costTotal)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Tid</p>
-                      <p className="text-sm text-gray-700">{profitability.costs.actual_hours}h / {profitability.budget.hours_with_ata}h</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400">Material</p>
-                      <p className="text-sm text-gray-700">{formatCurrency(profitability.costs.material_purchase)}</p>
-                    </div>
-                  </div>
-                  <div className="w-full bg-gray-100 rounded-full h-3 mb-2">
-                    <div className={`h-3 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(costPct, 100)}%` }} />
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">{costPct}% använt</span>
-                    <span className={costPct > 95 ? 'text-red-600 font-medium' : costPct > 75 ? 'text-amber-600 font-medium' : 'text-primary-700 font-medium'}>
-                      {statusLabel}
-                    </span>
-                  </div>
-                  {hoursPct > 10 && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      Prognos: {formatCurrency(projectedCost)} {projectedCost <= budgetTotal ? '(inom budget)' : `(${formatCurrency(projectedCost - budgetTotal)} över)`}
-                    </p>
-                  )}
-                </div>
-              )
-            })()}
+            {/* Lönsamhet-vy ligger på Ekonomi-tabben (ProjectEconomicsCard, v53). */}
 
             {/* Progress bar */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
@@ -3811,261 +3725,7 @@ export default function ProjectDetailPage() {
 
         {/* === TAB: Ekonomi === */}
         {activeTab === 'economy' && (
-          <div className="space-y-6">
-            {profitLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="w-6 h-6 text-secondary-700 animate-spin" />
-              </div>
-            ) : profitability ? (
-              <>
-                {/* Revenue / Costs / Result / Invoicing cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Intakter */}
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <DollarSign className="w-4 h-4 text-emerald-600" />
-                      <p className="text-sm font-medium text-gray-500">Intakter</p>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.revenue.total)}</p>
-                    <div className="space-y-1 text-xs text-gray-400">
-                      <div className="flex justify-between">
-                        <span>Offert</span>
-                        <span>{formatCurrency(profitability.revenue.quote_amount)}</span>
-                      </div>
-                      {profitability.revenue.ata_additions > 0 && (
-                        <div className="flex justify-between text-emerald-600">
-                          <span>+ ATA tillagg</span>
-                          <span>+{formatCurrency(profitability.revenue.ata_additions)}</span>
-                        </div>
-                      )}
-                      {profitability.revenue.ata_removals > 0 && (
-                        <div className="flex justify-between text-red-600">
-                          <span>- ATA avgaende</span>
-                          <span>-{formatCurrency(profitability.revenue.ata_removals)}</span>
-                        </div>
-                      )}
-                      {profitability.revenue.material_sell > 0 && (
-                        <div className="flex justify-between">
-                          <span>Material (forsaljning)</span>
-                          <span>{formatCurrency(profitability.revenue.material_sell)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Kostnader */}
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Clock className="w-4 h-4 text-amber-400" />
-                      <p className="text-sm font-medium text-gray-500">Kostnader</p>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900 mb-2">{formatCurrency(profitability.costs.total)}</p>
-                    <div className="space-y-1 text-xs text-gray-400">
-                      <div className="flex justify-between">
-                        <span>Arbetstid ({formatHours(profitability.costs.actual_hours)})</span>
-                        <span>{formatCurrency(profitability.costs.actual_amount)}</span>
-                      </div>
-                      {profitability.costs.material_purchase > 0 && (
-                        <div className="flex justify-between">
-                          <span>Material (inkop)</span>
-                          <span>{formatCurrency(profitability.costs.material_purchase)}</span>
-                        </div>
-                      )}
-                      {profitability.costs.subcontractor > 0 && (
-                        <div className="flex justify-between">
-                          <span>Underentreprenor</span>
-                          <span>{formatCurrency(profitability.costs.subcontractor)}</span>
-                        </div>
-                      )}
-                      {profitability.costs.other > 0 && (
-                        <div className="flex justify-between">
-                          <span>Ovriga kostnader</span>
-                          <span>{formatCurrency(profitability.costs.other)}</span>
-                        </div>
-                      )}
-                      {supplierInvoices.length > 0 && (() => {
-                        const siTotal = supplierInvoices.reduce((s, inv) => s + (parseFloat(inv.total_amount) || 0), 0)
-                        return siTotal > 0 ? (
-                          <div className="flex justify-between">
-                            <span>Leverantörsfakturor</span>
-                            <span>{formatCurrency(siTotal)}</span>
-                          </div>
-                        ) : null
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Resultat */}
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <TrendingUp className="w-4 h-4 text-secondary-700" />
-                      <p className="text-sm font-medium text-gray-500">Resultat</p>
-                    </div>
-                    <p className={`text-2xl font-bold mb-1 ${profitability.margin.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {profitability.margin.amount >= 0 ? '+' : ''}{formatCurrency(profitability.margin.amount)}
-                    </p>
-                    <p className={`text-sm font-medium ${profitability.margin.percent >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {profitability.margin.percent}% marginal
-                    </p>
-                  </div>
-
-                  {/* Fakturering */}
-                  <div className="bg-white rounded-xl border border-[#E2E8F0] p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Receipt className="w-4 h-4 text-primary-500" />
-                      <p className="text-sm font-medium text-gray-500">Fakturering</p>
-                    </div>
-                    <div className="space-y-2">
-                      <div>
-                        <p className="text-xs text-gray-400">Fakturerat</p>
-                        <p className="text-lg font-bold text-gray-900">{formatCurrency(profitability.invoicing.invoiced_amount)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400">Ofakturerat</p>
-                        <p className="text-lg font-bold text-amber-400">{formatCurrency(profitability.invoicing.uninvoiced_amount)}</p>
-                        <p className="text-xs text-gray-400">{formatHours(profitability.invoicing.uninvoiced_hours)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Budget usage bars */}
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                  <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-primary-500" />
-                    Budgetforbrukning
-                  </h2>
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-500">Timmar</span>
-                        <span className="text-sm text-gray-900">
-                          {formatHours(profitability.costs.actual_hours)} / {formatHours(profitability.budget.hours_with_ata)}
-                        </span>
-                      </div>
-                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(profitability.budget.hours_usage_percent)}`}
-                          style={{ width: `${Math.min(profitability.budget.hours_usage_percent, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{profitability.budget.hours_usage_percent}%</p>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-500">Belopp</span>
-                        <span className="text-sm text-gray-900">
-                          {formatCurrency(profitability.costs.total)} / {formatCurrency(profitability.budget.amount_with_ata)}
-                        </span>
-                      </div>
-                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(profitability.budget.amount_usage_percent)}`}
-                          style={{ width: `${Math.min(profitability.budget.amount_usage_percent, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{profitability.budget.amount_usage_percent}%</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Extra costs section */}
-                <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <Briefcase className="w-5 h-5 text-amber-500" />
-                      Projektkostnader
-                    </h2>
-                    <button
-                      onClick={() => setCostModal(true)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-secondary-700 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Lagg till kostnad
-                    </button>
-                  </div>
-
-                  {profitability.extra_costs && profitability.extra_costs.length > 0 ? (
-                    <div className="space-y-2">
-                      {profitability.extra_costs.map((cost) => (
-                        <div key={cost.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg group">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                cost.category === 'subcontractor'
-                                  ? 'bg-purple-100 text-purple-700'
-                                  : 'bg-gray-200 text-gray-600'
-                              }`}>
-                                {cost.category === 'subcontractor' ? 'UE' : 'Ovrigt'}
-                              </span>
-                              <span className="text-sm text-gray-900 truncate">{cost.description || 'Ingen beskrivning'}</span>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-0.5">{formatDate(cost.date)}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-gray-900">{formatCurrency(cost.amount)}</span>
-                            <button
-                              onClick={async () => {
-                                if (deletingCostId) return
-                                setDeletingCostId(cost.id)
-                                try {
-                                  const res = await fetch(`/api/projects/${projectId}/costs?cost_id=${cost.id}`, { method: 'DELETE' })
-                                  if (res.ok) {
-                                    setProfitability(null)
-                                    showToast('Kostnad borttagen', 'success')
-                                  } else {
-                                    showToast('Kunde inte ta bort kostnad', 'error')
-                                  }
-                                } catch {
-                                  showToast('Kunde inte ta bort kostnad', 'error')
-                                } finally {
-                                  setDeletingCostId(null)
-                                }
-                              }}
-                              className="p-1 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
-                              title="Ta bort"
-                            >
-                              {deletingCostId === cost.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="flex justify-between pt-2 border-t border-gray-100 text-sm">
-                        <span className="text-gray-500 font-medium">Totalt</span>
-                        <span className="font-bold text-gray-900">
-                          {formatCurrency(profitability.extra_costs.reduce((s, c) => s + c.amount, 0))}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-400 text-center py-4">
-                      Inga extra kostnader registrerade
-                    </p>
-                  )}
-                </div>
-
-                {/* Create invoice button */}
-                {profitability.invoicing.uninvoiced_amount > 0 && (
-                  <button
-                    onClick={() => setShowInvoiceModal(true)}
-                    className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90"
-                  >
-                    <Receipt className="w-5 h-5" />
-                    Fakturera projekt ({formatCurrency(profitability.invoicing.uninvoiced_amount)})
-                  </button>
-                )}
-              </>
-            ) : (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-400">Kunde inte ladda ekonomidata</p>
-              </div>
-            )}
-          </div>
+          <ProjectEconomicsCard projectId={projectId} refreshKey={economicsRefreshKey} />
         )}
         {/* === TAB: AI-logg (Projektanalys) === */}
         {activeTab === 'field_reports' && (
@@ -4612,23 +4272,9 @@ export default function ProjectDetailPage() {
           onClose={() => setChangeModal({ open: false, editing: null })}
           onSaved={() => {
             setChangeModal({ open: false, editing: null })
-            setProfitability(null)
+            setEconomicsRefreshKey(k => k + 1)
             fetchProjectData()
             showToast(changeModal.editing ? 'ÄTA uppdaterad' : 'ÄTA skapad', 'success')
-          }}
-          onError={(msg) => showToast(msg, 'error')}
-        />
-      )}
-
-      {/* === Cost Modal === */}
-      {costModal && (
-        <CostModal
-          projectId={projectId}
-          onClose={() => setCostModal(false)}
-          onSaved={() => {
-            setCostModal(false)
-            setProfitability(null)
-            showToast('Kostnad tillagd', 'success')
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -4671,7 +4317,7 @@ export default function ProjectDetailPage() {
           onSaved={() => {
             setSiModal({ open: false, editing: null })
             fetchSupplierInvoices()
-            setProfitability(null)
+            setEconomicsRefreshKey(k => k + 1)
             showToast(siModal.editing ? 'Faktura uppdaterad' : 'Faktura tillagd', 'success')
           }}
         />
@@ -5249,140 +4895,6 @@ function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {editing ? 'Spara' : 'Skapa'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// --- Cost Modal (Lägg till kostnad) ---
-
-function CostModal({ projectId, onClose, onSaved, onError }: {
-  projectId: string
-  onClose: () => void
-  onSaved: () => void
-  onError: (msg: string) => void
-}) {
-  const [category, setCategory] = useState<'subcontractor' | 'other'>('subcontractor')
-  const [description, setDescription] = useState('')
-  const [amount, setAmount] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      onError('Ange ett belopp')
-      return
-    }
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/projects/${projectId}/costs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          category,
-          description: description.trim() || null,
-          amount: parseFloat(amount),
-          date
-        })
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Error')
-      }
-      onSaved()
-    } catch (err: any) {
-      onError(err.message || 'Kunde inte lagga till kostnad')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">Lagg till kostnad</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Kategori</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setCategory('subcontractor')}
-                className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
-                  category === 'subcontractor'
-                    ? 'bg-purple-100 border-purple-500/30 text-purple-700'
-                    : 'bg-gray-100 border-gray-300 text-gray-500'
-                }`}
-              >
-                Underentreprenor
-              </button>
-              <button
-                onClick={() => setCategory('other')}
-                className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
-                  category === 'other'
-                    ? 'bg-amber-100 border-amber-500/30 text-amber-700'
-                    : 'bg-gray-100 border-gray-300 text-gray-500'
-                }`}
-              >
-                Ovrigt
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Beskrivning</label>
-            <input
-              type="text"
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              placeholder="T.ex. Elektriker AB, hyra stegar..."
-              autoFocus
-              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Belopp (kr) *</label>
-              <input
-                type="number"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Datum</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
-          >
-            Avbryt
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !amount}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Lagg till
           </button>
         </div>
       </div>
