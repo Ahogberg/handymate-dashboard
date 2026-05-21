@@ -1382,3 +1382,68 @@ Sedan UI-rendering i fakturarad + PDF-template + invoice-view-skärm respekterar
 **Trigger:** Post-launch när vi ändå rör stage-koden. Inte akut — båda fungerar idag.
 
 **Estimat:** 2-3h.
+
+---
+
+## 2026-05-20 — Race condition i offert→projekt-konvertering (TD-57)
+
+**Plats:** `app/api/projects/route.ts` POST-handler (sökväg ~rad 236-398, `from_quote_id`-blocket).
+
+**Symtom:** Verifierat 2026-05-20 i Bee Service-pilot:
+```
+project_id 7a55e92a-...  created_at 2026-03-18 20:33:07.802
+project_id proj_mc67tt9rh created_at 2026-03-18 20:33:08.799
+```
+Två projekt skapade från samma offert (`quote_j0ejjprsv`) med 1 sekunds mellanrum. Samma kund, samma namn ("Renovering"). Båda har 0 timmar/ÄTA/bokningar = orphan-spöken efter dubbel-submit.
+
+**Rotorsak:** Inget idempotens-skydd. Möjliga triggers:
+- Användaren klickar "Skapa projekt" två gånger (snabb-klick / sviktande UI-feedback).
+- Nätverket retransmittterar en POST (timeout + retry).
+- Frontend skickar dubbel POST p.g.a. felaktig event-handler.
+
+**Konsekvens:**
+- Datakvalitet-divergens (samma offert ↔ två projekt).
+- Manuella city för Lars/Karin-marginal: vilket projekt är "rätt"?
+- Förvirring för användare som ser dubbletter i projekt-listan.
+
+**Förslag-lösningar (välj en post-launch):**
+
+1. **DB-constraint (säkrast):** `ALTER TABLE project ADD CONSTRAINT unique_quote_project UNIQUE (quote_id) WHERE quote_id IS NOT NULL`. Andra INSERT med samma quote_id fail:ar omedelbart. Krav: rensa befintliga dubbletter först.
+
+2. **Application-dedup (mjukare):** I `/api/projects` POST med `from_quote_id`, gör `SELECT project_id FROM project WHERE quote_id = X` först. Om träff → returnera existerande projekt istället för att skapa nytt. Idempotent.
+
+3. **UI-dedup:** Disable knapp + spinner under POST. Behandlar bara klick-spam, inte nätverks-retransmission.
+
+**Rek:** Kombo 1+2 — application-dedup blockerar nya dubbletter omedelbart, DB-constraint som extra säkerhetsnät.
+
+**Bee Service-pilot:** två orphan-projekt kvarstår tomma. Andreas beslutar om de ska tas bort eller bara accepteras (de skadar inte men förvirrar).
+
+**Estimat:** 2-3h kod + 1h test + 1h migration. Total ~5h.
+
+**Trigger:** Innan nästa pilot börjar producera riktiga projekt. Annars riskerar nya dubletter uppstå.
+
+---
+
+## 2026-05-20 — Backfill av historisk invoice→project skippad (TD-58)
+
+**Plats:** `sql/v52_invoice_project_id.sql` lades till 2026-05-20 (Etapp 1 av projekt-konsolidering). `sql/v52b_invoice_project_id_backfill.sql` förbereddes med dry-run + UPDATE, men UPDATE-delen kördes **aldrig**.
+
+**Varför:** Bee Service-pilot har inga riktiga fakturor med produktiv data ännu (verifierat: 0 time_entry, 0 project_change, 0 schedule_entry på alla projekt). Backfill skulle bara mappat test/demo-fakturor och försämra signal-till-brus i Lars-aggregator. Plus en dublett (TD-57) som skulle krävt manuell mapping.
+
+**Konsekvens:** Historiska invoice-rader (om de existerar) har permanent `project_id = NULL` om de skapades innan kod-fixarna i steg 1.3.
+
+**När det blir akut:**
+
+- När en pilot börjar producera riktiga fakturor från `/api/invoices/from-project` (= rutten som tidigare hade buggen). Då finns en "kant" mellan pre-fix-orphans och post-fix-fakturor med project_id.
+- När Lars/Karin börjar göra cross-project margin-rapporter över längre tidsspann (>90d). 
+
+**Vad som behövs då:**
+
+1. Lös TD-57 (dubbletter) först — annars blir backfill blockerad igen.
+2. Kör v52b-Del 2-UPDATE riktat mot business som faktiskt har fakturor.
+3. För orphans utan `quote_id` (skapade via `from-project` pre-fix): manuell mapping per faktura eller heuristik via `customer_id + invoice_date`-fönster (mis-attribution-risk → kräver granskning).
+
+**Trigger:** När 5+ pilots aktivt fakturerar via systemet OCH Lars/Karin-output visar att fakturor saknas i marginal-analyserna.
+
+**Estimat:** 2h granskning + 2h riktad UPDATE + 1-3h orphan-mapping per business. Total ~5-8h.
+
