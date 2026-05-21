@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
     const {
       customer_id,
       quote_id,
+      project_id,
       time_entry_ids,
       project_material_ids,
       items: providedItems,
@@ -283,12 +284,28 @@ export async function POST(request: NextRequest) {
     const dueDate = new Date(invoiceDateVal)
     dueDate.setDate(dueDate.getDate() + due_days)
 
+    // Härd: om client skickade quote_id men inte project_id, försök
+    // backlinka via project.quote_id (samma mönster som from-quote/1.3b).
+    let resolvedProjectId: string | null = project_id || null
+    if (!resolvedProjectId && quote_id) {
+      const { data: projectMatch } = await supabase
+        .from('project')
+        .select('project_id')
+        .eq('quote_id', quote_id)
+        .eq('business_id', business_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (projectMatch) resolvedProjectId = projectMatch.project_id
+    }
+
     const { data: invoice, error: insertError } = await supabase
       .from('invoice')
       .insert({
         business_id,
         customer_id,
         quote_id,
+        project_id: resolvedProjectId,
         invoice_number: invoiceNumber,
         invoice_type: invoice_type || 'standard',
         status: 'draft',
