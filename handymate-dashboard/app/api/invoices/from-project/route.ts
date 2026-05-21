@@ -139,6 +139,17 @@ export async function POST(request: NextRequest) {
 
   const supabase = getServerSupabase()
 
+  // Slå upp project.quote_id för att härda mot orphan-fakturor. Tidigare
+  // skapade rutten invoice utan vare sig project_id eller quote_id —
+  // gjorde framtida marginal-analys + backfill omöjlig (TD-58, v52).
+  const { data: projectRow } = await supabase
+    .from('project')
+    .select('project_id, quote_id')
+    .eq('project_id', project_id)
+    .eq('business_id', business.business_id)
+    .single()
+  const linkedQuoteId = projectRow?.quote_id || null
+
   // Hämta invoice-nummer
   const { data: config } = await supabase
     .from('business_config')
@@ -203,6 +214,8 @@ export async function POST(request: NextRequest) {
       invoice_id: invoiceId,
       business_id: business.business_id,
       customer_id: customer_id || null,
+      project_id,
+      quote_id: linkedQuoteId,
       invoice_number: invoiceNumber,
       invoice_type: 'standard',
       status: 'draft',
