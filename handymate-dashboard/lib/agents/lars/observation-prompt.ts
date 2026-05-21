@@ -85,6 +85,15 @@ interface ProjectChangeRow {
   project_id: string | null
 }
 
+interface InvoiceRow {
+  invoice_id: string
+  project_id: string | null
+  total: number | null
+  status: string | null
+  paid_at: string | null
+  invoice_date: string | null
+}
+
 export interface LarsAggregate {
   period_days: 90
   projects_90d: {
@@ -137,6 +146,25 @@ export interface LarsAggregate {
     sign_rate_pct: number | null
     total_signed_value_kr: number
     avg_signed_value_kr: number | null
+  }
+  // Tillagt v52 (2026-05-20): invoice WHERE project_id direkt-läsning.
+  // Bygger på `invoice.project_id`-kolumnen som lades till i samma
+  // migration. Låser upp marginal-analys per projekt — Lars kunde
+  // tidigare bara läsa snapshot-kolumner (`actual_*`) som ej synkades
+  // tillförlitligt.
+  invoicing_90d: {
+    total_count: number
+    with_project_id_count: number
+    total_invoiced_kr: number
+    total_paid_kr: number
+    paid_rate_pct: number | null
+    under_invoiced_samples: Array<{
+      project_id: string
+      name: string
+      budget_amount: number
+      invoiced_kr: number
+      gap_kr: number
+    }>
   }
 }
 
@@ -295,6 +323,55 @@ async function buildLarsAggregate(
     ? Math.round(ataSignedValue / ataSigned.length)
     : null
 
+  // ── Invoice (90d, v52 invoice.project_id) ────────────────
+  // Direkt-läsning per projekt. Karins mönster (hon läser invoice för
+  // cash-flow); Lars läser samma tabell men slicar per projekt-id.
+  const { data: invoicesData } = await supabase
+    .from('invoice')
+    .select('invoice_id, project_id, total, status, paid_at, invoice_date')
+    .eq('business_id', businessId)
+    .gte('invoice_date', ninetyDaysAgo.toISOString().split('T')[0])
+    .limit(500)
+
+  const invoices = (invoicesData || []) as InvoiceRow[]
+  const invoicesWithProject = invoices.filter(i => i.project_id !== null)
+
+  const totalInvoicedKr = invoicesWithProject.reduce(
+    (s, i) => s + Number(i.total || 0),
+    0,
+  )
+  const totalPaidKr = invoicesWithProject
+    .filter(i => i.status === 'paid')
+    .reduce((s, i) => s + Number(i.total || 0), 0)
+  const paidRatePct = totalInvoicedKr > 0
+    ? Math.round((totalPaidKr / totalInvoicedKr) * 100)
+    : null
+
+  // Aggregera fakturerat per projekt
+  const invoicedByProject = new Map<string, number>()
+  for (const inv of invoicesWithProject) {
+    const key = inv.project_id!
+    invoicedByProject.set(key, (invoicedByProject.get(key) || 0) + Number(inv.total || 0))
+  }
+
+  // Top 5 under-invoiced projekt (har offert men fakturerat <80% av budget)
+  const underInvoicedSamples = projects
+    .filter(p => Number(p.budget_amount || 0) > 0)
+    .map(p => {
+      const budget = Number(p.budget_amount || 0)
+      const invoiced = invoicedByProject.get(p.project_id) || 0
+      return {
+        project_id: p.project_id,
+        name: p.name || '(namnlöst)',
+        budget_amount: Math.round(budget),
+        invoiced_kr: Math.round(invoiced),
+        gap_kr: Math.round(budget - invoiced),
+      }
+    })
+    .filter(s => s.gap_kr > 0 && s.invoiced_kr / s.budget_amount < 0.8)
+    .sort((a, b) => b.gap_kr - a.gap_kr)
+    .slice(0, 5)
+
   return {
     period_days: 90,
     projects_90d: {
@@ -343,6 +420,14 @@ async function buildLarsAggregate(
       sign_rate_pct: signRate,
       total_signed_value_kr: Math.round(ataSignedValue),
       avg_signed_value_kr: ataAvgSignedValue,
+    },
+    invoicing_90d: {
+      total_count: invoices.length,
+      with_project_id_count: invoicesWithProject.length,
+      total_invoiced_kr: Math.round(totalInvoicedKr),
+      total_paid_kr: Math.round(totalPaidKr),
+      paid_rate_pct: paidRatePct,
+      under_invoiced_samples: underInvoicedSamples,
     },
   }
 }
@@ -414,6 +499,11 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Vilken andel av bokningar slutförs vs avbokas?
    - Finns kunder/projekt med upprepade avbokningar?
    - Påverkar avbokningar projekt-timeline märkbart?
+
+5. **Faktureringstakt vs offert (v52, ny):**
+   - Vilka projekt i \`invoicing_90d.under_invoiced_samples\` har stor gap mellan offert-summa och fakturerat? Tappade vi en delfaktura?
+   - Total \`paid_rate_pct\` — sittfaktureringar långsamma i betalning?
+   - Finns aktiva projekt utan en enda faktura där arbetet pågått längre än rimligt?
 
 Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
 
