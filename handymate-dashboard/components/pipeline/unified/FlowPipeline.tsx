@@ -15,6 +15,7 @@ import {
   type FlowSystemStage,
 } from './flow-constants'
 import { timeAgo } from '@/app/dashboard/pipeline/helpers'
+import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
 import styles from './flow.module.css'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -754,7 +755,7 @@ function ProjectRow({
         </div>
       </div>
 
-      <StageBars currentStageId={currentStage.id} density={density} />
+      <ProjectStageStrip currentStageId={currentStage.id} density={density} />
 
       {/* AI-aktivitet (live från v3_automation_logs via customer_id) */}
       {project.latest_automation && (

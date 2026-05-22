@@ -84,7 +84,8 @@ import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
-import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
+import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
+import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { ProjectEconomicsMiniSnapshot } from '@/components/projects/ProjectEconomicsMiniSnapshot'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
@@ -122,6 +123,8 @@ interface Project {
   ai_health_summary: string | null
   ai_auto_created: boolean
   ai_last_analyzed_at: string | null
+  // Etapp 4a.1: behövs för ProjectStageStrip på förstasidan
+  current_workflow_stage_id?: string | null
   customer?: {
     customer_id: string
     name: string
@@ -544,6 +547,8 @@ export default function ProjectDetailPage() {
     return 'overview'
   })
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false)
+  // Etapp 4a.1: klick på fas-strip öppnar modal med byt-stage + tasks
+  const [stageModalOpen, setStageModalOpen] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
   // Modals
@@ -1854,9 +1859,15 @@ export default function ProjectDetailPage() {
           <div className="fixed inset-0 z-10" onClick={() => setStatusDropdownOpen(false)} />
         )}
 
-        {/* 8-fas-tidslinje — pilot-feedback 2026-05-20: synlig direkt på projekt-detalj */}
-        <div className="mb-6">
-          <ProjectStageInline projectId={projectId} />
+        {/* 8-fas-tidslinje — Etapp 4a.1 (2026-05-22): vertikal stapel
+            ersatt av kompakt horisontell strip (samma mönster som
+            Verksamhetsöversikten). Klick på fas öppnar modal med
+            byt-stage + tasks + AI-aktivitet. */}
+        <div className="mb-6 bg-white border border-slate-200 rounded-xl p-4">
+          <ProjectStageStrip
+            currentStageId={project.current_workflow_stage_id || 'ps-01'}
+            onStageClick={() => setStageModalOpen(true)}
+          />
         </div>
 
         {/* Mobile: horizontal scroll tabs */}
@@ -4197,6 +4208,14 @@ export default function ProjectDetailPage() {
         onClose={() => setShowTaskPresetPicker(false)}
         onCreate={createProjectTaskBatch}
         contextLabel={project?.name ? `Projekt · ${project.name}` : undefined}
+      />
+
+      {/* Stage-modal — Etapp 4a.1 (2026-05-22): öppnas från klick på
+          horisontella fas-stripen. Visar full 8-stage-lista, byt-stage,
+          tasks-summary, AI-aktivitet. */}
+      <ProjectStageModal
+        projectId={stageModalOpen ? projectId : null}
+        onClose={() => setStageModalOpen(false)}
       />
     </div>
   )
