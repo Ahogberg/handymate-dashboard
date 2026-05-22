@@ -1587,24 +1587,24 @@ export default function ProjectDetailPage() {
 
   // --- Tab definitions ---
 
+  // Tab-grupper — Etapp 4a.2 (2026-05-22):
+  // 4 logiska grupper istället för 5. ÄTA + Delmoment till ÖVERSIKT
+  // (ekonomi-relaterade). Rityta dold men koden behållen (TD-75).
+  // INGA sammanslagningar — varje tab är fortfarande separat tab,
+  // bara visuellt grupperad. Sammanslagningar är 4c-arbete.
   const tabGroups: { group: string; items: { key: TabKey; label: string }[] }[] = [
     { group: 'ÖVERSIKT', items: [
       { key: 'overview', label: 'Översikt' },
-      { key: 'quote_spec', label: 'Offert' },
-      { key: 'economy', label: 'Ekonomi' },
-    ]},
-    { group: 'PLANERING', items: [
-      { key: 'schedule', label: 'Schema' },
       { key: 'milestones', label: 'Delmoment' },
+      { key: 'economy', label: 'Ekonomi' },
+      { key: 'quote_spec', label: 'Offert' },
       { key: 'changes', label: 'ÄTA' },
-      { key: 'tasks', label: 'Uppgifter' },
     ]},
-    { group: 'FÄLT', items: [
+    { group: 'ARBETE', items: [
       { key: 'arbetsorder', label: 'Arbetsorder' },
+      { key: 'tasks', label: 'Uppgifter' },
+      { key: 'schedule', label: 'Schema' },
       { key: 'time', label: 'Tidrapporter' },
-      { key: 'field_reports', label: 'Fältrapporter' },
-      { key: 'checklists', label: 'Checklistor' },
-      { key: 'canvas', label: 'Rityta' },
     ]},
     { group: 'RESURSER', items: [
       { key: 'team', label: 'Team' },
@@ -1612,9 +1612,14 @@ export default function ProjectDetailPage() {
       { key: 'leverantorer', label: 'Leverantörer' },
     ]},
     { group: 'DOKUMENTATION', items: [
-      { key: 'documents', label: 'Dokument' },
+      { key: 'checklists', label: 'Checklistor' },
+      { key: 'field_reports', label: 'Fältrapporter' },
       { key: 'log', label: 'Byggdagbok' },
+      { key: 'documents', label: 'Dokument' },
     ]},
+    // Rityta (canvas) DOLD från tabbarna i Etapp 4a.3 — koden behålls
+    // för framtida platsbesök-funktionalitet. activeTab='canvas' via
+    // URL-bookmark renderar fortfarande (allowed-array inkluderar den).
   ]
   const allTabs = tabGroups.flatMap(g => g.items)
 

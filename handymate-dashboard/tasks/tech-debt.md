@@ -2119,3 +2119,34 @@ UI:n lovar funktionalitet som inte finns. Användaren förväntar sig en faktura
 
 **Trigger:** SNABB-fix lämpligt — kan göras i samma session som ett annat litet arbete. Inte 4a-scope eftersom det rör fakturadomänen (separat från projekt-layout). Möjligt 4b-arbete eller separat städnings-commit.
 
+
+---
+
+## 2026-05-22 — Rityta (canvas) dold från projekt-tabbar, koden behållen (TD-75)
+
+**Plats:** `app/dashboard/projects/[id]/page.tsx` (Etapp 4a.3).
+
+**Symtom:** Rityta-tabben (canvas) togs bort från `tabGroups` i Etapp 4a.2-4.4. Den var en del av FÄLT-gruppen, nu dold.
+
+**Varför dold:** Christoffer-feedback: Projekt har för många tabbar, Rityta är onödig idag. Christoffer använder den aldrig.
+
+**Varför INTE raderad:**
+- `<ProjectCanvas>`-komponenten finns kvar (`components/project/ProjectCanvas.tsx`)
+- Tab-rendering via `activeTab === 'canvas'`-villkor finns kvar i page.tsx
+- `'canvas'` finns kvar i `TabKey`-typen och `allowed`-arrayen för URL-bookmark-tolerans
+- Tabellen `canvas_layer` orörd i databasen
+
+**Konsekvens:**
+- Användaren ser inte tabben i sidebar/mobile-tabs
+- Direkt-URL `/dashboard/projects/[id]?tab=canvas` renderar fortfarande Rityta-vyn (bookmark fungerar)
+- Inga API-routes påverkas
+
+**Framtida åter-aktivering (om relevant):**
+Lägg tillbaka `{ key: 'canvas', label: 'Rityta' }` i någon tab-grupp (sannolikt ARBETE eller en ny FÄLT-grupp). 5 minuters arbete.
+
+**När det är relevant:** Platsbesök-canvas där hantverkaren skissar offert på plats med kund. Kan vara värdefull post-pilot om Vy 1 (offert-skapande på plats) prioriteras. Hade kunnat användas av Christoffer om han hade muntligt-ja-flöde där han ritar direkt med kund (relaterar till TD-68 om manuell accept för utkast).
+
+**Estimat (åter-aktivering):** 5 min UI + 30 min UX-utvärdering om bevarat värde.
+
+**Trigger:** Bara om pilot-feedback specifikt efterfrågar canvas-funktionalitet. Annars förblir den dold på obestämd tid.
+
