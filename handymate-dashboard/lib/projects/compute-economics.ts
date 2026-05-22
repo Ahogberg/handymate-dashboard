@@ -68,6 +68,16 @@ export interface ProjectEconomics {
     /** marginal i procent = marginal_kr / forvantad_intakt * 100. Null
         om arbetskostnad_konfigurerad=false eller intakt = 0. */
     marginal_pct: number | null
+    /** TD-63 (2026-05-22): är registrerad kostnad rimligt komplett?
+        Heuristik: status='completed' ELLER kostnad utgör >= 30% av
+        förväntad intäkt. False = pågående projekt med så liten
+        kostnadsregistrering att marginalen sannolikt är vilseledande
+        ("preliminär"). UI och Lars använder denna för ärlig signalering. */
+    kostnad_sannolikt_komplett: boolean
+    /** Kostnadens andel av förväntad intäkt i procent. Null om
+        intäkt = 0 eller arbetskostnad ej konfigurerad. UI visar
+        "kostnad registrerad: X% av budget". */
+    kostnad_completeness_pct: number | null
   }
 
   // ── Metadata ───────────────────────────────────────────────────
@@ -92,6 +102,7 @@ export interface ProjectExtraCost {
 interface ProjectRow {
   project_id: string
   business_id: string
+  status: string | null
   budget_amount: number | null
   budget_hours: number | null
 }
@@ -173,7 +184,7 @@ export async function computeProjectEconomics(
   // ── 1. Project (budget) ──────────────────────────────────────
   const { data: projectRow, error: projectError } = await supabase
     .from('project')
-    .select('project_id, business_id, budget_amount, budget_hours')
+    .select('project_id, business_id, status, budget_amount, budget_hours')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
     .single()
@@ -331,6 +342,22 @@ export async function computeProjectEconomics(
       : null
   }
 
+  // TD-63: kostnad-completeness-flagga. Skiljer pågående projekt med
+  // lite registrerad kostnad från projekt där kostnaden faktiskt är
+  // låg. Utan denna risk: ett 85k-projekt med 2k registrerad kostnad
+  // skulle rapporteras som 97% marginal — vilseledande för Lars +
+  // användare. Heuristik: completed-status = data är slutgiltig.
+  // Annars kräv att kostnaden utgör minst 30% av förväntad intäkt
+  // för att räknas som rimligt komplett.
+  const COST_COMPLETENESS_THRESHOLD = 0.30
+  const kostnadCompletenessPct =
+    arbetskostnadKonfigurerad && forvantadIntakt > 0 && totalKostnad != null
+      ? Math.round((totalKostnad / forvantadIntakt) * 100)
+      : null
+  const kostnadSannoliktKomplett =
+    project.status === 'completed' ||
+    (kostnadCompletenessPct != null && kostnadCompletenessPct >= COST_COMPLETENESS_THRESHOLD * 100)
+
   return {
     project_id: project.project_id,
     business_id: project.business_id,
@@ -358,6 +385,8 @@ export async function computeProjectEconomics(
       timrader_utan_kostnad: timraderUtanKostnad,
       marginal_kr: marginalKr == null ? null : Math.round(marginalKr),
       marginal_pct: marginalPct,
+      kostnad_sannolikt_komplett: kostnadSannoliktKomplett,
+      kostnad_completeness_pct: kostnadCompletenessPct,
     },
     meta: {
       computed_at: new Date().toISOString(),
