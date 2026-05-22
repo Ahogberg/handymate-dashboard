@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateSubtotal } from '@/lib/quote-calculations'
 import {
   escapeHtml,
@@ -21,6 +22,13 @@ export async function POST(request: NextRequest) {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // TD-71 (2026-05-22): rollskydd. Offert-PDF visar priser
+    // — kräver see_financials-permission. Owner/admin auto.
+    const currentUser = await getCurrentUser(request)
+    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()
@@ -109,6 +117,15 @@ export async function GET(request: NextRequest) {
       if (!business) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
+
+      // TD-71 (2026-05-22): rollskydd för pris-data. Offert-PDF visar
+      // priser — kräver see_financials-permission. Publik ?token=-vägen
+      // ovan är medveten kund-vy och lämnas orörd.
+      const currentUser = await getCurrentUser(request)
+      if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+        return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+      }
+
       const { data } = await supabase
         .from('quotes')
         .select('*')
