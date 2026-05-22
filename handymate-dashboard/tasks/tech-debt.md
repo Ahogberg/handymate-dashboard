@@ -1530,3 +1530,37 @@ Båda fallen är känslig data som inte ska exponeras till employees.
 
 **Trigger:** Efter Etapp 2.4 är klar och Lars producerar relevanta marginal-observationer på minst 2 pilots.
 
+
+---
+
+## 2026-05-22 — Lars-aggregator: N+1-mönster per projekt via computeProjectEconomics (TD-62)
+
+**Plats:** `lib/agents/lars/observation-prompt.ts` `buildLarsAggregate` (Etapp 2.4).
+
+**Bakgrund:** För att ge Lars sann marginal-data anropas `computeProjectEconomics(supabase, projectId, businessId)` per projekt i 90-dagars-fönstret. Helpern gör internt ~7 queries (project, project_change, invoice, time_entry, business_users, business_config, supplier_invoices, project_cost). För N projekt blir det N×7 round-trips.
+
+**Aktuell pilot-impact:**
+- biz_al7pjuu5smi: ~25 projekt → ~175 queries per Lars-run
+- Run-frekvens: en gång per dag (cron)
+- Latency: parallelliserat via `Promise.all`, så wall-time hålls nere men Supabase-server-side trafiken är fortfarande N×7
+
+**Skalrisk:**
+- 100 aktiva projekt: ~700 queries/run
+- 5 pilots × 50 projekt × dagligen: ~17 500 queries/dag i Lars-runs alone
+- I jämförelse skulle en batch-variant ge ~10 queries totalt (en query per tabell med IN-klausul)
+
+**Förslag-lösning v2 (post-pilot):**
+1. Skapa `computeProjectEconomicsBatch(supabase, projectIds, businessId)` som tar en array av project_ids och kör 7-10 queries totalt med `IN (...)`-klausuler.
+2. Returnerar `Map<projectId, ProjectEconomics>`.
+3. Lars-aggregator + andra batch-konsumenter använder batch-varianten.
+4. Per-projekt-helpern (`computeProjectEconomics`) blir tunn wrapper runt batch som tar ett projektId.
+
+**När:** Inte akut idag (pilot-volym). Trigga när:
+- Lars-run latency > 30s, ELLER
+- Antal pilots × snittprojekt-volym > 500 (≈10 pilots med 50+ projekt vardera), ELLER
+- Supabase-användning närmar sig plangräns
+
+**Estimat:** 4-6h batch-implementation + 2h migrering av konsumenter + 2h test.
+
+**Pilot-trigger:** Granska Lars-latency efter 3-5 pilots, mät då.
+

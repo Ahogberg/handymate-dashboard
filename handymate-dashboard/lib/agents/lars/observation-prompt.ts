@@ -23,6 +23,10 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
+import {
+  computeProjectEconomics,
+  type ProjectEconomics,
+} from '@/lib/projects/compute-economics'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -51,6 +55,10 @@ export interface LarsRunResult {
 // Aggregate-typer
 // ─────────────────────────────────────────────────────────────────
 
+// Etapp 2.4 (2026-05-22): ProjectRow innehåller nu BARA grunddata.
+// Marginal, kostnader och alla "actual_*"-fält hämtas via
+// computeProjectEconomics (per projekt) — inga snapshot-läsningar
+// av stale actual_labor_cost / actual_material_cost / profitability_status.
 interface ProjectRow {
   project_id: string
   name: string | null
@@ -58,10 +66,6 @@ interface ProjectRow {
   status: string
   budget_hours: number | null
   budget_amount: number | null
-  actual_hours: number | null
-  actual_labor_cost: number | null
-  actual_material_cost: number | null
-  profitability_status: string | null
   completed_at: string | null
   created_at: string
 }
@@ -100,8 +104,12 @@ export interface LarsAggregate {
     total_count: number
     completed_count: number
     active_count: number
+    // over_budget_count räknas nu från helpern: arbetskostnad_konfigurerad
+    // OCH total_kr > forvantad_intakt
     over_budget_count: number
-    at_risk_count: number
+    // Projekt där vi inte kan beräkna marginal (timrader utan intern
+    // kostnad satt) — ärlighet vid saknad data.
+    missing_cost_config_count: number
     avg_margin_pct: number | null
     over_budget_samples: Array<{
       project_id: string
@@ -109,9 +117,33 @@ export interface LarsAggregate {
       budget_amount: number
       actual_total_cost: number
       pct_over: number
-      profitability_status: string
     }>
   }
+  // Etapp 2.4: full ekonomi per projekt via computeProjectEconomics.
+  // Lars använder dessa istället för stale snapshot-kolumner.
+  project_economics: Array<{
+    project_id: string
+    name: string
+    status: string
+    budget_amount: number
+    forvantad_intakt_kr: number
+    fakturerat_kr: number
+    betalt_kr: number
+    total_cost_kr: number | null
+    marginal_kr: number | null
+    marginal_pct: number | null
+    arbetskostnad_konfigurerad: boolean
+    timrader_utan_kostnad: number
+  }>
+  // Lista av projekt där marginal EJ kan beräknas pga saknad intern-
+  // kostnad. Lars ska refera till dessa explicit i sina observationer
+  // istället för att räkna fram en falskt hög marginal.
+  projects_missing_internal_cost: Array<{
+    project_id: string
+    name: string
+    budget_amount: number
+    timrader_utan_kostnad: number
+  }>
   scope_creep: {
     completed_with_budget: number
     avg_pct_actual_vs_budget: number | null
@@ -172,16 +204,19 @@ export interface LarsAggregate {
 // Aggregation helpers
 // ─────────────────────────────────────────────────────────────────
 
-function projectMarginPct(p: ProjectRow): number | null {
-  const budget = Number(p.budget_amount || 0)
-  const cost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
-  return budget > 0 ? Math.round(((budget - cost) / budget) * 100) : null
+/** Avgör om ett projekt är "över budget" från helper-data.
+ *  Kräver att arbetskostnad är konfigurerad — annars vet vi inte. */
+function isOverBudgetFromEconomics(e: ProjectEconomics): boolean {
+  if (!e.marginal.arbetskostnad_konfigurerad) return false
+  if (e.kostnader.total_kr == null) return false
+  return e.kostnader.total_kr > e.intakter.forvantad_intakt_kr
 }
 
-function projectActualVsBudgetPct(p: ProjectRow): number | null {
-  const budgetHours = Number(p.budget_hours || 0)
-  const actualHours = Number(p.actual_hours || 0)
-  return budgetHours > 0 ? Math.round((actualHours / budgetHours) * 100) : null
+/** Beräkna marginal-percent från helper-data, eller null om
+ *  arbetskostnad ej konfigurerad eller intäkt = 0. */
+function marginPctFromEconomics(e: ProjectEconomics): number | null {
+  if (!e.marginal.arbetskostnad_konfigurerad) return null
+  return e.marginal.marginal_pct
 }
 
 async function buildLarsAggregate(
@@ -194,7 +229,7 @@ async function buildLarsAggregate(
   // ── Projekt (90d) ─────────────────────────────────────────
   const { data: projectsData, error: projectsError } = await supabase
     .from('project')
-    .select('project_id, name, customer_id, status, budget_hours, budget_amount, actual_hours, actual_labor_cost, actual_material_cost, profitability_status, completed_at, created_at')
+    .select('project_id, name, customer_id, status, budget_hours, budget_amount, completed_at, created_at')
     .eq('business_id', businessId)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .limit(300)
@@ -211,49 +246,106 @@ async function buildLarsAggregate(
   const projects = projectsData as ProjectRow[]
   const completed = projects.filter(p => p.status === 'completed')
   const active = projects.filter(p => p.status === 'active' || p.status === 'planning')
-  const overBudget = projects.filter(p => p.profitability_status === 'over_budget')
-  const atRisk = projects.filter(p => p.profitability_status === 'at_risk')
 
-  // Marginal-stats
-  const completedWithBudget = completed.filter(p => Number(p.budget_amount || 0) > 0)
-  let avgMarginPct: number | null = null
-  if (completedWithBudget.length > 0) {
-    const margins = completedWithBudget
-      .map(p => projectMarginPct(p))
-      .filter((m): m is number => m !== null)
-    if (margins.length > 0) {
-      avgMarginPct = Math.round(margins.reduce((s, m) => s + m, 0) / margins.length)
-    }
+  // ── Etapp 2.4: full ekonomi via computeProjectEconomics per projekt ──
+  // Anropar helpern parallellt med Promise.all. För ~25 projekt blir
+  // det ~25 helper-anrop = ~175 round-trips totalt (helpern gör ~7
+  // queries internt). TD-62 loggat om vi behöver batcha senare.
+  const economicsResults = await Promise.all(
+    projects.map(p => computeProjectEconomics(supabase, p.project_id, businessId)),
+  )
+  const economicsByProjectId = new Map<string, ProjectEconomics>()
+  for (let i = 0; i < projects.length; i++) {
+    const e = economicsResults[i]
+    if (e) economicsByProjectId.set(projects[i].project_id, e)
   }
 
-  // Top 5 over-budget samples
-  const overBudgetSamples = overBudget
-    .map(p => {
-      const totalCost = Number(p.actual_labor_cost || 0) + Number(p.actual_material_cost || 0)
-      const budget = Number(p.budget_amount || 0)
+  // Strukturerad lista per projekt — det är denna data Lars använder
+  // i sina observationer (inte snapshot-fält).
+  const projectEconomicsList = projects.map(p => {
+    const e = economicsByProjectId.get(p.project_id)
+    return {
+      project_id: p.project_id,
+      name: p.name || '(namnlöst)',
+      status: p.status,
+      budget_amount: Math.round(Number(p.budget_amount || 0)),
+      forvantad_intakt_kr: e?.intakter.forvantad_intakt_kr ?? Math.round(Number(p.budget_amount || 0)),
+      fakturerat_kr: e?.intakter.fakturerat_kr ?? 0,
+      betalt_kr: e?.intakter.betalt_kr ?? 0,
+      total_cost_kr: e?.kostnader.total_kr ?? null,
+      marginal_kr: e?.marginal.marginal_kr ?? null,
+      marginal_pct: e?.marginal.marginal_pct ?? null,
+      arbetskostnad_konfigurerad: e?.marginal.arbetskostnad_konfigurerad ?? false,
+      timrader_utan_kostnad: e?.marginal.timrader_utan_kostnad ?? 0,
+    }
+  })
+
+  // Projekt där marginal EJ kan beräknas — Lars ska referera till
+  // dessa explicit istället för att gissa.
+  const projectsMissingInternalCost = projectEconomicsList
+    .filter(p => !p.arbetskostnad_konfigurerad && p.timrader_utan_kostnad > 0)
+    .map(p => ({
+      project_id: p.project_id,
+      name: p.name,
+      budget_amount: p.budget_amount,
+      timrader_utan_kostnad: p.timrader_utan_kostnad,
+    }))
+    .sort((a, b) => b.timrader_utan_kostnad - a.timrader_utan_kostnad)
+    .slice(0, 10)
+
+  // Över-budget-projekt (helper-bedömt, ej snapshot)
+  const overBudgetEconomics = Array.from(economicsByProjectId.values())
+    .filter(isOverBudgetFromEconomics)
+
+  // Genomsnittlig marginal — endast räknat på projekt med konfigurerad
+  // arbetskostnad. Projekt utan kostnad-config exkluderas (de skulle
+  // annars sänka snittet med null:s).
+  const completedWithEconomics = completed
+    .map(p => economicsByProjectId.get(p.project_id))
+    .filter((e): e is ProjectEconomics => e !== undefined)
+  const completedWithMargin = completedWithEconomics
+    .filter(e => e.marginal.arbetskostnad_konfigurerad && Number(e.intakter.forvantad_intakt_kr) > 0)
+  const completedMargins = completedWithMargin
+    .map(e => marginPctFromEconomics(e))
+    .filter((m): m is number => m !== null)
+  const avgMarginPct = completedMargins.length > 0
+    ? Math.round(completedMargins.reduce((s, m) => s + m, 0) / completedMargins.length)
+    : null
+
+  // Top 5 over-budget samples — helper-baserade, alltid pålitliga
+  const overBudgetSamples = overBudgetEconomics
+    .map(e => {
+      const proj = projects.find(p => p.project_id === e.project_id)
+      const budget = e.intakter.forvantad_intakt_kr
+      const totalCost = e.kostnader.total_kr || 0
       const pctOver = budget > 0 ? Math.round(((totalCost - budget) / budget) * 100) : 0
       return {
-        project_id: p.project_id,
-        name: p.name || '(namnlöst)',
+        project_id: e.project_id,
+        name: proj?.name || '(namnlöst)',
         budget_amount: Math.round(budget),
         actual_total_cost: Math.round(totalCost),
         pct_over: pctOver,
-        profitability_status: p.profitability_status || 'unknown',
       }
     })
     .sort((a, b) => b.pct_over - a.pct_over)
     .slice(0, 5)
 
   // ── Scope-creep (faktiska timmar vs budget-timmar) ───────
-  const completedWithHours = completed.filter(
-    p => Number(p.budget_hours || 0) > 0 && Number(p.actual_hours || 0) > 0,
-  )
+  // Använder arbete_timmar från helpern istället för project.actual_hours.
+  const completedWithHours = completed.filter(p => {
+    if (!(Number(p.budget_hours || 0) > 0)) return false
+    const e = economicsByProjectId.get(p.project_id)
+    return e ? e.kostnader.arbete_timmar > 0 : false
+  })
   let avgActualVsBudgetPct: number | null = null
   let projectsOver120Count = 0
   if (completedWithHours.length > 0) {
-    const ratios = completedWithHours
-      .map(p => projectActualVsBudgetPct(p))
-      .filter((r): r is number => r !== null)
+    const ratios = completedWithHours.map(p => {
+      const e = economicsByProjectId.get(p.project_id)
+      const budgetHours = Number(p.budget_hours || 0)
+      const actualHours = e?.kostnader.arbete_timmar || 0
+      return budgetHours > 0 ? Math.round((actualHours / budgetHours) * 100) : null
+    }).filter((r): r is number => r !== null)
     if (ratios.length > 0) {
       avgActualVsBudgetPct = Math.round(ratios.reduce((s, r) => s + r, 0) / ratios.length)
       projectsOver120Count = ratios.filter(r => r > 120).length
@@ -261,26 +353,29 @@ async function buildLarsAggregate(
   }
 
   // ── Projekt-storlek (under/över 50k SEK) ─────────────────
+  // Marginal per storleksklass — bara från projekt med konfigurerad
+  // arbetskostnad.
   const small = projects.filter(p => Number(p.budget_amount || 0) > 0 && Number(p.budget_amount) < 50000)
   const large = projects.filter(p => Number(p.budget_amount || 0) >= 50000)
   const smallCompleted = small.filter(p => p.status === 'completed')
   const largeCompleted = large.filter(p => p.status === 'completed')
 
-  const smallMargins = smallCompleted
-    .map(p => projectMarginPct(p))
-    .filter((m): m is number => m !== null)
-  const largeMargins = largeCompleted
-    .map(p => projectMarginPct(p))
-    .filter((m): m is number => m !== null)
+  const collectMargins = (rows: ProjectRow[]): number[] =>
+    rows
+      .map(p => economicsByProjectId.get(p.project_id))
+      .filter((e): e is ProjectEconomics => !!e && e.marginal.arbetskostnad_konfigurerad)
+      .map(e => e.marginal.marginal_pct)
+      .filter((m): m is number => m !== null)
 
-  const smallAvgMargin =
-    smallMargins.length > 0
-      ? Math.round(smallMargins.reduce((s, m) => s + m, 0) / smallMargins.length)
-      : null
-  const largeAvgMargin =
-    largeMargins.length > 0
-      ? Math.round(largeMargins.reduce((s, m) => s + m, 0) / largeMargins.length)
-      : null
+  const smallMargins = collectMargins(smallCompleted)
+  const largeMargins = collectMargins(largeCompleted)
+
+  const smallAvgMargin = smallMargins.length > 0
+    ? Math.round(smallMargins.reduce((s, m) => s + m, 0) / smallMargins.length)
+    : null
+  const largeAvgMargin = largeMargins.length > 0
+    ? Math.round(largeMargins.reduce((s, m) => s + m, 0) / largeMargins.length)
+    : null
 
   // ── Bokningar (90d) ──────────────────────────────────────
   const { data: bookingsData } = await supabase
@@ -378,11 +473,13 @@ async function buildLarsAggregate(
       total_count: projects.length,
       completed_count: completed.length,
       active_count: active.length,
-      over_budget_count: overBudget.length,
-      at_risk_count: atRisk.length,
+      over_budget_count: overBudgetEconomics.length,
+      missing_cost_config_count: projectsMissingInternalCost.length,
       avg_margin_pct: avgMarginPct,
       over_budget_samples: overBudgetSamples,
     },
+    project_economics: projectEconomicsList,
+    projects_missing_internal_cost: projectsMissingInternalCost,
     scope_creep: {
       completed_with_budget: completedWithHours.length,
       avg_pct_actual_vs_budget: avgActualVsBudgetPct,
@@ -489,6 +586,17 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Är små projekt (<50k SEK) mer eller mindre lönsamma än stora?
    - Vilken storleksklass har lägst marginal — och vad är orsaken?
    - Var lägger vi tid med dålig avkastning?
+   - **ÄRLIGHET (Etapp 2.4):** Använd \`projects_90d.avg_margin_pct\` och \`by_project_size.*.avg_margin_pct\` — dessa räknas BARA på projekt med konfigurerad intern timkostnad. Om \`missing_cost_config_count > 0\`, notera det i din observation. ALDRIG hitta på en marginal-siffra för projekt utan kostnadsdata.
+
+2b. **Projekt med saknad intern-kostnad (kritisk för datakvalitet):**
+   - Lista i \`projects_missing_internal_cost\` är projekt där vi INTE kan beräkna marginal pga ingen intern timkostnad satt på medlemmar/business-default
+   - Om listan är icke-tom: säg explicit "X projekt saknar kostnadsdata — sätt intern timkostnad på medlemmar för att låsa upp marginal-analys"
+   - Detta är INTE en negativ observation — det är ärlighet om att verktyget behöver mer data
+
+2c. **Förlustprojekt (negativ marginal):**
+   - Använd \`project_economics\` — projekt där \`arbetskostnad_konfigurerad=true\` OCH \`marginal_kr < 0\`
+   - Om någon ligger på 25%+ förlust, lyft det med projektnamn och belopp
+   - Suggestion: "se över ÄTA-möjligheter" eller "granska tidsåtgång"
 
 3. **ÄTA-flödet:**
    - Skickas ÄTA:er ut i tid? (skapade men ej sent_at?)
