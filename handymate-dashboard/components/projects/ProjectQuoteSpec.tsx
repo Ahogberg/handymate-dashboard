@@ -81,6 +81,10 @@ interface ProjectQuoteContext {
   legacy: {
     using_jsonb_fallback: boolean
   }
+  /** Server-side stripping: API:t har satt pris-fält till 0 för icke-OWA.
+      Komponenten döljer pris-kolumner när detta är true OAVSETT vad
+      isOwnerOrAdmin säger lokalt (server är källan till sanning). */
+  prices_redacted?: boolean
 }
 
 interface ProjectQuoteSpecProps {
@@ -186,6 +190,10 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
   const totalArbete = data.rader.arbete.reduce((s, r) => s + r.total, 0)
   const totalMaterial = data.rader.material.reduce((s, r) => s + r.total, 0)
 
+  // Server-side stripping vinner. Om server redacted priser → dölj
+  // OAVSETT isOwnerOrAdmin (defense-in-depth, undvik client-server drift).
+  const showPrices = isOwnerOrAdmin && !data.prices_redacted
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -245,8 +253,8 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
         </div>
 
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          {/* Total visas bara för OWA — Andreas 2026-05-22 */}
-          {isOwnerOrAdmin && <Stat label="Total (netto)" value={formatKr(data.total_kr)} />}
+          {/* Total visas bara om server skickat med priser */}
+          {showPrices && <Stat label="Total (netto)" value={formatKr(data.total_kr)} />}
           {data.meta.accepted_at && (
             <Stat label="Accepterad" value={new Date(data.meta.accepted_at).toLocaleDateString('sv-SE')} />
           )}
@@ -270,7 +278,7 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
         rows={data.rader.arbete}
         total={totalArbete}
         emptyMessage="Inga arbets-rader registrerade på offerten."
-        showPrices={isOwnerOrAdmin}
+        showPrices={showPrices}
       />
 
       {/* Material-rader */}
@@ -279,7 +287,7 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
         rows={data.rader.material}
         total={totalMaterial}
         emptyMessage="Inga material-rader registrerade på offerten."
-        showPrices={isOwnerOrAdmin}
+        showPrices={showPrices}
       />
 
       {/* Textblock — ej inkluderat */}
