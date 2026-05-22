@@ -1508,3 +1508,25 @@ Båda fallen är känslig data som inte ska exponeras till employees.
 
 **Pilot-impact:** Låg. Bee Service har inga aktuella `project_cost`-poster i Bee Service-pilot (verifierat 2026-05-20 dry-run). Funktionen återinförs innan andra pilots börjar köra.
 
+
+---
+
+## 2026-05-22 — ai_health_score fortfarande synligt på dashboard + projektlista (TD-61)
+
+**Plats:** `app/dashboard/page.tsx` ("Projects at risk"-widget) och `app/dashboard/projects/page.tsx` (projektlistan visar hälsopoäng-badge per projekt).
+
+**Bakgrund:** Etapp 2.3.4 tog bort Projektanalys-fliken + Projekthälsa-widgeten + /api/projects/[id]/ai-log-route från projekt-detalj-sidan per Andreas spec 2026-05-22 ("meningslös hälsopoäng 1x/vecka, överlappar nya Ekonomi-tab + kommande Lars-marginal"). Score-fältet `project.ai_health_score` används dock fortfarande:
+
+1. **Dashboard ("Projects at risk")** — listar projekt med `ai_health_score < 70`. Sorterar projektsidan efter score.
+2. **Projektlista** — visar score-badge per projekt-rad (färgkodad mot 80/50-trösklar).
+3. **`/api/projects/ai-analyze`** — endpointen finns kvar men har ingen UI-konsument efter denna etapp. Eventuella cron som triggar den fortsätter producera scores som ovan UI:n visar.
+4. **`lib/project-ai-engine.ts`** — skriver `ai_health_score` + `project_ai_log`-rader. Fortfarande aktivt.
+
+**Frågan:** Ska hälsopoängen tas bort ÖVERALLT (konsekvent med specens "meningslös"), eller ska den behållas i listvyer som triage-signal medan vi väntar på Lars-marginal-observationer (Etapp 2.4)?
+
+**Förslag:** Behåll i dashboard + lista tills Lars-marginal är validerad (Etapp 2.4 + några veckors pilot-data). Då ta bort score-displayen från dashboard + lista, plus `ai-analyze`-route + `project-ai-engine.ts` om de inte används till annat.
+
+**Estimat:** 1-2h cleanup när det är dags.
+
+**Trigger:** Efter Etapp 2.4 är klar och Lars producerar relevanta marginal-observationer på minst 2 pilots.
+
