@@ -1825,38 +1825,51 @@ Plus: ta bort TD-67 från tasks/tech-debt.md i samma commit.
 
 ---
 
-## 2026-05-22 — Ekonomi-tab budget märks ej tydligt som exkl. moms (TD-69)
+## 2026-05-22 — Ekonomi-tab budget/marginal beräknas på netto, måste märkas tydligt (TD-69)
 
 **Plats:** `components/projects/ProjectEconomicsCard.tsx` + `ProjectEconomicsMiniSnapshot.tsx`.
 
-**Symtom:** Ekonomi-tabben visar `budget_amount` som "Total budget" utan tydlig märkning. Värdet är netto (exkl. moms) — vilket är **korrekt** för marginal-analys (intern lönekostnad är också netto) — men användaren ser offertens totalsumma inkl. moms i andra vyer och kan förvirras av differensen.
+**Designprincip (BEKRÄFTAD, korrekt val):** Ekonomi-tabben beräknar budget och marginal på NETTO (exkl. moms). Företag räknar lönsamhet på netto eftersom **moms är en genomgångspost** — den betalas av kunden och vidare till Skatteverket utan att påverka företagets resultat. Intern lönekostnad är också netto. Att blanda inkl/exkl. moms skulle ge fel marginal-procent.
 
-**Exempel scenario:**
-- Offert #011 visas i offert-vyn med totalsumma 43 100 kr (inkl. 25% moms på 34 480)
-- Ekonomi-tabben på samma projekt visar "Total budget: 34 480 kr"
-- Hantverkaren undrar: "Var blev 8 620 kr av?"
+**Problem:** Värdet märks INTE tydligt i UI:n idag. Användaren ser offertens totalsumma inkl. moms i andra vyer och kan förvirras av differensen.
 
-**Förslag-fix (Etapp 4 UI-polish):**
+**Verifierat-exempel (offert #007, 2026-05-22):**
+- Offert: netto 18 700 kr + moms 4 675 kr = totalt **23 375 kr inkl. moms**
+- Projekt: `budget_amount = 18 700` (netto) ✓ korrekt
+- Användaren ser "Total budget: 18 700 kr" i Ekonomi-tabben och kan tänka: "Var blev 4 675 kr av?"
 
-1. **Märk värdet tydligt:**
-   - "Total budget (exkl. moms): 34 480 kr"
-   - Eller: "34 480 kr" + liten subtle-rad "exkl. moms"
+**Krav för fix (Etapp 4 UI-polish, eller riktad fix tidigare):**
 
-2. **Bonus:** visa både brutto + netto med tydlig märkning:
+1. **Märk budget "exkl. moms"** överallt där siffran visas:
+   - Total budget-stat: "Total budget (exkl. moms): 18 700 kr"
+   - Eller subtle-rad under siffran: "18 700 kr" + "exkl. moms"
+
+2. **Eller — visa moms-uppdelning i INTÄKT-sektionen** (rikare variant, samma struktur som offertens summering):
    ```
-   Total budget    34 480 kr    (exkl. moms)
-                   43 100 kr    (inkl. moms 25%)
+   Offert (netto)               18 700 kr
+   ÄTA signerat                      0 kr
+   ───────────────────────────────────────
+   Summa netto                  18 700 kr
+   Moms 25%                      4 675 kr
+   Totalt inkl. moms            23 375 kr
+   ───────────────────────────────────────
+   Fakturerat                        0 kr  (0%)
+   Betalt                            0 kr  (0%)
+   Kvar att fakturera           18 700 kr
    ```
+   Mer komplett — användaren ser direkt att 23 375 kr matchar offerten.
 
-3. **Konsekvens i mini-snapshot:** samma märkning där "Total budget" syns
+3. **Marginal tydligt märkt "beräknas på netto":**
+   - Under marginal-värdet: subtle-text "beräknas på netto (exkl. moms)"
 
-**Designprincip:** marginal-beräkning ska FORTSÄTTA göras på netto-värden (korrekt jämförelse mot interna kostnader som också är netto). UI-märkningen handlar bara om att tydliggöra vad siffran representerar.
+4. **Mini-snapshot (Översikt-tab):** samma märkning där "Total budget" visas — minst variant 1.
 
-**Risk-överväganden:**
-- Inkl/exkl. moms-räkning är ROT/RUT-specifik: när ROT/RUT-avdrag visas är "kund-pays"-värdet redan justerat
-- ROT-projekt kan visas dubbelt-justerat om vi inte är försiktiga (intäkt netto vs kund-pays inkl. ROT)
+**ROT/RUT-överväganden:**
+- ROT/RUT-avdrag är på arbetskostnad (inkl. moms). När ROT/RUT-projekt visas är `customer_pays`-värdet redan justerat
+- För ROT-projekt bör UI tydligt skilja: netto-budget (för marginal) vs vad-kund-betalar (inkl. ROT-avdrag)
+- Test-scenarier: ROT-projekt med privatkund vs B2B-projekt utan ROT vs RUT-projekt
 
-**Estimat:** 30 min UI-text + 1h test mot olika moms/ROT-scenarier. Total ~1.5h.
+**Estimat:** 1h UI-text för variant 1 (snabb) eller 2-3h för variant 2 (moms-uppdelning) + 1-2h test mot olika moms/ROT/RUT-scenarier.
 
-**Trigger:** Etapp 4 UI-polish. Om någon pilot förvirras tidigare → bumpas upp.
+**Trigger:** Etapp 4 UI-polish. Bump upp om pilot-feedback flaggar förvirring tidigare. Christoffer eller annan ROT-fokuserad pilot är trolig att stöta på detta.
 
