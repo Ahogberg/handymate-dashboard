@@ -2074,3 +2074,48 @@ Auto-detect döda konton i cron-routes:
 
 **Trigger:** Post-Etapp 3/Etapp 5 — innan vi adderar fler pilots så vi har en clean state.
 
+
+---
+
+## 2026-05-22 — "Förhandsgranska faktura"-knapp är stubbe (TD-74)
+
+**Plats:** `app/dashboard/projects/[id]/page.tsx` (header-action-knappar, ~rad 1692-1698).
+
+**Symptom:** Knappen "Förhandsgranska faktura" finns synlig i projekt-headern bredvid "Nytt tilläggsarbete" och "Visa offert". Klick triggar:
+
+```typescript
+onClick={() => showToast('Faktura-förhandsgranskning kommer snart', 'success')}
+```
+
+UI:n lovar funktionalitet som inte finns. Användaren förväntar sig en faktura-preview men får bara en toast.
+
+**Princip:** Stubbe-knappar sänker förtroende — användaren testar varje knapp en gång, märker att den inte gör något, slutar lita på UI:n. Bättre att dölja tills funktionalitet finns.
+
+**Konsekvens:**
+- Christoffer (pilot) testade redan ekonomi-knapp en gång och fick toast → mindre förtroende för andra knappar
+- Stubbe-knappar i prod-pilot-fas är sämre än ingen knapp alls
+
+**Två fix-vägar:**
+
+1. **Bygg funktionalitet (rätt långsiktigt)**
+   - Ny route `/api/projects/[id]/invoice-preview` som beräknar invoice-data utan att spara
+   - Returnerar PDF/HTML-render av hur fakturan skulle se ut
+   - Använd samma template-engine som /api/invoices/pdf
+   - Modal eller ny tab på projektsidan visar preview
+   - **Estimat:** 4-6h kod + 2h test
+   - Risk: kan dubbla logik med existerande "Skapa faktura"-flöden — bör återanvända
+
+2. **Dölj knappen tills byggd (kortsiktigt)**
+   - Bara ta bort knappen från `app/dashboard/projects/[id]/page.tsx`
+   - Logga som "borttagen tills byggd" — knappen kan återinföras i framtiden
+   - **Estimat:** 5 min
+   - **Princip:** ingen synlig stubbe är bättre än fake-knapp
+
+**Min rek:** Alternativ 2 (dölj) **omedelbart**. Alternativ 1 (bygg) som planerat arbete när faktureringsdomänen får fokus (post-pilot eller efter Etapp 4b).
+
+**Pilot-impact:** Direkt — varje pilot som hittar knappen och provar ger negativt intryck. Speciellt skadligt eftersom det är en SYNLIG knapp i header-actions (mest framträdande plats).
+
+**Estimat (alternativ 2):** 5 min för att dölja.
+
+**Trigger:** SNABB-fix lämpligt — kan göras i samma session som ett annat litet arbete. Inte 4a-scope eftersom det rör fakturadomänen (separat från projekt-layout). Möjligt 4b-arbete eller separat städnings-commit.
+
