@@ -5,15 +5,17 @@ import Link from 'next/link'
 import {
   AlertCircle,
   ArrowRight,
-  ChevronRight,
   Clock,
   Loader2,
+  Plus,
+  Receipt,
   RefreshCw,
   Settings,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
+import { ProjectCostModal } from './ProjectCostModal'
 
 /**
  * ProjectEconomicsCard (Etapp 2.2, v53 2026-05-21).
@@ -47,6 +49,8 @@ interface ProjectEconomics {
     arbete_timmar: number
     material_inkop_kr: number
     material_billable_kr: number
+    extra_kr: number
+    extra_per_kategori: Record<string, number>
     total_kr: number | null
   }
   marginal: {
@@ -61,6 +65,7 @@ interface ProjectEconomics {
     ata_count: number
     time_entry_count: number
     supplier_invoice_count: number
+    extra_cost_count: number
   }
 }
 
@@ -69,6 +74,9 @@ interface ProjectEconomicsCardProps {
   /** Externt-triggad refresh — när parent ändrar något som påverkar
       ekonomin (t.ex. statusbyte eller ny tid) öka denna. */
   refreshKey?: number
+  /** Triggas när användaren klickar 'Fakturera projekt' (kvar att
+      fakturera > 0). Parent ansvarar för att öppna faktura-modal/-route. */
+  onInvoiceProject?: () => void
 }
 
 function formatKr(n: number | null | undefined): string {
@@ -91,12 +99,13 @@ function pct(part: number, whole: number): string {
   return `${Math.round((part / whole) * 100)}%`
 }
 
-export function ProjectEconomicsCard({ projectId, refreshKey = 0 }: ProjectEconomicsCardProps) {
+export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProject }: ProjectEconomicsCardProps) {
   const { isOwnerOrAdmin } = useCurrentUser()
   const [data, setData] = useState<ProjectEconomics | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [costModalOpen, setCostModalOpen] = useState(false)
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -218,9 +227,19 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0 }: ProjectEcono
 
       {/* KOSTNAD */}
       <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
-          Kostnad
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+            Kostnad
+          </h3>
+          <button
+            type="button"
+            onClick={() => setCostModalOpen(true)}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-600 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Lägg till manuell kostnad
+          </button>
+        </div>
         <div className="space-y-2 text-sm">
           <Row
             label={`Arbete (${formatHours(kostnader.arbete_timmar)} h)`}
@@ -231,6 +250,12 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0 }: ProjectEcono
             label={`Material (${meta.supplier_invoice_count} lev.fakt.)`}
             value={formatKr(kostnader.material_inkop_kr)}
           />
+          {meta.extra_cost_count > 0 && (
+            <Row
+              label={`Manuella kostnader (${meta.extra_cost_count} st)`}
+              value={formatKr(kostnader.extra_kr)}
+            />
+          )}
 
           <div className="border-t border-slate-100 pt-2 mt-2" />
 
@@ -339,9 +364,32 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0 }: ProjectEcono
         )}
       </section>
 
+      {/* Fakturera projekt — visas när det finns mer att fakturera */}
+      {onInvoiceProject && kvarAttFakturera > 0 && (
+        <button
+          type="button"
+          onClick={onInvoiceProject}
+          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 hover:bg-primary-600 text-white font-semibold rounded-xl transition-colors"
+        >
+          <Receipt className="w-5 h-5" />
+          Fakturera projekt ({formatKr(kvarAttFakturera)} kvar)
+        </button>
+      )}
+
       <p className="text-[10px] text-slate-400 text-right">
         Uppdaterad {new Date(meta.computed_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
       </p>
+
+      {costModalOpen && (
+        <ProjectCostModal
+          projectId={projectId}
+          onClose={() => setCostModalOpen(false)}
+          onSaved={() => {
+            setCostModalOpen(false)
+            fetchData(true)
+          }}
+        />
+      )}
     </div>
   )
 }

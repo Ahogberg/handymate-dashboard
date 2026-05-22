@@ -3725,7 +3725,11 @@ export default function ProjectDetailPage() {
 
         {/* === TAB: Ekonomi === */}
         {activeTab === 'economy' && (
-          <ProjectEconomicsCard projectId={projectId} refreshKey={economicsRefreshKey} />
+          <ProjectEconomicsCard
+            projectId={projectId}
+            refreshKey={economicsRefreshKey}
+            onInvoiceProject={() => setShowInvoiceModal(true)}
+          />
         )}
         {/* === TAB: AI-logg (Projektanalys) === */}
         {activeTab === 'field_reports' && (
