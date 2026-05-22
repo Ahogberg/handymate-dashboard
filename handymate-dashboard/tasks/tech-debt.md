@@ -1873,3 +1873,67 @@ Plus: ta bort TD-67 från tasks/tech-debt.md i samma commit.
 
 **Trigger:** Etapp 4 UI-polish. Bump upp om pilot-feedback flaggar förvirring tidigare. Christoffer eller annan ROT-fokuserad pilot är trolig att stöta på detta.
 
+
+---
+
+## 2026-05-22 — git-refs korrupteras intermittent efter commit på Windows (TD-70)
+
+**Plats:** `.git/refs/heads/main` (lokal git-state, ej i repo).
+
+**Symtom:** Efter `git commit -m "..."` på Windows-miljön blir `.git/refs/heads/main` ibland **tom** istället för att uppdateras till nya commit-sha:n. `git status` rapporterar då `fatal: cannot lock ref 'HEAD': unable to resolve reference 'refs/heads/main': reference broken`. Commit-objektet finns dock korrekt i `.git/objects/` och `.git/logs/HEAD` har rätt sha — bara ref-filen är trasig.
+
+**Frekvens:** Hänt 2 gånger i samma session 2026-05-22 (möjligen fler obemärkt).
+- Gång 1: tidigare i session (parent monorepo `.git/index` korrupterad — fixades med `rm -f .git/index && git reset`)
+- Gång 2: efter moms-fix-commit (sha `538204f5`) — `refs/heads/main` blev tom
+
+**Reparations-procedur (verifierad):**
+```bash
+# 1. Hitta senaste lokal commit
+tail -5 .git/logs/HEAD
+# Sista raden har "<old_sha> <new_sha> ... commit: ..."
+# new_sha är senaste lokal commit
+
+# 2. Skriv tillbaka till refs/heads/main
+echo "<new_sha>" > .git/refs/heads/main
+
+# 3. Verifiera
+git status   # bör nu visa "Your branch is ahead of 'origin/main' by N commits"
+git log --oneline -3   # senaste commits
+
+# 4. Push som vanligt
+git push origin main
+```
+
+**Inga commits förlorade** — det är bara ref-pekaren som behöver återskapas. Commit-objekten är intakt i `.git/objects/`.
+
+**Möjliga rotorsaker att utreda:**
+
+1. **Windows-fs locking / antivirus** — Windows Defender eller annat antivirus kan låsa `.git`-filer under skrivning. Git ger upp, ref-filen lämnas tom.
+
+2. **Line-endings i ref-filer** — git förväntar sig LF i ref-filer men Windows-tools (cygwin/git-for-windows) kan skriva CRLF under vissa villkor.
+
+3. **WSL / Cygwin / Git-for-Windows-interaktion** — om bash/PowerShell/WSL alternerar mot samma `.git`-mapp kan locking-strategin variera.
+
+4. **Repo-layout med flera nivåer** — vår monorepo har `.git` på parent-nivå (`C:\Users\Gaming\handymate-dashboard\`) men arbete sker i sub-mapp (`handymate-dashboard/`). Kan trigga edge-cases i `core.worktree` eller liknande.
+
+5. **`core.fscache`-inställning** — Git har en cache som kan hänga om filsystemet hostar konstigt.
+
+**Möjliga mitigationer (att testa när det inte är akut):**
+
+1. **Excludera `.git`-mappen från Windows Defender** — testa om antivirus är boven
+2. **`git config core.fscache true`** — global fscache påslagen
+3. **`git config core.preloadIndex true`** — preload index för bättre Windows-prestanda
+4. **`git config core.fsync committed`** — synkronisera commits till disk (säkrare men långsammare)
+5. **Använd WSL-git istället för Git-for-Windows** — Linux-fs-semantik
+6. **Repo-flytt: clone om till en path utan special-tecken / kortare path** — Windows har MAX_PATH-historik
+
+**Skadebild:**
+- Låg — inga commits förloras, bara extra friktion vid push
+- Medel — risk för förvirring om det händer mitt i större operation och man inte vet att fixet är trivialt
+
+**Estimat:** 2-3h utredning + 1h test av mitigationer. Total ~4h.
+
+**Trigger:** Inte brådskande. Logga om det händer igen, så kan vi se mönster (alltid efter stor commit? alltid efter typecheck-körning innan? alltid när Bash + Edit kört nyligen?).
+
+**Workaround tills root cause är hittad:** följ reparations-proceduren ovan när det inträffar. ~30 sek att fixa.
+
