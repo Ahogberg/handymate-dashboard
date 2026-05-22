@@ -1713,3 +1713,77 @@ FROM quotes q;
 
 **Trigger:** Andreas kör SQL:en post-pilot för att förstå skala. Beslut om migration följer.
 
+
+---
+
+## 2026-05-22 — Arbete-vs-material-klassning är heuristisk (TD-66)
+
+**Plats:** `lib/projects/get-quote-context.ts` `isLaborByHeuristic()` + `fromJsonbItem()`-konvertering.
+
+**Bakgrund:** Etapp 3.1's helper måste dela `quote_items`-rader i `arbete` vs `material` enligt designspec. `quote_items`-tabellen har dock ingen explicit `type`-kolumn (bara `item_type` som anger rubrik/text/item osv). Heuristik valdes:
+- `is_rot_eligible || is_rut_eligible` → arbete (ROT/RUT-avdrag gäller arbetskostnad)
+- `unit ∈ {tim, h, timmar, hour}` → arbete
+- Annars → material
+
+**Kända begränsningar (när heuristiken brister):**
+
+1. **Fastprisarbete utan ROT-eligible**
+   Hantverkare som offererar "Renovering badrum — 95 000 kr fastpris" med unit='st' och `is_rot_eligible=false` (kunden är ej privatperson). Helpern klassar som material. Korrekt klassning: arbete.
+
+2. **Företagskund-arbete**
+   ROT/RUT gäller bara privatpersoner. När kunden är företag sätts `is_rot_eligible=false` även för rena arbetsrader. Heuristikens första regel missar dessa.
+
+3. **Material som debiteras per timme**
+   Edge-case men möjligt: "Materialhantering 2 timmar á 500 kr" får unit='tim' → heuristiken klassar som arbete, vilket kan vara rätt eller fel beroende på tolkning.
+
+4. **Nya enheter**
+   Heuristiken kollar bara 4 enheter (`tim/h/timmar/hour`). Branschspecifika som "dagar", "skift" går till material.
+
+**Konsekvenser för Etapp 4 + Etapp 2:**
+
+- **Etapp 4 material-kedja:** om helpern klassar arbetsrader som material kan kedjan "offerterad material → projekt-material → fakturerad material" få fel innehåll. När material-kedjan byggs behöver klassningen vara tillförlitlig.
+- **Etapp 2 marginal-precision:** `kostnader.material_inkop_kr` vs `arbete_kr` använder inte den FÖRdelnings-heuristiken i compute-economics (compute läser från egna tabeller), men UI:n kan visa missvisande "Material X kr" på offert-vyn om heuristiken har klassat fel.
+
+**Förslag-lösningar (om Etapp 4 visar att det är ett problem):**
+
+1. **SQL-migration: lägg till explicit `line_type`-kolumn på `quote_items`**
+   - Värden: `'labor' | 'material' | 'service' | 'fixed_price'`
+   - Sätts vid spara från UI (utöver `item_type` som handlar om radstruktur)
+   - Migration backfillar från `quotes.items` JSONB för legacy
+
+2. **Utöka heuristiken** med kund-typ-kontext:
+   - Hämta `customer.customer_type` (privat/företag)
+   - Företagskund + numeriska rader med ROT-eligible=false → arbete (sannolikt)
+   - Mindre exakt än option 1 men kräver ingen SQL
+
+3. **UI-toggle vid spara:** hantverkare märker själv "arbete" eller "material" per rad. Mest exakt men kräver mer UI-arbete.
+
+**Pilot-impact:** Låg idag (Bee Service har bara test-data). Tröskel: när första hantverkare med >10 offerter där arbete-rader hamnar i material-buckets pga ROT-eligible=false (företagskunder).
+
+**Estimat (option 1):** 2h SQL + 4h kod (UI + helpern + compute-economics-justering) + 1h test. Total ~7h.
+
+**Trigger:** Etapp 4 design-fas eller första pilot-feedback om "siffrorna ser konstiga ut i material-vyn".
+
+---
+
+## 2026-05-22 — Temporär debug-endpoint /api/projects/[id]/quote-context-debug (TD-67)
+
+**Plats:** `app/api/projects/[id]/quote-context-debug/route.ts`.
+
+**Bakgrund:** Etapp 3.1 byggde `getProjectQuoteContext`-helpern. Innan UI byggs (3.2-3.4) verifierar Andreas att helpern returnerar korrekt data via en temporär debug-endpoint som returnerar rå JSON-output. Owner/admin-only rollgate eftersom offert-data innehåller priser och marginal-info som anställda inte ska se via debug-vägar.
+
+**Status:** Live för Etapp 3-verifiering.
+
+**Borttagning:** Ta bort routen efter Etapp 3.2-3.4 har byggts och Andreas bekräftat att UI levererar rätt data. Helpern (`lib/projects/get-quote-context.ts`) behålls.
+
+**Konkret cleanup:**
+```bash
+rm -rf app/api/projects/[id]/quote-context-debug
+```
+
+Plus: ta bort TD-67 från tasks/tech-debt.md i samma commit.
+
+**Estimat:** 5 minuter (filborttagning).
+
+**Trigger:** När Etapp 3 är slutlevererad och 3.2-3.4 UI visar samma data som debug-endpointen.
+
