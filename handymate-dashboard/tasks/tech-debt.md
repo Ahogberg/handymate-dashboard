@@ -2017,3 +2017,60 @@ Employee som känner till URL-formatet (eller råkar lista quote_id i någon ann
 
 **Trigger:** När lead-källa-analys faktiskt börjar användas av Daniel/Hanna (Etapp 6 eller agent-arbete). Innan dess har det ingen praktisk konsekvens.
 
+
+---
+
+## 2026-05-22 — Dött Bee Service-dubblettkonto biz_6wunctak49 (TD-73)
+
+**Plats:** `business_config` + alla relaterade tabeller (`deal`, `leads`, `quotes`, `project`, agent-observations).
+
+**Symtom:** `biz_6wunctak49` har 22 deals och **ingen aktivitet sedan 2026-03-13**. Det är ett dubblett av Bee Service — den "riktiga" Bee Service-pilotn är ett separat business-id (sannolikt `biz_21wswuhrbhy` baserat på tidigare arbete).
+
+**Bekräftad konsekvens:** Hanna gav approvals mot det döda kontot i en tidig cron-körning. Cron:en triggade på alla aktiva businesses utan att veta att en av dem var en ghost. Approvals + agent-observationer som genererades där är effektivt skräp — ingen läser dem, agerar inte på dem.
+
+**Risker om kontot inte städas:**
+
+1. **Agent-cost-svinn:** Lars, Karin, Daniel, Hanna kör mot kontot varje dygn (eller oftare per cron-schema). Anthropic-API-anrop kostar för observationer som ingen läser.
+
+2. **Förvirring i queries:** SQL-frågor som "räkna deals för business X" inkluderar dubblettkonton. Verkligt antal pilot-deals blir snedvridet.
+
+3. **Agent-observation-output:** Lars rapporterar "X projekt över budget" för dött konto → noise i hans output, dilluterar äkta insikter.
+
+4. **Pilot-statistik:** "5 aktiva pilots" inkluderar ghost-konto → felaktig metric för Andreas + investerare.
+
+5. **Backfill-risker:** v54 (projekt-budget) + v55 (deal.lead_id) backfilles kan inkludera dött konto. Inte fel per se, men onödigt arbete på data som inte används.
+
+**Förslag-fix-vägar (välj en post-pilot):**
+
+1. **Soft-arkivering (säkrast):**
+   - Lägg till kolumn `business_config.is_archived BOOLEAN DEFAULT false`
+   - Sätt `is_archived=true` på `biz_6wunctak49`
+   - Cron-routes och agent-observation-loops filtrerar bort `is_archived=true`-businesses
+   - Datan kvar för audit men inte aktivt processad
+   - **Estimat:** 2-3h SQL + cron-filter-uppdateringar + test
+
+2. **Hard-radering (komplett):**
+   - DELETE FROM business_config WHERE business_id = 'biz_6wunctak49'
+   - ON DELETE CASCADE rensar alla relaterade rader om FKs är korrekt satta (risk: inte alla tabeller har FK definierat)
+   - Permanent. Ingen återväg.
+   - **Estimat:** 4-6h (dataflöden-audit för CASCADE-säkerhet + verifikation + körning)
+
+3. **Migrera + arkivera (om något i ghost-data ska behållas):**
+   - Hitta unika rader i ghost som inte finns på riktiga Bee Service
+   - Kopiera över med ny ID-prefix
+   - Sedan radera ghost
+   - **Estimat:** mest tid, sannolikt onödig (ghost har ingen aktivitet sedan mars)
+
+**Förebyggande fix för framtiden:**
+
+Auto-detect döda konton i cron-routes:
+- Om `business_config.last_login_at` eller `business_config.last_activity_at` är >90 dagar gammal → markera som inactive
+- Cron-routes skippar inactive-businesses automatiskt
+- Notifierar Andreas om någon business blir inactive (om det är oavsiktligt)
+
+**Pilot-impact:** Direkt — ghost-kontot bidrar inte värde men kostar agent-anrop och förorenar metrics. Inte brådskande nog att avbryta annan utveckling, men reda ut innan första riktiga pilots börjar köra (annars riskerar vi att stöter på samma dubblett-typ-problem igen).
+
+**Estimat:** 2-3h soft-arkivering (rekommenderad väg) + framtida cron-filter-uppdatering.
+
+**Trigger:** Post-Etapp 3/Etapp 5 — innan vi adderar fler pilots så vi har en clean state.
+
