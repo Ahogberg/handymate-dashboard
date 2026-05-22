@@ -88,6 +88,7 @@ import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { ProjectEconomicsMiniSnapshot } from '@/components/projects/ProjectEconomicsMiniSnapshot'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
+import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -3172,6 +3173,11 @@ export default function ProjectDetailPage() {
         {/* === TAB: Dokument === */}
         {activeTab === 'documents' && (
           <div className="space-y-6">
+            {/* Offert-PDF via referens (Etapp 3.3). Owner/admin-only +
+                server-side stripping i quote-context-endpoint. Komponenten
+                renderar null om has_quote=false eller icke-OWA. */}
+            <ProjectQuoteDocumentCard projectId={projectId} />
+
             {/* Generated documents from template engine */}
             {generatedDocs.length > 0 && (
               <div>

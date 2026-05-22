@@ -1937,3 +1937,47 @@ git push origin main
 
 **Workaround tills root cause är hittad:** följ reparations-proceduren ovan när det inträffar. ~30 sek att fixa.
 
+
+---
+
+## 2026-05-22 — /api/quotes/pdf saknar rollskydd för icke-OWA i samma business (TD-71)
+
+**Plats:** `app/api/quotes/pdf/route.ts` (GET + POST handlers).
+
+**Symtom:** PDF-endpointen accepterar två auth-vägar:
+1. **POST med business-auth** — alla autentiserade i affären
+2. **GET med `?id=<quote_id>` + business-auth** — alla autentiserade
+3. **GET med `?token=<sign_token>`** — publik kund-access via signeringslänk
+
+Ingen av dessa kollar `currentUser.role`. En employee i samma business som offerten kan anropa `GET /api/quotes/pdf?id=X` direkt och få full PDF inkl. priser — även om UI:t (Etapp 3.2 + 3.3) döljer länken via owner/admin-gate.
+
+**Konsekvens:** Inkonsekvent säkerhet:
+- `/api/projects/[id]/quote-context` strippar priser server-side för icke-OWA ✓
+- `ProjectQuoteSpec` döljer pris-kolumner för icke-OWA ✓
+- `ProjectQuoteDocumentCard` döljer PDF-länken för icke-OWA ✓
+- **`/api/quotes/pdf?id=X` exponerar full PDF inkl. priser till alla i business** ❌
+
+Employee som känner till URL-formatet (eller råkar lista quote_id i någon annan API-svar) kan kringgå alla UI-skydd.
+
+**Förslag-fix:**
+
+1. **Lägg till canSeePrices-gate i GET-handlern** (för `?id=`-vägen):
+   ```typescript
+   if (!canSeePrices(currentUser?.role)) {
+     return NextResponse.json({ error: 'Endast owner/admin' }, { status: 403 })
+   }
+   ```
+   `?token=`-vägen (publik signering) lämnas orörd — den är medveten kund-vy.
+
+2. **Samma gate i POST-handlern** (används vid "Skicka offert"-flödet som idag fungerar — verifiera att Skicka-funktionen körs av owner/admin eller via service-role).
+
+**Risk-överväganden:**
+- Skicka-flödet använder POST. Om en PM (project_manager) ska kunna skicka offert måste rollen kollas mot rätt permission (`see_financials`? eller `manage_quotes`?).
+- Verifiera att alla existerande Skicka-flöden går via owner/admin innan vi strikar gate:n. Annars bryts Skicka för vissa roller.
+
+**Pre-existing scope** — buggen fanns före Etapp 3. Vi har bara EXPONERAT problemet genom att lägga in URL:en i UI:n. Innan Etapp 3 var URL:en bara känd för UI-knappar och cron-routes.
+
+**Estimat:** 1h kod + 2h verifiering att Skicka-flödet fortfarande fungerar för rätt roller + 1h test mot olika roll-konstellationer. Total ~4h.
+
+**Trigger:** HÖG prio — bör fixas innan första pilot börjar dela offert-URL:er. Plus: utan denna fix är allt rollskydd i Etapp 3.2 + 3.3 effektivt "security theater" — en informerad icke-OWA kan kringgå allt via direkt-anrop.
+
