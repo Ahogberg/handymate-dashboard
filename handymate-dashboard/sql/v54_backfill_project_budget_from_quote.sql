@@ -137,78 +137,80 @@ FROM calc
 ORDER BY created_at DESC NULLS LAST;
 
 -- ============================================================
--- DEL C — UPDATE (avkommentera EFTER Andreas-godkännande)
+-- DEL C — UPDATE (Andreas godkände 2026-05-22)
+-- Kör inom BEGIN/COMMIT, verifiera, sedan COMMIT eller ROLLBACK.
 -- ============================================================
---
--- BEGIN;
---
--- WITH calc AS (
---   SELECT
---     p.project_id,
---     (SELECT SUM(qi.total)
---        FROM quote_items qi
---        WHERE qi.quote_id = p.quote_id
---          AND (qi.item_type IS NULL OR qi.item_type = 'item')
---     ) AS table_total,
---     (SELECT SUM(qi.quantity)
---        FROM quote_items qi
---        WHERE qi.quote_id = p.quote_id
---          AND (qi.item_type IS NULL OR qi.item_type = 'item')
---          AND (
---            COALESCE(qi.is_rot_eligible, false)
---            OR COALESCE(qi.is_rut_eligible, false)
---            OR LOWER(COALESCE(qi.unit, '')) IN ('tim', 'h', 'timmar', 'hour')
---          )
---     ) AS table_hours,
---     (SELECT SUM(COALESCE((item->>'total')::numeric, 0))
---        FROM jsonb_array_elements(COALESCE(q.items, '[]'::jsonb)) item
---        WHERE item->>'item_type' IS NULL OR item->>'item_type' = 'item'
---     ) AS jsonb_total,
---     (SELECT SUM(COALESCE((item->>'quantity')::numeric, 0))
---        FROM jsonb_array_elements(COALESCE(q.items, '[]'::jsonb)) item
---        WHERE (item->>'item_type' IS NULL OR item->>'item_type' = 'item')
---          AND (
---            item->>'type' = 'labor'
---            OR COALESCE((item->>'is_rot_eligible')::boolean, false)
---            OR COALESCE((item->>'is_rut_eligible')::boolean, false)
---            OR LOWER(COALESCE(item->>'unit', '')) IN ('tim', 'h', 'timmar', 'hour')
---          )
---     ) AS jsonb_hours,
---     q.total AS quote_total
---   FROM project p
---   LEFT JOIN quotes q ON q.quote_id = p.quote_id
---   WHERE p.quote_id IS NOT NULL
---     AND p.budget_amount IS NULL
--- )
--- UPDATE project p
--- SET
---   budget_amount = COALESCE(
---     NULLIF(c.table_total, 0),
---     NULLIF(c.jsonb_total, 0),
---     NULLIF(c.quote_total, 0)
---   ),
---   budget_hours = COALESCE(
---     p.budget_hours,
---     NULLIF(c.table_hours, 0),
---     NULLIF(c.jsonb_hours, 0)
---   )
--- FROM calc c
--- WHERE p.project_id = c.project_id
---   AND COALESCE(
---     NULLIF(c.table_total, 0),
---     NULLIF(c.jsonb_total, 0),
---     NULLIF(c.quote_total, 0)
---   ) IS NOT NULL;
---
--- -- Verifiering före COMMIT:
--- SELECT
---   COUNT(*) FILTER (WHERE budget_amount IS NOT NULL) AS med_budget,
---   COUNT(*) FILTER (WHERE budget_amount IS NULL AND quote_id IS NOT NULL) AS fortfarande_null
--- FROM project;
---
--- -- Om allt ser bra ut:
--- COMMIT;
--- -- Annars: ROLLBACK;
+
+BEGIN;
+
+WITH calc AS (
+  SELECT
+    p.project_id,
+    (SELECT SUM(qi.total)
+       FROM quote_items qi
+       WHERE qi.quote_id = p.quote_id
+         AND (qi.item_type IS NULL OR qi.item_type = 'item')
+    ) AS table_total,
+    (SELECT SUM(qi.quantity)
+       FROM quote_items qi
+       WHERE qi.quote_id = p.quote_id
+         AND (qi.item_type IS NULL OR qi.item_type = 'item')
+         AND (
+           COALESCE(qi.is_rot_eligible, false)
+           OR COALESCE(qi.is_rut_eligible, false)
+           OR LOWER(COALESCE(qi.unit, '')) IN ('tim', 'h', 'timmar', 'hour')
+         )
+    ) AS table_hours,
+    (SELECT SUM(COALESCE((item->>'total')::numeric, 0))
+       FROM jsonb_array_elements(COALESCE(q.items, '[]'::jsonb)) item
+       WHERE item->>'item_type' IS NULL OR item->>'item_type' = 'item'
+    ) AS jsonb_total,
+    (SELECT SUM(COALESCE((item->>'quantity')::numeric, 0))
+       FROM jsonb_array_elements(COALESCE(q.items, '[]'::jsonb)) item
+       WHERE (item->>'item_type' IS NULL OR item->>'item_type' = 'item')
+         AND (
+           item->>'type' = 'labor'
+           OR COALESCE((item->>'is_rot_eligible')::boolean, false)
+           OR COALESCE((item->>'is_rut_eligible')::boolean, false)
+           OR LOWER(COALESCE(item->>'unit', '')) IN ('tim', 'h', 'timmar', 'hour')
+         )
+    ) AS jsonb_hours,
+    q.total AS quote_total
+  FROM project p
+  LEFT JOIN quotes q ON q.quote_id = p.quote_id
+  WHERE p.quote_id IS NOT NULL
+    AND p.budget_amount IS NULL
+)
+UPDATE project p
+SET
+  budget_amount = COALESCE(
+    NULLIF(c.table_total, 0),
+    NULLIF(c.jsonb_total, 0),
+    NULLIF(c.quote_total, 0)
+  ),
+  budget_hours = COALESCE(
+    p.budget_hours,
+    NULLIF(c.table_hours, 0),
+    NULLIF(c.jsonb_hours, 0)
+  )
+FROM calc c
+WHERE p.project_id = c.project_id
+  AND COALESCE(
+    NULLIF(c.table_total, 0),
+    NULLIF(c.jsonb_total, 0),
+    NULLIF(c.quote_total, 0)
+  ) IS NOT NULL;
+
+-- Verifiering FÖRE COMMIT — granska siffrorna:
+SELECT
+  COUNT(*) FILTER (WHERE budget_amount IS NOT NULL AND quote_id IS NOT NULL) AS med_budget_och_offert,
+  COUNT(*) FILTER (WHERE budget_amount IS NULL AND quote_id IS NOT NULL) AS fortfarande_null_med_offert
+FROM project;
+
+-- Om siffrorna ser bra ut (fortfarande_null matchar "empty"-räkningen från Del A):
+COMMIT;
+-- Annars:
+-- ROLLBACK;
 
 -- ============================================================
 -- ANMÄRKNINGAR
