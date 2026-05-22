@@ -1564,3 +1564,61 @@ Båda fallen är känslig data som inte ska exponeras till employees.
 
 **Pilot-trigger:** Granska Lars-latency efter 3-5 pilots, mät då.
 
+
+---
+
+## 2026-05-22 — Lars riskerar visa hög marginal på projekt med ofullständig kostnadsregistrering (TD-63)
+
+**Plats:** `lib/agents/lars/observation-prompt.ts` + `lib/projects/compute-economics.ts`.
+
+**Symtom (hypotetiskt scenario på riktig pilot-data):**
+- Projekt "Badrum Lindgren", budget 85 000 kr
+- Arbete registrerat hittills: 2 083 kr (en timrad)
+- Material: 0
+- Fakturerat: 0
+- **Helpern räknar marginal = 82 917 kr (97.5%)**
+- **Lars-observation:** "Badrum Lindgren ligger på 98% marginal — superlönsamt!"
+- **Verklighet:** projektet är pågående, hantverkaren har inte hunnit logga klart sin tid eller registrera material. När hela jobbet är klart är marginalen sannolikt 30-40%, inte 98%.
+
+**Designprincip kränkt:** samma som `arbetskostnad_konfigurerad` löste — aldrig påstå lönsamhet utan grund. Men nu med en annan rotorsak: data finns men är ofullständig.
+
+**Skillnad mot arbetskostnad_konfigurerad=false:**
+- Det fallet: vi vet att intern timkostnad saknas → kan inte räkna alls → null + amber-varning. Det fungerar.
+- Det här fallet: vi HAR kostnadsdata, men den är så liten relativt budgeten att den uppenbart inte är klar. Helpern räknar utan att veta detta → falsk hög marginal.
+
+**Förslag-lösningar:**
+
+1. **Cost completeness-flagga i helpern:**
+   ```typescript
+   marginal: {
+     ...
+     // Heuristik: total_cost_kr / budget_amount > 0.3 räknas som "rimligt komplett"
+     // ELLER project.status === 'completed' = data är slutgiltig
+     kostnad_sannolikt_komplett: boolean
+     kostnad_completeness_pct: number  // cost/budget ratio
+   }
+   ```
+
+2. **Lars-prompt-instruktion (hypotes 2c utökad):**
+   "Om `marginal_pct > 60` MEN `kostnad_sannolikt_komplett=false`: säg explicit 'preliminär marginal — bara X% av budgeten är registrerad som kostnad så siffran är sannolikt ofullständig'. ALDRIG kalla det 'superlönsamt' utan att ifrågasätta kompletthet."
+
+3. **UI-konsekvens (ProjectEconomicsCard):**
+   Visa en mindre varnings-rad under marginal när `kostnad_sannolikt_komplett=false`:
+   "Preliminär — kostnad registrerad: 2 500 kr av budget 85 000 kr (3%)"
+
+**Risk om ej fixas:**
+- Lars riskerar att felaktigt rapportera "superlönsamhet" till hantverkare på pågående projekt
+- Det leder till **överoptimistisk planering** — hantverkaren tror snittprojektet ger 60% när det verkligen ger 30%
+- Användarförtroende för Lars sjunker när skillnaden upptäcks
+
+**Tröskel-val (heuristik):**
+- 30% completeness är ett rimligt golv: 25 000 kr registrerad kostnad på 85 000 kr-projekt = troligen real signal
+- Alternativ: status='completed' OR completeness > 30% = sannolikt komplett
+- Etapp 4: kanske tid-baserat: projekt < 7 dagar gammalt = automatiskt preliminär
+
+**Estimat:** 2h helper-ändring + 1h prompt-uppdatering + 1h UI + 1h test. Total ~5h.
+
+**Trigger:** PRIO HÖG — innan första pilot med riktig kostnadsdata. Annars riskerar Lars att leverera vilseledande "superlönsamhet"-observationer i pilot-skedet och underminera förtroendet. Lös före Etapp 3 eller som första post-Etapp-2-arbete.
+
+**Pilot-impact:** Direkt. Christoffer eller andra pilots med påbörjade men ej slutförda projekt kommer få falska Lars-observationer på första dagarna.
+
