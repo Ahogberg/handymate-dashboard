@@ -1981,3 +1981,39 @@ Employee som känner till URL-formatet (eller råkar lista quote_id i någon ann
 
 **Trigger:** HÖG prio — bör fixas innan första pilot börjar dela offert-URL:er. Plus: utan denna fix är allt rollskydd i Etapp 3.2 + 3.3 effektivt "security theater" — en informerad icke-OWA kan kringgå allt via direkt-anrop.
 
+
+---
+
+## 2026-05-22 — Widget-chat skapar deals utan lead-rad (TD-72)
+
+**Plats:** `app/api/widget/chat/route.ts:295-309`.
+
+**Symtom:** Website-widget-chat skapar en deal direkt när en konversation kvalificeras som "lead", men:
+- Ingen rad skapas i `leads`-tabellen
+- `deal.lead_id` förblir NULL
+- `widget_conversation.lead_created = true` + `deal_id` sätts (men ingen lead-koppling i leads-tabellen)
+
+**Inkonsekvent med Golden Path:** `/api/leads/intake/route.ts:159-198` skapar BÅDE lead-rad OCH deal med lead_id-koppling. Widget-chat hoppar lead-steget.
+
+**Konsekvens:**
+
+- `leads`-tabellen är inte komplett källa-arkiv för alla intag — widget-leads saknas
+- Lead-källa-analys (`source` per lead) i `customers/[id]/timeline` missar widget-källan
+- Daniel/Hanna lead-källa-aggregation kan inte se widget-leads
+- Statistik "hur många leads per källa" snedvrids — widget visas som "deals" men aldrig som "leads"
+
+**Förslag-fix (Etapp 5+ eller separat):**
+
+1. Skapa lead-rad i `leads`-tabellen FÖRE deal i widget-chat-routen
+2. Sätt `deal.lead_id` till nya lead-id
+3. Använd samma `source='website_widget'` på lead-raden för konsekvens
+4. Lead får `score`/`urgency` från AI-konversation-kontexten (rimligt default)
+
+**Risk:** Befintliga widget-deals utan lead-rad. Backfill: skapa lead-rader retroaktivt från `widget_conversation`-rader där `lead_created=true`. Säkrast: per-business utvärdering eftersom widget-data kan vara inkonsekvent.
+
+**Estimat:** 2-3h kod + 1h test + 1-2h backfill-design. Total ~5h.
+
+**Pilot-impact:** Låg idag — widget används mest av tidiga pilots. Skala med antal pilots som har website-widget aktiverat.
+
+**Trigger:** När lead-källa-analys faktiskt börjar användas av Daniel/Hanna (Etapp 6 eller agent-arbete). Innan dess har det ingen praktisk konsekvens.
+
