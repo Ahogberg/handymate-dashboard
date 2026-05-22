@@ -87,6 +87,7 @@ import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
 import { ProjectEconomicsMiniSnapshot } from '@/components/projects/ProjectEconomicsMiniSnapshot'
+import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -213,7 +214,7 @@ interface Summary {
   ata_hours: number
 }
 
-type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'documents' | 'log' | 'checklists' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports' | 'tasks'
+type TabKey = 'overview' | 'team' | 'schedule' | 'milestones' | 'changes' | 'time' | 'material' | 'economy' | 'quote_spec' | 'documents' | 'log' | 'checklists' | 'arbetsorder' | 'leverantorer' | 'canvas' | 'field_reports' | 'tasks'
 
 interface ScheduleEntry {
   id: string
@@ -534,7 +535,7 @@ export default function ProjectDetailPage() {
   // Initialisera activeTab från ?tab=X — gör att deep-länkar (t.ex. dashboardens
   // "Att göra"-lista) öppnar rätt flik direkt utan flicker.
   const [activeTab, setActiveTab] = useState<TabKey>(() => {
-    const allowed: TabKey[] = ['overview', 'team', 'schedule', 'milestones', 'changes', 'time', 'material', 'economy', 'documents', 'log', 'checklists', 'arbetsorder', 'leverantorer', 'canvas', 'field_reports', 'tasks']
+    const allowed: TabKey[] = ['overview', 'team', 'schedule', 'milestones', 'changes', 'time', 'material', 'economy', 'quote_spec', 'documents', 'log', 'checklists', 'arbetsorder', 'leverantorer', 'canvas', 'field_reports', 'tasks']
     if (typeof window !== 'undefined') {
       const tabParam = new URLSearchParams(window.location.search).get('tab')
       if (tabParam && (allowed as string[]).includes(tabParam)) return tabParam as TabKey
@@ -1583,6 +1584,7 @@ export default function ProjectDetailPage() {
   const tabGroups: { group: string; items: { key: TabKey; label: string }[] }[] = [
     { group: 'ÖVERSIKT', items: [
       { key: 'overview', label: 'Översikt' },
+      { key: 'quote_spec', label: 'Offert' },
       { key: 'economy', label: 'Ekonomi' },
     ]},
     { group: 'PLANERING', items: [
@@ -3642,6 +3644,11 @@ export default function ProjectDetailPage() {
         {/* === TAB: Canvas === */}
         {activeTab === 'canvas' && (
           <ProjectCanvas projectId={projectId} />
+        )}
+
+        {/* === TAB: Offert === */}
+        {activeTab === 'quote_spec' && (
+          <ProjectQuoteSpec projectId={projectId} />
         )}
 
         {/* === TAB: Ekonomi === */}
