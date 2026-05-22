@@ -134,6 +134,11 @@ export interface LarsAggregate {
     marginal_pct: number | null
     arbetskostnad_konfigurerad: boolean
     timrader_utan_kostnad: number
+    // TD-63: ärlighet vid ofullständig kostnadsregistrering.
+    // false = marginal-siffran är preliminär (lite kostnad registrerad
+    // hittills relativt budgeten), inte verklig lönsamhet.
+    kostnad_sannolikt_komplett: boolean
+    kostnad_completeness_pct: number | null
   }>
   // Lista av projekt där marginal EJ kan beräknas pga saknad intern-
   // kostnad. Lars ska refera till dessa explicit i sina observationer
@@ -277,6 +282,8 @@ async function buildLarsAggregate(
       marginal_pct: e?.marginal.marginal_pct ?? null,
       arbetskostnad_konfigurerad: e?.marginal.arbetskostnad_konfigurerad ?? false,
       timrader_utan_kostnad: e?.marginal.timrader_utan_kostnad ?? 0,
+      kostnad_sannolikt_komplett: e?.marginal.kostnad_sannolikt_komplett ?? false,
+      kostnad_completeness_pct: e?.marginal.kostnad_completeness_pct ?? null,
     }
   })
 
@@ -597,6 +604,13 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Använd \`project_economics\` — projekt där \`arbetskostnad_konfigurerad=true\` OCH \`marginal_kr < 0\`
    - Om någon ligger på 25%+ förlust, lyft det med projektnamn och belopp
    - Suggestion: "se över ÄTA-möjligheter" eller "granska tidsåtgång"
+
+2d. **Preliminär marginal (KRITISK ärlighet, TD-63):**
+   - Ett projekt där \`kostnad_sannolikt_komplett=false\` har så lite registrerad kostnad relativt budgeten att marginal-siffran SANNOLIKT är vilseledande
+   - Exempel: 85 000 kr budget med 2 083 kr registrerad kostnad ger matematiskt 98% marginal — men det är pågående data, inte verklig lönsamhet
+   - ALDRIG säg "superlönsamt" eller "fantastisk marginal" om \`kostnad_sannolikt_komplett=false\`. Säg istället: "Preliminär marginal — bara X% av budgeten registrerad som kostnad hittills"
+   - Ton: sakligt ärligt om datamognad, inte negativt. Samma anda som 2b
+   - Använd \`kostnad_completeness_pct\` för att uttrycka hur mycket av budgeten som registrerats
 
 3. **ÄTA-flödet:**
    - Skickas ÄTA:er ut i tid? (skapade men ej sent_at?)
