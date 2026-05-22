@@ -1622,3 +1622,94 @@ Båda fallen är känslig data som inte ska exponeras till employees.
 
 **Pilot-impact:** Direkt. Christoffer eller andra pilots med påbörjade men ej slutförda projekt kommer få falska Lars-observationer på första dagarna.
 
+
+---
+
+## 2026-05-22 — Etapp 4 övervägning: låst offert-snapshot vid projekt-konvertering? (TD-64)
+
+**Plats:** `lib/projects/get-quote-context.ts` (Etapp 3.1) + `app/api/projects/route.ts` (offert→projekt-konvertering).
+
+**Bakgrund:** Etapp 3.1 implementerade `getProjectQuoteContext` som referens-modell — projektet refererar till `quote_id` och visar ALLTID aktuell offert-data. Om offerten ändras efter att projektet skapades visar projektsidan den uppdaterade versionen.
+
+**Två motstridiga argument:**
+
+*Referens-modell (nuvarande val) — fördelar:*
+- Inga snapshot-tabeller, inga duplicater, alltid en sanning
+- Rättning av offert-fel (t.ex. fel pris) propagerar automatiskt
+- Mindre datalager-komplexitet
+
+*Referens-modell — nackdelar:*
+- Om hantverkare ändrar offerten EFTER kund godkänt → projektet visar nu annan data än vad kunden signerade
+- Juridiskt: vid tvist, "vad sa offerten när jobbet startade?" har inget svar i datan
+- ÄTA-beräkning kräver redan en "ursprunglig budget" (project.budget_amount kopieras vid konvertering) — så vi gör delvis snapshot ÄNDÅ
+
+*Snapshot-modell — fördelar:*
+- Juridisk spårbarhet av vad kunden signerade
+- Skydd mot oavsiktliga ändringar i ursprungsdata
+- Konsistent med project.budget_amount (som redan är en snapshot)
+
+*Snapshot-modell — nackdelar:*
+- Ny tabell `project_quote_snapshot` (eller liknande)
+- Logik vid offert-uppdatering: vad händer om quote ändras efter konvertering?
+- Migration av befintliga projekt om vi byter modell senare
+
+**Förslag-beslut:** Inget bygge nu. Etapp 4 inkluderar UX-utvärdering — när hantverkare presenteras offert-data i projektet, vill de se "vad kunden signerade" eller "aktuell offert"? Pilot-feedback styr beslutet.
+
+**Migrations-väg om snapshot väljs senare:**
+1. Ny tabell `project_quote_snapshot(project_id, quote_data_at_conversion JSONB, created_at)`
+2. Snapshot tas vid POST /api/projects med from_quote_id
+3. getProjectQuoteContext-helper utökas: prioriterar snapshot, fallback till live-referens för gamla projekt
+4. UI får val: "Visa signerad version" vs "Visa aktuell version"
+
+**Estimat:** 4-6h om beslutet faller på snapshot.
+
+**Trigger:** Etapp 4-design eller efter första juridiska tvist/diskrepans-rapport från pilot.
+
+---
+
+## 2026-05-22 — Räkning av offerter med endast JSONB-data (legacy-only) (TD-65)
+
+**Plats:** `quotes`-tabellen, `quote_items`-tabellen.
+
+**Bakgrund:** Audit 2026-05-20 flaggade dubbel-lagring: `quotes.items` (JSONB) och `quote_items` (normaliserad tabell). Etapp 3.1's `getProjectQuoteContext` använder primärt `quote_items` med fallback till JSONB. För att förstå konsoliderings-omfattning behöver vi veta hur många offerter som ENBART har JSONB-data.
+
+**SQL för engångsräkning (Andreas kör i Supabase SQL Editor):**
+
+```sql
+-- Räkning per business
+SELECT
+  q.business_id,
+  COUNT(*) AS total_quotes,
+  COUNT(*) FILTER (WHERE NOT EXISTS (
+    SELECT 1 FROM quote_items qi WHERE qi.quote_id = q.quote_id
+  )) AS legacy_only_count,
+  COUNT(*) FILTER (WHERE EXISTS (
+    SELECT 1 FROM quote_items qi WHERE qi.quote_id = q.quote_id
+  )) AS migrated_count
+FROM quotes q
+GROUP BY q.business_id
+ORDER BY legacy_only_count DESC;
+
+-- Totalsumma över alla businesses
+SELECT
+  COUNT(*) AS total_quotes,
+  COUNT(*) FILTER (WHERE NOT EXISTS (
+    SELECT 1 FROM quote_items qi WHERE qi.quote_id = q.quote_id
+  )) AS legacy_only_count,
+  ROUND(
+    100.0 * COUNT(*) FILTER (WHERE NOT EXISTS (
+      SELECT 1 FROM quote_items qi WHERE qi.quote_id = q.quote_id
+    )) / NULLIF(COUNT(*), 0), 1
+  ) AS legacy_pct
+FROM quotes q;
+```
+
+**Vad resultatet säger:**
+- Om legacy_pct < 5%: dubbel-lagring är nästan rensad, JSONB-fallback kan tas bort efter migration av sista offerterna
+- Om legacy_pct > 50%: stor migrations-skuld kvar, behåll fallbacken indefinitivt eller bygg explicit migration
+- Mittemellan: utvärdera per business
+
+**Fixar inte:** detta är räkning för insikt, ingen kod-fix. Eventuell migration är separat TD om det visar sig behövas.
+
+**Trigger:** Andreas kör SQL:en post-pilot för att förstå skala. Beslut om migration följer.
+
