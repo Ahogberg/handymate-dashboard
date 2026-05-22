@@ -58,6 +58,8 @@ interface ProjectEconomics {
     timrader_utan_kostnad: number
     marginal_kr: number | null
     marginal_pct: number | null
+    kostnad_sannolikt_komplett: boolean
+    kostnad_completeness_pct: number | null
   }
   meta: {
     computed_at: string
@@ -295,6 +297,13 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
                 : isNegative
                   ? 'text-red-600'
                   : 'text-slate-500'
+            // TD-63: preliminär-varning när kostnadsregistrering är fragmentarisk.
+            // Pågående projekt med <30% kostnad/budget — siffran är sannolikt
+            // vilseledande. Visa diskret rad istället för att markera helt grå.
+            const showPreliminaryWarning =
+              !isZeroData &&
+              !marginal.kostnad_sannolikt_komplett &&
+              marginal.kostnad_completeness_pct != null
             return (
               <>
                 <div className="flex items-baseline gap-3">
@@ -321,6 +330,15 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
                     ? 'Ingen intäkt eller kostnad registrerad ännu'
                     : 'Total budget − kostnad'}
                 </p>
+                {showPreliminaryWarning && (
+                  <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />
+                    <span>
+                      Preliminär — kostnadsregistrering ej komplett (bara{' '}
+                      <strong>{marginal.kostnad_completeness_pct}%</strong> av budget registrerad som kostnad hittills)
+                    </span>
+                  </div>
+                )}
               </>
             )
           })()

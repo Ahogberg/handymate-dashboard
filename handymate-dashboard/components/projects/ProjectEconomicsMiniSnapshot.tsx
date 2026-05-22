@@ -33,6 +33,8 @@ interface ProjectEconomicsLite {
     arbetskostnad_konfigurerad: boolean
     marginal_kr: number | null
     marginal_pct: number | null
+    kostnad_sannolikt_komplett: boolean
+    kostnad_completeness_pct: number | null
   }
 }
 
@@ -158,7 +160,13 @@ export function ProjectEconomicsMiniSnapshot({
                     ? 'text-red-700'
                     : 'text-slate-600'
             }
-            subtle={marginal.marginal_pct != null ? `${marginal.marginal_pct}%` : undefined}
+            subtle={
+              !marginal.kostnad_sannolikt_komplett && marginal.kostnad_completeness_pct != null
+                ? `preliminär (${marginal.kostnad_completeness_pct}% reg.)`
+                : marginal.marginal_pct != null
+                  ? `${marginal.marginal_pct}%`
+                  : undefined
+            }
           />
         ) : (
           <div className="flex flex-col">
