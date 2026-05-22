@@ -1822,3 +1822,41 @@ Plus: ta bort TD-67 från tasks/tech-debt.md i samma commit.
 
 **Trigger:** Etapp 4 UX-design eller första pilot-feedback om "för många steg från ja till projekt".
 
+
+---
+
+## 2026-05-22 — Ekonomi-tab budget märks ej tydligt som exkl. moms (TD-69)
+
+**Plats:** `components/projects/ProjectEconomicsCard.tsx` + `ProjectEconomicsMiniSnapshot.tsx`.
+
+**Symtom:** Ekonomi-tabben visar `budget_amount` som "Total budget" utan tydlig märkning. Värdet är netto (exkl. moms) — vilket är **korrekt** för marginal-analys (intern lönekostnad är också netto) — men användaren ser offertens totalsumma inkl. moms i andra vyer och kan förvirras av differensen.
+
+**Exempel scenario:**
+- Offert #011 visas i offert-vyn med totalsumma 43 100 kr (inkl. 25% moms på 34 480)
+- Ekonomi-tabben på samma projekt visar "Total budget: 34 480 kr"
+- Hantverkaren undrar: "Var blev 8 620 kr av?"
+
+**Förslag-fix (Etapp 4 UI-polish):**
+
+1. **Märk värdet tydligt:**
+   - "Total budget (exkl. moms): 34 480 kr"
+   - Eller: "34 480 kr" + liten subtle-rad "exkl. moms"
+
+2. **Bonus:** visa både brutto + netto med tydlig märkning:
+   ```
+   Total budget    34 480 kr    (exkl. moms)
+                   43 100 kr    (inkl. moms 25%)
+   ```
+
+3. **Konsekvens i mini-snapshot:** samma märkning där "Total budget" syns
+
+**Designprincip:** marginal-beräkning ska FORTSÄTTA göras på netto-värden (korrekt jämförelse mot interna kostnader som också är netto). UI-märkningen handlar bara om att tydliggöra vad siffran representerar.
+
+**Risk-överväganden:**
+- Inkl/exkl. moms-räkning är ROT/RUT-specifik: när ROT/RUT-avdrag visas är "kund-pays"-värdet redan justerat
+- ROT-projekt kan visas dubbelt-justerat om vi inte är försiktiga (intäkt netto vs kund-pays inkl. ROT)
+
+**Estimat:** 30 min UI-text + 1h test mot olika moms/ROT-scenarier. Total ~1.5h.
+
+**Trigger:** Etapp 4 UI-polish. Om någon pilot förvirras tidigare → bumpas upp.
+
