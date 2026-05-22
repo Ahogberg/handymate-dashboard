@@ -1787,3 +1787,38 @@ Plus: ta bort TD-67 från tasks/tech-debt.md i samma commit.
 
 **Trigger:** När Etapp 3 är slutlevererad och 3.2-3.4 UI visar samma data som debug-endpointen.
 
+
+---
+
+## 2026-05-22 — Manuell accept/konvertera-till-projekt saknas för utkast (TD-68)
+
+**Plats:** `/dashboard/quotes/[id]` "Skapa projekt"-knapp + `/api/quotes/accept` accept-flöde.
+
+**Symtom:** "Skapa projekt"-knappen på offert-detaljsidan visas endast när `quote.status === 'accepted'` ([QuoteHeader.tsx:162](app/dashboard/quotes/[id]/components/QuoteHeader.tsx#L162)). "Markera som accepterad"-vägen via `/api/quotes/accept` kräver `quote.status ∈ ('sent', 'opened')` ([rad 37-39](app/api/quotes/accept/route.ts#L37-L39)).
+
+**Konsekvens för hantverkare:**
+- Möter kund, skissar offerten i appen, får muntligt ja på plats
+- Vill konvertera till projekt direkt utan att skicka offerten formellt först
+- **Tvingas idag:** skicka offert till sin egen mail/SMS → "Markera som accepterad" → "Skapa projekt"
+- Onödigt friktion för ett vanligt case
+
+**Förslag-lösning (Etapp 4 UX):**
+
+1. **Tillåt accept från status `draft`:**
+   - Utöka `accept`-routen att acceptera `draft`-offerter med en flagga `accepted_manually_without_send=true` (audit-trail)
+   - UI: lägg till "Konvertera till projekt direkt" på `/dashboard/quotes/[id]` när status=draft, distinkt från "Skicka"
+   - Bekräftelsedialog: "Skapas projekt utan att kunden formellt signerat offerten. Är detta ett muntligt avtal?"
+
+2. **Alternativ kortare väg:** quick-action "Direkt-konvertera" på offert-listans rad-meny för draft-offerter
+
+**Risk-överväganden:**
+- Juridiskt: utkast utan formell signering ska markeras i audit-trail så det är spårbart
+- Statistik: blanda inte ihop "draft-konverterade" med "signerade" projekt — separat counter
+- Inkonsekvens med ROT/RUT: ROT-deklaration kräver kund-godkännande, så för ROT-jobb är muntlig accept inte tillräcklig — flagga det i UI
+
+**Pilot-relevans:** Christoffer har sannolikt detta case ofta (möter kund på plats, gör snabb prissättning).
+
+**Estimat:** 2h API + 2-3h UI + 1h audit-trail + 1h juridisk granskning av flödet. Total ~6-7h.
+
+**Trigger:** Etapp 4 UX-design eller första pilot-feedback om "för många steg från ja till projekt".
+
