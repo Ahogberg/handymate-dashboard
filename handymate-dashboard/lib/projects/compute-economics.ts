@@ -49,7 +49,10 @@ export interface ProjectEconomics {
     arbete_timmar: number  // alltid satt (även om kostnad-pris saknas)
     material_inkop_kr: number  // sum(supplier_invoices.total_amount)
     material_billable_kr: number  // delmängd med billable_to_customer=true
-    total_kr: number | null  // arbete + material (null om arbete null)
+    // Manuella projektkostnader (project_cost: UE, övrigt) — Etapp 2.3
+    extra_kr: number  // sum av alla manuella kostnader
+    extra_per_kategori: Record<string, number>  // ex. { subcontractor: 5000, other: 1200 }
+    total_kr: number | null  // arbete + material + extra (null om arbete null)
   }
 
   // ── Marginal ───────────────────────────────────────────────────
@@ -74,7 +77,16 @@ export interface ProjectEconomics {
     ata_count: number
     time_entry_count: number
     supplier_invoice_count: number
+    extra_cost_count: number  // antal project_cost-rader
   }
+}
+
+export interface ProjectExtraCost {
+  id: string
+  category: string  // 'subcontractor' | 'other' | (free text)
+  description: string
+  amount: number
+  date: string
 }
 
 interface ProjectRow {
@@ -107,6 +119,11 @@ interface TimeEntryRow {
 interface SupplierInvoiceRow {
   total_amount: number | null
   billable_to_customer: boolean | null
+}
+
+interface ProjectCostRow {
+  amount: number | null
+  category: string | null
 }
 
 interface BusinessUserCost {
@@ -278,12 +295,32 @@ export async function computeProjectEconomics(
     if (s.billable_to_customer) materialBillable += v
   }
 
-  // ── 6. Beräkna marginal ──────────────────────────────────────
+  // ── 6. Project cost (manuella kostnader: UE, övrigt) ─────────
+  // project_cost (sql/easoft_parity.sql:48) — användarinmatade kostnader
+  // utöver tid och leverantörsfakturor. Återinfört i Etapp 2.3 efter att
+  // ha varit urkopplat sedan 2.2-omskrivningen.
+  const { data: costData } = await supabase
+    .from('project_cost')
+    .select('amount, category')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+
+  const extraCosts = (costData || []) as ProjectCostRow[]
+  let extraTotalKr = 0
+  const extraPerKategori: Record<string, number> = {}
+  for (const c of extraCosts) {
+    const v = Number(c.amount || 0)
+    const key = (c.category || 'other').toLowerCase()
+    extraTotalKr += v
+    extraPerKategori[key] = (extraPerKategori[key] || 0) + v
+  }
+
+  // ── 7. Beräkna marginal ──────────────────────────────────────
   const budgetAmount = Number(project.budget_amount || 0)
   const forvantadIntakt = budgetAmount + ataSigneratKr
 
   const totalKostnad =
-    arbeteKrFinal != null ? arbeteKrFinal + materialInkop : null
+    arbeteKrFinal != null ? arbeteKrFinal + materialInkop + extraTotalKr : null
 
   let marginalKr: number | null = null
   let marginalPct: number | null = null
@@ -310,6 +347,10 @@ export async function computeProjectEconomics(
       arbete_timmar: Math.round(arbeteTimmar * 100) / 100,
       material_inkop_kr: Math.round(materialInkop),
       material_billable_kr: Math.round(materialBillable),
+      extra_kr: Math.round(extraTotalKr),
+      extra_per_kategori: Object.fromEntries(
+        Object.entries(extraPerKategori).map(([k, v]) => [k, Math.round(v)]),
+      ),
       total_kr: totalKostnad == null ? null : Math.round(totalKostnad),
     },
     marginal: {
@@ -324,6 +365,7 @@ export async function computeProjectEconomics(
       ata_count: changes.length,
       time_entry_count: timeEntries.length,
       supplier_invoice_count: supplierInvoices.length,
+      extra_cost_count: extraCosts.length,
     },
   }
 }
