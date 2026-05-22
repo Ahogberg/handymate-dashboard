@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
+import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 
 /**
  * GET - Lista projekt för ett företag
@@ -272,25 +273,18 @@ export async function POST(request: NextRequest) {
       // Titel-prio: 1) explicit i body, 2) offerttitel, 3) deal-titel, 4) fallback
       projectData.name = projectData.name || quote.title || dealTitle || `Projekt från offert`
 
-      // Calculate budget from quote
-      const items = quote.items || []
-      const laborHours = items
-        .filter((i: any) => i.type === 'labor')
-        .reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
+      // Budget-härledning via gemensam helper (pilot-blocker fix 2026-05-22):
+      // läser quote_items-tabellen primärt + JSONB-fallback. Tidigare läste
+      // koden bara quote.items (JSONB) → nya offerter fick budget=null.
+      const budgetDerivation = await getQuoteBudgetDerivation(
+        supabase,
+        body.from_quote_id,
+        businessId,
+      )
 
-      const totalAmount = items.reduce((sum: number, i: any) => sum + (i.total || 0), 0)
-
-      projectData.budget_hours = projectData.budget_hours || laborHours || null
-      projectData.budget_amount = projectData.budget_amount || totalAmount || null
-
-      // Determine project type
-      if (laborHours > 0 && items.some((i: any) => i.type === 'material')) {
-        projectData.project_type = 'mixed'
-      } else if (laborHours > 0) {
-        projectData.project_type = 'hourly'
-      } else {
-        projectData.project_type = 'fixed_price'
-      }
+      projectData.budget_hours = projectData.budget_hours || budgetDerivation.budget_hours
+      projectData.budget_amount = projectData.budget_amount || budgetDerivation.budget_amount
+      projectData.project_type = budgetDerivation.project_type
     }
 
     // Direktkoppling till deal (om anroparen skickar from_deal_id)
@@ -372,28 +366,27 @@ export async function POST(request: NextRequest) {
     }
 
     // If from quote, create milestones from quote items
+    // Pilot-blocker fix 2026-05-22: använder samma budget-derivation-helper
+    // som ovan så milestones bygger på quote_items-tabellen, inte tom JSONB.
     if (body.from_quote_id && body.create_milestones !== false) {
-      const { data: quote } = await supabase
-        .from('quotes')
-        .select('items')
-        .eq('quote_id', body.from_quote_id)
-        .single()
+      const derivation = await getQuoteBudgetDerivation(
+        supabase,
+        body.from_quote_id,
+        businessId,
+      )
 
-      if (quote?.items && Array.isArray(quote.items)) {
-        const laborItems = quote.items.filter((i: any) => i.type === 'labor')
-        if (laborItems.length > 1) {
-          const milestones = laborItems.map((item: any, idx: number) => ({
-            business_id: businessId,
-            project_id: project.project_id,
-            name: item.name || item.description || `Moment ${idx + 1}`,
-            budget_hours: item.quantity || null,
-            budget_amount: item.total || null,
-            sort_order: idx,
-            status: 'pending'
-          }))
+      if (derivation.labor_items.length > 1) {
+        const milestones = derivation.labor_items.map((item, idx) => ({
+          business_id: businessId,
+          project_id: project.project_id,
+          name: item.description || `Moment ${idx + 1}`,
+          budget_hours: item.unit === 'tim' || item.unit === 'h' ? item.quantity : null,
+          budget_amount: item.total || null,
+          sort_order: idx,
+          status: 'pending',
+        }))
 
-          await supabase.from('project_milestone').insert(milestones)
-        }
+        await supabase.from('project_milestone').insert(milestones)
       }
     }
 

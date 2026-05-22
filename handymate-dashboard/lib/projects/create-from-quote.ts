@@ -5,6 +5,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 
 interface CreateResult {
   success: boolean
@@ -45,27 +46,17 @@ export async function createProjectFromQuote(
       return { success: false, error: 'Offert hittades inte' }
     }
 
-    // 3. Beräkna budget från offertens rader
-    let budgetHours: number | null = null
-    let budgetAmount: number | null = null
-    let projectType = 'fixed_price'
-
-    if (quote.items && Array.isArray(quote.items)) {
-      const items = quote.items as any[]
-      const laborHours = items
-        .filter(i => i.unit === 'tim' || i.type === 'labor')
-        .reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
-      const totalAmount = items
-        .filter(i => i.item_type === 'item' || i.type)
-        .reduce((sum: number, i: any) => sum + (i.total || 0), 0)
-
-      budgetHours = laborHours || null
-      budgetAmount = totalAmount || quote.total || null
-
-      if (laborHours > 0) {
-        projectType = items.some(i => i.item_type === 'item' && i.unit !== 'tim') ? 'mixed' : 'hourly'
-      }
-    }
+    // 3. Beräkna budget från offertens rader via gemensam helper
+    // (pilot-blocker fix 2026-05-22 — samma helper som /api/projects POST).
+    // Läser quote_items-tabellen primärt, JSONB-fallback, total-fallback.
+    const budgetDerivation = await getQuoteBudgetDerivation(
+      supabase,
+      quoteId,
+      businessId,
+    )
+    const budgetHours = budgetDerivation.budget_hours
+    const budgetAmount = budgetDerivation.budget_amount
+    const projectType = budgetDerivation.project_type
 
     // 4. Skapa projekt
     const projectName = quote.title || 'Projekt från offert'
@@ -98,22 +89,19 @@ export async function createProjectFromQuote(
     }
 
     // 5. Skapa milestones från offertens arbetsrader
-    if (quote.items && Array.isArray(quote.items)) {
-      const laborItems = (quote.items as any[]).filter(
-        i => (i.unit === 'tim' || i.type === 'labor') && i.item_type !== 'heading'
-      )
-      if (laborItems.length > 1) {
-        const milestones = laborItems.map((item: any, idx: number) => ({
-          business_id: businessId,
-          project_id: projectId,
-          name: item.description || item.name || `Moment ${idx + 1}`,
-          budget_hours: item.unit === 'tim' ? item.quantity : null,
-          budget_amount: item.total || null,
-          sort_order: idx,
-          status: 'pending',
-        }))
-        await supabase.from('project_milestone').insert(milestones).then(() => {})
-      }
+    // Använder labor_items från budgetDerivation (samma helper) så
+    // milestones byggs från quote_items-tabellen, inte tom JSONB.
+    if (budgetDerivation.labor_items.length > 1) {
+      const milestones = budgetDerivation.labor_items.map((item, idx) => ({
+        business_id: businessId,
+        project_id: projectId,
+        name: item.description || `Moment ${idx + 1}`,
+        budget_hours: item.unit === 'tim' || item.unit === 'h' ? item.quantity : null,
+        budget_amount: item.total || null,
+        sort_order: idx,
+        status: 'pending',
+      }))
+      await supabase.from('project_milestone').insert(milestones).then(() => {})
     }
 
     // 6. Fire project_created event
