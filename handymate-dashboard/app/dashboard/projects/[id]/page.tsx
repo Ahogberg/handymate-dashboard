@@ -87,6 +87,7 @@ import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageInline } from '@/components/projects/ProjectStageInline'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
+import { ProjectEconomicsMiniSnapshot } from '@/components/projects/ProjectEconomicsMiniSnapshot'
 
 const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas'), {
   loading: () => (
@@ -1994,7 +1995,11 @@ export default function ProjectDetailPage() {
               </div>
             </div>
 
-            {/* Lönsamhet-vy ligger på Ekonomi-tabben (ProjectEconomicsCard, v53). */}
+            {/* Ekonomi-puls — full vy ligger på Ekonomi-tabben */}
+            <ProjectEconomicsMiniSnapshot
+              projectId={projectId}
+              onOpenFull={() => setActiveTab('economy')}
+            />
 
             {/* Progress bar */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
