@@ -68,11 +68,17 @@ export interface ProjectEconomics {
     /** marginal i procent = marginal_kr / forvantad_intakt * 100. Null
         om arbetskostnad_konfigurerad=false eller intakt = 0. */
     marginal_pct: number | null
+    /** TD-63b (2026-05-22): projektet har varken budget eller registrerad
+        kostnad. Skiljer "tomt" från "preliminär" — tomma projekt har inte
+        OFULLSTÄNDIG data, de har INGEN data. UI visar "Ingen intäkt eller
+        kostnad registrerad ännu", Lars skippar preliminär-uttalanden. */
+    är_tomt: boolean
     /** TD-63 (2026-05-22): är registrerad kostnad rimligt komplett?
-        Heuristik: status='completed' ELLER kostnad utgör >= 30% av
-        förväntad intäkt. False = pågående projekt med så liten
-        kostnadsregistrering att marginalen sannolikt är vilseledande
-        ("preliminär"). UI och Lars använder denna för ärlig signalering. */
+        Heuristik: status='completed' ELLER tomt projekt ELLER kostnad
+        utgör >= 30% av förväntad intäkt. False = pågående projekt med
+        så liten kostnadsregistrering att marginalen sannolikt är
+        vilseledande ("preliminär"). UI och Lars använder denna för
+        ärlig signalering. */
     kostnad_sannolikt_komplett: boolean
     /** Kostnadens andel av förväntad intäkt i procent. Null om
         intäkt = 0 eller arbetskostnad ej konfigurerad. UI visar
@@ -342,6 +348,11 @@ export async function computeProjectEconomics(
       : null
   }
 
+  // TD-63b: är projektet helt tomt? (varken budget eller registrerad
+  // kostnad). Tomt-tillståndet vinner över preliminär-tillståndet —
+  // ett tomt projekt har inte OFULLSTÄNDIG data, det har INGEN data.
+  const ärTomt = forvantadIntakt === 0 && (totalKostnad || 0) === 0
+
   // TD-63: kostnad-completeness-flagga. Skiljer pågående projekt med
   // lite registrerad kostnad från projekt där kostnaden faktiskt är
   // låg. Utan denna risk: ett 85k-projekt med 2k registrerad kostnad
@@ -349,12 +360,16 @@ export async function computeProjectEconomics(
   // användare. Heuristik: completed-status = data är slutgiltig.
   // Annars kräv att kostnaden utgör minst 30% av förväntad intäkt
   // för att räknas som rimligt komplett.
+  // TD-63b: tomma projekt räknas också som "komplett" — inget mer
+  // finns att registrera än att börja med. Förhindrar att Lars/UI
+  // går in i preliminär-grenen för tomma projekt.
   const COST_COMPLETENESS_THRESHOLD = 0.30
   const kostnadCompletenessPct =
     arbetskostnadKonfigurerad && forvantadIntakt > 0 && totalKostnad != null
       ? Math.round((totalKostnad / forvantadIntakt) * 100)
       : null
   const kostnadSannoliktKomplett =
+    ärTomt ||
     project.status === 'completed' ||
     (kostnadCompletenessPct != null && kostnadCompletenessPct >= COST_COMPLETENESS_THRESHOLD * 100)
 
@@ -385,6 +400,7 @@ export async function computeProjectEconomics(
       timrader_utan_kostnad: timraderUtanKostnad,
       marginal_kr: marginalKr == null ? null : Math.round(marginalKr),
       marginal_pct: marginalPct,
+      är_tomt: ärTomt,
       kostnad_sannolikt_komplett: kostnadSannoliktKomplett,
       kostnad_completeness_pct: kostnadCompletenessPct,
     },

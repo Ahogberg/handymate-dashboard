@@ -58,6 +58,7 @@ interface ProjectEconomics {
     timrader_utan_kostnad: number
     marginal_kr: number | null
     marginal_pct: number | null
+    är_tomt: boolean
     kostnad_sannolikt_komplett: boolean
     kostnad_completeness_pct: number | null
   }
@@ -300,8 +301,10 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
             // TD-63: preliminär-varning när kostnadsregistrering är fragmentarisk.
             // Pågående projekt med <30% kostnad/budget — siffran är sannolikt
             // vilseledande. Visa diskret rad istället för att markera helt grå.
+            // TD-63b: tomma projekt (är_tomt) ska INTE flaggas preliminära.
             const showPreliminaryWarning =
               !isZeroData &&
+              !marginal.är_tomt &&
               !marginal.kostnad_sannolikt_komplett &&
               marginal.kostnad_completeness_pct != null
             return (

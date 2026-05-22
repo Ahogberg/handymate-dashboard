@@ -139,6 +139,10 @@ export interface LarsAggregate {
     // hittills relativt budgeten), inte verklig lönsamhet.
     kostnad_sannolikt_komplett: boolean
     kostnad_completeness_pct: number | null
+    // TD-63b: projektet är helt tomt (varken budget eller kostnad).
+    // Vinner över preliminär-flaggan — tomma projekt ska skippas i
+    // marginal-analyser, inte flaggas som preliminära.
+    är_tomt: boolean
   }>
   // Lista av projekt där marginal EJ kan beräknas pga saknad intern-
   // kostnad. Lars ska refera till dessa explicit i sina observationer
@@ -284,6 +288,7 @@ async function buildLarsAggregate(
       timrader_utan_kostnad: e?.marginal.timrader_utan_kostnad ?? 0,
       kostnad_sannolikt_komplett: e?.marginal.kostnad_sannolikt_komplett ?? false,
       kostnad_completeness_pct: e?.marginal.kostnad_completeness_pct ?? null,
+      är_tomt: e?.marginal.är_tomt ?? false,
     }
   })
 
@@ -607,8 +612,9 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
 
 2d. **Preliminär marginal (KRITISK ärlighet, TD-63):**
    - Ett projekt där \`kostnad_sannolikt_komplett=false\` har så lite registrerad kostnad relativt budgeten att marginal-siffran SANNOLIKT är vilseledande
+   - **TD-63b: HOPPA ÖVER projekt där \`är_tomt=true\`** — dessa är helt tomma (varken budget eller kostnad), inte preliminära. De är inte värda att kommentera marginal-mässigt alls.
    - Exempel: 85 000 kr budget med 2 083 kr registrerad kostnad ger matematiskt 98% marginal — men det är pågående data, inte verklig lönsamhet
-   - ALDRIG säg "superlönsamt" eller "fantastisk marginal" om \`kostnad_sannolikt_komplett=false\`. Säg istället: "Preliminär marginal — bara X% av budgeten registrerad som kostnad hittills"
+   - ALDRIG säg "superlönsamt" eller "fantastisk marginal" om \`kostnad_sannolikt_komplett=false\` OCH \`är_tomt=false\`. Säg istället: "Preliminär marginal — bara X% av budgeten registrerad som kostnad hittills"
    - Ton: sakligt ärligt om datamognad, inte negativt. Samma anda som 2b
    - Använd \`kostnad_completeness_pct\` för att uttrycka hur mycket av budgeten som registrerats
 
