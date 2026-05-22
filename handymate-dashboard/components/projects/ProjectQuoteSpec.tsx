@@ -252,9 +252,25 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          {/* Total visas bara om server skickat med priser */}
-          {showPrices && <Stat label="Total (netto)" value={formatKr(data.total_kr)} />}
+        {/* Moms-uppdelning enligt TD-69 (Andreas 2026-05-22):
+            quote.total i databasen är INKL. moms. Netto = total - moms.
+            Visar både netto (vad företaget räknar på) och inkl-moms
+            (vad kunden betalar) för att matcha offertens egen summering. */}
+        {showPrices && (() => {
+          const totalInklMoms = data.total_kr
+          const momsAmount = data.vat_amount
+          const netto = totalInklMoms - momsAmount
+          const vatPct = Math.round(data.vat_rate || 25)
+          return (
+            <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-sm border-t border-slate-100 pt-3">
+              <Stat label="Netto" value={formatKr(netto)} />
+              <Stat label={`Moms ${vatPct}%`} value={formatKr(momsAmount)} />
+              <Stat label="Totalt inkl. moms" value={formatKr(totalInklMoms)} bold />
+            </div>
+          )
+        })()}
+
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           {data.meta.accepted_at && (
             <Stat label="Accepterad" value={new Date(data.meta.accepted_at).toLocaleDateString('sv-SE')} />
           )}
@@ -311,11 +327,13 @@ export function ProjectQuoteSpec({ projectId }: ProjectQuoteSpecProps) {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-      <p className="text-sm font-semibold text-slate-900 tabular-nums mt-0.5">{value}</p>
+      <p className={`text-sm tabular-nums mt-0.5 ${bold ? 'font-bold text-slate-900' : 'font-semibold text-slate-900'}`}>
+        {value}
+      </p>
     </div>
   )
 }
