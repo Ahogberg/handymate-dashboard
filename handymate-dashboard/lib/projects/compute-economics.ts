@@ -28,6 +28,13 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 // Public types
 // ─────────────────────────────────────────────────────────────────
 
+/**
+ * Tröskeln för när registrerad kostnad räknas som "rimligt komplett".
+ * Används för kostnad_sannolikt_komplett-flaggan (TD-63).
+ * Exporterad så UI (MarginalCard) kan referera till samma värde.
+ */
+export const COST_COMPLETENESS_THRESHOLD = 0.30
+
 export interface ProjectEconomics {
   project_id: string
   business_id: string
@@ -363,7 +370,6 @@ export async function computeProjectEconomics(
   // TD-63b: tomma projekt räknas också som "komplett" — inget mer
   // finns att registrera än att börja med. Förhindrar att Lars/UI
   // går in i preliminär-grenen för tomma projekt.
-  const COST_COMPLETENESS_THRESHOLD = 0.30
   const kostnadCompletenessPct =
     arbetskostnadKonfigurerad && forvantadIntakt > 0 && totalKostnad != null
       ? Math.round((totalKostnad / forvantadIntakt) * 100)

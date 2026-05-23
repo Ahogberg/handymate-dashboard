@@ -1,21 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import Link from 'next/link'
 import {
   AlertCircle,
-  ArrowRight,
   Clock,
   Loader2,
   Plus,
   Receipt,
   RefreshCw,
-  Settings,
-  TrendingDown,
-  TrendingUp,
 } from 'lucide-react'
-import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { ProjectCostModal } from './ProjectCostModal'
+import { MarginalCard } from './economy/MarginalCard'
 
 /**
  * ProjectEconomicsCard (Etapp 2.2, v53 2026-05-21).
@@ -103,7 +98,6 @@ function pct(part: number, whole: number): string {
 }
 
 export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProject }: ProjectEconomicsCardProps) {
-  const { isOwnerOrAdmin } = useCurrentUser()
   const [data, setData] = useState<ProjectEconomics | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -271,119 +265,11 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
         </div>
       </section>
 
-      {/* MARGINAL */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-4">
-          Marginal
-        </h3>
-        {marginal.arbetskostnad_konfigurerad && marginal.marginal_kr != null ? (
-          (() => {
-            // Färg-logik: grön = verifierad positiv, röd = negativ, grå =
-            // noll/noll (ingen verklig data ännu). Grön "+0 kr" är vilseledande
-            // när både intäkt och kostnad är 0 — signalerar lönsamhet utan grund.
-            const isZeroData = intakter.forvantad_intakt_kr === 0 && (kostnader.total_kr || 0) === 0
-            const isPositive = !isZeroData && marginal.marginal_kr > 0
-            const isNegative = marginal.marginal_kr < 0
-            const valueColor = isZeroData
-              ? 'text-slate-500'
-              : isPositive
-                ? 'text-emerald-700'
-                : isNegative
-                  ? 'text-red-700'
-                  : 'text-slate-600'
-            const pctColor = isZeroData
-              ? 'text-slate-400'
-              : isPositive
-                ? 'text-emerald-600'
-                : isNegative
-                  ? 'text-red-600'
-                  : 'text-slate-500'
-            // TD-63: preliminär-varning när kostnadsregistrering är fragmentarisk.
-            // Pågående projekt med <30% kostnad/budget — siffran är sannolikt
-            // vilseledande. Visa diskret rad istället för att markera helt grå.
-            // TD-63b: tomma projekt (är_tomt) ska INTE flaggas preliminära.
-            const showPreliminaryWarning =
-              !isZeroData &&
-              !marginal.är_tomt &&
-              !marginal.kostnad_sannolikt_komplett &&
-              marginal.kostnad_completeness_pct != null
-            return (
-              <>
-                <div className="flex items-baseline gap-3">
-                  {isZeroData ? (
-                    <TrendingUp className="w-5 h-5 text-slate-400" />
-                  ) : isPositive ? (
-                    <TrendingUp className="w-5 h-5 text-emerald-600" />
-                  ) : isNegative ? (
-                    <TrendingDown className="w-5 h-5 text-red-600" />
-                  ) : (
-                    <TrendingUp className="w-5 h-5 text-slate-400" />
-                  )}
-                  <div className={`text-3xl font-bold tabular-nums ${valueColor}`}>
-                    {marginal.marginal_kr > 0 ? '+' : ''}{formatKr(marginal.marginal_kr)}
-                  </div>
-                  {marginal.marginal_pct != null && (
-                    <div className={`text-base font-semibold ${pctColor}`}>
-                      ({marginal.marginal_pct}%)
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500 mt-2">
-                  {isZeroData
-                    ? 'Ingen intäkt eller kostnad registrerad ännu'
-                    : 'Total budget − kostnad'}
-                </p>
-                {showPreliminaryWarning && (
-                  <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
-                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />
-                    <span>
-                      Preliminär — kostnadsregistrering ej komplett (bara{' '}
-                      <strong>{marginal.kostnad_completeness_pct}%</strong> av budget registrerad som kostnad hittills)
-                    </span>
-                  </div>
-                )}
-              </>
-            )
-          })()
-        ) : (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-amber-900">
-                  Sätt intern timkostnad för att se marginal
-                </p>
-                <p className="text-xs text-amber-800 mt-1">
-                  {marginal.timrader_utan_kostnad > 0 ? (
-                    <>
-                      {marginal.timrader_utan_kostnad} timrad
-                      {marginal.timrader_utan_kostnad === 1 ? '' : 'er'} saknar kostnadsdata.
-                      Vi visar inte marginal förrän intern timkostnad är satt — annars
-                      hade siffran blivit missvisande.
-                    </>
-                  ) : (
-                    <>
-                      Intern timkostnad (lön + sociala avgifter + overhead) krävs för
-                      marginal-beräkning. Sätt antingen per anställd eller som
-                      företags-default.
-                    </>
-                  )}
-                </p>
-                {isOwnerOrAdmin && (
-                  <Link
-                    href="/dashboard/settings/internal-costs"
-                    className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-amber-900 hover:text-amber-700"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    Gå till inställningar
-                    <ArrowRight className="w-3 h-3" />
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
+      {/* MARGINAL — Etapp 4b steg 1 (2026-05-23): ersatt med MarginalCard.
+          Komponenten bär ärlighets-hierarkin (fem states inkl. ej-konfig-
+          gate) + completeness-bar med 30%-tröskel som tickmark. Använder
+          COST_COMPLETENESS_THRESHOLD från helpern — en sanning. */}
+      <MarginalCard economics={data} size="normal" />
 
       {/* Fakturera projekt — visas när det finns mer att fakturera */}
       {onInvoiceProject && kvarAttFakturera > 0 && (
