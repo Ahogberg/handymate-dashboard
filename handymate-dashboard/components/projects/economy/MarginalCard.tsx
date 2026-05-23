@@ -56,9 +56,14 @@ export interface MarginalCardProps {
   size?: MarginalCardSize
 }
 
-type DisplayState = 'gate' | 'empty' | 'potential' | 'preliminary' | 'confirmed'
+/** Ärlighets-tillstånd för marginal-presentation. Exporterad så
+    EkonomiPulsCard (mini-version på Översikt-tab) kan använda samma
+    state-derivation = en sanning, två presentationer. */
+export type MarginalDisplayState = 'gate' | 'empty' | 'potential' | 'preliminary' | 'confirmed'
 
-function deriveState(eco: ProjectEconomics): DisplayState {
+/** Härleder display-state från ProjectEconomics. Samma logik används
+    av MarginalCard (alla tre size-varianter) och EkonomiPulsCard. */
+export function deriveMarginalState(eco: ProjectEconomics): MarginalDisplayState {
   if (!eco.marginal.arbetskostnad_konfigurerad) return 'gate'
   if (eco.marginal.är_tomt) return 'empty'
   // confirmed = helpern säger att data är rimligt komplett
@@ -172,7 +177,7 @@ function CompletenessBar({
 
 export function MarginalCard({ economics, size = 'normal' }: MarginalCardProps) {
   const { isOwnerOrAdmin } = useCurrentUser()
-  const state = deriveState(economics)
+  const state = deriveMarginalState(economics)
   const { marginal, intakter, kostnader } = economics
 
   // ── Gate-tillstånd: arbetskostnad ej konfigurerad ──────────────

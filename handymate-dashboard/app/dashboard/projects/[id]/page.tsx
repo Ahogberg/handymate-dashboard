@@ -87,7 +87,9 @@ import { ProjectBookingsTable } from './components/ProjectBookingsTable'
 import { ProjectStageStrip } from '@/components/projects/ProjectStageStrip'
 import { ProjectStageModal } from '@/components/pipeline/unified/ProjectStageModal'
 import { ProjectEconomicsCard } from '@/components/projects/ProjectEconomicsCard'
-import { ProjectEconomicsMiniSnapshot } from '@/components/projects/ProjectEconomicsMiniSnapshot'
+import { ProjectInfoCard } from '@/components/projects/economy/ProjectInfoCard'
+import { EkonomiPulsCard } from '@/components/projects/economy/EkonomiPulsCard'
+import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 
@@ -322,12 +324,6 @@ function formatDate(date: string): string {
 
 function formatHours(hours: number): string {
   return hours.toFixed(2) + ' tim'
-}
-
-function budgetBarColor(percent: number): string {
-  if (percent > 100) return 'bg-red-500'
-  if (percent >= 80) return 'bg-amber-500'
-  return 'bg-emerald-500'
 }
 
 // --- Sortable Milestone Row ---
@@ -1583,15 +1579,6 @@ export default function ProjectDetailPage() {
     )
   }
 
-  // --- Computed values ---
-
-  const budgetHoursPercent = project.budget_hours && summary
-    ? Math.round((summary.total_hours / project.budget_hours) * 100)
-    : 0
-  const budgetAmountPercent = project.budget_amount && summary
-    ? Math.round((summary.total_revenue / project.budget_amount) * 100)
-    : 0
-
   // --- Tab definitions ---
 
   // Tab-grupper — Etapp 4a.2 (2026-05-22):
@@ -1933,117 +1920,35 @@ export default function ProjectDetailPage() {
         {/* === TAB: Oversikt === */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
-            {/* Project info card */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-              <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-secondary-700" />
-                Projektinfo
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div>
-                  <p className="text-sm text-gray-400">Typ</p>
-                  <p className="text-gray-900">{PROJECT_TYPE_LABELS[project.project_type] || project.project_type}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Startdatum</p>
-                  <p className="text-gray-900">{project.start_date ? formatDate(project.start_date) : '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Slutdatum</p>
-                  <p className="text-gray-900">{project.end_date ? formatDate(project.end_date) : '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-400">Kund</p>
-                  {project.customer ? (
-                    <Link href={`/dashboard/customers/${project.customer.customer_id}`} className="text-secondary-700 hover:text-primary-700">
-                      {project.customer.name}
-                    </Link>
-                  ) : (
-                    <p className="text-gray-500">-</p>
-                  )}
-                </div>
-                {quote && (
-                  <div>
-                    <p className="text-sm text-gray-400">Kopplad offert</p>
-                    <Link href={`/dashboard/quotes/${quote.quote_id}`} className="text-secondary-700 hover:text-primary-700 flex items-center gap-1">
-                      {quote.title || 'Offert'} <ExternalLink className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                )}
-                {project.description && (
-                  <div className="sm:col-span-2 lg:col-span-4">
-                    <p className="text-sm text-gray-400">Beskrivning</p>
-                    <p className="text-gray-700">{project.description}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Ekonomi-puls — full vy ligger på Ekonomi-tabben */}
-            <ProjectEconomicsMiniSnapshot
-              projectId={projectId}
-              onOpenFull={() => setActiveTab('economy')}
+            {/* Projektinfo (Etapp 4b steg 3) */}
+            <ProjectInfoCard
+              projectType={project.project_type}
+              projectTypeLabel={PROJECT_TYPE_LABELS[project.project_type] || project.project_type}
+              startDate={project.start_date}
+              endDate={project.end_date}
+              customer={project.customer}
+              quote={quote}
+              description={project.description}
+              formatDate={formatDate}
             />
 
-            {/* Progress bar */}
-            <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <Target className="w-5 h-5 text-primary-700" />
-                  Framsteg
-                </h2>
-                <span className="text-2xl font-bold text-gray-900">{project.progress_percent}%</span>
-              </div>
-              <div className="w-full h-4 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary-700 rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(project.progress_percent, 100)}%` }}
-                />
-              </div>
-            </div>
+            {/* Ekonomi-puls — samma state-källa som Ekonomi-fliken */}
+            <EkonomiPulsCard
+              projectId={projectId}
+              onOpenFull={() => setActiveTab('economy')}
+              refreshKey={economicsRefreshKey}
+            />
 
-
-            {/* Budget vs Actual */}
-            {(project.budget_hours || project.budget_amount) && summary && (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                <h2 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-primary-500" />
-                  Budget vs Utfall
-                </h2>
-                <div className="space-y-4">
-                  {project.budget_hours != null && project.budget_hours > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-500">Timmar</span>
-                        <span className="text-sm text-gray-900">{formatHours(summary.total_hours)} / {formatHours(project.budget_hours)}</span>
-                      </div>
-                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(budgetHoursPercent)}`}
-                          style={{ width: `${Math.min(budgetHoursPercent, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{budgetHoursPercent}% anvant</p>
-                    </div>
-                  )}
-                  {project.budget_amount != null && project.budget_amount > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-500">Belopp</span>
-                        <span className="text-sm text-gray-900">{formatCurrency(summary.total_revenue)} / {formatCurrency(project.budget_amount)}</span>
-                      </div>
-                      <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${budgetBarColor(budgetAmountPercent)}`}
-                          style={{ width: `${Math.min(budgetAmountPercent, 100)}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-400 mt-1">{budgetAmountPercent}% anvant</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Framdrift (progress + Budget vs Utfall) */}
+            <FramdriftCard
+              progressPercent={project.progress_percent}
+              budgetHours={project.budget_hours ?? null}
+              actualHours={summary?.total_hours ?? 0}
+              budgetAmount={project.budget_amount ?? null}
+              actualRevenue={summary?.total_revenue ?? null}
+              formatHours={formatHours}
+              formatCurrency={formatCurrency}
+            />
 
             {/* Personal (team allocation) */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
