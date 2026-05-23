@@ -1,16 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import {
-  AlertCircle,
-  Clock,
-  Loader2,
-  Plus,
-  Receipt,
-  RefreshCw,
-} from 'lucide-react'
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react'
 import { ProjectCostModal } from './ProjectCostModal'
 import { MarginalCard } from './economy/MarginalCard'
+import { HeroKpi } from './economy/HeroKpi'
+import { IntaktCard } from './economy/IntaktCard'
+import { KostnadCard } from './economy/KostnadCard'
+import { FaktureringsstatusCard } from './economy/FaktureringsstatusCard'
+import { AtaCard } from './economy/AtaCard'
 
 /**
  * ProjectEconomicsCard (Etapp 2.2, v53 2026-05-21).
@@ -77,26 +75,6 @@ interface ProjectEconomicsCardProps {
   onInvoiceProject?: () => void
 }
 
-function formatKr(n: number | null | undefined): string {
-  if (n == null) return '—'
-  return new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    maximumFractionDigits: 0,
-  }).format(n)
-}
-
-function formatHours(h: number): string {
-  return new Intl.NumberFormat('sv-SE', {
-    maximumFractionDigits: 1,
-  }).format(h)
-}
-
-function pct(part: number, whole: number): string {
-  if (whole <= 0) return '—'
-  return `${Math.round((part / whole) * 100)}%`
-}
-
 export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProject }: ProjectEconomicsCardProps) {
   const [data, setData] = useState<ProjectEconomics | null>(null)
   const [loading, setLoading] = useState(true)
@@ -156,136 +134,82 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
     )
   }
 
-  const { intakter, kostnader, marginal, meta } = data
+  const { intakter, kostnader, meta } = data
 
-  const totalBudget = intakter.budget_amount + intakter.ata_signerat_kr
-  const kvarAttFakturera = Math.max(totalBudget - intakter.fakturerat_kr, 0)
+  // VAT default 25% — kommer från quote-context om vi vill ha exakt
+  // värde per offert. Senare 4b-steg kan utöka.
+  const VAT_RATE = 25
+  const intaktInklMoms = Math.round(intakter.forvantad_intakt_kr * (1 + VAT_RATE / 100))
+  const kostnadInklMoms =
+    kostnader.total_kr != null
+      ? Math.round(kostnader.total_kr * (1 + VAT_RATE / 100))
+      : null
 
   return (
     <div className="space-y-4">
-      {/* INTÄKT */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Intäkt
-          </h3>
-          <button
-            type="button"
-            onClick={() => fetchData(true)}
-            disabled={refreshing}
-            title="Uppdatera"
-            className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+      {/* Hero-rad: 3 KPI-cards (Intäkt + Kostnad + Marginal) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <HeroKpi
+          label="Intäkt"
+          value={intakter.forvantad_intakt_kr}
+          inklMoms={intaktInklMoms}
+          vatRate={VAT_RATE}
+          variant="teal"
+          icon="trendUp"
+          footnote={
+            intakter.forvantad_intakt_kr > 0
+              ? `Offert + ${meta.ata_count} signerad${meta.ata_count === 1 ? '' : 'a'} ÄTA`
+              : 'Ingen offert kopplad än'
+          }
+        />
+        <HeroKpi
+          label="Kostnad"
+          value={kostnader.total_kr ?? 0}
+          inklMoms={kostnadInklMoms}
+          vatRate={VAT_RATE}
+          variant="slate"
+          icon="bag"
+          footnote={
+            kostnader.total_kr && kostnader.total_kr > 0
+              ? `${meta.time_entry_count} timrad${meta.time_entry_count === 1 ? '' : 'er'} · ${meta.supplier_invoice_count} lev.faktura${meta.supplier_invoice_count === 1 ? '' : 'or'}`
+              : 'Inga kostnader registrerade än'
+          }
+        />
+        <MarginalCard economics={data} size="hero" />
+      </div>
+
+      {/* Two-col detail grid: vänster = Intäkt + ÄTA, höger = Kostnad + Fakturering */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="flex flex-col gap-4">
+          <IntaktCard economics={data} vatRate={VAT_RATE} />
+          <AtaCard projectId={projectId} />
         </div>
-
-        <div className="space-y-2 text-sm">
-          <Row label="Offert" value={formatKr(intakter.budget_amount)} />
-          {intakter.ata_signerat_kr > 0 && (
-            <Row
-              label={`ÄTA (${meta.ata_count} st, signerade)`}
-              value={`+${formatKr(intakter.ata_signerat_kr)}`}
-              valueClass="text-emerald-700"
-            />
-          )}
-
-          <div className="border-t border-slate-100 pt-2 mt-2" />
-
-          <Row
-            label="Total budget"
-            value={formatKr(totalBudget)}
-            bold
+        <div className="flex flex-col gap-4">
+          <KostnadCard
+            economics={data}
+            onAddManualCost={() => setCostModalOpen(true)}
           />
-          <Row
-            label="Fakturerat"
-            value={`${formatKr(intakter.fakturerat_kr)} (${pct(intakter.fakturerat_kr, totalBudget)})`}
-          />
-          <Row
-            label="Betalt"
-            value={`${formatKr(intakter.betalt_kr)} (${pct(intakter.betalt_kr, totalBudget)})`}
-          />
-          <Row
-            label="Kvar att fakturera"
-            value={formatKr(kvarAttFakturera)}
-            valueClass={kvarAttFakturera > 0 ? 'text-amber-700' : 'text-slate-500'}
-          />
-        </div>
-
-        {intakter.ata_pending_kr > 0 && (
-          <div className="mt-3 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 text-xs text-slate-600 flex items-start gap-2">
-            <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0 text-slate-400" />
-            <span>
-              ÄTA väntar på signering: <strong>+{formatKr(intakter.ata_pending_kr)}</strong> (räknas inte i total ännu)
-            </span>
-          </div>
-        )}
-      </section>
-
-      {/* KOSTNAD */}
-      <section className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-            Kostnad
-          </h3>
-          <button
-            type="button"
-            onClick={() => setCostModalOpen(true)}
-            className="inline-flex items-center gap-1 text-xs font-semibold text-primary-700 hover:text-primary-600 transition-colors"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Lägg till manuell kostnad
-          </button>
-        </div>
-        <div className="space-y-2 text-sm">
-          <Row
-            label={`Arbete (${formatHours(kostnader.arbete_timmar)} h)`}
-            value={kostnader.arbete_kr == null ? '—' : formatKr(kostnader.arbete_kr)}
-            valueClass={kostnader.arbete_kr == null ? 'text-slate-400 italic' : undefined}
-          />
-          <Row
-            label={`Material (${meta.supplier_invoice_count} lev.fakt.)`}
-            value={formatKr(kostnader.material_inkop_kr)}
-          />
-          {meta.extra_cost_count > 0 && (
-            <Row
-              label={`Manuella kostnader (${meta.extra_cost_count} st)`}
-              value={formatKr(kostnader.extra_kr)}
-            />
-          )}
-
-          <div className="border-t border-slate-100 pt-2 mt-2" />
-
-          <Row
-            label="Total kostnad"
-            value={kostnader.total_kr == null ? '—' : formatKr(kostnader.total_kr)}
-            valueClass={kostnader.total_kr == null ? 'text-slate-400 italic' : undefined}
-            bold
+          <FaktureringsstatusCard
+            economics={data}
+            vatRate={VAT_RATE}
+            onInvoiceProject={onInvoiceProject}
           />
         </div>
-      </section>
+      </div>
 
-      {/* MARGINAL — Etapp 4b steg 1 (2026-05-23): ersatt med MarginalCard.
-          Komponenten bär ärlighets-hierarkin (fem states inkl. ej-konfig-
-          gate) + completeness-bar med 30%-tröskel som tickmark. Använder
-          COST_COMPLETENESS_THRESHOLD från helpern — en sanning. */}
-      <MarginalCard economics={data} size="normal" />
-
-      {/* Fakturera projekt — visas när det finns mer att fakturera */}
-      {onInvoiceProject && kvarAttFakturera > 0 && (
+      {/* Footer: uppdaterad-tidstämpel + refresh */}
+      <div className="flex items-center justify-end gap-2 text-[10px] text-slate-400">
         <button
           type="button"
-          onClick={onInvoiceProject}
-          className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 hover:bg-primary-600 text-white font-semibold rounded-xl transition-colors"
+          onClick={() => fetchData(true)}
+          disabled={refreshing}
+          title="Uppdatera"
+          className="text-slate-400 hover:text-slate-600 disabled:opacity-50"
         >
-          <Receipt className="w-5 h-5" />
-          Fakturera projekt ({formatKr(kvarAttFakturera)} kvar)
+          <RefreshCw className={`w-3 h-3 ${refreshing ? 'animate-spin' : ''}`} />
         </button>
-      )}
-
-      <p className="text-[10px] text-slate-400 text-right">
         Uppdaterad {new Date(meta.computed_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })}
-      </p>
+      </div>
 
       {costModalOpen && (
         <ProjectCostModal
@@ -297,29 +221,6 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
           }}
         />
       )}
-    </div>
-  )
-}
-
-function Row({
-  label,
-  value,
-  valueClass,
-  bold,
-}: {
-  label: string
-  value: string
-  valueClass?: string
-  bold?: boolean
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className={`text-slate-600 ${bold ? 'font-semibold text-slate-900' : ''}`}>{label}</span>
-      <span
-        className={`tabular-nums ${bold ? 'font-bold text-slate-900' : 'text-slate-900'} ${valueClass || ''}`}
-      >
-        {value}
-      </span>
     </div>
   )
 }

@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 
 /**
  * GET - Lista ÄTA för ett projekt
+ *
+ * Rollskydd (Etapp 4b steg 2, 2026-05-23): see_financials-gate.
+ * ÄTA-belopp är kund-priser (samma kategori som offert-priser via
+ * /api/quotes/pdf och /api/projects/[id]/quote-context).
+ *
+ * Icke-behörig får data men med belopp strippade till 0 + flagga
+ * prices_redacted=true så UI kan visa "Priser visas endast för..."
+ * istället för att krascha eller läcka.
+ *
+ * Publik signering via ?token= går INTE här — den ligger på
+ * /api/ata/sign/[token]. Skicka-ÄTA-flödet via /api/ata/[id]/send
+ * är opåverkat.
  */
 export async function GET(
   request: NextRequest,
@@ -15,6 +28,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const currentUser = await getCurrentUser(request)
     const supabase = getServerSupabase()
 
     const { data: changes, error } = await supabase
@@ -26,7 +40,25 @@ export async function GET(
 
     if (error) throw error
 
-    return NextResponse.json({ changes: changes || [] })
+    const list = changes || []
+
+    // Pris-stripping för icke-see_financials. Konsekvent med
+    // quote-context-pattern (Etapp 3.2). Fält som strippas: amount,
+    // total + items[].unit_price/total. Beskrivning + status-tider
+    // behålls (arbets-instruktion, inte intern marginal).
+    if (!currentUser || !hasPermission(currentUser, 'see_financials')) {
+      const stripped = list.map((c: any) => ({
+        ...c,
+        amount: 0,
+        total: 0,
+        items: Array.isArray(c.items)
+          ? c.items.map((item: any) => ({ ...item, unit_price: 0, total: 0 }))
+          : c.items,
+      }))
+      return NextResponse.json({ changes: stripped, prices_redacted: true })
+    }
+
+    return NextResponse.json({ changes: list })
 
   } catch (error: any) {
     console.error('Get changes error:', error)
