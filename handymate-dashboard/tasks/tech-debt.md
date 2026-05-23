@@ -2150,3 +2150,74 @@ Lägg tillbaka `{ key: 'canvas', label: 'Rityta' }` i någon tab-grupp (sannolik
 
 **Trigger:** Bara om pilot-feedback specifikt efterfrågar canvas-funktionalitet. Annars förblir den dold på obestämd tid.
 
+
+---
+
+## 2026-05-23 — VAT-rate hårdkodad till 25% i Ekonomi-vyn (TD-76)
+
+**Plats:**
+- `components/projects/ProjectEconomicsCard.tsx` (`VAT_RATE = 25`)
+- `components/projects/economy/IntaktCard.tsx` (`vatRate = 25` default)
+- `components/projects/economy/FaktureringsstatusCard.tsx` (`vatRate = 25` default)
+- `components/projects/economy/HeroKpi.tsx` (`vatRate = 25` default)
+
+**Symtom:** Ekonomi-fliken visar inkl-moms-värden beräknade som `netto × 1.25` oavsett offertens faktiska VAT-rate. För offerter med standardsatsen 25% (~99% av hantverkar-fall) är detta korrekt. För icke-standard satser (12% restaurang/hotell, 6% kultur/transport, 0% export) blir inkl-moms-värdet fel.
+
+**Knyter till:** TD-69 (moms-uppdelnings-design). Den TD:n löste presentationen men antog default-VAT.
+
+**Källa för korrekt VAT-rate:**
+- `quotes.vat_rate` (kolumn på quotes-tabellen) — per offert
+- För projekt utan kopplad offert (`quote_id IS NULL`): företagets default-VAT, alternativt visa enbart netto utan inkl-omräkning
+
+**Förslag-fix:**
+
+1. **Utöka `ProjectEconomics` (compute-economics.ts):**
+   - Lägg till `vat_rate: number` (hämtas från `quotes.vat_rate` när `project.quote_id` finns)
+   - Default 25 om quote saknas
+2. **Komponenter läser från `economics.vat_rate`** istället för hårdkodad default-prop
+3. **Eventuellt:** visa VAT-rate explicit ("Moms 12%") när det avviker från 25%
+
+**Pilot-impact:** Mycket låg. Bee Service + de flesta hantverkare = 25%. Drabbar specifika branscher (restaurang, transport, kultur, export) som inte är primär målgrupp.
+
+**Estimat:** 30 min compute-economics + 30 min komponent-uppdateringar + 1h test mot olika VAT-rater. Total ~2h.
+
+**Trigger:** När första pilot med icke-25%-VAT börjar köra. Annars förblir 25%-default och korrekt för ~99% av fall.
+
+---
+
+## 2026-05-23 — ÄTA-belopp läcker via /api/projects/[id] huvud-endpoint (TD-77)
+
+**Plats:** `app/api/projects/[id]/route.ts` GET-handler — returnerar `data.changes` direkt utan pris-stripping.
+
+**Symtom:** Etapp 4b steg 2 lade till see_financials-gate på `/api/projects/[id]/changes` GET (separat endpoint). Men huvud-endpointen `/api/projects/[id]` returnerar också ÄTA-data via `data.changes`-fältet, och **där sker ingen stripping**. ÄTA-tabben (`changes`-tab i page.tsx:710) använder denna huvud-endpoint, inte den nyligen gate:ade.
+
+**Konsekvens:**
+- Ekonomi-flikens nya **AtaCard** (fetchar `/changes`) → priser strippade korrekt för icke-OWA ✓
+- **ÄTA-flikens vy** (renderas från `data.changes` via huvud-endpoint) → priser fortfarande exponerade till alla i business ❌
+- **Inkonsekvent säkerhet** — samma "security theater"-mönster som TD-71 hade för PDF-endpointen
+
+**Samma rotorsak som TD-71:** ÄTA-belopp är kund-priser (samma kategori som offert-priser). Bör skyddas konsekvent oavsett vilken endpoint som returnerar datan.
+
+**Förslag-fix:**
+
+1. **Lägg till see_financials-gate i `/api/projects/[id]` GET för `data.changes`-fältet:**
+   ```typescript
+   if (!hasPermission(currentUser, 'see_financials')) {
+     responseData.changes = (responseData.changes || []).map(c => ({
+       ...c, amount: 0, total: 0,
+       items: Array.isArray(c.items) ? c.items.map(i => ({ ...i, unit_price: 0, total: 0 })) : c.items
+     }))
+     responseData.prices_redacted = true
+   }
+   ```
+
+2. **Audit alla andra fält i huvud-endpointen** som kan innehålla priser: `quote.total`, `materials[].total_sell`, `time_entries[].hourly_rate`, etc. Säkerställ konsekvent stripping.
+
+3. **Längre-sikt:** överväg att flytta GET-logik till delade helpers så alla endpoints automatiskt får samma rollskydd. Just nu duplikeras stripping-logik per endpoint.
+
+**Risk om ej fixat:** Etapp 4b:s AtaCard-säkerhet är effektivt "security theater" — en informerad employee kan curl:a `/api/projects/[id]` och få ÄTA-belopp. Samma princip som motiverade TD-71-fixen för PDF-endpoint.
+
+**Estimat:** 2-3h (gate + audit av övriga fält + test). Plus eventuell delad helper-refaktor 2-3h.
+
+**Trigger:** HÖG prio — bör fixas innan pilot börjar dela projekt-länkar internt. Annars är AtaCard:s rollskydd inte äkta.
+
