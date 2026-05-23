@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 
 /**
  * GET /api/projects/[id] - Hämta projektöversikt med all data
+ *
+ * Rollskydd (TD-77, 2026-05-23): data.changes (ÄTA) strippas för
+ * icke-see_financials. Konsekvent med /api/projects/[id]/changes
+ * och /api/ata. Bevarar publik sign-flöde (/api/ata/sign/[token]
+ * är separat och opåverkad).
  */
 export async function GET(
   request: NextRequest,
@@ -137,26 +143,36 @@ export async function GET(
       actual_revenue: Math.round(milestoneTimeMap[ms.milestone_id]?.actual_revenue || 0),
     }))
 
+    // TD-77 (2026-05-23): strippa ÄTA-belopp + summary-ekonomi för icke-
+    // see_financials. ataResult.flag avgör om priser ska redact:as
+    // även i summary-aggregaten (ata_*, total_revenue, material_*).
+    // Tim-fält (total_hours, billable_hours) behålls — inte priser per se.
+    const ataResult = await maybeStripAtaList(request, changes || [])
+    const redacted = ataResult.flag.prices_redacted === true
+
     return NextResponse.json({
       project,
       quote,
       milestones: milestonesWithTime,
-      changes: changes || [],
+      changes: ataResult.atas,
+      ...ataResult.flag,
       time_entries: entries,
       materials: mats,
       summary: {
+        // Tim-fält — behålls för alla (arbetsinstruktion, inte pris)
         total_hours: Math.round(totalMinutes / 60 * 100) / 100,
         billable_hours: Math.round(billableMinutes / 60 * 100) / 100,
-        total_revenue: Math.round(totalRevenue),
         uninvoiced_hours: Math.round(uninvoicedMinutes / 60 * 100) / 100,
-        uninvoiced_revenue: Math.round(uninvoicedRevenue),
-        ata_additions: Math.round(ataAdditions),
-        ata_removals: Math.round(ataRemovals),
-        ata_net: Math.round(ataAdditions - ataRemovals),
         ata_hours: Math.round(ataHours * 100) / 100,
-        material_purchase_total: Math.round(materialPurchaseTotal),
-        material_sell_total: Math.round(materialSellTotal),
-        uninvoiced_material_sell: Math.round(uninvoicedMaterialSell)
+        // Belopps-fält — strippas för icke-behörig
+        total_revenue: redacted ? 0 : Math.round(totalRevenue),
+        uninvoiced_revenue: redacted ? 0 : Math.round(uninvoicedRevenue),
+        ata_additions: redacted ? 0 : Math.round(ataAdditions),
+        ata_removals: redacted ? 0 : Math.round(ataRemovals),
+        ata_net: redacted ? 0 : Math.round(ataAdditions - ataRemovals),
+        material_purchase_total: redacted ? 0 : Math.round(materialPurchaseTotal),
+        material_sell_total: redacted ? 0 : Math.round(materialSellTotal),
+        uninvoiced_material_sell: redacted ? 0 : Math.round(uninvoicedMaterialSell)
       }
     })
 

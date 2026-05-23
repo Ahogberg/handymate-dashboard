@@ -469,6 +469,10 @@ export default function ProjectDetailPage() {
   const [quote, setQuote] = useState<Quote | null>(null)
   const [milestones, setMilestones] = useState<Milestone[]>([])
   const [changes, setChanges] = useState<Change[]>([])
+  // TD-77 (2026-05-23): server strippar ÄTA-belopp för icke-see_financials.
+  // Flagga sätts från response.prices_redacted, UI kan dölja pris-fält
+  // i ÄTA-fliken (samma princip som AtaCard i Ekonomi-fliken).
+  const [ataPricesRedacted, setAtaPricesRedacted] = useState(false)
   // Uppgifter kopplade till projektet (synk med /dashboard/tasks)
   type ProjectTaskRow = {
     id: string
@@ -708,6 +712,9 @@ export default function ProjectDetailPage() {
       setQuote(data.quote)
       setMilestones(data.milestones)
       setChanges(data.changes)
+      // TD-77: server strippar ÄTA-belopp för icke-see_financials.
+      // Flagga propageras till UI så pris-kolumner kan döljas.
+      setAtaPricesRedacted(data.prices_redacted === true)
       setTimeEntries(data.time_entries)
       setSummary(data.summary)
       setMaterials(data.materials || [])
@@ -2269,8 +2276,16 @@ export default function ProjectDetailPage() {
               </button>
             </div>
 
-            {/* ÄTA summary */}
-            {summary && (summary.ata_additions > 0 || summary.ata_removals > 0) && (
+            {/* TD-77: visa Lock-meddelande om server redact:at belopp */}
+            {ataPricesRedacted && (
+              <div className="px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 flex items-center gap-2 text-sm text-slate-600">
+                <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+                Priser visas endast för dig med ekonomi-behörighet (see_financials)
+              </div>
+            )}
+
+            {/* ÄTA summary — döljs när belopp är strippade (visar bara 0) */}
+            {summary && !ataPricesRedacted && (summary.ata_additions > 0 || summary.ata_removals > 0) && (
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-center">
                   <p className="text-xs text-emerald-600 mb-1">Tillägg</p>

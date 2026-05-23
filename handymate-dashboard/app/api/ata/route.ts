@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { randomUUID } from 'crypto'
 
 /**
  * GET /api/ata?projectId=xxx — Lista ÄTA för ett projekt
+ *
+ * Rollskydd (TD-77, 2026-05-23): see_financials-stripping på belopp
+ * för icke-behörig. Konsekvent med /api/projects/[id]/changes och
+ * /api/projects/[id] huvud-endpoint.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -29,7 +34,8 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ atas: data || [] })
+    const result = await maybeStripAtaList(request, data || [])
+    return NextResponse.json({ atas: result.atas, ...result.flag })
   } catch (error: any) {
     console.error('GET /api/ata error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
