@@ -56,7 +56,7 @@ export function IntaktCard({ economics, vatRate = 25 }: IntaktCardProps) {
       </div>
 
       {/* Column headers */}
-      <div className="mt-4 grid grid-cols-[1fr_120px_120px] gap-3 pb-2 border-b border-slate-200">
+      <div className="mt-4 grid grid-cols-[minmax(0,1fr)_max-content_max-content] gap-x-2 sm:gap-x-3 pb-2 border-b border-slate-200">
         <div />
         <div className="text-right">
           <div className="text-[10px] font-bold uppercase tracking-wider text-primary-700">
@@ -91,7 +91,7 @@ export function IntaktCard({ economics, vatRate = 25 }: IntaktCardProps) {
       )}
 
       {/* Total */}
-      <div className="mt-1.5 pt-2.5 border-t-2 border-slate-800 grid grid-cols-[1fr_120px_120px] gap-3 items-baseline">
+      <div className="mt-1.5 pt-2.5 border-t-2 border-slate-800 grid grid-cols-[minmax(0,1fr)_max-content_max-content] gap-x-2 sm:gap-x-3 items-baseline">
         <div className="text-sm font-bold text-slate-900">Totalt</div>
         <div className="text-right text-xl font-bold text-primary-700 tabular-nums tracking-tight">
           {formatKr(totalNetto)}
@@ -102,7 +102,7 @@ export function IntaktCard({ economics, vatRate = 25 }: IntaktCardProps) {
       </div>
 
       {/* Moms breakdown */}
-      <div className="mt-1.5 grid grid-cols-[1fr_120px_120px] gap-3 text-[11px] text-slate-500">
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_max-content_max-content] gap-x-2 sm:gap-x-3 text-[11px] text-slate-500">
         <div className="inline-flex items-center gap-1">
           <Info className="w-3 h-3 text-slate-400" />
           Moms {vatRate}% (genomgångspost)
@@ -137,7 +137,7 @@ function IntaktRow({
   positive?: boolean
 }) {
   return (
-    <div className="grid grid-cols-[1fr_120px_120px] gap-3 py-3 items-baseline border-b border-dashed border-slate-200">
+    <div className="grid grid-cols-[minmax(0,1fr)_max-content_max-content] gap-x-2 sm:gap-x-3 py-3 items-baseline border-b border-dashed border-slate-200">
       <div className="text-sm text-slate-800">{label}</div>
       <div
         className={`text-right text-sm font-semibold tabular-nums ${
