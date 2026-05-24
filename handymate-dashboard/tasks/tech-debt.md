@@ -2221,3 +2221,38 @@ Lägg tillbaka `{ key: 'canvas', label: 'Rityta' }` i någon tab-grupp (sannolik
 
 **Trigger:** HÖG prio — bör fixas innan pilot börjar dela projekt-länkar internt. Annars är AtaCard:s rollskydd inte äkta.
 
+---
+
+## 2026-05-24 — Projekt-header ej mobil-anpassad (TD-78)
+
+**Plats:** `app/dashboard/projects/[id]/page.tsx:1652-1735` — Hero-block med titel, meta-rad och action-knappar.
+
+**Symtom (Andreas, 2026-05-24):** På viewport <420px:
+- Titel (`<h1 className="text-3xl sm:text-4xl font-bold ... tracking-tight">`) klipps / pressar layouten — saknar `truncate` eller `break-words` och `text-4xl` ger ~40px font-höjd som tar mycket plats.
+- Action-knappar (`Nytt tilläggsarbete` + `Förhandsgranska faktura` + `Visa offert` + status-dropdown) — alla `px-4 py-2.5` ghost/primary med ikon+text. Wrappar visuellt men status-dropdownens `ml-auto` gör att den hoppar till egen rad och ser bruten ut.
+
+**Bakgrund:** Etapp 4a (2026-05-22) extraherade `ProjectStageStrip` och konsoliderade tabs (17→11), men hero-headern fick aldrig ett mobil-pass. Economy-komponenterna (Etapp 4b) är mobil-verifierade — bara headern saknar det.
+
+**Förslag-fix (liten):**
+
+1. **Titel — truncate + responsiv storlek:**
+   ```tsx
+   <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight mb-3 break-words">
+   ```
+   `break-words` så långa projekt-namn wrappar istället för klipp; `text-2xl` på mobil ger mer utrymme för actions under.
+
+2. **Action-knappar — kompaktare på mobil + dölj sekundär text:**
+   - På mobil: visa bara ikon för "Förhandsgranska faktura" och "Visa offert" (behåll `aria-label`), behåll text på primary "Nytt tilläggsarbete".
+   - Status-dropdownens `ml-auto` → ta bort på mobil (`sm:ml-auto`) så den hamnar inline istället för "hoppande".
+   - Alternativt: kondensera till `px-3 py-2` på mobil.
+
+3. **Meta-rad redan OK:** `flex flex-wrap` + svenska tecken hanterar wrapping.
+
+**Estimat:** 30 min (responsiva utility-klasser, ingen ny komponent).
+
+**Trigger / prio-fråga:** Beror på om mobil-browser-projekt-vy är pilot-scenario. Två alternativ:
+- **Pilot använder browser på mobil för att titta på projekt** (även sporadiskt) → fix före launch. Headern är första intrycket.
+- **Pilot använder PWA-appen på mobil + dashboard på desktop** (separation) → kan vänta till efter launch.
+
+Andreas beslutar baserat på pilot-användarmönster.
+
