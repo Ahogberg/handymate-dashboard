@@ -2700,6 +2700,20 @@ export default function ProjectDetailPage() {
         {/* === TAB: Material === */}
         {activeTab === 'material' && (
           <div className="space-y-6">
+            {/* Förtydligande (Etapp 4c, 2026-05-24): Material vs Leverantörer */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 leading-relaxed">
+              <strong className="text-slate-800">Material =</strong> produkter att fakturera vidare till kund.
+              För att registrera fakturor från leverantörer (att betala), gå till{' '}
+              <button
+                type="button"
+                onClick={() => setActiveTab('leverantorer')}
+                className="text-primary-700 font-semibold hover:text-primary-800 hover:underline"
+              >
+                Leverantörer
+              </button>
+              .
+            </div>
+
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl p-4 border border-[#E2E8F0]">
@@ -3870,6 +3884,20 @@ export default function ProjectDetailPage() {
         {/* ═══════ LEVERANTÖRSFAKTUROR TAB ═══════ */}
         {activeTab === 'leverantorer' && (
           <div className="space-y-4">
+            {/* Förtydligande (Etapp 4c, 2026-05-24): Material vs Leverantörer */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-600 leading-relaxed">
+              <strong className="text-slate-800">Leverantörer =</strong> fakturor från leverantörer att betala
+              (bokföringsperspektiv). För att registrera enskilda produkter att fakturera vidare till kund, gå till{' '}
+              <button
+                type="button"
+                onClick={() => setActiveTab('material')}
+                className="text-primary-700 font-semibold hover:text-primary-800 hover:underline"
+              >
+                Material
+              </button>
+              .
+            </div>
+
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <Receipt className="w-5 h-5 text-primary-700" />

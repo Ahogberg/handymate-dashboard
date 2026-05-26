@@ -2256,3 +2256,48 @@ Lägg tillbaka `{ key: 'canvas', label: 'Rityta' }` i någon tab-grupp (sannolik
 
 Andreas beslutar baserat på pilot-användarmönster.
 
+Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
+
+---
+
+## 2026-05-24 — Material-kedja: offert→inköpt→faktura→kund (TD-79)
+
+**Plats:** Saknas helt — `project_material` har idag bara `invoice_id` (kundfaktura) men ingen länk till `supplier_invoices`. `quote_items` har ingen länk till `project_material`.
+
+**Symtom (Etapp 4c-kartläggning, 2026-05-24):** Det går inte att svara på "vilken leverantörsfaktura täcker det här materialet?" eller "köptes detta offerterade material faktiskt?". Användare måste manuellt korsreferera mellan flikar.
+
+**Bakgrund:** Etapp 4c-mappningen bekräftade att Material-fliken (produkt-nivå, kundfakturering) och Leverantörer-fliken (faktura-nivå, bokföring) är genuint olika saker — sammanslagning vore fel. Men länkarna mellan dem saknas, vilket begränsar AI Job Estimator V1-moat:en (Lars + framtida estimator kan inte se hela kedjan).
+
+**Förslag-fix (framtida feature, inte 4c):**
+
+1. **DB-migration:** Lägg till `project_material.supplier_invoice_id TEXT NULL` (svag FK).
+2. **Helper:** Skapa `lib/projects/get-material-flow.ts` → `getProjectMaterialFlow(projectId)` som joinar:
+   ```
+   quote_items.material → project_material.supplier_invoice_id → supplier_invoices → invoice (kund)
+   ```
+3. **UI:** Material-fliken får filter "Per leverantörsfaktura". Leverantörer-fliken expanderar med "Länkade produkter".
+4. **Lars-integration:** Aggregator kan visa avvikelser (offerterat 10k, inköpt 12k, fakturerat 11k).
+
+**Estimat:** 4-6h (migration + helper + UI-länkning).
+
+**Trigger:** När material-flödet är bevisat pilot-behov (3+ pilot-kunder ber om "varför stämmer inte material-marginalen?"). Knyter till V1-moat (AI Job Estimator), inte 4c-konsolidering. Logga som potentiell Etapp 6+.
+
+---
+
+## 2026-05-24 — offert↔inköpt-länk: quote_items → project_material (TD-80)
+
+**Plats:** `quote_items` och `project_material` är helt frånkopplade. Offerten är en mall; project_material är inköpsregister.
+
+**Symtom:** När en användare lägger till material i ett projekt (Material-fliken) görs det utan referens till offerten. Offerten kan ha lovat "10 m² parkett", men inget i `project_material` säger "detta är de 10 m² från offerten".
+
+**Beslutskrav (innan kod kan skrivas):** Vad är offert-materialet?
+- **Alternativ A (mall):** Offert-rader är en *mall* — vid projekt-start kopieras de till `project_material` som utkast. Användare kan ändra antal/leverantör. Behåller offert som referens, project_material är "verklighet". Risk: dubbel datalagring.
+- **Alternativ B (förbrukning):** Offert-rader *konsumeras* — när material registreras i project_material markeras motsvarande quote_item som "uppfyllt". Avvikelse syns omedelbart. Risk: kräver matchning (samma SKU? Likadant namn?).
+- **Alternativ C (ren referens):** Ingen kopiering. project_material får valfri `quote_item_id NULL`. Användare väljer manuellt vilken offert-rad det motsvarar. Lågrisk, kräver disciplin.
+
+**Förslag-fix:** Andreas beslutar A/B/C → ny migration + UI-flöde därefter. Knyter till TD-79 (vore naturligt att bygga ihop).
+
+**Estimat:** 1-2 dagar beroende på alternativ.
+
+**Trigger:** Aktualiseras tillsammans med TD-79 när material-flödet får pilot-trafik. Inte före.
+
