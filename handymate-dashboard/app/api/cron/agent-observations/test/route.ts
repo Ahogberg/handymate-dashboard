@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getAgentRunner, SUPPORTED_AGENTS } from '@/lib/agents/registry'
+import { checkCostGuards, logAgentRun } from '@/lib/agents/shared/cost-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,10 +56,12 @@ export async function GET(request: NextRequest) {
       )
     }
     businessId = requestedBizId
+    // Hämta business_name OCH cost-guard-fält så test-routen respekterar
+    // samma skydd som riktiga cron (Steg 7 fix 2026-05-29).
     const supabase = getServerSupabase()
     const { data: biz } = await supabase
       .from('business_config')
-      .select('business_name')
+      .select('business_name, agents_globally_paused, agent_cost_cap_usd_daily')
       .eq('business_id', businessId)
       .maybeSingle()
     businessName = biz?.business_name || 'företaget'
@@ -97,17 +100,53 @@ export async function GET(request: NextRequest) {
 
   const supabase = getServerSupabase()
 
+  // Steg 7 fix (2026-05-29): test-routen måste respektera samma cost-guards
+  // som riktiga cron. Annars är test-routen en bakdörr förbi cap + pause.
+  // Hämta business cost-guard-fält (re-fetch så vi alltid har färska värden
+  // även om CRON_SECRET-grenen redan hämtade en del).
+  const { data: bizGuards } = await supabase
+    .from('business_config')
+    .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily')
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (bizGuards) {
+    const skip = await checkCostGuards(supabase, bizGuards, agentId)
+    if (skip) {
+      return NextResponse.json({
+        ok: true,
+        business_id: businessId,
+        business_name: businessName,
+        agent_id: agentId,
+        debug_mode: debugMode,
+        result: skip,
+      })
+    }
+  }
+
   try {
     const result = await runner(supabase, businessId, businessName, {
-      includeDebug: debugMode,
+      includeDebug: true,  // alltid debug i test-route så vi kan logga cost
     })
+
+    // Post-step: skriv agent_runs-rad så cap-summan ökar för nästa körning.
+    const costUsd = await logAgentRun(supabase, businessId, agentId, result)
+
+    // Slim response: ta bort debug-payloaden om caller inte begärde det
+    let returnedResult = result as Record<string, unknown>
+    if (!debugMode) {
+      returnedResult = { ...returnedResult }
+      delete returnedResult.debug
+    }
+
     return NextResponse.json({
       ok: true,
       business_id: businessId,
       business_name: businessName,
       agent_id: agentId,
       debug_mode: debugMode,
-      result,
+      run_cost_usd: Math.round(costUsd * 10000) / 10000,
+      result: returnedResult,
     })
   } catch (err: any) {
     console.error(`[agent-observations/test] error for agent=${agentId}:`, err)

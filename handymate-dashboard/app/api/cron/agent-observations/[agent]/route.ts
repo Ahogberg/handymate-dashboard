@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAgentRunner, SUPPORTED_AGENTS } from '@/lib/agents/registry'
+import { checkCostGuards, logAgentRun } from '@/lib/agents/shared/cost-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,13 +74,6 @@ export async function GET(
     )
   }
 
-  // Start of today (UTC) — används för dagens cost-summa och agent_runs-rad.
-  const startOfTodayIso = (() => {
-    const d = new Date()
-    d.setUTCHours(0, 0, 0, 0)
-    return d.toISOString()
-  })()
-
   const results: Array<Record<string, unknown>> = []
 
   for (const biz of (businesses || []) as Array<{
@@ -88,46 +82,10 @@ export async function GET(
     agents_globally_paused: boolean | null
     agent_cost_cap_usd_daily: number | string | null
   }>) {
-    // ── Pre-check 1: kill-switch ────────────────────────────────
-    if (biz.agents_globally_paused === true) {
-      console.log(`[cron/agent-observations/${agentId}] skip business — agents_globally_paused`, {
-        business_id: biz.business_id,
-      })
-      results.push({
-        business_id: biz.business_id,
-        skipped: 'agents_globally_paused',
-      })
-      continue
-    }
-
-    // ── Pre-check 2: cost-cap. Summera dagens estimated_cost för business. ──
-    const cap = biz.agent_cost_cap_usd_daily != null
-      ? Number(biz.agent_cost_cap_usd_daily)
-      : 5.0
-    let todayCostUsd = 0
-    try {
-      const { data: todayRuns } = await supabase
-        .from('agent_runs')
-        .select('estimated_cost')
-        .eq('business_id', biz.business_id)
-        .gte('created_at', startOfTodayIso)
-      todayCostUsd = (todayRuns || []).reduce((s, r) => s + Number(r.estimated_cost || 0), 0)
-    } catch (sumErr) {
-      console.warn(`[cron/agent-observations/${agentId}] cost-summering failed (fortsätter ändå):`, sumErr)
-    }
-
-    if (todayCostUsd >= cap) {
-      console.log(`[cron/agent-observations/${agentId}] skip business — cost-cap`, {
-        business_id: biz.business_id,
-        today_cost_usd: todayCostUsd,
-        cap_usd: cap,
-      })
-      results.push({
-        business_id: biz.business_id,
-        skipped: 'cost_cap_exceeded',
-        today_cost_usd: Math.round(todayCostUsd * 10000) / 10000,
-        cap_usd: cap,
-      })
+    // ── Pre-checks (pause + cost-cap) via delad helper ─────────
+    const skip = await checkCostGuards(supabase, biz, agentId)
+    if (skip) {
+      results.push({ business_id: biz.business_id, ...skip })
       continue
     }
 
@@ -140,24 +98,8 @@ export async function GET(
         { includeDebug: true },
       )
 
-      // ── Post-step: logga agent_runs-rad med usage + cost ──────
-      const debug = (result as { debug?: { usage?: { input_tokens: number; output_tokens: number }; estimated_cost_usd?: number } }).debug
-      if (debug?.usage && typeof debug.estimated_cost_usd === 'number') {
-        try {
-          const runId = 'agentrun_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10)
-          await supabase.from('agent_runs').insert({
-            run_id: runId,
-            business_id: biz.business_id,
-            trigger_type: `agent_observation_cron:${agentId}`,
-            tokens_used: (debug.usage.input_tokens || 0) + (debug.usage.output_tokens || 0),
-            estimated_cost: debug.estimated_cost_usd,
-            status: 'completed',
-          })
-        } catch (logErr) {
-          // Non-blocking — cron-resultat är viktigare än perfekt logging
-          console.warn(`[cron/agent-observations/${agentId}] agent_runs insert failed:`, logErr)
-        }
-      }
+      // ── Post-step: logga agent_runs-rad ─────────────────────
+      const costUsd = await logAgentRun(supabase, biz.business_id, agentId, result)
 
       // Inkludera inte hela debug-payloaden i response (kan vara tung)
       const slim = { ...(result as Record<string, unknown>) }
@@ -165,7 +107,7 @@ export async function GET(
       results.push({
         business_id: biz.business_id,
         ...slim,
-        today_cost_usd_after: Math.round((todayCostUsd + (debug?.estimated_cost_usd || 0)) * 10000) / 10000,
+        run_cost_usd: Math.round(costUsd * 10000) / 10000,
       })
     } catch (err) {
       console.error(`[cron/agent-observations/${agentId}] business error:`, {
