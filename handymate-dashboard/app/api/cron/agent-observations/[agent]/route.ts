@@ -51,9 +51,15 @@ export async function GET(
 
   const supabase = getServerSupabase()
 
+  // Filtrera ut dött/test-konton (pilot-fix-plan Steg 2, audit 2 2026-05-20).
+  // Karin-buggen: agenter körde mot biz_6wunctak49 (dubblett-konto). Default
+  // för is_active är true så alla befintliga businesses fortsätter ingå.
+  // För att stänga av en business från cron: UPDATE business_config SET
+  // is_active=false WHERE business_id=...
   const { data: businesses, error: bizError } = await supabase
     .from('business_config')
     .select('business_id, business_name')
+    .eq('is_active', true)
 
   if (bizError) {
     console.error(`[cron/agent-observations/${agentId}] business_config error:`, bizError)

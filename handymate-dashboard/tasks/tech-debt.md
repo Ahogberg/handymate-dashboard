@@ -2427,3 +2427,33 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 **Pilot-impact:** Ingen. Christoffer kan flagga deals med "Offertarbete pågår" i deal-notes tills steget finns. Inte värt att blockera pilot-launch för.
 
+---
+
+## 2026-05-20 — Cron-agenter iterar customers utan dvalad-filter
+
+**Plats:** `lib/agents/karin/observation-prompt.ts:176`, `lib/agents/daniel/observation-prompt.ts:184`, `lib/agents/hanna/observation-prompt.ts:145` (Lars saknar customer-query).
+
+**Bakgrund:** Audit 2 (2026-05-20) flaggade att agenter kan generera observations mot historiska kunder ("väck döda kunder"-risk för Hanna's reaktiverings-flöde). Föreslog ursprungligen en `.eq('is_active', true)`-fix.
+
+**Varför is_active-flagga är fel approach:**
+- Handymate har **ingen UI-väg** att markera en customer som inaktiv. Kunder är historiska entiteter — när jobb är klart finns customer kvar för historik.
+- En `is_active=true`-default + ingen UI = alla customers förblir aktiva. Filter blir no-op.
+- Konceptuell stuk: customers är inte ett "lifecycle"-objekt utan en historisk post.
+
+**Rätt approach:** Filtrera via aktivitets-signaler, inte flag.
+
+**Förslag på implementation:**
+- Per-agent helper `isRelevantForReactivation(customer)` som kollar `last_activity_at` (senaste invoice/quote/booking)
+- Karin: bara customers med invoices senaste 90d (redan filtrerat via invoice-iteration → låg direkt risk)
+- Daniel: bara customers med quotes senaste 90d (redan filtrerat)
+- Hanna: VIKTIGAST — 180d-fönster gör "väck döda kunder"-risken konkret. Filter: `last_invoice/quote/booking BETWEEN 6 och 18 månader sedan` = "dvalad men ej död"
+- Inget UI-arbete — bara prompt-internal logik
+
+**Pilot-impact:** Hanna är pausad enligt audit 2. Risken aktualiseras bara om Hanna aktiveras innan denna fix. Pilot-säkerhet: håll Hanna pausad tills denna TD är löst, ELLER acceptera "väck döda kunder"-risken för Bee-pilot (få customers, låg risk i praktiken).
+
+**Estimat:** 2-3 h (per-agent helper + tests + observations-prompt-justeringar).
+
+**Trigger:** Innan Hanna aktiveras för någon pilot, eller om en pilot rapporterar olämpliga reaktiverings-suggestions.
+
+**Relaterat:** Pilot-fix-plan Steg 2 (audit 2 A2-B3) löste *business_config*-delen av samma audit-fynd via v57_business_config_is_active.sql. Customer-delen är denna TD.
+
