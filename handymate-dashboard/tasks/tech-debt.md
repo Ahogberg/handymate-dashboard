@@ -2301,3 +2301,32 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 **Trigger:** Aktualiseras tillsammans med TD-79 när material-flödet får pilot-trafik. Inte före.
 
+---
+
+## 2026-05-28 — Telefonnummer-val i onboarding (TD-81)
+
+**Plats:** [app/api/phone/provision/route.ts:75-86](app/api/phone/provision/route.ts#L75-L86) — POST mot 46elks `/a1/numbers` utan att specificera nummer → slumpmässigt val.
+
+**Symtom:** Hantverkaren ser tilldelat 46elks-nummer först **efter** att det köpts (månadsavgift börjar ticka). Ingen möjlighet att förhandsgranska eller välja "snyggare" nummer (010-XXX 12 34 vs 010-489 67 89). För hantverkare som vill visa numret på skylt/visitkort kan det betyda en svagare brand-känsla.
+
+**Två lösnings-vägar (välj senare):**
+
+**Väg A — "rulla nummer"-bekräftelse (snabb, 15 min):**
+- Köp nummer som idag
+- Visa modal: "Du fick 010-XXX. Behåll eller prova ett annat?"
+- Ja → spara. Nej → DELETE-and-retry (numret tillbaka i 46elks-pool, ny POST).
+- Hantverkare kan rulla 2-3 ggr.
+- Kostnad: varje "rull" är ~5 min månadsavgift (proportionellt vid omedelbar DELETE).
+
+**Väg B — preview-pool (3-4h):**
+- Köp 5 nummer i förväg i admin-pool
+- Onboarding visar dem som radio-buttons
+- Hantverkare väljer → kopplas till business + reserveras
+- Refill pool när låg.
+- Risk: oanvända pool-nummer kostar månadsavgift, admin-overhead.
+- Beroende: 46elks "available numbers"-preview-endpoint är osäker — Väg B kan kräva manuell pool-hantering.
+
+**Trigger:** Inte före pilot. Aktualiseras om hantverkare uttryckligen ber om val ("jag vill ha ett snyggare nummer"), eller vid enterprise-deals där brand-känslan är prioriterad. För majoriteten av målgruppen (småhantverkare) räcker auto-tilldelning.
+
+**Estimat:** Väg A 15 min. Väg B 3-4h. Plus eventuell 46elks-API-research om Väg B prioriteras.
+
