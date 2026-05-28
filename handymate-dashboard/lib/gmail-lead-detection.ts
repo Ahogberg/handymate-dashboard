@@ -11,6 +11,11 @@ export interface LeadData {
   description: string | null
   urgency: 'low' | 'medium' | 'high'
   estimated_value: number | null
+  /** Lead-källa extraherad ur mail-kontext (förmedlande byrå, formulär-
+      ursprung, hänvisande domän). Fri text — webhook-mottagaren mappar
+      ev. mot lead_source-tabellen och sätter lead_source_id. Null om
+      ingen tydlig källa hittades (manuell granskning fyller i). */
+  source: string | null
   raw_text: string
 }
 
@@ -109,7 +114,8 @@ Returnera detta JSON-schema (använd null om info saknas):
   "job_type": "Typ av arbete (t.ex. 'el-installation', 'rörmokeri', 'målning', 'snickeri')",
   "description": "Kort beskrivning av önskat arbete (max 200 tecken)",
   "urgency": "low|medium|high (high = akut/snarast, medium = inom veckan, low = ingen brådska)",
-  "estimated_value": null_eller_heltal_i_SEK_om_budget_nämns
+  "estimated_value": null_eller_heltal_i_SEK_om_budget_nämns,
+  "source": "Lead-källa om identifierbar — förmedlande byrå, formulär-ursprung eller hänvisande domän. Leta efter mönster: 'Förfrågan via X', 'via [firma]', 'X-formulär', forwarding-information, eller domän-namn längst ner i mailet. Exempel: 'Webolia', 'Bee Service', 'sodermalmsbyggentreprenader.se', 'Offerta.se', 'Bizzdo'. Om Webolia-mönster känns igen, returnera 'Webolia'. Returnera null om ingen tydlig källa kan identifieras — GISSA INTE."
 }`
 
   try {
@@ -136,6 +142,7 @@ Returnera detta JSON-schema (använd null om info saknas):
       description: parsed.description || null,
       urgency: ['low', 'medium', 'high'].includes(parsed.urgency) ? parsed.urgency : 'medium',
       estimated_value: typeof parsed.estimated_value === 'number' ? parsed.estimated_value : null,
+      source: typeof parsed.source === 'string' && parsed.source.trim() ? parsed.source.trim() : null,
       raw_text: `${email.subject}\n${email.body.slice(0, 500)}`,
     }
   } catch (err) {
@@ -150,6 +157,7 @@ Returnera detta JSON-schema (använd null om info saknas):
       description: email.subject.slice(0, 200),
       urgency: 'medium',
       estimated_value: null,
+      source: null,
       raw_text: `${email.subject}\n${email.body.slice(0, 500)}`,
     }
   }
