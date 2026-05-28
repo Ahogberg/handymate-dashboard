@@ -105,6 +105,22 @@ export async function POST(
       // Non-blocking — learning event failure should not break approval flow
     }
 
+    // Reject-side-effect för specifika types som behöver mer än status-flip
+    if (action === 'reject' && approval.approval_type === 'lead_review') {
+      const leadId = (approval.payload as Record<string, unknown>)?.lead_id as string | undefined
+      if (leadId) {
+        try {
+          await supabase
+            .from('leads')
+            .update({ status: 'declined', updated_at: new Date().toISOString() })
+            .eq('lead_id', leadId)
+            .eq('business_id', business.business_id)
+        } catch (err) {
+          console.error('[approvals/lead_review] Failed to mark lead declined:', err)
+        }
+      }
+    }
+
     // If approved or edited, execute the payload action
     let executionResult: Record<string, unknown> | null = null
     if (action === 'approve' || action === 'edit') {
@@ -735,6 +751,31 @@ async function executeApprovalPayload(
           invoice_id: invoiceId,
           navigate_to: `/dashboard/invoices/${invoiceId}`,
           detail: sendData?.error || 'Faktura skickad till kund',
+        }
+      }
+
+      case 'lead_review': {
+        // Email-forwarding-flöde (2026-05-28): leaden skapades av
+        // /api/email/inbound i status='pending_review' utan deal.
+        // Vid approve aktiverar vi den via Golden Path-helpern —
+        // status='new', deal skapas i pipeline, SMS + fireEvent.
+        const leadId = payload.lead_id as string | undefined
+        if (!leadId) return { action: 'lead_review', error: 'payload.lead_id saknas' }
+
+        const { activatePendingLead } = await import('@/lib/leads/golden-path')
+        try {
+          const result = await activatePendingLead(
+            leadId,
+            (await import('@/lib/supabase')).getServerSupabase(),
+          )
+          return {
+            action: 'lead_review',
+            lead_id: leadId,
+            deal_id: result.dealId,
+            navigate_to: result.dealId ? `/dashboard/pipeline` : `/dashboard/leads/${leadId}`,
+          }
+        } catch (err: any) {
+          return { action: 'lead_review', error: err.message }
         }
       }
 

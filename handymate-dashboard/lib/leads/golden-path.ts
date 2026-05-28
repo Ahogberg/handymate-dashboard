@@ -220,3 +220,99 @@ export async function createLeadAndDeal(
 
   return { leadId, dealId, customerId }
 }
+
+/**
+ * Aktiverar en lead som tidigare skapades i pending_review (av t.ex.
+ * email-webhook). Steg:
+ *   1. Byt lead.status pending_review → new
+ *   2. Skapa deal i pipeline (Golden Path-deal-delen)
+ *   3. Skicka SMS till hantverkaren
+ *   4. fireEvent('lead_received')
+ *
+ * Ingen customer skapas — den finns redan från webhook.
+ * Returnerar dealId | null (deal-skapande är non-blocking).
+ *
+ * Caller måste verifiera att lead.business_id stämmer med session-
+ * business innan denna helper kallas — denna funktion gör ingen
+ * extra rättighetscheck.
+ */
+export async function activatePendingLead(
+  leadId: string,
+  supabase: SupabaseClient,
+): Promise<{ dealId: string | null }> {
+  const { data: lead, error } = await supabase
+    .from('leads')
+    .select('lead_id, business_id, customer_id, name, phone, email, notes, source')
+    .eq('lead_id', leadId)
+    .single()
+
+  if (error || !lead) {
+    throw new Error(`[activatePendingLead] Lead ${leadId} hittades inte`)
+  }
+
+  // Byt status till 'new' så Golden Path-pipeline tar över
+  await supabase
+    .from('leads')
+    .update({ status: 'new', updated_at: new Date().toISOString() })
+    .eq('lead_id', leadId)
+
+  // Hämta business-telefon för SMS-notis
+  const { data: biz } = await supabase
+    .from('business_config')
+    .select('phone_number')
+    .eq('business_id', lead.business_id)
+    .single()
+
+  // Skapa deal i pipeline
+  let dealId: string | null = null
+  try {
+    const { data: firstPipelineStage } = await supabase
+      .from('pipeline_stages')
+      .select('id')
+      .eq('business_id', lead.business_id)
+      .order('sort_order', { ascending: true })
+      .limit(1)
+      .single()
+
+    if (firstPipelineStage) {
+      const nextNumber = await getNextCaseNumber(supabase, lead.business_id)
+      const message = lead.notes
+      const { data: newDeal } = await supabase
+        .from('deal')
+        .insert({
+          business_id: lead.business_id,
+          title: message ? message.slice(0, 80) : `Förfrågan från ${lead.name || 'kund'}`,
+          customer_id: lead.customer_id,
+          lead_id: lead.lead_id,
+          stage_id: firstPipelineStage.id,
+          source: (lead.source || 'email_forward').toLowerCase(),
+          deal_number: nextNumber,
+          priority: 'medium',
+        })
+        .select('deal_id')
+        .maybeSingle()
+      dealId = newDeal?.deal_id || null
+    }
+  } catch (err) {
+    console.error('[activatePendingLead] Deal creation failed:', err)
+  }
+
+  // SMS-notis (non-blocking)
+  if (biz?.phone_number) {
+    const smsText = `🌐 Ny lead!\nNamn: ${lead.name}\nTel: ${lead.phone}${lead.notes ? `\n"${lead.notes.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
+    sendSMS(biz.phone_number, smsText, 'Handymate').catch(() => {})
+  }
+
+  // Automation-event
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(supabase, 'lead_received', lead.business_id, {
+      source: lead.source || 'email_forward',
+      lead_id: lead.lead_id,
+      customer_id: lead.customer_id,
+      customer_name: lead.name,
+    })
+  } catch { /* non-blocking */ }
+
+  return { dealId }
+}
