@@ -8,6 +8,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 // ── Stegdefinitioner med risknivåer ──────────────────────
 
@@ -825,7 +826,7 @@ async function executeReviewRequest(
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              from: businessName.substring(0, 11),
+              from: sanitizeSenderId(businessName),
               to: customer.phone_number,
               message: `Hej ${customerName}! Tack för att du anlitade ${businessName}. Vi hoppas du är nöjd! En kort recension hjälper oss och andra kunder.\n${suffix}`,
             }).toString(),

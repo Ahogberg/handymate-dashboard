@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isAdmin } from '@/lib/admin-auth'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * POST /api/debug/sms — Test-SMS till hantverkarens eget nummer
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: (business.business_name || 'Handymate').substring(0, 11),
+        from: sanitizeSenderId(business.business_name),
         to: formattedTo,
         message: testMessage,
       }),

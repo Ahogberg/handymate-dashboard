@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * GET /api/cron/quote-follow-up - Automatisk uppföljning av offerter via AI agent.
@@ -111,7 +112,7 @@ export async function GET(request: NextRequest) {
                 'Content-Type': 'application/x-www-form-urlencoded',
               },
               body: new URLSearchParams({
-                from: businessName.substring(0, 11),
+                from: sanitizeSenderId(businessName),
                 to: customer.phone_number,
                 message: `Hej${firstName ? ' ' + firstName : ''}! Din offert "${q.title || ''}" på ${amount} kr går ut om 3 dagar. Hör av dig om du har frågor eller vill gå vidare!\n${suffix}`,
               }).toString(),

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              from: bizName.substring(0, 11),
+              from: sanitizeSenderId(bizName),
               to: customer.phone_number,
               message,
             }).toString(),

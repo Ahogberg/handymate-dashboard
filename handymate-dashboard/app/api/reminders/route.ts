@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -27,7 +28,7 @@ async function sendSMS(to: string, message: string, from: string): Promise<boole
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: from.substring(0, 11),
+        from: sanitizeSenderId(from),
         to: to,
         message: message,
       }),

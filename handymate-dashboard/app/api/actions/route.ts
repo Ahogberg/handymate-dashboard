@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -342,7 +343,7 @@ case 'create_booking': {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          from: businessConfig.business_name.substring(0, 11),
+          from: sanitizeSenderId(businessConfig.business_name),
           to: customer.phone_number,
           message: message,
         }),

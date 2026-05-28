@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { fireEvent } from '@/lib/automation-engine'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * POST /api/work-orders/[id]/send — Skicka arbetsorder via SMS
@@ -103,7 +104,7 @@ export async function POST(
       return NextResponse.json({ error: 'SMS-konfiguration saknas' }, { status: 500 })
     }
 
-    const senderName = (business.business_name || 'Handymate').substring(0, 11)
+    const senderName = sanitizeSenderId(business.business_name)
 
     const smsRes = await fetch('https://api.46elks.com/a1/sms', {
       method: 'POST',

@@ -16,6 +16,7 @@ import {
   buildUserContentWithImages,
   type ThreadImage,
 } from '@/lib/agent/thread-messages'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -296,7 +297,7 @@ async function executeTool(
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          from: (biz?.business_name || 'Handymate').substring(0, 11),
+          from: sanitizeSenderId(biz?.business_name),
           to: formattedPhone,
           message: String(message),
         }),
@@ -316,7 +317,7 @@ async function executeTool(
           sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
           business_id: businessId,
           direction: 'outbound',
-          phone_from: (biz?.business_name || 'Handymate').substring(0, 11),
+          phone_from: sanitizeSenderId(biz?.business_name),
           phone_to: formattedPhone,
           message: String(message),
           status: 'sent',

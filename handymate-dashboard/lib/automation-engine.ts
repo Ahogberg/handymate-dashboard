@@ -8,6 +8,7 @@
  */
 
 import { SupabaseClient } from '@supabase/supabase-js'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -261,7 +262,7 @@ async function handleSendSms(
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: (business?.business_name || 'Handymate').substring(0, 11),
+        from: sanitizeSenderId(business?.business_name),
         to: formatPhone(to),
         message,
       }),
@@ -282,7 +283,7 @@ async function handleSendSms(
         sms_id: 'sms_' + Math.random().toString(36).substring(2, 14),
         business_id: businessId,
         direction: 'outbound',
-        phone_from: (business?.business_name || 'Handymate').substring(0, 11),
+        phone_from: sanitizeSenderId(business?.business_name),
         phone_to: formatPhone(to),
         message,
         status: 'sent',

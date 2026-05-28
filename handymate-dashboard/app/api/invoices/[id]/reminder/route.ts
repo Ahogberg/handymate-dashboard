@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -128,7 +129,7 @@ export async function POST(
             'Content-Type': 'application/x-www-form-urlencoded'
           },
           body: new URLSearchParams({
-            from: businessName.substring(0, 11),
+            from: sanitizeSenderId(businessName),
             to: invoice.customer.phone_number,
             message: message
           }).toString()

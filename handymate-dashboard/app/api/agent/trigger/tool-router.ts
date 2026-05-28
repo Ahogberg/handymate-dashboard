@@ -5,6 +5,7 @@ import { SupabaseClient } from '@supabase/supabase-js'
 import { getCalendarEvents, createGoogleEvent } from '@/lib/google-calendar'
 import { getCustomerEmails, sendGmailEmail } from '@/lib/gmail'
 import { getNextCustomerNumber, getNextProjectNumber, getNextLeadNumber } from '@/lib/numbering'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 interface ToolResult {
   success: boolean
@@ -553,7 +554,7 @@ async function sendSms(
     const sendAfter = sendDate.toISOString()
 
     const queueId = 'smq_' + Math.random().toString(36).substring(2, 14)
-    const senderName = (context.businessName || 'Handymate').substring(0, 11)
+    const senderName = sanitizeSenderId(context.businessName)
     await supabase.from('sms_queue').insert({
       queue_id: queueId, business_id: businessId,
       phone_to: to, sender_name: senderName, message,
@@ -566,7 +567,7 @@ async function sendSms(
 
   const elksUser = process.env.ELKS_API_USER!
   const elksPassword = process.env.ELKS_API_PASSWORD!
-  const senderName = (context.businessName || 'Handymate').substring(0, 11)
+  const senderName = sanitizeSenderId(context.businessName)
 
   const response = await fetch('https://api.46elks.com/a1/sms', {
     method: 'POST',

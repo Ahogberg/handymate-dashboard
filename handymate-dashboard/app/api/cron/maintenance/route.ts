@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -135,7 +136,7 @@ export async function GET(request: NextRequest) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            from: bizName.substring(0, 11),
+            from: sanitizeSenderId(bizName),
             to: p.customer_phone,
             message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${reviewLink}\n${suffix}`,
           }).toString(),

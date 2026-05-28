@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * POST /api/field-reports/[id]/sign — Publik signering/avvisning via token
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              from: (biz.business_name || 'Handymate').substring(0, 11),
+              from: sanitizeSenderId(biz.business_name),
               to: biz.phone_number,
               message: `${signed_by || 'Kunden'} har signerat fältrapporten "${report.title}"!`,
             }),
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              from: (biz.business_name || 'Handymate').substring(0, 11),
+              from: sanitizeSenderId(biz.business_name),
               to: biz.phone_number,
               message: `${signed_by || 'Kunden'} har invändningar mot "${report.title}". ${customer_note ? 'Kommentar: ' + customer_note : ''}`,
             }),

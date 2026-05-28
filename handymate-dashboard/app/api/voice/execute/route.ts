@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * POST /api/voice/execute
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            from: (business.business_name || 'Handymate').substring(0, 11),
+            from: sanitizeSenderId(business.business_name),
             to: customer.phone_number,
             message: action.data.message || '',
           }),

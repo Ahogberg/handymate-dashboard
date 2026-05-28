@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeSwedishPhone } from './phone-normalize'
+import { sanitizeSenderId } from './sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -59,7 +60,7 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     return { success: false, error: `Ogiltigt telefonnummer: "${to}"` }
   }
 
-  const fromName = (businessName || 'Handymate').substring(0, 11)
+  const fromName = sanitizeSenderId(businessName)
   const smsId = 'sms_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8)
 
   let elksId: string | undefined

@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { buildSwishQRData } from '@/lib/swish-qr'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -337,7 +338,7 @@ async function sendAutoReminders() {
               'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: new URLSearchParams({
-              from: businessName.substring(0, 11),
+              from: sanitizeSenderId(businessName),
               to: customer.phone_number,
               message: messages.sms,
             }).toString(),

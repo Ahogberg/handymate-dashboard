@@ -7,6 +7,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
 import { randomUUID } from 'crypto'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            from: business?.business_name?.substring(0, 11) || 'Handymate',
+            from: sanitizeSenderId(business?.business_name),
             to: invoice.customer.phone_number,
             message: `Faktura ${invoice.invoice_number} från ${business?.business_name || 'oss'}.\n\nAtt betala: ${amountToPay?.toLocaleString('sv-SE')} kr\nFörfaller: ${new Date(invoice.due_date).toLocaleDateString('sv-SE')}\n\nSe faktura: ${smsLink}`
           }).toString()

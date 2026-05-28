@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const STAGE_LABELS: Record<string, string> = {
   quote_accepted: 'Offert godkänd',
@@ -98,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
                 'Content-Type': 'application/x-www-form-urlencoded',
               },
               body: new URLSearchParams({
-                from: (business.business_name || 'Handymate').substring(0, 11),
+                from: sanitizeSenderId(business.business_name),
                 to: customer.phone_number,
                 message,
               }),

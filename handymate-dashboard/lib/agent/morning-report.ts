@@ -6,6 +6,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -154,7 +155,7 @@ export async function sendMorningReport(businessId: string): Promise<{
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: (config.business_name || 'Handymate').substring(0, 11),
+        from: sanitizeSenderId(config.business_name),
         to: config.personal_phone,
         message,
       }),

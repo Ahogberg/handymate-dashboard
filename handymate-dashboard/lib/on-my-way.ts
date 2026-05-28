@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildSmsSuffix } from './sms-reply-number'
 import { normalizeSwedishPhone } from './phone-normalize'
+import { sanitizeSenderId } from './sms/sender-id'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -124,7 +125,7 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          from: businessName.substring(0, 11),
+          from: sanitizeSenderId(businessName),
           to: normalizedPhone,
           message: smsText,
         }),
@@ -143,7 +144,7 @@ export async function sendOnMyWaySms(args: OnMyWaySmsArgs): Promise<OnMyWaySmsRe
           status: smsRes.status,
           body: responseBody.substring(0, 500),
           to: normalizedPhone,
-          from_truncated: businessName.substring(0, 11),
+          from_truncated: sanitizeSenderId(businessName),
         })
       } else {
         console.log('[on-my-way] 46elks ok:', { status: smsRes.status, to: normalizedPhone })

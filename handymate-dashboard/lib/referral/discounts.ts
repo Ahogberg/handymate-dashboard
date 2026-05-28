@@ -6,6 +6,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
 /**
  * Spara en pending referralrabatt som appliceras på nästa faktura.
@@ -165,7 +166,7 @@ export async function handleFirstPaymentReferral(
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
-            from: (referrerConfig.business_name || 'Handymate').substring(0, 11),
+            from: sanitizeSenderId(referrerConfig.business_name),
             to: referrerConfig.personal_phone,
             message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
           }),
