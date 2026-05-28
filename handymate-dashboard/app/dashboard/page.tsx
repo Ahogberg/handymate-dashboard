@@ -27,6 +27,8 @@ import {
   ThumbsDown,
   Lightbulb,
   ChevronDown as ChevronDownIcon,
+  ChevronDown,
+  ChevronUp,
   Loader2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -156,6 +158,10 @@ export default function DashboardPage() {
   const [bookingsLoaded, setBookingsLoaded] = useState(false)
   const [configLoaded, setConfigLoaded] = useState(false)
   const [statsLoaded, setStatsLoaded] = useState(false)
+  // Dashboard Steg 1B (2026-05-28): KPI-raden krympt till inline-summary.
+  // Klick utökar till klassisk fyra-cards-vy. Default collapsed för att
+  // ge agent-blocket prominens.
+  const [kpiExpanded, setKpiExpanded] = useState(false)
   const [pipelineLoaded, setPipelineLoaded] = useState(false)
   const [profitLoaded, setProfitLoaded] = useState(false)
   const [activityLoaded, setActivityLoaded] = useState(false)
@@ -894,75 +900,110 @@ export default function DashboardPage() {
           })()
         )}
 
-        {/* KPI cards — 2 per row on mobile, 4 on desktop */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {!statsLoaded ? (
-            <>
-              {[...Array(5)].map((_, i) => (
-                <SkeletonCard key={i} />
-              ))}
-            </>
-          ) : (
-            <>
-              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bokningar</p>
-                  <TrendIndicator value={stats?.bookings?.trend || 0} />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.bookings?.week || 0}</p>
-                  <p className="text-sm text-gray-400">denna vecka</p>
-                </div>
-                <MiniSparkBars data={stats?.bookings_per_day || []} />
-              </div>
-
-              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nya kunder</p>
-                  <TrendIndicator value={stats?.customers?.trend || 0} />
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.customers?.new_this_month || 0}</p>
-                  <p className="text-sm text-gray-400">i månaden</p>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                  <Users className="w-3 h-3" />
-                  <span>{stats?.customers?.total || 0} totalt</span>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Arbetad tid</p>
-                </div>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.time?.week_hours || 0}<span className="text-lg font-medium text-gray-400">h</span></p>
-                  <p className="text-sm text-gray-400">vecka</p>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                  <Clock className="w-3 h-3" />
-                  <span>{stats?.time?.month_hours || 0}h denna månad</span>
+        {/* KPI — Steg 1B (2026-05-28): default kompakt inline-rad,
+            klick utökar till klassisk fyra-cards-vy. Agent-blocket
+            äger top-fokuset; siffrorna är "nice to see" inte primärt. */}
+        {!statsLoaded ? (
+          <div className="mb-8 bg-white border border-[#E2E8F0] rounded-xl p-4 flex items-center justify-center min-h-[52px]">
+            <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
+          </div>
+        ) : (
+          <div className="mb-8">
+            <button
+              type="button"
+              onClick={() => setKpiExpanded(prev => !prev)}
+              className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 hover:border-primary-200 transition-colors text-left"
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Nyckeltal denna vecka
+                </span>
+                <div className="flex items-center gap-4 sm:gap-5 text-sm flex-wrap flex-1 justify-end">
+                  <span className="text-gray-700">
+                    <span className="font-bold text-gray-900">{stats?.bookings?.week || 0}</span>
+                    <span className="text-gray-400 ml-1">bokningar</span>
+                  </span>
+                  <span className="text-gray-700">
+                    <span className="font-bold text-gray-900">{stats?.customers?.new_this_month || 0}</span>
+                    <span className="text-gray-400 ml-1">nya kunder</span>
+                  </span>
+                  <span className="text-gray-700">
+                    <span className="font-bold text-gray-900">{stats?.time?.week_hours || 0}h</span>
+                    <span className="text-gray-400 ml-1">arbetat</span>
+                  </span>
+                  <span className="text-gray-700">
+                    <span className="font-bold text-gray-900">{activeProjects}</span>
+                    <span className="text-gray-400 ml-1">projekt</span>
+                  </span>
+                  <span className="text-gray-400">
+                    {kpiExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </span>
                 </div>
               </div>
+            </button>
 
-              <Link href="/dashboard/projects" className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base group cursor-pointer">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projekt</p>
-                  <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+            {/* Expanderad vy — fyra detaljerade cards */}
+            {kpiExpanded && (
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Bokningar</p>
+                    <TrendIndicator value={stats?.bookings?.trend || 0} />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.bookings?.week || 0}</p>
+                    <p className="text-sm text-gray-400">denna vecka</p>
+                  </div>
+                  <MiniSparkBars data={stats?.bookings_per_day || []} />
                 </div>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-gray-900 font-heading">{activeProjects}</p>
-                  <p className="text-sm text-gray-400">aktiva</p>
-                </div>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                  <FolderKanban className="w-3 h-3" />
-                  <span>Se alla projekt</span>
-                </div>
-              </Link>
-            </>
-          )}
-        </div>
 
+                <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Nya kunder</p>
+                    <TrendIndicator value={stats?.customers?.trend || 0} />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.customers?.new_this_month || 0}</p>
+                    <p className="text-sm text-gray-400">i månaden</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                    <Users className="w-3 h-3" />
+                    <span>{stats?.customers?.total || 0} totalt</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Arbetad tid</p>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-gray-900 font-heading">{stats?.time?.week_hours || 0}<span className="text-lg font-medium text-gray-400">h</span></p>
+                    <p className="text-sm text-gray-400">vecka</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                    <Clock className="w-3 h-3" />
+                    <span>{stats?.time?.month_hours || 0}h denna månad</span>
+                  </div>
+                </div>
+
+                <Link href="/dashboard/projects" className="bg-white rounded-xl p-4 border border-[#E2E8F0] card-base group cursor-pointer">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Projekt</p>
+                    <ArrowRight className="w-3.5 h-3.5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-0.5 transition-all" />
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-bold text-gray-900 font-heading">{activeProjects}</p>
+                    <p className="text-sm text-gray-400">aktiva</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
+                    <FolderKanban className="w-3 h-3" />
+                    <span>Se alla projekt</span>
+                  </div>
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
         {/* ═══ Att göra idag ═══ */}
         <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 mb-8">
           <div className="flex items-center justify-between mb-3">
