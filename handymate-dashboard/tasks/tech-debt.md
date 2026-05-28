@@ -2457,3 +2457,45 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 **Relaterat:** Pilot-fix-plan Steg 2 (audit 2 A2-B3) löste *business_config*-delen av samma audit-fynd via v57_business_config_is_active.sql. Customer-delen är denna TD.
 
+---
+
+## 2026-05-29 — Claude Sonnet på 17+ ställen — manuell klassificering krävs
+
+**Plats:** Diverse routes + lib-helpers.
+
+**Bakgrund:** Pilot-fix-plan Steg 6 (audit 2 A2-B4) auditerade Sonnet-cost-läckor och listade 3 ställen (communication-ai, ai.ts, voice/analyze). GREP-sweep (TD-77-lärdom: alltid utöka audit-listan) visade att Sonnet faktiskt används på **21+ ställen**. De 4 obviousa background-tasks är nu refactorade till Haiku via `getClaudeModel('background')`/`'extraction'`.
+
+**Återstår ~15 ställen för manuell klassificering** — kräver produktägar-beslut om "är detta user-väntar-på-svar (live) eller batch (background)?":
+
+| Fil | Anropas av | Trolig klassificering |
+|-----|-----------|----------------------|
+| `lib/ai-quote-generator.ts:153, 383` | Quote-AI på dashboard | **live-customer** (användare väntar) |
+| `lib/ai.ts:79` (askCopilot) | Dashboard copilot | **live-customer** eller borderline |
+| `lib/matte/monthly-review.ts:282` | Cron-baserad månadsrapport | **background** — kan bytas |
+| `lib/agent/context-engine.ts:11` | Context-build för agent-trigger | borderline (live om Matte använder) |
+| `lib/agent/agents/strategi-agent.ts:12` | Strategi-svar | **live-customer** sannolikt |
+| `app/api/assistant/command/route.ts:135` | User-facing assistant | **live-customer** |
+| `app/api/ai-copilot/route.ts:152` | Copilot user-facing | **live-customer** |
+| `app/api/agent/trigger/route.ts:29` (MODEL_LIVE) | Lisa/Matte agent-trigger | **live-customer** ✓ (befintlig konstant) |
+| `app/api/widget/chat/route.ts:207` | Widget-chat på hemsidan | **live-customer** ✓ |
+| `app/api/automations/test/route.ts:31` | Test-endpoint | **background** — kan bytas |
+| `app/api/storefront/generate/route.ts:92` | Storefront-content | **background** sannolikt |
+| `app/api/jobbuddy/voice/route.ts:82` | Mobile voice-input | **live-customer** |
+| `app/api/jobbuddy/photo/route.ts:30` | Foto-analys | borderline (snabb = live, batch = bg) |
+| `app/api/quotes/generate/route.ts:83` | Quote-generation | **live-customer** |
+| `app/api/quotes/from-photo/route.ts:28` | Photo→quote | **live-customer** |
+| `lib/agents/shared/thinking-call.ts:56, 80` | Karin/Daniel/Lars/Hanna cron | **background** men override-bart |
+
+**Pilot-impact:** Inte blocker. Bee-pilot har låg volym → cost-läckorna kostar ören. Men för 50+ businesses skenar det fort.
+
+**Trigger:** Innan vi går från 1 pilot till 5+ kunder. Eller om månads-Anthropic-fakturan visar oväntad spike.
+
+**Approach:**
+1. Andreas klassificerar varje ställe (5 min per fil)
+2. Refactor `'background'`-stämplade till `getClaudeModel('background')`
+3. Behåll `'live-customer'`-stämplade som de är (eller övergå till `getClaudeModel('live-customer')` för konsistens)
+
+**Estimat:** 30-45 min klassificering + 30 min refactor = ~1.5 h.
+
+**Helper finns redan:** [lib/ai/get-model.ts](../lib/ai/get-model.ts) (skapad i Steg 6).
+

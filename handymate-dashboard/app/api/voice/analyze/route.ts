@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import Anthropic from '@anthropic-ai/sdk'
+import { getClaudeModel } from '@/lib/ai/get-model'
 
 function getAnthropic() {
   return new Anthropic({
@@ -213,7 +214,9 @@ Svara ENDAST med JSON i följande format:
 8. Svara ENDAST med JSON, ingen annan text före eller efter`
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      // Post-call analys av transkript — background extraction (kunden har redan
+      // lagt på). JSON-output gör Haiku lämplig. Sonnet behövdes inte här.
+      model: getClaudeModel('background'),
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }]
     })

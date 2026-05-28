@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { getClaudeModel } from '@/lib/ai/get-model'
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -47,7 +48,8 @@ Fokusera på:
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
+      // analyzeInsights är extraction (JSON-array från context) — Haiku räcker.
+      model: getClaudeModel('extraction'),
       max_tokens: 500,
       messages: [{ role: 'user', content: prompt }],
     })

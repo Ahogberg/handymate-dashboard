@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { getClaudeModel } from '@/lib/ai/get-model'
 import {
   getCommunicationSettings,
   resolveMessageVariables,
@@ -236,7 +237,9 @@ Tänk på:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        // SMS-evaluation är classification (shouldSend/reason/confidence) — Haiku räcker.
+        // Tidigare Sonnet = 10× kostnad utan kvalitetsvinst.
+        model: getClaudeModel('background'),
         max_tokens: 300,
         messages: [{ role: 'user', content: prompt }],
       }),
