@@ -96,6 +96,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
   review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  lead_review: { label: 'Ny lead', icon: Phone, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
@@ -714,6 +715,60 @@ export default function ApprovalsPage() {
                               {pl.alternatives && (pl.alternatives as any[]).length > 0 && (
                                 <p className="text-[10px] text-gray-400">Alternativ: {(pl.alternatives as any[]).map((a: any) => a.name).join(', ')}</p>
                               )}
+                            </div>
+                          )
+                        })()}
+                        {/* Lead review details (email-forwarding-flöde) */}
+                        {approval.approval_type === 'lead_review' && approval.payload && (() => {
+                          const pl = approval.payload as any
+                          const parsed = (pl.parsed || {}) as Record<string, any>
+                          const rawEmail = (pl.raw_email || {}) as Record<string, any>
+                          const sourceMatched = !!pl.lead_source_id
+                          return (
+                            <div className="mt-2 bg-amber-50 rounded-lg p-3 space-y-2 border border-amber-200">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                <div>
+                                  <span className="text-amber-700 font-semibold">Namn:</span>{' '}
+                                  <span className="text-gray-900">{parsed.name || <em className="text-gray-400">saknas</em>}</span>
+                                </div>
+                                <div>
+                                  <span className="text-amber-700 font-semibold">Telefon:</span>{' '}
+                                  <span className="text-gray-900 tabular-nums">{parsed.phone || <em className="text-gray-400">saknas</em>}</span>
+                                </div>
+                                <div>
+                                  <span className="text-amber-700 font-semibold">Email:</span>{' '}
+                                  <span className="text-gray-900">{parsed.email || <em className="text-gray-400">saknas</em>}</span>
+                                </div>
+                                <div>
+                                  <span className="text-amber-700 font-semibold">Adress:</span>{' '}
+                                  <span className="text-gray-900">{parsed.address || <em className="text-gray-400">saknas</em>}</span>
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <span className="text-amber-700 font-semibold">Källa:</span>{' '}
+                                  <span className="text-gray-900">{pl.resolved_source_name || parsed.source || <em className="text-gray-400">okänd</em>}</span>
+                                  {sourceMatched ? (
+                                    <span className="ml-1.5 text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full">matchad</span>
+                                  ) : (parsed.source && (
+                                    <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">fritext</span>
+                                  ))}
+                                </div>
+                              </div>
+                              {parsed.description && (
+                                <div className="text-xs text-gray-700 italic border-t border-amber-200 pt-2">
+                                  "{parsed.description}"
+                                </div>
+                              )}
+                              <details className="text-xs">
+                                <summary className="cursor-pointer text-amber-700 hover:text-amber-800 font-medium select-none">
+                                  Visa raw email
+                                </summary>
+                                <div className="mt-2 px-3 py-2 bg-white rounded border border-amber-200 space-y-1">
+                                  <div><span className="text-gray-400">Från:</span> {rawEmail.from_name ? `${rawEmail.from_name} <${rawEmail.from}>` : rawEmail.from}</div>
+                                  <div><span className="text-gray-400">Ämne:</span> {rawEmail.subject || '—'}</div>
+                                  <div><span className="text-gray-400">Datum:</span> {rawEmail.date || '—'}</div>
+                                  <pre className="mt-2 whitespace-pre-wrap text-[11px] text-gray-700 font-mono max-h-48 overflow-y-auto">{rawEmail.body_preview || ''}</pre>
+                                </div>
+                              </details>
                             </div>
                           )
                         })()}
