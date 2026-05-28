@@ -2332,6 +2332,43 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 ---
 
+## 2026-05-28 — Migrera kund-SMS-flow till resolveSenderId (TD-82)
+
+**Plats:** Alla 25+ SMS-call-sites använder idag `sanitizeSenderId(business_name)` direkt. Spec (Andreas 2026-05-28): kund-vänliga SMS bör visa **ansvarig persons namn** (deal.assigned_to / project_assignment role='lead') med business_name som fallback.
+
+**Status:** Helper [`lib/sms/sender-id.ts:resolveSenderId`](lib/sms/sender-id.ts) är byggd och redo. Slår upp deal/project → business_users.name → returnerar sanerade förnamn. Fallback business_name.
+
+**Migrations-batch (call-sites som behöver byta från `sanitizeSenderId(business_name)` → `await resolveSenderId(supabase, { businessId, dealId, projectId })`):**
+
+| Call-site | Kontext att skicka |
+|---|---|
+| `lib/on-my-way.ts` | booking → project_id |
+| `lib/automation-engine.ts` | payload kan ha deal_id/project_id |
+| `lib/e2e-deal-flow.ts` | deal direct |
+| `lib/leads/golden-path.ts` | (lead — annorlunda, leads.assigned_to är UUID, separat lookup) |
+| `app/api/quotes/send/route.ts` | quote → deal_id |
+| `app/api/invoices/send/route.ts` | invoice → project_id |
+| `app/api/invoices/[id]/reminder/route.ts` | invoice → project_id |
+| `app/api/projects/[id]/stages/route.ts` | project_id direct |
+| `app/api/work-orders/[id]/send/route.ts` | work_order → project_id |
+| `app/api/field-reports/[id]/sign/route.ts` | field_report → project_id |
+| `app/api/portal/[token]/route.ts` | portal → quote/project lookup |
+| `app/api/cron/quote-follow-up/route.ts` | quote → deal |
+| `app/api/cron/send-reminders/route.ts` | invoice → project |
+| `app/api/cron/maintenance/route.ts` | booking → project |
+
+**Lämna oförändrade (ingen kontext, fallback räcker):**
+- `/api/sms/send` (test-SMS, generella)
+- `lib/agent/morning-report.ts` (intern)
+- `lib/referral/discounts.ts` (intern)
+- `app/api/debug/sms` (test)
+
+**Estimat:** 2-3h för alla migreringar (varje call-site ~10 min: läsa payload-struktur, hitta deal/project_id, byta till await + sanitizeSenderId-fallback om resolve failar).
+
+**Trigger:** Aktualiseras när Bee Service-piloten begär att kunden ska se "Christoffer" istället för "BeeService" på SMS. Inte före.
+
+---
+
 ## 2026-05-20 — Pipeline-steg "Offertarbete" mellan Kontaktad och Offert skickad
 
 **Plats:** `pipeline_stage`-tabellen + alla call-sites som läser stage-ordningen (sökord: `pipeline_stage`, `stage_slug`, `sort_order`, `contacted`, `quote_sent`, `won`, `lost`).
