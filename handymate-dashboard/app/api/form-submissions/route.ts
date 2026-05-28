@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 /**
  * GET /api/form-submissions?projectId=xxx
@@ -78,15 +79,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mall eller namn krävs' }, { status: 400 })
     }
 
+    // Cross-business-skydd (pilot-fix-plan Steg 3, audit 1 B1)
+    const ownership = await verifyOwnership(supabase, business.business_id, [
+      { table: 'project', idColumn: 'project_id', idValue: body.project_id, label: 'projekt' },
+      { table: 'form_templates', idColumn: 'id', idValue: body.template_id, label: 'formulärmall' },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json(
+        { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+        { status: 403 },
+      )
+    }
+
     let name = body.name || ''
     let fields: any[] = body.fields || []
 
-    // If template_id provided, copy fields from template
+    // If template_id provided, copy fields from template (verifierat ovan att den ägs)
     if (body.template_id) {
       const { data: template } = await supabase
         .from('form_templates')
         .select('name, fields')
         .eq('id', body.template_id)
+        .eq('business_id', business.business_id)
         .single()
 
       if (template) {

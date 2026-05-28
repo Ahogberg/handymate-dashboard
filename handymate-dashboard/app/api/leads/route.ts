@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 // GET /api/leads — fetch leads with pipeline stats
 export async function GET(request: NextRequest) {
@@ -111,6 +112,20 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = getServerSupabase()
+
+  // Cross-business-skydd: customer_id kan ändras via PATCH — verifiera att
+  // ny customer ägs av authenticated business (pilot-fix-plan Steg 3, audit 1 B1)
+  if ('customer_id' in updates) {
+    const ownership = await verifyOwnership(supabase, business.business_id, [
+      { table: 'customer', idColumn: 'customer_id', idValue: updates.customer_id, label: 'kund' },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json(
+        { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+        { status: 403 },
+      )
+    }
+  }
 
   const { data, error } = await supabase
     .from('leads')

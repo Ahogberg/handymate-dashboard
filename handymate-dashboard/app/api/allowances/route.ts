@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 /**
  * GET /api/allowances?startDate=&endDate=&projectId=
@@ -55,6 +56,17 @@ export async function POST(request: NextRequest) {
 
     if (!body.allowance_type_id || !body.quantity) {
       return NextResponse.json({ error: 'Typ och antal krävs' }, { status: 400 })
+    }
+
+    // Cross-business-skydd (pilot-fix-plan Steg 3, audit 1 B1)
+    const ownership = await verifyOwnership(supabase, business.business_id, [
+      { table: 'project', idColumn: 'project_id', idValue: body.project_id, label: 'projekt' },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json(
+        { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+        { status: 403 },
+      )
     }
 
     // Get the type to calculate amount

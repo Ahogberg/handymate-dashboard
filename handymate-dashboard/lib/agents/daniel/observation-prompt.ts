@@ -95,6 +95,19 @@ export interface DanielAggregate {
     total_kr: number
     days_since_created: number
   }>
+  /** Steg 3 Dag 3: stale opens med kund-phone (E.164), redo för
+      SMS-nudge-action. Daniel kan generera action.send_sms från denna
+      lista. Subset av stale_opens där phone finns. */
+  actionable_nudges: Array<{
+    quote_id: string
+    title: string | null
+    customer_id: string
+    customer_name: string
+    customer_phone_e164: string
+    open_count: number
+    total_kr: number
+    days_since_created: number
+  }>
   leads_by_source: Record<
     string,
     {
@@ -179,10 +192,11 @@ async function buildDanielAggregate(
 
   const customerTypeMap: Record<string, string> = {}
   const customerNameMap: Record<string, string> = {}
+  const customerPhoneMap: Record<string, string> = {}
   if (customerIds.length > 0) {
     const { data: customers } = await supabase
       .from('customer')
-      .select('customer_id, customer_type, name')
+      .select('customer_id, customer_type, name, phone_number')
       .in('customer_id', customerIds)
       .eq('business_id', businessId)
     for (const c of customers || []) {
@@ -191,7 +205,20 @@ async function buildDanielAggregate(
       const likelyBrf = !declaredType && (name.includes('brf') || name.includes('bostadsrätts'))
       customerTypeMap[c.customer_id] = declaredType || (likelyBrf ? 'brf' : 'private')
       customerNameMap[c.customer_id] = c.name || ''
+      if (c.phone_number) customerPhoneMap[c.customer_id] = c.phone_number
     }
+  }
+
+  // Steg 3 Dag 3 (2026-05-28): E.164-konvertering för send_sms-actions
+  function toE164(raw: string | null | undefined): string | null {
+    if (!raw) return null
+    const clean = raw.replace(/[\s\-()]/g, '')
+    if (clean.startsWith('+')) return /^\+\d{8,15}$/.test(clean) ? clean : null
+    if (clean.startsWith('0')) {
+      const candidate = '+46' + clean.slice(1)
+      return /^\+\d{8,15}$/.test(candidate) ? candidate : null
+    }
+    return null
   }
 
   const byType: Record<string, QuoteRow[]> = {}
@@ -206,12 +233,13 @@ async function buildDanielAggregate(
   }
 
   // ── Stale opens (3+ views utan signering) ──────────────────
-  const staleOpens = quotes
-    .filter(q => {
-      const views = Number(q.view_count || 0)
-      const isUndetermined = !['accepted', 'signed', 'declined', 'expired'].includes(q.status)
-      return views >= 3 && isUndetermined
-    })
+  const staleQuotesFiltered = quotes.filter(q => {
+    const views = Number(q.view_count || 0)
+    const isUndetermined = !['accepted', 'signed', 'declined', 'expired'].includes(q.status)
+    return views >= 3 && isUndetermined
+  })
+
+  const staleOpens = staleQuotesFiltered
     .map(q => ({
       quote_id: q.quote_id,
       title: q.title,
@@ -223,6 +251,27 @@ async function buildDanielAggregate(
     }))
     .sort((a, b) => b.open_count - a.open_count)
     .slice(0, 5)
+
+  // Subset med phone — actionable_nudges (top 3, sorterad efter open_count)
+  const actionableNudges = staleQuotesFiltered
+    .map(q => {
+      if (!q.customer_id) return null
+      const phoneE164 = toE164(customerPhoneMap[q.customer_id])
+      if (!phoneE164) return null
+      return {
+        quote_id: q.quote_id,
+        title: q.title,
+        customer_id: q.customer_id,
+        customer_name: customerNameMap[q.customer_id] || '',
+        customer_phone_e164: phoneE164,
+        open_count: Number(q.view_count || 0),
+        total_kr: Math.round(Number(q.total || 0)),
+        days_since_created: Math.round((now - new Date(q.created_at).getTime()) / 86400000),
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.open_count - a.open_count)
+    .slice(0, 3)
 
   // ── Leads-källor (90d) ─────────────────────────────────────
   const { data: leadsData } = await supabase
@@ -276,6 +325,7 @@ async function buildDanielAggregate(
     last_90d: last90d,
     by_customer_type: byCustomerType,
     stale_opens: staleOpens,
+    actionable_nudges: actionableNudges,
     leads_by_source: leadsBySource,
     hot_leads: hotLeads,
   }
@@ -349,6 +399,14 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Skiljer accepterad vs avvisad snittsumma per typ?
    - Vilket prisspann ger högst acceptans?
 
+5. **Stale-offerter med konkret SMS-nudge-action (Steg 3 Dag 3):**
+   - I aggregate.actionable_nudges finns 0-3 offerter med 3+ visningar utan signering OCH där kunden har telefon registrerad.
+   - För VARJE sådan offert: generera observation med strukturerad action.send_sms (se exempel).
+   - SMS-tonen: vänlig nudge, INTE pushig. "Såg att du tittat på offerten — hur tänker du?" Inte "Köp nu eller missa rabatten".
+   - Referera till offert-titel + open_count i SMS-texten så det känns personligt.
+   - Sätt dedup_key: "daniel_quote_nudge:\${quote_id}" så samma offert inte nudgas dagligen.
+   - Confidence: 0.7 (säker på datan, osäkrare på timing — kund kan ha bestämt sig nyss).
+
 Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
 
 Var inte trivial. "Du har X offerter ute" = data, inte observation.
@@ -382,6 +440,28 @@ EXAKT EXEMPEL — kopiera strukturen:
       "brf_acceptance_rate": 92,
       "brf_avg_accepted_kr": 47500,
       "private_avg_accepted_kr": 40250
+    }
+  },
+  {
+    "knowledge_type": "recommendation",
+    "title": "Erik S. har tittat på offerten 5 ggr utan signering",
+    "observation": "Erik S. har öppnat offerten för Söder-renoveringen fem gånger sista veckan men inte signerat. Något stoppar honom — kanske pris, kanske timing.",
+    "suggestion": "Skicka vänlig nudge via SMS.",
+    "confidence": 0.7,
+    "data_basis": {
+      "quote_id": "q_abc",
+      "open_count": 5,
+      "days_since_created": 8,
+      "total_kr": 47500
+    },
+    "dedup_key": "daniel_quote_nudge:q_abc",
+    "action": {
+      "type": "send_sms",
+      "to": "+46701234567",
+      "message": "Hej Erik! Såg att du tittat på offerten för Söder-renoveringen ett par gånger. Hör av dig om du har frågor eller behöver justera något. Mvh \${företagsnamn}",
+      "customer_id": "cust_xyz",
+      "customer_name": "Erik S.",
+      "related_id": "q_abc"
     }
   }
 ]`

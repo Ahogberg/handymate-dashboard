@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 // Helper: log task activity
 async function logTaskActivity(
@@ -143,6 +144,21 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getServerSupabase()
+
+  // Cross-business-skydd: customer_id/deal_id/project_id måste tillhöra
+  // authenticated business (pilot-fix-plan Steg 3, audit 1 B1)
+  const ownership = await verifyOwnership(supabase, auth.business_id, [
+    { table: 'customer', idColumn: 'customer_id', idValue: body.customer_id, label: 'kund' },
+    { table: 'deal', idColumn: 'id', idValue: body.deal_id, label: 'deal' },
+    { table: 'project', idColumn: 'project_id', idValue: body.project_id, label: 'projekt' },
+  ])
+  if (!ownership.ok) {
+    return NextResponse.json(
+      { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+      { status: 403 },
+    )
+  }
+
   const { data, error } = await supabase
     .from('task')
     .insert({
@@ -207,6 +223,20 @@ export async function PUT(request: NextRequest) {
 
   if (!oldTask) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+  }
+
+  // Cross-business-skydd för ev. nya kopplingar (project_id/customer_id/deal_id
+  // kan ändras via PUT — verifiera att nya värdena ägs av authenticated business)
+  const ownership = await verifyOwnership(supabase, auth.business_id, [
+    { table: 'customer', idColumn: 'customer_id', idValue: body.customer_id, label: 'kund' },
+    { table: 'deal', idColumn: 'id', idValue: body.deal_id, label: 'deal' },
+    { table: 'project', idColumn: 'project_id', idValue: body.project_id, label: 'projekt' },
+  ])
+  if (!ownership.ok) {
+    return NextResponse.json(
+      { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+      { status: 403 },
+    )
   }
 
   const updates: Record<string, any> = {}

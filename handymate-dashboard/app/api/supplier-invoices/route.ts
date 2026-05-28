@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { verifyOwnership } from '@/lib/auth/verify-ownership'
 
 /**
  * GET /api/supplier-invoices?project_id=xxx
@@ -50,6 +51,18 @@ export async function POST(request: NextRequest) {
 
     if (!body.supplier_name?.trim()) {
       return NextResponse.json({ error: 'Leverantörsnamn krävs' }, { status: 400 })
+    }
+
+    // Cross-business-skydd (pilot-fix-plan Steg 3, audit 1 B1) —
+    // hindra att leverantörsfaktura kopplas till annans projekt
+    const ownership = await verifyOwnership(supabase, business.business_id, [
+      { table: 'project', idColumn: 'project_id', idValue: body.project_id, label: 'projekt' },
+    ])
+    if (!ownership.ok) {
+      return NextResponse.json(
+        { error: `Du har inte tillgång till: ${ownership.missing.join(', ')}` },
+        { status: 403 },
+      )
     }
 
     const amountExclVat = parseFloat(body.amount_excl_vat) || 0
