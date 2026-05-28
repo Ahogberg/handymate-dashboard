@@ -14,6 +14,7 @@ import { runKarinObservation } from './karin/observation-prompt'
 import { runDanielObservation } from './daniel/observation-prompt'
 import { runLarsObservation } from './lars/observation-prompt'
 import { runHannaObservation } from './hanna/observation-prompt'
+import { runLisaObservation } from './lisa/observation-prompt'
 
 export type AgentObservationRunner = (
   supabase: SupabaseClient,
@@ -27,6 +28,7 @@ export const AGENT_RUNNERS: Record<string, AgentObservationRunner> = {
   daniel: runDanielObservation as AgentObservationRunner,
   lars: runLarsObservation as AgentObservationRunner,
   hanna: runHannaObservation as AgentObservationRunner,
+  lisa: runLisaObservation as AgentObservationRunner,
 }
 
 export const SUPPORTED_AGENTS = Object.keys(AGENT_RUNNERS)
