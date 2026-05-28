@@ -24,3 +24,16 @@
 - **Audit-historik:** Tidigare TD-71/TD-77 hittade 4-5 läckor var där "samma fix borde appliceras på fler ställen". Pilot-audit 2026-05-20 hittade 6 nya. Mönstret återupprepar sig — använd helpern på ALLA nya routes som tar fk-id i body.
 - **`.eq('business_id', X).update()` skyddar bara ENTITY-raden** (kan inte uppdatera B's task), men **NYA kopplingar** (sätta A:s task.project_id = B:s project_id) blockas inte av WHERE-filter — UPDATE bara skriver de nya värdena. Måste verifieras separat.
 - **Public/token-routes är undantag** — de har egen access-model (sign_token, portal_token) och behöver inte denna check.
+
+## Externa write-API:er kräver explicit sync-status för idempotent retry
+- **Symptom:** Fortnox-sync failade tyst, men status='sent' sattes ändå. Användaren tryckte "skicka igen" → dubblett-faktura i Fortnox-bokföring.
+- **Anti-pattern:** Sätt local entity-status (`sent`, `done`, etc) FÖRE bekräftat svar från extern service. Skapar dissociering mellan local truth och remote truth.
+- **Rätt mönster:** Egen `<service>_sync_status` enum-kolumn med fyra states:
+  - `NULL` → ej försökt, retry tillåts
+  - `'pending'` → in-flight, blocka retry under timeout (5 min)
+  - `'synced'` → bekräftat klart, blocka retry helt (idempotent — returnera befintlig data)
+  - `'failed'` → tillåt retry, behåll local status så användaren ser tydligt att action behövs
+- **Pre-flight check:** Innan extern POST, läs sync_status. Om `synced` → returnera idempotent-response. Om `pending` < timeout → 409. Om `pending` >= timeout → tillåt (antag in-flight-dödad).
+- **Idempotens på extern sida:** Sätt `ExternalReference1: <local_id>` på extern payload (om service stödjer det) → möjliggör framtida GET-lookup för in-flight-recovery.
+- **Post-flight automationer (pipeline-flytt, project-stage, notiser) ska BARA triggas vid sync_status='synced'** — annars triggar de på fakturor som inte nådde Fortnox alls.
+- **Referens:** [app/api/invoices/[id]/send-via-fortnox/route.ts](../app/api/invoices/%5Bid%5D/send-via-fortnox/route.ts) + [sql/v58_invoice_fortnox_sync_status.sql](../sql/v58_invoice_fortnox_sync_status.sql). Pilot-fix-plan Steg 4, audit 1 B3.

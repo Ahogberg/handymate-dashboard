@@ -3,6 +3,15 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox } from '@/lib/fortnox'
 
+/**
+ * Hur länge en pending sync räknas som "in-flight" innan vi antar att den
+ * dog (nätverket eller serverless-functionen) och tillåter retry. 5 minuter
+ * ger gott om tid för långsamma Fortnox-svar utan att blockera långvariga
+ * felfall. Om vi någonsin behöver per-business-override → flytta till
+ * business_config eller env-var.
+ */
+const FORTNOX_PENDING_TIMEOUT_MS = 5 * 60 * 1000
+
 interface InvoiceItem {
   description?: string
   quantity?: number
@@ -23,16 +32,30 @@ interface FortnoxInvoiceRow {
  * POST /api/invoices/[id]/send-via-fortnox
  *
  * Skapar fakturan i Fortnox (med ROT-stöd om invoice.rot_rut_type='ROT'/'RUT'),
- * sparar fortnox_invoice_number, och markerar Handymate-fakturan som 'sent'
- * DIREKT — oavsett om Fortnox lyckades. Detta så att Karins påminnelser
- * och projekt-stage-flytt börjar bevaka utan fördröjning.
+ * sparar fortnox_invoice_number, markerar Handymate-fakturan som 'sent' och
+ * triggar post-send-automationer (pipeline-flytt, project-stage, smart-
+ * communication, portal-notifikation).
+ *
+ * Pilot-fix-plan Steg 4 / audit 1 B3 (2026-05-29 refactor):
+ * Tidigare sattes status='sent' OAVSETT om Fortnox lyckades — användaren
+ * tryckte "skicka igen" vid fel → DUBBLETT i Fortnox. Nu drivs flödet
+ * av fortnox_sync_status:
+ *   - synced → blocka retry, returnera befintlig data (idempotent)
+ *   - pending + < 5 min → blocka retry (in-flight)
+ *   - pending + >= 5 min → tillåt retry (antag in-flight-dödad)
+ *   - failed eller NULL → tillåt retry
+ *
+ * status='sent' sätts BARA när Fortnox-anropet lyckas. Post-send
+ * automationer triggas BARA vid lyckad sync.
+ *
+ * ExternalInvoiceReference1 sätts till Handymate-invoice_id på Fortnox-
+ * payload → möjliggör framtida idempotens-lookup via Fortnox-search-API.
+ *
+ * KRÄVER MIGRATION: sql/v58_invoice_fortnox_sync_status.sql.
  *
  * Returnerar:
- *   { success: boolean, fortnox_invoice_number?, fortnox_document_number?, error? }
- *
- * Status='sent' uppdateras alltid på Handymate-sidan om DB-skrivningen
- * lyckas, även när Fortnox-anropet kraschar — användaren kan då försöka
- * synka senare via "Synka nu".
+ *   { success: boolean, fortnox_invoice_number?, fortnox_document_number?,
+ *     error?, idempotent?: true }
  */
 export async function POST(
   request: NextRequest,
@@ -63,6 +86,37 @@ export async function POST(
       return NextResponse.json(
         { error: `Fakturan är redan ${invoice.status === 'paid' ? 'betald' : 'avbruten'}` },
         { status: 400 }
+      )
+    }
+
+    // Idempotens-skydd: blocka retry om sync redan lyckats eller pågår.
+    // Eliminerar dubblett-fakturor i Fortnox när användaren trycker
+    // "skicka igen" på en faktura som faktiskt är synkad.
+    const syncStatus = invoice.fortnox_sync_status as string | null
+    const lastAttempt = invoice.fortnox_sync_attempted_at as string | null
+    if (syncStatus === 'synced' && invoice.fortnox_invoice_number) {
+      return NextResponse.json({
+        success: true,
+        idempotent: true,
+        fortnox_invoice_number: invoice.fortnox_invoice_number,
+        fortnox_document_number: invoice.fortnox_document_number,
+        message: 'Fakturan är redan synkad till Fortnox.',
+      })
+    }
+    if (syncStatus === 'pending' && lastAttempt) {
+      const ageMs = Date.now() - new Date(lastAttempt).getTime()
+      if (ageMs < FORTNOX_PENDING_TIMEOUT_MS) {
+        return NextResponse.json(
+          {
+            error: 'Sync pågår redan. Vänta ett par minuter innan du försöker igen.',
+            sync_status: 'pending',
+          },
+          { status: 409 },
+        )
+      }
+      // > 5 min sedan → antag in-flight-dödad, tillåt retry
+      console.warn(
+        `[send-via-fortnox] invoice ${invoiceId} pending för ${Math.round(ageMs / 1000)}s — antar in-flight-dödad, tillåter retry`,
       )
     }
 
@@ -127,6 +181,10 @@ export async function POST(
       YourReference: invoice.customer?.name || undefined,
       InvoiceRows: invoiceRows,
       Remarks: invoice.internal_notes || undefined,
+      // Idempotens-stöd: ger oss möjlighet att framtidigt fråga
+      // Fortnox "har du redan en invoice med denna ExternalReference?"
+      // via search-API. Skyddar mot mid-flight-nätverksdöd.
+      ExternalInvoiceReference1: invoiceId,
     }
 
     // ROT/RUT — Fortnox `TaxReductionType` på Invoice + `TaxReduction`-payload
@@ -148,6 +206,19 @@ export async function POST(
       }
     }
 
+    // Markera sync som in-flight FÖRE Fortnox-anropet. Skydd mot
+    // parallella requests (samtidiga tryck på "Skicka") och in-flight-
+    // detection vid retry.
+    const startedAt = new Date().toISOString()
+    await supabase
+      .from('invoice')
+      .update({
+        fortnox_sync_status: 'pending',
+        fortnox_sync_attempted_at: startedAt,
+      })
+      .eq('invoice_id', invoiceId)
+      .eq('business_id', business.business_id)
+
     // Skapa fakturan i Fortnox
     let fortnoxInvoiceNumber: string | null = null
     let fortnoxDocumentNumber: string | null = null
@@ -167,25 +238,44 @@ export async function POST(
       console.error('[send-via-fortnox] Fortnox API failed:', fortnoxError)
     }
 
-    // KRITISKT: Sätt status='sent' och sent_at DIREKT — oavsett Fortnox-resultat.
-    // Automationer (Karin-påminnelser, projekt-stage) behöver inte vänta på sync.
     const now = new Date().toISOString()
+
+    // FAILURE-väg: behåll status (draft/sent), markera sync som failed
+    // så användaren kan retry utan att skapa dubblett. INGEN post-send-
+    // automation triggas — pipeline/project-stage/portal-notis ska bara
+    // ske vid faktisk lyckad sync.
+    if (fortnoxError || !fortnoxInvoiceNumber) {
+      await supabase
+        .from('invoice')
+        .update({
+          fortnox_sync_status: 'failed',
+          fortnox_sync_error: fortnoxError || 'No invoice number returned',
+        })
+        .eq('invoice_id', invoiceId)
+        .eq('business_id', business.business_id)
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: fortnoxError || 'No invoice number returned',
+          message: 'Fortnox-synk misslyckades. Försök igen — vi skapar ingen dubblett.',
+        },
+        { status: 502 },
+      )
+    }
+
+    // SUCCESS-väg: sätt status='sent', spara Fortnox-data, markera synced.
     const updateData: Record<string, unknown> = {
       status: 'sent',
       sent_at: now,
+      fortnox_invoice_number: fortnoxInvoiceNumber,
+      fortnox_document_number: fortnoxDocumentNumber,
+      fortnox_synced_at: now,
+      fortnox_sync_status: 'synced',
+      fortnox_sync_error: null,
     }
-    if (fortnoxInvoiceNumber) {
-      updateData.fortnox_invoice_number = fortnoxInvoiceNumber
-      updateData.fortnox_synced_at = now
-    }
-    if (fortnoxDocumentNumber) {
-      updateData.fortnox_document_number = fortnoxDocumentNumber
-    }
-    if (isRot && fortnoxInvoiceNumber) {
+    if (isRot) {
       updateData.rot_application_status = 'submitted'
-    }
-    if (fortnoxError) {
-      updateData.fortnox_sync_error = fortnoxError
     }
 
     await supabase
@@ -194,19 +284,18 @@ export async function POST(
       .eq('invoice_id', invoiceId)
       .eq('business_id', business.business_id)
 
-    // Trigga samma post-send automationer som /api/invoices/send
+    // Post-send automationer triggas BARA vid lyckad sync — pipeline-flytt
+    // och project-stage ska inte starta för fakturor som faktiskt inte
+    // nådde Fortnox.
     await runPostSendAutomations(invoiceId, business.business_id, invoice.customer_id).catch(err =>
       console.error('[send-via-fortnox] post-send automations failed:', err)
     )
 
     return NextResponse.json({
-      success: !fortnoxError,
+      success: true,
       fortnox_invoice_number: fortnoxInvoiceNumber,
       fortnox_document_number: fortnoxDocumentNumber,
-      error: fortnoxError,
-      message: fortnoxError
-        ? 'Fakturan markerad som skickad i Handymate, men Fortnox-synk misslyckades. Försök "Synka nu" senare.'
-        : `Faktura ${fortnoxInvoiceNumber} skapad i Fortnox.`,
+      message: `Faktura ${fortnoxInvoiceNumber} skapad i Fortnox.`,
     })
   } catch (err: any) {
     console.error('[send-via-fortnox] error:', err)
