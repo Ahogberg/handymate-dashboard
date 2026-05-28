@@ -258,15 +258,69 @@ export async function POST(
       await sendQuoteSignedConfirmation(quote.business_id, quote.quote_id)
     } catch { /* non-blocking */ }
 
-    // Auto-skapa projekt från signerad offert (non-blocking)
+    // Auto-skapa projekt från signerad offert (non-blocking).
+    // Om creation failar: skapa pending_approval så Christoffer SER problemet i UI
+    // istället för att det försvinner. Kund-signeringen får inte faila — men
+    // hantverkaren MÅSTE få veta att projekt-skapande misslyckades och kräver
+    // manuell uppföljning (kunden har redan fått bekräftelse via SMS).
     try {
       const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
       const result = await createProjectFromQuote(quote.business_id, quote.quote_id)
       if (result.success) {
         console.log(`[quote/public] Auto-created project ${result.project_id} from quote ${quote.quote_id}`)
+      } else {
+        // High-severity log så Vercel-loggar fångar det
+        console.error(
+          `[quote/public] CRITICAL: Auto-project creation failed for quote ${quote.quote_id}: ${result.error}`,
+        )
+        // Skapa pending_approval (egen try/catch så insert-fel inte bryter kund-signering)
+        try {
+          await supabase.from('pending_approvals').insert({
+            business_id: quote.business_id,
+            approval_type: 'manual_project_create',
+            title: `Skapa projekt manuellt — ${(quote as any).title || quote.quote_id}`,
+            description: `Offerten är signerad av kund (${(quote.customer as any)?.name || 'okänd'}) men automatisk projekt-skapande misslyckades: ${result.error || 'okänt fel'}. Kunden har fått bekräftelse — skapa projektet manuellt eller kontakta support.`,
+            payload: {
+              quote_id: quote.quote_id,
+              quote_number: (quote as any).quote_number || null,
+              quote_title: (quote as any).title || null,
+              customer_id: quote.customer_id,
+              customer_name: (quote.customer as any)?.name || null,
+              customer_phone: (quote.customer as any)?.phone_number || null,
+              total: quote.total || null,
+              signed_at: new Date().toISOString(),
+              error: result.error || 'unknown',
+            },
+            status: 'pending',
+            risk_level: 'high',
+          })
+        } catch (approvalErr) {
+          console.error('[quote/public] Failed to create manual_project_create approval:', approvalErr)
+        }
       }
     } catch (projErr) {
-      console.error('Auto project creation error (non-blocking):', projErr)
+      // Thrown exception (separat från result.success === false)
+      console.error('[quote/public] Auto project creation exception (non-blocking):', projErr)
+      try {
+        await supabase.from('pending_approvals').insert({
+          business_id: quote.business_id,
+          approval_type: 'manual_project_create',
+          title: `Skapa projekt manuellt — ${(quote as any).title || quote.quote_id}`,
+          description: `Offerten är signerad av kund men automatisk projekt-skapande kastade ett undantag. Kunden har fått bekräftelse — skapa projektet manuellt eller kontakta support.`,
+          payload: {
+            quote_id: quote.quote_id,
+            quote_number: (quote as any).quote_number || null,
+            customer_id: quote.customer_id,
+            customer_name: (quote.customer as any)?.name || null,
+            signed_at: new Date().toISOString(),
+            error: projErr instanceof Error ? projErr.message : String(projErr),
+          },
+          status: 'pending',
+          risk_level: 'high',
+        })
+      } catch (approvalErr) {
+        console.error('[quote/public] Failed to create manual_project_create approval after exception:', approvalErr)
+      }
     }
 
     // Golden Path: flytta deal till "Vunnen"
