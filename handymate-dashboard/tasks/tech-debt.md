@@ -2330,3 +2330,63 @@ Beslut 2026-05-24 (Andreas): vänta. Dashboard desktop-only, mobil-flow via PWA.
 
 **Estimat:** Väg A 15 min. Väg B 3-4h. Plus eventuell 46elks-API-research om Väg B prioriteras.
 
+---
+
+## 2026-05-20 — Pipeline-steg "Offertarbete" mellan Kontaktad och Offert skickad
+
+**Plats:** `pipeline_stage`-tabellen + alla call-sites som läser stage-ordningen (sökord: `pipeline_stage`, `stage_slug`, `sort_order`, `contacted`, `quote_sent`, `won`, `lost`).
+
+**Bakgrund:** Nuvarande pipeline saknar ett steg där deals befinner sig efter första kontakt men innan offert kan skickas. Christoffer (pilot) beskriver att han ofta behöver göra research, kalkylera material, eller (för vissa branscher) platsbesök innan offert. Branschneutralt namn: **"Offertarbete"** — täcker research, underlag, ev. platsbesök, kalkyl. Ej bara platsbesök.
+
+**Föreslagen stage-ordning:**
+1. Ny lead
+2. Kontaktad
+3. **Offertarbete** ← NY
+4. Offert skickad
+5. Offert öppnad
+6. Aktivt jobb / Vunnen
+7. Fakturerad
+8. Avslutad
+9. Förlorad (deals som dör i Offertarbete eller senare)
+
+**Trigger:** Bygg EFTER pilot-fix-plan (se [pilot-fix-plan.md](pilot-fix-plan.md)). Inte pilot-blocker — Bee kan jobba runt med Kontaktad-stage tills vidare.
+
+**Före bygge — utred:**
+
+1. **Vad läser stage-ordningen?**
+   - `lib/pipeline.ts` — `moveDeal()`, `findStageBySlug()`, automation-triggers
+   - `app/api/pipeline/deals/route.ts` — deal-listning + stage-filter
+   - `app/dashboard/pipeline/page.tsx` (eller motsvarande) — kanban-vy
+   - Automation-regler i `sql/v3_seed_rules.sql` som triggar på `pipeline_move_on_*`
+   - Smart-communication-regler som lyssnar på stage-transitions
+   - Karin/Daniel/Lars/Hanna observation-prompts som läser deal-stages
+   - Auto-actions som triggas vid stage-byte (auto_move_on_signature etc)
+
+2. **Obligatoriskt vs valfritt:**
+   - Ska "Offertarbete" vara tvingande för alla nya deals?
+   - Eller skip-bar för enkla jobb (Bee kan ta in jobb där offert kan göras direkt)?
+   - Per business-config-toggle eller per deal-type?
+
+3. **Migrering av befintliga deals:**
+   - Deals i "Kontaktad" idag: stannar de där eller flyttas till "Offertarbete"?
+   - Deals i "Offert skickad": behöver de retro-fitted med en "Offertarbete"-passering för logg-konsistens?
+   - SQL-migration som backfillar `stage_history` om vi vill ha audit-trail?
+
+4. **UI-impact:**
+   - Kanban får en kolumn till — påverkar mobile-layout?
+   - Pipeline-statistik (`/api/dashboard/today`, dashboard-card för "needsFollowUp") — vilka räknar mot vilket stage?
+   - Sortering — vilka stages syns som "aktiva" vs "passerade"?
+
+5. **Automation-implications:**
+   - Vilka automations triggar idag på `pipeline_move_on_quote_sent`? Behöver de uppdateras för `pipeline_move_on_offert_arbete`?
+   - Smart-communication "väntar på svar"-cron — ska den triggas också i Offertarbete?
+   - Karin/Daniel observation-prompts som räknar quote-acceptance-rate — påverkas funnel-stats?
+
+6. **Förlorad-flödet:**
+   - Lägg till "förlorade i Offertarbete"-tracking — viktig för att förstå var deals dör (forskning för dyrt? kund hittade annat? platsbesök avslöjade problem?)
+   - `lost_reason`-dropdown bör utökas med stage-specifika alternativ
+
+**Estimat preliminärt:** 6-10 h kod + 1-2 h migration + 30 min Christoffer-validering. Justeras efter utredning ovan.
+
+**Pilot-impact:** Ingen. Christoffer kan flagga deals med "Offertarbete pågår" i deal-notes tills steget finns. Inte värt att blockera pilot-launch för.
+
