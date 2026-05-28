@@ -8,6 +8,24 @@
  */
 
 /**
+ * Strukturerad action — när satt blir observationen en typed approval
+ * (t.ex. 'send_sms') som faktiskt utför action vid approve, istället
+ * för en informativ agent_observation som bara markerar acknowledged.
+ *
+ * Discriminerad union — fler typer kan läggas till framöver (send_email,
+ * create_invoice_draft, etc.).
+ */
+export type AgentAction =
+  | {
+      type: 'send_sms'
+      to: string
+      message: string
+      customer_id?: string
+      customer_name?: string
+      related_id?: string
+    }
+
+/**
  * Generisk observation-shape som matchar business_knowledge-tabellens
  * INSERT-kontrakt. Per-agent-types (KarinObservation, DanielObservation, etc.)
  * är alias för denna typ.
@@ -27,6 +45,13 @@ export interface AgentObservation {
    * precision på samma fenomen över olika title-formuleringar.
    */
   dedup_key?: string
+  /**
+   * Strukturerad action — om satt blir approval typed och faktiskt
+   * utförs vid approve. Steg 3 Dag 2 (2026-05-28): Karin (och senare
+   * Daniel, Lisa) sätter denna för konkreta SMS-actions så user-approve
+   * inte längre är "tomt löfte".
+   */
+  action?: AgentAction
 }
 
 export const VALID_KNOWLEDGE_TYPES = new Set([
@@ -114,6 +139,10 @@ export function normalizeObservation(
       ? raw.dedup_key.trim()
       : undefined
 
+  // action: frivilligt — strukturerad SMS-action. Säkerhetsprincip:
+  // ogiltig action → ignorera (legacy fallback), gissa inte.
+  const action = normalizeAction(raw.action, index, notes)
+
   return {
     knowledge_type: knowledgeType as AgentObservation['knowledge_type'],
     title,
@@ -122,5 +151,46 @@ export function normalizeObservation(
     confidence,
     data_basis: dataBasis,
     ...(dedupKey ? { dedup_key: dedupKey } : {}),
+    ...(action ? { action } : {}),
   }
+}
+
+/**
+ * Normalisera raw.action till AgentAction eller null. Validerar required
+ * fields per type. Felaktig/inkomplett action → null (observationen
+ * fortsätter som legacy informational utan typed approval).
+ */
+function normalizeAction(
+  raw: any,
+  index: number,
+  notes: string[],
+): AgentAction | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const type = (raw.type || '').toString().toLowerCase()
+
+  if (type === 'send_sms') {
+    const to = (raw.to || '').toString().trim()
+    const message = (raw.message || '').toString().trim()
+    if (!to || !message) {
+      notes.push(`obs[${index}]: action.send_sms saknar to/message — ignorerar`)
+      return null
+    }
+    // E.164-validering: börjar med + och 8-15 siffror efter
+    if (!/^\+\d{8,15}$/.test(to)) {
+      notes.push(`obs[${index}]: action.send_sms.to "${to}" är inte E.164 — ignorerar`)
+      return null
+    }
+    return {
+      type: 'send_sms',
+      to,
+      message,
+      ...(raw.customer_id ? { customer_id: String(raw.customer_id) } : {}),
+      ...(raw.customer_name ? { customer_name: String(raw.customer_name) } : {}),
+      ...(raw.related_id ? { related_id: String(raw.related_id) } : {}),
+    }
+  }
+
+  notes.push(`obs[${index}]: action.type "${type}" ej stödd — ignorerar`)
+  return null
 }

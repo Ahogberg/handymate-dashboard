@@ -111,24 +111,43 @@ export async function saveAndPush(
     const knowledgeId = savedRow?.id || null
 
     if (obs.suggestion && obs.suggestion.trim().length > 0) {
-      // Observation MED konkret action → skapa approval + push
+      // Observation MED konkret action → skapa approval + push.
+      //
+      // Steg 3 Dag 2 (2026-05-28): Om obs.action finns blir approval typed
+      // (t.ex. 'send_sms') så approve faktiskt skickar SMS via befintlig
+      // executeApprovalPayload-switch. Utan action → legacy generic
+      // 'agent_observation' som bara markerar acknowledged.
+      const isTypedSms = obs.action?.type === 'send_sms'
+      const approvalType = isTypedSms ? 'send_sms' : 'agent_observation'
+
+      const approvalPayload: Record<string, unknown> = {
+        agent_id: agentId,
+        business_knowledge_id: knowledgeId,
+        observation: obs.observation,
+        suggestion: obs.suggestion,
+        confidence: obs.confidence,
+        data_basis: obs.data_basis,
+        knowledge_type: obs.knowledge_type,
+        routed_agent: agentId,
+      }
+
+      // Typed SMS-action: inkludera de fält som approve-handlern + UI behöver.
+      if (isTypedSms && obs.action?.type === 'send_sms') {
+        approvalPayload.to = obs.action.to
+        approvalPayload.message = obs.action.message
+        if (obs.action.customer_id) approvalPayload.customer_id = obs.action.customer_id
+        if (obs.action.customer_name) approvalPayload.customer_name = obs.action.customer_name
+        if (obs.action.related_id) approvalPayload.related_id = obs.action.related_id
+      }
+
       const { data: approval } = await supabase
         .from('pending_approvals')
         .insert({
           business_id: businessId,
-          approval_type: 'agent_observation',
+          approval_type: approvalType,
           title: obs.title,
           description: obs.observation,
-          payload: {
-            agent_id: agentId,
-            business_knowledge_id: knowledgeId,
-            observation: obs.observation,
-            suggestion: obs.suggestion,
-            confidence: obs.confidence,
-            data_basis: obs.data_basis,
-            knowledge_type: obs.knowledge_type,
-            routed_agent: agentId,
-          },
+          payload: approvalPayload,
           status: 'pending',
           risk_level: obs.confidence > 0.8 ? 'medium' : 'low',
         })
@@ -144,7 +163,7 @@ export async function saveAndPush(
 
       void sendApprovalPush({
         business_id: businessId,
-        approval_type: 'agent_observation',
+        approval_type: approvalType,
         payload: {
           agent_id: agentId,
           title: obs.title,

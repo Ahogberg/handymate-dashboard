@@ -90,6 +90,19 @@ export interface KarinAggregate {
     oldest_days: number | null
     oldest_invoice_number: string | null
   }
+  /** Steg 3 Dag 2: topp 3 förfallna fakturor med kund-phone, redo för
+      SMS-påminnelse-action. Karin kan generera action.send_sms från
+      denna lista. Tom array om inga kvalificerar. */
+  actionable_overdue: Array<{
+    invoice_id: string
+    invoice_number: string | null
+    customer_id: string | null
+    customer_name: string
+    customer_phone_e164: string
+    due_date: string | null
+    days_overdue: number
+    total_kr: number
+  }>
   projects_90d: {
     total_count: number
     completed_count: number
@@ -171,10 +184,11 @@ async function buildAggregate(
 
   const customerTypeMap: Record<string, string> = {}
   const customerNameMap: Record<string, string> = {}
+  const customerPhoneMap: Record<string, string> = {}
   if (customerIds.length > 0) {
     const { data: customers } = await supabase
       .from('customer')
-      .select('customer_id, customer_type, name')
+      .select('customer_id, customer_type, name, phone_number')
       .in('customer_id', customerIds)
       .eq('business_id', businessId)
     for (const c of customers || []) {
@@ -184,6 +198,7 @@ async function buildAggregate(
       const likelyBrf = !declaredType && (name.includes('brf') || name.includes('bostadsrätts'))
       customerTypeMap[c.customer_id] = declaredType || (likelyBrf ? 'brf' : 'private')
       customerNameMap[c.customer_id] = c.name || ''
+      if (c.phone_number) customerPhoneMap[c.customer_id] = c.phone_number
     }
   }
 
@@ -214,6 +229,44 @@ async function buildAggregate(
     oldestDays = Math.round(oldest.age)
     oldestInvoiceNumber = oldest.i.invoice_number
   }
+
+  // ── Actionable overdue (Steg 3 Dag 2, 2026-05-28) ──────────
+  // Topp 3 förfallna fakturor (>7d över due_date) där kunden har
+  // telefon registrerad. Karin kan generera action.send_sms för dessa.
+  // E.164-format: konvertera 07xxxxx → +467xxxxx för 46elks-kompatibilitet.
+  function toE164(raw: string | null | undefined): string | null {
+    if (!raw) return null
+    const clean = raw.replace(/[\s\-()]/g, '')
+    if (clean.startsWith('+')) return /^\+\d{8,15}$/.test(clean) ? clean : null
+    if (clean.startsWith('0')) {
+      const candidate = '+46' + clean.slice(1)
+      return /^\+\d{8,15}$/.test(candidate) ? candidate : null
+    }
+    return null
+  }
+  const overdueWithDue = sentPending
+    .map(i => {
+      const dueDate = i.due_date ? new Date(i.due_date).getTime() : null
+      if (!dueDate) return null
+      const daysOverdue = Math.floor((now - dueDate) / 86400000)
+      if (daysOverdue < 7) return null
+      const customerId = i.customer_id
+      const phoneE164 = customerId ? toE164(customerPhoneMap[customerId]) : null
+      if (!phoneE164) return null
+      return {
+        invoice_id: i.invoice_id,
+        invoice_number: i.invoice_number,
+        customer_id: customerId,
+        customer_name: customerId ? customerNameMap[customerId] || '' : '',
+        customer_phone_e164: phoneE164,
+        due_date: i.due_date,
+        days_overdue: daysOverdue,
+        total_kr: Math.round(Number(i.total || 0)),
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.days_overdue - a.days_overdue)
+    .slice(0, 3)
 
   // ── Projects (90d) ─────────────────────────────────────────
   const { data: projectsData } = await supabase
@@ -323,6 +376,7 @@ async function buildAggregate(
       oldest_days: oldestDays,
       oldest_invoice_number: oldestInvoiceNumber,
     },
+    actionable_overdue: overdueWithDue,
     projects_90d: {
       total_count: projects.length,
       completed_count: completedProjects.length,
@@ -409,6 +463,14 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Vilken månad har störst cash flow-dipp på grund av sena betalningar?
    - Finns specifika kunder som alltid ligger på gränsen?
 
+5. **Förfallna fakturor med konkret SMS-action (Steg 3 Dag 2):**
+   - I aggregate.actionable_overdue finns 0-3 fakturor som är >7 dagar förfallna OCH där kunden har telefon registrerad.
+   - För VARJE sådan faktura: generera en observation med strukturerad action.send_sms (se exempel nedan).
+   - SMS-tonen: vänlig påminnelse, INTE inkasso-hot. Hänvisa till fakturanummer + belopp.
+   - Returnera action.to i E.164 (kommer redan så från aggregatet — kopiera).
+   - Sätt dedup_key: "karin_overdue_reminder:\${invoice_number}" så samma faktura inte spammas dagligen.
+   - Confidence: 0.85 (säker på datan, osäker på om kunden är rätt person att SMSa just nu).
+
 Generera 1-3 KORTA observationer (max 2 meningar var) med konkret suggestion när det är vettigt.
 
 Var inte trivial. "Du har X förfallna fakturor" = data, inte observation.
@@ -439,6 +501,28 @@ EXAKT EXEMPEL — kopiera strukturen:
       "metric": "avg_days_to_payment_by_customer_type",
       "brf_avg_dso": 38,
       "private_avg_dso": 27
+    }
+  },
+  {
+    "knowledge_type": "anomaly",
+    "title": "Anna A. har förfallen faktura #123 sedan 12 dagar",
+    "observation": "Faktura #123 till Anna A. på 8 500 kr är 12 dagar förfallen. Hon brukar betala inom 7 dagar — något är annorlunda denna gång.",
+    "suggestion": "Skicka vänlig påminnelse via SMS.",
+    "confidence": 0.85,
+    "data_basis": {
+      "invoice_number": "123",
+      "customer_id": "cust_abc",
+      "days_overdue": 12,
+      "total_kr": 8500
+    },
+    "dedup_key": "karin_overdue_reminder:123",
+    "action": {
+      "type": "send_sms",
+      "to": "+46701234567",
+      "message": "Hej Anna! Påminnelse om faktura #123 (8 500 kr) som förföll 16/5. Hör av dig om något är oklart. Mvh \${företagsnamn}",
+      "customer_id": "cust_abc",
+      "customer_name": "Anna A.",
+      "related_id": "inv_id_xyz"
     }
   }
 ]`
