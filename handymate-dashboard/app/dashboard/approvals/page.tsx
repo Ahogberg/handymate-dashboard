@@ -97,6 +97,11 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
   review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   lead_review: { label: 'Ny lead', icon: Phone, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // Akut: kund tror de har ett projekt men auto-skapande failade. Röd för
+  // att signalera att hantverkaren måste agera nu (skapa projekt manuellt
+  // eller kontakta support). Skapas från /api/quotes/public/[token] när
+  // createProjectFromQuote() returnerar success=false eller kastar exception.
+  manual_project_create: { label: 'Skapa projekt', icon: AlertTriangle, bgColor: 'bg-red-50', textColor: 'text-red-700' },
   other: { label: 'Övrigt', icon: Bot, bgColor: 'bg-gray-50', textColor: 'text-gray-600' },
 }
 
