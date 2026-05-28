@@ -45,6 +45,16 @@ export interface AgentDebugInfo {
   validation_dropped: number
   validation_drop_reasons?: string[]
   parsed_observations?: AgentObservation[]
+  /** Steg 7 (2026-05-29): Anthropic API usage från response.usage.
+      Används av cron-route för agent_runs-logging och cost-cap-summering. */
+  usage?: {
+    input_tokens: number
+    output_tokens: number
+    cache_creation_input_tokens?: number
+    cache_read_input_tokens?: number
+  }
+  /** Steg 7: USD-kostnad för anropet, beräknad från usage + Sonnet 4.6-priser. */
+  estimated_cost_usd?: number
 }
 
 export interface ThinkingCallOptions {
@@ -142,6 +152,34 @@ export async function callAgentWithThinking(
   debug.stop_reason = data.stop_reason
   debug.content_block_count = blocks.length
   debug.content_block_types = blocks.map(b => b.type)
+
+  // Steg 7 (2026-05-29): usage + cost. Sonnet 4.6-priser:
+  //   $3/1M input tokens, $15/1M output tokens (thinking räknas som output)
+  //   Cache write: $3.75/1M (5m), cache read: $0.30/1M
+  // Defensiv parsing — om Anthropic ändrar shape framöver lever cron kvar.
+  if (data.usage && typeof data.usage === 'object') {
+    const u = data.usage as {
+      input_tokens?: number
+      output_tokens?: number
+      cache_creation_input_tokens?: number
+      cache_read_input_tokens?: number
+    }
+    const inputTokens = typeof u.input_tokens === 'number' ? u.input_tokens : 0
+    const outputTokens = typeof u.output_tokens === 'number' ? u.output_tokens : 0
+    const cacheWrite = typeof u.cache_creation_input_tokens === 'number' ? u.cache_creation_input_tokens : 0
+    const cacheRead = typeof u.cache_read_input_tokens === 'number' ? u.cache_read_input_tokens : 0
+    debug.usage = {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens,
+      cache_creation_input_tokens: cacheWrite,
+      cache_read_input_tokens: cacheRead,
+    }
+    const inputCost = (inputTokens / 1_000_000) * 3.0
+    const outputCost = (outputTokens / 1_000_000) * 15.0
+    const cacheWriteCost = (cacheWrite / 1_000_000) * 3.75
+    const cacheReadCost = (cacheRead / 1_000_000) * 0.30
+    debug.estimated_cost_usd = inputCost + outputCost + cacheWriteCost + cacheReadCost
+  }
 
   const thinkingBlock = blocks.find(b => b.type === 'thinking')
   const textBlock = blocks.find(b => b.type === 'text')
