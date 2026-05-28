@@ -42,6 +42,41 @@ export interface SaveAndPushResult {
   insights_pushed: number
   skipped_duplicates: number
   skipped_details: DedupSkipDetail[]
+  /** Steg 3 Dag 5b: antal approvals som rate-limit:ats bort
+      (>3 per agent per business per dag). Observation sparas
+      ändå i business_knowledge för insight-vyer, men ingen
+      approval-rad → ingen ny notis till hantverkaren. */
+  skipped_rate_limit: number
+}
+
+/**
+ * Max antal approvals en agent kan skapa per dag (per business).
+ * Förhindrar att en agent spammar 15 fakturapåminnelser på en gång om
+ * många kunder är förfallna. Christoffer (pilot) ser då 3 av Karin,
+ * 3 av Daniel, 3 av Lisa = 9 totalt = hanterbart.
+ *
+ * Reglerbart per agent om vi ser olika behov framöver.
+ */
+const MAX_APPROVALS_PER_AGENT_PER_DAY = 3
+
+async function countTodayApprovals(
+  supabase: SupabaseClient,
+  businessId: string,
+  agentId: string,
+): Promise<number> {
+  const startOfToday = new Date()
+  startOfToday.setUTCHours(0, 0, 0, 0)
+  const { count } = await supabase
+    .from('pending_approvals')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .gte('created_at', startOfToday.toISOString())
+    // Två sätt en approval kan tillhöra denna agent:
+    //   payload->>'agent_id' = agentId (typed actions, t.ex. send_sms)
+    //   payload->>'routed_agent' = agentId (generic agent_observation)
+    // .or() hanterar båda.
+    .or(`payload->>agent_id.eq.${agentId},payload->>routed_agent.eq.${agentId}`)
+  return count || 0
 }
 
 export async function saveAndPush(
@@ -54,7 +89,14 @@ export async function saveAndPush(
   let approvalsCreated = 0
   let insightsPushed = 0
   let skippedDuplicates = 0
+  let skippedRateLimit = 0
   const skippedDetails: DedupSkipDetail[] = []
+
+  // Rate-limit: hur många approvals har denna agent redan skapat idag?
+  // Räknas EN gång före loopen + decrementeras lokalt — vi vill inte
+  // skapa fler approvals än begränsningen tillåter inom samma run heller.
+  const todayCount = await countTodayApprovals(supabase, businessId, agentId)
+  let approvalsRemainingToday = Math.max(0, MAX_APPROVALS_PER_AGENT_PER_DAY - todayCount)
 
   for (const obs of observations) {
     // ── Dedup-check ────────────────────────────────────────────
@@ -113,6 +155,18 @@ export async function saveAndPush(
     if (obs.suggestion && obs.suggestion.trim().length > 0) {
       // Observation MED konkret action → skapa approval + push.
       //
+      // Steg 3 Dag 5b (2026-05-29): rate-limit. Om dagens kvot är slut
+      // sparar vi observationen i business_knowledge men hoppar över
+      // approval-skapandet — operatören slipper bli spamad.
+      if (approvalsRemainingToday <= 0) {
+        skippedRateLimit++
+        console.log(
+          `[rate-limit] agent=${agentId} business=${businessId} dagskvot slut — observation sparad utan approval`,
+        )
+        continue
+      }
+      approvalsRemainingToday--
+
       // Steg 3 Dag 2 (2026-05-28): Om obs.action finns blir approval typed
       // (t.ex. 'send_sms') så approve faktiskt skickar SMS via befintlig
       // executeApprovalPayload-switch. Utan action → legacy generic
@@ -192,5 +246,6 @@ export async function saveAndPush(
     insights_pushed: insightsPushed,
     skipped_duplicates: skippedDuplicates,
     skipped_details: skippedDetails,
+    skipped_rate_limit: skippedRateLimit,
   }
 }
