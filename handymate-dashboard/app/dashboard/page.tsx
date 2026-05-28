@@ -36,6 +36,7 @@ import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
+import { PendingApprovalsBlock } from '@/components/dashboard/PendingApprovalsBlock'
 import IdentityPill from '@/components/IdentityPill'
 
 interface Booking {
@@ -645,6 +646,12 @@ export default function DashboardPage() {
             Observationer (insikter, mönster, avvikelser, förslag) renderas
             inline per agent-rad istället för i ett separat kort. */}
         <TeamActivityStrip onLoaded={(summary) => setTeamSummaryText(buildSummaryText(summary))} />
+
+        {/* Pending approvals — Dashboard Steg 1A (2026-05-28).
+            Agent-first paradigm: förslag från teamet möter användaren
+            direkt på startsidan, inte gömda på sub-sida. Top 3 inline,
+            "Se alla" går till /dashboard/approvals. */}
+        <PendingApprovalsBlock />
 
         {/* Welcome popup — visas bara en gång */}
         {showWelcome && (
