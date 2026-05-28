@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 import { Sparkles, Check, X, ArrowRight, Loader2 } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 
@@ -243,14 +242,30 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
                     )}
                     <div className="flex items-center gap-2 mt-2">
                       {obs.suggestion && obs.related_approval_id && (
-                        <Link
-                          href="/dashboard/approvals?filter=agent_observation"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Steg 1C (2026-05-28): försök scrolla till
+                            // approval-card i PendingApprovalsBlock på
+                            // samma sida (om bland top-3). Annars navigera
+                            // till /dashboard/approvals med hash.
+                            const target = document.getElementById(`approval-${obs.related_approval_id}`)
+                            if (target) {
+                              target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                              target.classList.add('ring-2', 'ring-primary-400', 'ring-offset-2')
+                              setTimeout(() => {
+                                target.classList.remove('ring-2', 'ring-primary-400', 'ring-offset-2')
+                              }, 2000)
+                            } else {
+                              window.location.href = `/dashboard/approvals#approval-${obs.related_approval_id}`
+                            }
+                          }}
                           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-primary-700 hover:bg-primary-800 text-white text-[11px] font-medium transition-colors"
                         >
                           <Check className="w-3 h-3" />
                           Agera
                           <ArrowRight className="w-2.5 h-2.5" />
-                        </Link>
+                        </button>
                       )}
                       <button
                         onClick={() => handleDismiss(obs.id)}
