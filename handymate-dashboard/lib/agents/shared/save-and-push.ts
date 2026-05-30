@@ -26,6 +26,7 @@ import {
   findRecentDuplicate,
   getDedupWindowHours,
 } from './dedup'
+import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 
 export interface DedupSkipDetail {
   title: string
@@ -59,6 +60,22 @@ export interface SaveAndPushResult {
  */
 const MAX_APPROVALS_PER_AGENT_PER_DAY = 3
 
+/**
+ * Räkna dagens approvals för agent.
+ *
+ * 2026-05-30 (Fas 1a Dag 3 Commit C): refaktor till client-side
+ * filtrering via extractAgentId-helpern. Tidigare hade vi inline
+ * .or('payload->>agent_id.eq.X,payload->>routed_agent.eq.X')-syntax
+ * som duplicerade samma logik som approve-rate-calculatorn — risk
+ * för drift (DB-syntax ändras oberoende av TS-logiken). Med
+ * extractAgentId som en sanning räknar rate-limit och approve-rate
+ * EXAKT samma approvals.
+ *
+ * Kostnad: fetchar alla dagens approvals för businessen istället
+ * för att räkna i DB. För Bee-volym (~25-30 approvals/dag) är detta
+ * försumbart. Om volymen växer kraftigt kan vi pre-filtrera på
+ * created_at + business_id i DB och sedan client-side på agent.
+ */
 async function countTodayApprovals(
   supabase: SupabaseClient,
   businessId: string,
@@ -66,17 +83,18 @@ async function countTodayApprovals(
 ): Promise<number> {
   const startOfToday = new Date()
   startOfToday.setUTCHours(0, 0, 0, 0)
-  const { count } = await supabase
+
+  const { data } = await supabase
     .from('pending_approvals')
-    .select('*', { count: 'exact', head: true })
+    .select('payload')
     .eq('business_id', businessId)
     .gte('created_at', startOfToday.toISOString())
-    // Två sätt en approval kan tillhöra denna agent:
-    //   payload->>'agent_id' = agentId (typed actions, t.ex. send_sms)
-    //   payload->>'routed_agent' = agentId (generic agent_observation)
-    // .or() hanterar båda.
-    .or(`payload->>agent_id.eq.${agentId},payload->>routed_agent.eq.${agentId}`)
-  return count || 0
+
+  if (!data) return 0
+
+  // Filtrera via extractAgentId — samma logik som approve-rate-calculatorn.
+  const normalizedAgent = agentId.trim().toLowerCase()
+  return data.filter(row => extractAgentId({ payload: row.payload as Record<string, unknown> | null }) === normalizedAgent).length
 }
 
 export async function saveAndPush(
