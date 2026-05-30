@@ -25,6 +25,7 @@ import {
 import { extractAgentId } from '../lib/patterns/utils/extract-agent-id'
 import { computeApproveRate, type ApprovalSample } from '../lib/patterns/calculators/approve-rate'
 import { buildPatternUpsertPayload } from '../lib/patterns/run-patterns'
+import { computeDealCycle, type DealCycleSample } from '../lib/patterns/calculators/deal-cycle'
 
 let failed = 0
 let passed = 0
@@ -622,6 +623,142 @@ section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
     failed++
     console.log(`  ✗ oldest_sample_days_ago = ${age}, förväntat 24-26`)
   }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// computeDealCycle (Dag 6)
+// ─────────────────────────────────────────────────────────────────
+
+section('computeDealCycle')
+
+function makeDeal(id: string, cycleDays: number): DealCycleSample {
+  const created = new Date('2026-05-01T10:00:00Z')
+  const closed = new Date(created.getTime() + cycleDays * 86400000)
+  return {
+    id,
+    created_at: created.toISOString(),
+    closed_at: closed.toISOString(),
+    cycle_days: cycleDays,
+  }
+}
+
+// Tom samples-array
+{
+  const result = computeDealCycle([], WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 0, 'tom array → sample_size=0')
+  assertEqual(result.pattern_key, 'deal_cycle', 'pattern_key korrekt')
+  const val = result.value as { avg_days: number | null; median_days: number | null }
+  assertEqual(val.avg_days, null, 'avg_days=null vid n=0')
+  assertEqual(val.median_days, null, 'median_days=null vid n=0')
+}
+
+// Bee-reality: 1 vunnen med cycle=0 → exkluderas → sample_size=0
+{
+  const samples: DealCycleSample[] = [makeDeal('bee_test', 0)]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 0, 'Bee-reality: cycle=0 exkluderas, sample_size=0')
+  const meta = result.metadata as { excluded_total: number; excluded_by_kind?: { outlier?: number }; excluded_by_reason?: Record<string, number> }
+  assertEqual(meta.excluded_total, 1, 'excluded_total=1')
+  assertEqual(meta.excluded_by_kind, { outlier: 1 }, 'kind=outlier (cycle < 1 day)')
+  assertEqual(
+    meta.excluded_by_reason,
+    { cycle_under_1_day_likely_testdata: 1 },
+    'reason för cykel-outlier',
+  )
+}
+
+// Realistisk fördelning: 10 deals med varierande cycle
+{
+  const samples: DealCycleSample[] = [
+    makeDeal('d1', 5),
+    makeDeal('d2', 8),
+    makeDeal('d3', 10),
+    makeDeal('d4', 12),
+    makeDeal('d5', 14),
+    makeDeal('d6', 18),
+    makeDeal('d7', 22),
+    makeDeal('d8', 25),
+    makeDeal('d9', 30),
+    makeDeal('d10', 40),
+  ]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as {
+    avg_days: number
+    median_days: number
+    p25_days: number
+    p75_days: number
+    min_days: number
+    max_days: number
+  }
+  assertEqual(result.sample_size, 10, 'sample_size=10 (inga outliers)')
+  assertEqual(val.min_days, 5, 'min=5')
+  assertEqual(val.max_days, 40, 'max=40')
+  // avg = 184 / 10 = 18.4
+  if (Math.abs(val.avg_days - 18.4) < 0.01) {
+    passed++
+    console.log('  ✓ avg_days ≈ 18.4')
+  } else {
+    failed++
+    console.log(`  ✗ avg_days=${val.avg_days}, expected ≈18.4`)
+  }
+  // median = (14+18)/2 = 16 vid rank 4.5
+  if (Math.abs(val.median_days - 16) < 0.01) {
+    passed++
+    console.log('  ✓ median_days ≈ 16')
+  } else {
+    failed++
+    console.log(`  ✗ median_days=${val.median_days}, expected ≈16`)
+  }
+}
+
+// Mixed: 3 outliers (cycle < 1) + 5 valid
+{
+  const samples: DealCycleSample[] = [
+    makeDeal('o1', 0),
+    makeDeal('o2', 0.3),
+    makeDeal('o3', 0.9),
+    makeDeal('v1', 10),
+    makeDeal('v2', 20),
+    makeDeal('v3', 30),
+    makeDeal('v4', 40),
+    makeDeal('v5', 50),
+  ]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 5, 'sample_size=5 (3 outliers exkluderade)')
+  const val = result.value as { avg_days: number; min_days: number }
+  assertEqual(val.min_days, 10, 'min_days=10 (outliers borta)')
+  assertEqual(val.avg_days, 30, 'avg_days=30 ((10+20+30+40+50)/5)')
+
+  const meta = result.metadata as { excluded_total: number; excluded_by_kind?: { outlier?: number } }
+  assertEqual(meta.excluded_total, 3, 'excluded_total=3')
+  assertEqual(meta.excluded_by_kind, { outlier: 3 }, 'alla outliers')
+}
+
+// open_deals_count i metadata
+{
+  const samples: DealCycleSample[] = [makeDeal('d1', 15)]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END, 7)
+  const meta = result.metadata as { open_deals_count?: number }
+  assertEqual(meta.open_deals_count, 7, 'open_deals_count=7 från param')
+}
+
+// Inga öppna deals → ingen open_deals_count i metadata
+{
+  const samples: DealCycleSample[] = [makeDeal('d1', 15)]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END)
+  const meta = result.metadata as { open_deals_count?: number }
+  assertEqual(meta.open_deals_count, undefined, 'open_deals_count utelämnad om ej satt')
+}
+
+// Sample-size 1 (under preliminary tröskel 10) — fortfarande beräknas value
+{
+  const samples: DealCycleSample[] = [makeDeal('d1', 15)]
+  const result = computeDealCycle(samples, WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 1, 'sample_size=1')
+  const val = result.value as { avg_days: number; min_days: number; max_days: number }
+  assertEqual(val.avg_days, 15, 'avg_days=15')
+  assertEqual(val.min_days, 15, 'min=max för 1 sample')
+  assertEqual(val.max_days, 15, 'min=max för 1 sample')
 }
 
 // ─────────────────────────────────────────────────────────────────
