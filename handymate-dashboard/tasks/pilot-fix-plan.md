@@ -1,5 +1,7 @@
 # Pilot Fix-Plan — Bee Service Launch
 
+> ⚠️ **2026-05-30 status-uppdatering:** Steg 4 (Fortnox dubblett-fix) är kod-färdig och deployad (`af725917`) men **blockerad externt** av Fortnox-licens-fråga. Se [fortnox-license-blocker.md](fortnox-license-blocker.md). Pilot-pitch till Christoffer justeras: "Fortnox-sync kommer när licens-frågan är löst — du fortsätter manuellt tills dess."
+
 **Källor:** [tasks/pilot-readiness-audit-2026-05-20.md](pilot-readiness-audit-2026-05-20.md) (A1) + [tasks/audit-2-automations-agents-2026-05-20.md](audit-2-automations-agents-2026-05-20.md) (A2).
 
 **Mål:** Konkret fix-sekvens innan Bee Service-launch. Tre hinkar enligt Andreas prioritering.
@@ -122,6 +124,8 @@ if (body.project_id) {
 ---
 
 ### Steg 4 — A1-B3: Fortnox dubblett-faktura vid retry (2-3 h)
+
+> ⚠️ **EXTERN BLOCKERARE (2026-05-30):** Fortnox-OAuth kräver licens vi inte har än. Fix-koden är levererad (`af725917`, v58_invoice_fortnox_sync_status.sql) men kan inte testas/aktiveras förrän licens-frågan löst. Se [fortnox-license-blocker.md](fortnox-license-blocker.md). Klassificeras nu som **blockerad-externt** snarare än BLOCKERARE — pilot kan launcha utan Fortnox-sync.
 
 **Vad:** `/api/invoices/[id]/send-via-fortnox` sätter `invoice.status='sent'` även när Fortnox-sync failar, men returnerar `success=false`. Användaren trycker "Skicka igen" → dubblett i Fortnox.
 
