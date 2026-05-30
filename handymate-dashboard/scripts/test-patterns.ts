@@ -22,6 +22,7 @@ import {
   summarizeExclusions,
   type ExclusionRule,
 } from '../lib/patterns/exclusions'
+import { extractAgentId } from '../lib/patterns/utils/extract-agent-id'
 
 let failed = 0
 let passed = 0
@@ -294,6 +295,78 @@ assertEqual(
     excluded_by_reason: { 'cycle < 1 day': 2, 'missing customer': 2 },
   },
   'flera reasons → exclusion_reason = "mixed"',
+)
+
+// ─────────────────────────────────────────────────────────────────
+// extractAgentId
+// ─────────────────────────────────────────────────────────────────
+
+section('extractAgentId')
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: 'karin' } }),
+  'karin',
+  'agent_id direkt',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: 'Karin' } }),
+  'karin',
+  'agent_id lowercase-normaliserad',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: '  daniel  ' } }),
+  'daniel',
+  'agent_id trimmad',
+)
+
+assertEqual(
+  extractAgentId({ payload: { routed_agent: 'lars' } }),
+  'lars',
+  'routed_agent fallback när agent_id saknas',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: 'karin', routed_agent: 'daniel' } }),
+  'karin',
+  'agent_id vinner över routed_agent (typed actions har prioritet)',
+)
+
+assertEqual(
+  extractAgentId({ payload: {} }),
+  null,
+  'tomt payload → null',
+)
+
+assertEqual(
+  extractAgentId({ payload: null }),
+  null,
+  'null payload → null',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: '' } }),
+  null,
+  'tom string-agent_id → fallback (här null eftersom inget routed_agent)',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: '   ' } }),
+  null,
+  'whitespace-only agent_id → fallback',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: 123 } as Record<string, unknown> }),
+  null,
+  'non-string agent_id → null (defensiv)',
+)
+
+assertEqual(
+  extractAgentId({ payload: { agent_id: '', routed_agent: 'lisa' } }),
+  'lisa',
+  'tom agent_id → fallback till routed_agent',
 )
 
 // ─────────────────────────────────────────────────────────────────
