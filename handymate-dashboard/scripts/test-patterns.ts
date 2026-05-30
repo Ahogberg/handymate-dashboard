@@ -24,6 +24,7 @@ import {
 } from '../lib/patterns/exclusions'
 import { extractAgentId } from '../lib/patterns/utils/extract-agent-id'
 import { computeApproveRate, type ApprovalSample } from '../lib/patterns/calculators/approve-rate'
+import { buildPatternUpsertPayload } from '../lib/patterns/run-patterns'
 
 let failed = 0
 let passed = 0
@@ -582,6 +583,103 @@ section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
   } else {
     failed++
     console.log(`  ✗ oldest_sample_days_ago = ${age}, förväntat 24-26`)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// buildPatternUpsertPayload (Dag 4)
+// ─────────────────────────────────────────────────────────────────
+
+section('buildPatternUpsertPayload')
+
+// Bygg en realistisk CalculatorResult + ConfidenceAssessment
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z', 'send_sms'),
+    makeApproval('rejected', 'karin', '2026-05-29T11:00:00Z', 'send_sms'),
+    makeApproval('approved', 'karin', '2026-05-29T12:00:00Z', 'send_sms'),
+    makeApproval('approved', 'karin', '2026-05-29T13:00:00Z', 'send_sms'),
+    makeApproval('approved', 'karin', '2026-05-29T14:00:00Z', 'send_sms'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  // 5 samples → preliminary
+  const conf = {
+    confidence: 'preliminary' as const,
+    is_stale: false,
+    threshold_used: 5,
+    next_threshold: 15,
+  }
+  const fixedNow = new Date('2026-05-30T05:00:00Z')
+
+  const payload = buildPatternUpsertPayload('biz_test', result, conf, fixedNow)
+
+  assertEqual(payload.business_id, 'biz_test', 'business_id satt')
+  assertEqual(payload.pattern_key, 'approve_rate', 'pattern_key från result')
+  assertEqual(payload.sample_size, 5, 'sample_size från result')
+  assertEqual(payload.confidence, 'preliminary', 'confidence från assessment')
+  assertEqual(payload.is_stale, false, 'is_stale från assessment')
+  assertEqual(payload.data_window_start, WINDOW_START, 'data_window_start från result')
+  assertEqual(payload.data_window_end, WINDOW_END, 'data_window_end från result')
+  assertEqual(payload.last_calculated_at, '2026-05-30T05:00:00.000Z', 'last_calculated_at från now-param')
+
+  // Verifiera att value och metadata är pass-through från result
+  if (JSON.stringify(payload.value) !== JSON.stringify(result.value)) {
+    failed++
+    console.log('  ✗ payload.value matchar inte result.value')
+  } else {
+    passed++
+    console.log('  ✓ payload.value = result.value (pass-through)')
+  }
+
+  if (JSON.stringify(payload.metadata) !== JSON.stringify(result.metadata)) {
+    failed++
+    console.log('  ✗ payload.metadata matchar inte result.metadata')
+  } else {
+    passed++
+    console.log('  ✓ payload.metadata = result.metadata (pass-through)')
+  }
+}
+
+// is_stale=true för låg sample
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z', 'send_sms'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const conf = {
+    confidence: 'preliminary' as const,
+    is_stale: true,
+    threshold_used: 0,
+    next_threshold: 5,
+  }
+  const payload = buildPatternUpsertPayload('biz_test', result, conf)
+
+  assertEqual(payload.is_stale, true, 'is_stale=true vid låg sample')
+  assertEqual(payload.sample_size, 1, 'sample_size=1')
+}
+
+// Idempotens-stöd: samma input → samma payload (förutom last_calculated_at)
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z', 'send_sms'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const conf = {
+    confidence: 'preliminary' as const,
+    is_stale: true,
+    threshold_used: 0,
+    next_threshold: 5,
+  }
+  const fixedNow = new Date('2026-05-30T05:00:00Z')
+  const p1 = buildPatternUpsertPayload('biz_test', result, conf, fixedNow)
+  const p2 = buildPatternUpsertPayload('biz_test', result, conf, fixedNow)
+
+  if (JSON.stringify(p1) === JSON.stringify(p2)) {
+    passed++
+    console.log('  ✓ samma input + samma now → identisk payload (idempotent-trygg)')
+  } else {
+    failed++
+    console.log('  ✗ identisk input gav olika payload')
   }
 }
 
