@@ -332,6 +332,31 @@ Varje pattern har sin egen data-window:
 
 ---
 
+## Fas 1a-status (2026-05-30, uppdaterat efter Dag 5)
+
+| Dag | Innehåll | Commits | Tester |
+|---|---|---|---|
+| 0 | SQL-verifiering av Bee:s data | (utfört av Andreas, rapporterat) | — |
+| 1 | `sql/v61_business_patterns.sql` + `lib/patterns/types.ts` | `892a4fd9` | — (typer + schema) |
+| 2 | `sample-thresholds.ts` + `exclusions.ts` + sanity-tester | `7ad8ad27`, sanity-fix | 42 |
+| 3 | `extract-agent-id.ts` (Commit A) + `approve-rate.ts` (Commit B) + `saveAndPush` refactor (Commit C) + `APPROVE_RATE_EXCLUSIONS` (Commit D) | `ed63ddde`, `7434e074`, `f2b7e1cd` | 90 |
+| 4 | `run-patterns.ts` + cron-route + test-route | `cd374ebc` | 103 |
+| 5 | `vercel.json`-entry (05:05 UTC) + [`lib/patterns/README.md`](../lib/patterns/README.md) + denna statusuppdatering | (pågående commit) | 103 |
+| 6 | `deal-cycle` + `ata-frequency` calculators | ⏳ | — |
+
+**Manuell verifiering mot Bee (2026-05-30, Dag 4):**
+- ✓ Test-route triggar `runPatternsForBusiness` korrekt
+- ✓ business_patterns-rad skapas: `approve_rate`, sample_size=0, confidence=preliminary, is_stale=true, value=`{overall_rate:null,per_agent:{},overall_n:0}`, metadata.excluded_outliers=0
+- ✓ Idempotens: andra triggern UPSERT:ar (1 rad, last_calculated_at tickar)
+- ✓ Kill-switch: `agents_globally_paused=true` → `result: { skipped: 'agents_globally_paused' }`
+
+**Bee-state efter Dag 4:**
+- 2 pending Lars-approvals (agent_observation, status=pending → exkluderas av resolved-filter i DB-wrapper)
+- 0 resolved approvals någonsin för Karin/Daniel/Lisa typed actions
+- `approve_rate` blir `is_stale=false` när Christoffer börjar approve/reject 5+ typed actions
+
+---
+
 ## Bygg-plan: Fas 1a (5-7 dagar)
 
 **Bygg-ordning enligt Andreas (2026-05-30):** approve-rate → deal-cycle → ata-frequency. Calculators byggs ÄVEN om sample-size är för låg — markerar `is_stale=true` istället för att hoppa över. Visuellt mönstret från MarginalCard:s potential-tillstånd: "lär mig fortfarande".

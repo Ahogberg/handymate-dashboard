@@ -6,6 +6,10 @@
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/cron/patterns",
+      "schedule": "5 5 * * *"
+    },
+    {
       "path": "/api/cron/gmail-poll",
       "schedule": "*/15 * * * *"
     },
