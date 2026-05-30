@@ -3,29 +3,37 @@
  *
  * Per tasks/fas1-pattern-extraction-design.md Tier A.
  *
- * Pattern: hur ofta godkänner användaren agentförslag, per agent?
+ * Pattern: hur ofta godkänner användaren agentens KONKRETA förslag?
  *
- * Sample = en resolved approval (status approved | rejected | edited).
+ * Sample = en resolved approval (status approved | rejected | edited)
+ *          MED actionable approval_type (typed action, inte ack-only).
  * Window: senaste 30 dagar.
- * Min N preliminary: 5 totala resolved approvals.
+ * Min N preliminary: 5 totala resolved approvals (efter exclusions).
  *
- * Beräkning:
+ * KRITISK semantik (Andreas-fråga 2026-05-30):
+ * approval_type='agent_observation' och 'agent_insight' är INFORMATIVA
+ * — Lars/Hannas varnings-observations som hantverkaren bara ack:ar.
+ * "Approve" här betyder "Tack, jag noterar", inte "Skicka SMS:et".
+ * Räknar man dessa som godkända får man falsk-hög rate (alltid ~100%
+ * eftersom ingen rejecte:ar en informativ notis).
+ *
+ * Exclusion-rule: `approval_type IN ('agent_observation', 'agent_insight')`
+ * → exkluderas innan rate-beräkning. Bara typed actions där approve
+ * betyder "utför handlingen" räknas.
+ *
+ * Beräkning (på kept samples efter exclusions):
  *   per_agent[X].approved = count där status=approved + agent=X
  *   per_agent[X].rejected = count där status=rejected + agent=X
  *   per_agent[X].edited   = count där status=edited + agent=X
  *   per_agent[X].rate     = approved / (approved + rejected + edited)
  *                            STRIKT: edited räknas inte som "godkänt"
- *                            men inkluderas i nämnaren. Resultat:
- *                            "Karin: 50% rate" = hälften av förslag
- *                            godkändes oförändrade.
+ *                            men inkluderas i nämnaren.
  *
  *   overall_rate = sum(approved) / sum(approved + rejected + edited)
- *   overall_n    = total kept-samples (efter exclusions, här inga)
+ *   overall_n    = total kept-samples (efter exclusions)
  *
- * Exclusion-rules: inga. Alla resolved approvals är giltiga samples.
  * Null-agent-approvals (autopilot, dispatch m.fl.) räknas inte i
- * per_agent men inkluderas i overall_n eftersom de ÄR resolved
- * samples — bara inte agent-attribuerade.
+ * per_agent men inkluderas i overall_n om de är typed actions.
  *
  * Designval: split i ren funktion `computeApproveRate(approvals[])` +
  * thin DB-wrapper `calculateApproveRate(supabase, businessId)`.
@@ -34,6 +42,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { assessConfidence, getDataWindow } from '../sample-thresholds'
+import { applyExclusions, summarizeExclusions, type ExclusionRule } from '../exclusions'
 import { extractAgentId } from '../utils/extract-agent-id'
 import type {
   ApproveRateValue,
@@ -52,6 +61,11 @@ import type {
 export interface ApprovalSample {
   id: string
   status: string  // 'approved' | 'rejected' | 'edited' | annat (filtreras)
+  /**
+   * Den approval-typ som skapades. Används för att skilja typed actions
+   * (rate-mätbara) från generic ack-only observations.
+   */
+  approval_type: string
   payload: Record<string, unknown> | null
   created_at: string
 }
@@ -62,6 +76,35 @@ export interface ApprovalSample {
  * feedback.
  */
 const RESOLVED_STATUSES = new Set(['approved', 'rejected', 'edited'])
+
+/**
+ * Approval-typer som är INFORMATIVA snarare än actionable. Användarens
+ * "approve" här = "Tack, jag noterar", inte "Utför handlingen". Dessa
+ * exkluderas från rate-beräkning eftersom de skulle ge falsk-hög rate
+ * (ingen rejecte:ar en informativ notis).
+ *
+ * Använder blocklist (inte allowlist) eftersom dessa två typer är väl
+ * etablerade som ack-only och listan är liten. Om nya generic-typer
+ * tillkommer i framtiden måste de adderas här. När antalet stabiliseras
+ * kan vi switcha till allowlist över actionable-typer.
+ */
+const GENERIC_INFO_APPROVAL_TYPES = new Set([
+  'agent_observation',  // Lars/Hannas warning-observations, legacy generic
+  'agent_insight',      // ren info-push utan approval-rad (sällsynt här)
+])
+
+/**
+ * Exclusion-rules för approve_rate (Andreas-fråga 2026-05-30).
+ *
+ * Exporteras så cron-route (Dag 4) kan inkludera dem i metadata-spår
+ * om vi vill visa "X observations exkluderades från rate-mätning".
+ */
+export const APPROVE_RATE_EXCLUSIONS: ExclusionRule<ApprovalSample>[] = [
+  {
+    predicate: s => GENERIC_INFO_APPROVAL_TYPES.has(s.approval_type),
+    reason: 'generic_observation_not_actionable',
+  },
+]
 
 // ─────────────────────────────────────────────────────────────────
 // Ren funktion — unit-testbar utan DB
@@ -82,16 +125,21 @@ export function computeApproveRate(
   dataWindowStart: string,
   dataWindowEnd: string,
 ): CalculatorResult {
-  // Defensiv filter: ta bara resolved samples
+  // Steg 1: defensiv filter — bara resolved samples
   const resolved = samples.filter(s => RESOLVED_STATUSES.has(s.status))
 
-  // Per agent + overall aggregering
+  // Steg 2: exkludera generic info-typer (agent_observation, agent_insight)
+  // — deras "approve" är inte kvalitetssignal på agentens förslag.
+  const exclusionResult = applyExclusions(resolved, APPROVE_RATE_EXCLUSIONS)
+  const kept = exclusionResult.kept
+
+  // Per agent + overall aggregering på kept samples
   const perAgent: ApproveRateValue['per_agent'] = {}
   let totalApproved = 0
   let totalRejected = 0
   let totalEdited = 0
 
-  for (const sample of resolved) {
+  for (const sample of kept) {
     const agentId = extractAgentId(sample)
     const status = sample.status
 
@@ -124,20 +172,24 @@ export function computeApproveRate(
     overall_n: overallDenom,
   }
 
-  const sampleSize = resolved.length  // total resolved oavsett agent
+  // sample_size = kept (post-exclusion). Avspeglar antal mätbara approvals.
+  const sampleSize = kept.length
 
   // Metadata: ålder på äldsta sample för "data-färskhet"-bedömning
   let oldestSampleDaysAgo: number | undefined
-  if (resolved.length > 0) {
-    const oldestIso = resolved.reduce(
+  if (kept.length > 0) {
+    const oldestIso = kept.reduce(
       (acc, s) => (s.created_at < acc ? s.created_at : acc),
-      resolved[0].created_at,
+      kept[0].created_at,
     )
     const ageMs = Date.now() - new Date(oldestIso).getTime()
     oldestSampleDaysAgo = Math.floor(ageMs / 86400000)
   }
 
+  // Slå ihop exclusion-summa med övrig metadata
+  const exclusionSummary = summarizeExclusions(exclusionResult)
   const metadata: ApproveRateMetadata = {
+    ...exclusionSummary,
     ...(oldestSampleDaysAgo !== undefined ? { oldest_sample_days_ago: oldestSampleDaysAgo } : {}),
   }
 
@@ -176,7 +228,7 @@ export async function calculateApproveRate(
 
   const { data, error } = await supabase
     .from('pending_approvals')
-    .select('id, status, payload, created_at')
+    .select('id, status, approval_type, payload, created_at')
     .eq('business_id', businessId)
     .in('status', ['approved', 'rejected', 'edited'])
     .gte('created_at', window.start.toISOString())

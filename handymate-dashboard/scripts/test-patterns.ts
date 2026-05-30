@@ -383,10 +383,12 @@ function makeApproval(
   status: string,
   agentId: string | null,
   created_at: string,
+  approval_type: string = 'send_sms',  // default actionable för existerande tester
 ): ApprovalSample {
   return {
     id: `appr_${Math.random().toString(36).slice(2, 8)}`,
     status,
+    approval_type,
     payload: agentId ? { agent_id: agentId } : {},
     created_at,
   }
@@ -473,19 +475,94 @@ function makeApproval(
   assertEqual(val.per_agent.karin.n, 1, 'Karin n=1')
 }
 
-// routed_agent-fallback fungerar för legacy agent_observation
+// routed_agent-fallback fungerar för legacy (men typed action — agent_observation
+// exkluderas separat nedan)
 {
   const samples: ApprovalSample[] = [
     {
       id: 'a1',
       status: 'approved',
+      approval_type: 'send_sms',  // typed → räknas
       payload: { routed_agent: 'lars' },  // legacy: bara routed_agent
       created_at: '2026-05-29T10:00:00Z',
     },
   ]
   const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
   const val = result.value as { per_agent: Record<string, { approved: number }> }
-  assertEqual(val.per_agent.lars.approved, 1, 'routed_agent → lars räknad')
+  assertEqual(val.per_agent.lars.approved, 1, 'routed_agent → lars räknad (typed action)')
+}
+
+// Andreas-spec (2026-05-30): agent_observation EXKLUDERAS
+section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
+
+// 5 Lars agent_observation + 3 Karin send_sms → bara Karin räknas
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'lars', '2026-05-29T10:00:00Z', 'agent_observation'),
+    makeApproval('approved', 'lars', '2026-05-29T11:00:00Z', 'agent_observation'),
+    makeApproval('approved', 'lars', '2026-05-29T12:00:00Z', 'agent_observation'),
+    makeApproval('approved', 'lars', '2026-05-29T13:00:00Z', 'agent_observation'),
+    makeApproval('approved', 'lars', '2026-05-29T14:00:00Z', 'agent_observation'),
+    makeApproval('approved', 'karin', '2026-05-29T15:00:00Z', 'send_sms'),
+    makeApproval('rejected', 'karin', '2026-05-29T16:00:00Z', 'send_sms'),
+    makeApproval('approved', 'karin', '2026-05-29T17:00:00Z', 'send_sms'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, unknown>; overall_n: number }
+
+  assertEqual(result.sample_size, 3, 'sample_size=3 (5 Lars exkluderade)')
+  assertEqual(val.overall_n, 3, 'overall_n=3 (bara Karin send_sms räknas)')
+  assertEqual(
+    (val.per_agent.lars as undefined),
+    undefined,
+    'Lars finns inte i per_agent (alla agent_observation exkluderade)',
+  )
+
+  const meta = result.metadata as { excluded_outliers: number; exclusion_reason?: string }
+  assertEqual(meta.excluded_outliers, 5, 'metadata.excluded_outliers=5')
+  assertEqual(
+    meta.exclusion_reason,
+    'generic_observation_not_actionable',
+    'exclusion_reason satt',
+  )
+}
+
+// agent_insight exkluderas också
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'hanna', '2026-05-29T10:00:00Z', 'agent_insight'),
+    makeApproval('approved', 'karin', '2026-05-29T11:00:00Z', 'send_invoice'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 1, 'sample_size=1 (Hanna agent_insight exkluderad)')
+  const meta = result.metadata as { excluded_outliers: number }
+  assertEqual(meta.excluded_outliers, 1, 'excluded_outliers=1')
+}
+
+// Bee:s reality-test: bara Lars agent_observation + null testdata
+// → 0 mätbara samples (replikerar dagens A/B-resultat)
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'lars', '2026-05-30T06:10:57Z', 'agent_observation'),
+    makeApproval('approved', 'lars', '2026-05-30T06:10:56Z', 'agent_observation'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { overall_n: number; overall_rate: number | null }
+  assertEqual(result.sample_size, 0, 'Bee-reality: 0 mätbara approve_rate-samples')
+  assertEqual(val.overall_rate, null, 'overall_rate=null (inget att räkna)')
+  assertEqual(val.overall_n, 0, 'overall_n=0')
+}
+
+// Inga exklueringar när alla samples är actionable
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z', 'send_sms'),
+    makeApproval('rejected', 'karin', '2026-05-29T11:00:00Z', 'send_invoice'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const meta = result.metadata as { excluded_outliers: number; exclusion_reason?: string }
+  assertEqual(meta.excluded_outliers, 0, 'inga exklueringar → 0')
+  assertEqual(meta.exclusion_reason, undefined, 'inget reason när 0 exklueringar')
 }
 
 // Metadata: oldest_sample_days_ago
