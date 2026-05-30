@@ -140,25 +140,32 @@ export type CalculatorResult =
 // Per-pattern metadata-typer
 // ─────────────────────────────────────────────────────────────────
 
-export interface ApproveRateMetadata {
-  /** Antal exkluderade samples + anledning. Tom om inga exkluderingar. */
-  excluded_outliers?: number
-  exclusion_reason?: string
+/**
+ * Delad exclusion-metadata-struktur (Andreas 2026-05-30).
+ *
+ * Sätts av summarizeExclusions(). Spreaden in i pattern-specifik
+ * metadata så fält-namn är konsekventa över alla calculators.
+ *
+ * Vid 0 exkluderade samples → bara `excluded_total: 0` skrivs.
+ * Vid 1+ → båda by_kind + by_reason för audit.
+ */
+export interface ExclusionMetadata {
+  excluded_total?: number
+  excluded_by_kind?: { type?: number; outlier?: number }
+  excluded_by_reason?: Record<string, number>
+}
+
+export interface ApproveRateMetadata extends ExclusionMetadata {
   /** Hur länge sedan första resolved approval. För att bedöma om data är "färsk". */
   oldest_sample_days_ago?: number
 }
 
-export interface DealCycleMetadata {
-  /** Andreas 2026-05-30: exkludera cycle_days < 1 (testdata). */
-  excluded_outliers: number
-  exclusion_reason: 'cycle < 1 day'
+export interface DealCycleMetadata extends ExclusionMetadata {
   /** Hur många öppna deals finns det utöver vunna? Kontext för Christoffer. */
   open_deals_count?: number
 }
 
-export interface AtaFrequencyMetadata {
-  excluded_outliers?: number
-  exclusion_reason?: string
+export interface AtaFrequencyMetadata extends ExclusionMetadata {
   /** Per projekttyp om projektet har project_type satt. */
   by_project_type?: Record<string, {
     total: number

@@ -35,7 +35,30 @@
  */
 
 /**
- * En exclusion-rule = predikat + reason-text för metadata.
+ * Exclusion-kategori för audit-rapportering.
+ *
+ * Andreas-observation 2026-05-30: vid first körning mot Bee visade
+ * metadata `excluded_outliers: 0` trots att 2 Lars-observations hade
+ * exkluderats av agent_observation-typ-filtret. Det var tekniskt korrekt
+ * (DB-status-filter sker före computeApproveRate, så 0 samples nådde
+ * exclusions) men strukturen missade att rapportera vad som hade hänt
+ * om datan hade varit annorlunda.
+ *
+ * Två konceptuellt olika kategorier:
+ *   - 'type'    = strukturell exklusion (fel approval_type, fel kategori).
+ *                 Exempel: APPROVE_RATE_EXCLUSIONS exkluderar
+ *                 approval_type='agent_observation' eftersom de är
+ *                 ack-only, inte kvalitetssignal.
+ *   - 'outlier' = data-anomali (testdata, fel värden, edge-case).
+ *                 Exempel: DEAL_CYCLE_EXCLUSIONS exkluderar deals med
+ *                 cycle_days < 1 eftersom det troligen är testdata.
+ *
+ * Default 'outlier' om kind saknas (bakåt-kompatibilitet).
+ */
+export type ExclusionKind = 'type' | 'outlier'
+
+/**
+ * En exclusion-rule = predikat + reason-text + kind för metadata.
  *
  * @typeParam T — sample-typen (specifik per calculator, t.ex. DealRow
  *               för deal_cycle, ApprovalRow för approve_rate).
@@ -56,27 +79,41 @@ export interface ExclusionRule<T> {
   predicate: (sample: T) => boolean
 
   /**
-   * Human-readable reason-text som loggas i metadata.exclusion_reason.
-   * Bör vara stabil string (för dedup i excluded_by_reason-counter).
+   * Human-readable reason-text som loggas i metadata.excluded_by_reason.
+   * Bör vara stabil string (för dedup i counter).
    *
-   * Konvention: kort beskrivning, t.ex. "cycle < 1 day",
-   * "missing customer_id", "test_data_flag".
+   * Konvention: kort beskrivning, t.ex. "cycle_under_1_day_likely_testdata",
+   * "generic_observation_not_actionable", "missing_customer_id".
    */
   reason: string
+
+  /**
+   * Kategori för audit-rapportering. Default 'outlier' om utelämnad.
+   *
+   * 'type'    = strukturell exklusion (fel approval_type, fel kategori)
+   * 'outlier' = data-anomali (testdata, fel värden, edge-case)
+   */
+  kind?: ExclusionKind
 }
 
 /**
  * Resultat av att tillämpa exclusion-rules på en sample-array.
  *
- * `excluded_by_reason` är aggregerad räknare per reason — lätt att
- * serialisera till metadata.excluded_outliers + metadata.exclusion_reason
- * i business_patterns-raden.
+ * Två aggregat-vägar (Andreas 2026-05-30):
+ *   - `excluded_by_reason` = detaljerad räknare per reason-text
+ *     (audit-spår: VARFÖR exkluderades samplet)
+ *   - `excluded_by_kind`   = aggregerad räknare per kind ('type'/'outlier')
+ *     (kategori-spår: VILKEN TYP av exklusion)
+ *
+ * UI/Fas 2 kan visa båda: "82 exkluderade (80 strukturella, 2 outliers)".
  */
 export interface ExclusionResult<T> {
   kept: T[]
   excluded: T[]
-  /** Aggregerad räknare per reason-text. T.ex. { "cycle < 1 day": 2 }. */
+  /** Aggregerad räknare per reason-text. T.ex. { "cycle_under_1_day_likely_testdata": 2 }. */
   excluded_by_reason: Record<string, number>
+  /** Aggregerad räknare per kind. Saknad kind defaultar till 'outlier'. */
+  excluded_by_kind: { type?: number; outlier?: number }
 }
 
 /**
@@ -99,9 +136,10 @@ export function applyExclusions<T>(
   const kept: T[] = []
   const excluded: T[] = []
   const excluded_by_reason: Record<string, number> = {}
+  const excluded_by_kind: { type?: number; outlier?: number } = {}
 
   if (rules.length === 0) {
-    return { kept: [...samples], excluded: [], excluded_by_reason: {} }
+    return { kept: [...samples], excluded: [], excluded_by_reason: {}, excluded_by_kind: {} }
   }
 
   for (const sample of samples) {
@@ -109,38 +147,42 @@ export function applyExclusions<T>(
     if (triggered) {
       excluded.push(sample)
       excluded_by_reason[triggered.reason] = (excluded_by_reason[triggered.reason] || 0) + 1
+      const kind: ExclusionKind = triggered.kind || 'outlier'
+      excluded_by_kind[kind] = (excluded_by_kind[kind] || 0) + 1
     } else {
       kept.push(sample)
     }
   }
 
-  return { kept, excluded, excluded_by_reason }
+  return { kept, excluded, excluded_by_reason, excluded_by_kind }
 }
 
 /**
  * Helper för att packa ExclusionResult till metadata-format som
- * business_patterns-raden förväntar sig (excluded_outliers + reason).
+ * business_patterns-raden förväntar sig.
  *
- * Aggregerar:
- *   - excluded_outliers: total antal exkluderade
- *   - exclusion_reason: första rule som triggade (eller "mixed" om flera)
- *   - excluded_by_reason: detalj per rule (bevarad i metadata för audit)
+ * Andreas 2026-05-30: två aggregat — `excluded_by_kind` (type vs outlier)
+ * och `excluded_by_reason` (detaljerad audit). UI/Fas 2 kan visa båda:
+ *   "82 exkluderade (80 strukturella, 2 outliers)"
  *
- * Om inga exkluderingar → returnerar tomt object så metadata-spreaden
- * inte lägger till brus.
+ * Om inga exklueringar → returnerar bara `excluded_total: 0`. Spreaden
+ * lägger då inte till brus i metadata.
  */
 export function summarizeExclusions<T>(
   result: ExclusionResult<T>,
-): { excluded_outliers: number; exclusion_reason?: string; excluded_by_reason?: Record<string, number> } {
+): {
+  excluded_total: number
+  excluded_by_kind?: { type?: number; outlier?: number }
+  excluded_by_reason?: Record<string, number>
+} {
   const total = result.excluded.length
   if (total === 0) {
-    return { excluded_outliers: 0 }
+    return { excluded_total: 0 }
   }
 
-  const reasons = Object.keys(result.excluded_by_reason)
   return {
-    excluded_outliers: total,
-    exclusion_reason: reasons.length === 1 ? reasons[0] : 'mixed',
+    excluded_total: total,
+    excluded_by_kind: result.excluded_by_kind,
     excluded_by_reason: result.excluded_by_reason,
   }
 }

@@ -103,6 +103,7 @@ export const APPROVE_RATE_EXCLUSIONS: ExclusionRule<ApprovalSample>[] = [
   {
     predicate: s => GENERIC_INFO_APPROVAL_TYPES.has(s.approval_type),
     reason: 'generic_observation_not_actionable',
+    kind: 'type',  // strukturell exklusion, inte data-outlier
   },
 ]
 

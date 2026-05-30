@@ -177,6 +177,7 @@ const samples: SampleRow[] = [
   assertEqual(result.kept.length, 5, 'inga rules → 5 kept')
   assertEqual(result.excluded.length, 0, 'inga rules → 0 excluded')
   assertEqual(result.excluded_by_reason, {}, 'inga rules → tomt reason-map')
+  assertEqual(result.excluded_by_kind, {}, 'inga rules → tomt kind-map')
 }
 
 // En rule, ingen träff
@@ -187,9 +188,10 @@ const samples: SampleRow[] = [
   const result = applyExclusions(samples, noop)
   assertEqual(result.kept.length, 5, 'rule matchar inget → 5 kept')
   assertEqual(result.excluded.length, 0, 'rule matchar inget → 0 excluded')
+  assertEqual(result.excluded_by_kind, {}, 'rule matchar inget → tomt kind-map')
 }
 
-// En rule, alla matchar
+// En rule, alla matchar (default kind=outlier)
 {
   const all: ExclusionRule<SampleRow>[] = [
     { predicate: () => true, reason: 'always' },
@@ -198,6 +200,39 @@ const samples: SampleRow[] = [
   assertEqual(result.kept.length, 0, 'rule matchar alla → 0 kept')
   assertEqual(result.excluded.length, 5, 'rule matchar alla → 5 excluded')
   assertEqual(result.excluded_by_reason, { always: 5 }, 'reason-count = 5')
+  assertEqual(result.excluded_by_kind, { outlier: 5 }, 'default kind=outlier')
+}
+
+// Explicit kind=type rule
+{
+  const all: ExclusionRule<SampleRow>[] = [
+    { predicate: () => true, reason: 'always', kind: 'type' },
+  ]
+  const result = applyExclusions(samples, all)
+  assertEqual(result.excluded_by_kind, { type: 5 }, 'kind=type respekterad')
+}
+
+// Mixed kinds — 3 outlier (default) + 2 type
+{
+  const samplesMixed: SampleRow[] = [
+    { id: 'a', cycle_days: 0, has_customer: true },   // outlier
+    { id: 'b', cycle_days: 0, has_customer: true },   // outlier
+    { id: 'c', cycle_days: 0, has_customer: true },   // outlier
+    { id: 'd', cycle_days: 5, has_customer: false },  // type
+    { id: 'e', cycle_days: 5, has_customer: false },  // type
+  ]
+  const rules: ExclusionRule<SampleRow>[] = [
+    { predicate: d => d.cycle_days < 1, reason: 'cycle_under_1_day_likely_testdata' },  // default outlier
+    { predicate: d => !d.has_customer, reason: 'missing_customer_structural', kind: 'type' },
+  ]
+  const result = applyExclusions(samplesMixed, rules)
+  assertEqual(result.excluded.length, 5, '5 excluded totalt')
+  assertEqual(result.excluded_by_kind, { outlier: 3, type: 2 }, 'split per kind')
+  assertEqual(
+    result.excluded_by_reason,
+    { cycle_under_1_day_likely_testdata: 3, missing_customer_structural: 2 },
+    'split per reason',
+  )
 }
 
 // Mönster-test: DEAL_CYCLE_EXCLUSIONS från Dag 6 spec
@@ -209,6 +244,7 @@ const samples: SampleRow[] = [
   assertEqual(result.kept.length, 3, 'deal_cycle: 3 kept (a, c, e)')
   assertEqual(result.excluded.length, 2, 'deal_cycle: 2 excluded (b, d)')
   assertEqual(result.excluded_by_reason, { 'cycle < 1 day': 2 }, 'reason-count = 2')
+  assertEqual(result.excluded_by_kind, { outlier: 2 }, 'default kind=outlier')
   assertEqual(
     result.kept.map(s => s.id).sort(),
     ['a', 'c', 'e'],
@@ -223,9 +259,6 @@ const samples: SampleRow[] = [
     { predicate: d => !d.has_customer, reason: 'missing customer' },
   ]
   const result = applyExclusions(samples, rules)
-  // a, c kept (uppfyller båda)
-  // b, d exkluderas av 'cycle < 1 day'
-  // e exkluderas av 'missing customer'
   assertEqual(result.kept.length, 2, '2 kept (a, c)')
   assertEqual(result.excluded.length, 3, '3 excluded (b, d, e)')
   assertEqual(
@@ -257,6 +290,7 @@ const samples: SampleRow[] = [
   assertEqual(result.kept.length, 0, 'tom input → 0 kept')
   assertEqual(result.excluded.length, 0, 'tom input → 0 excluded')
   assertEqual(result.excluded_by_reason, {}, 'tom input → tomt reason-map')
+  assertEqual(result.excluded_by_kind, {}, 'tom input → tomt kind-map')
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -266,9 +300,9 @@ const samples: SampleRow[] = [
 section('summarizeExclusions')
 
 assertEqual(
-  summarizeExclusions({ kept: [1, 2, 3], excluded: [], excluded_by_reason: {} }),
-  { excluded_outliers: 0 },
-  'inga exklueringar → bara excluded_outliers=0',
+  summarizeExclusions({ kept: [1, 2, 3], excluded: [], excluded_by_reason: {}, excluded_by_kind: {} }),
+  { excluded_total: 0 },
+  'inga exklueringar → bara excluded_total=0',
 )
 
 assertEqual(
@@ -276,27 +310,29 @@ assertEqual(
     kept: [1, 2],
     excluded: [3, 4],
     excluded_by_reason: { 'cycle < 1 day': 2 },
+    excluded_by_kind: { outlier: 2 },
   }),
   {
-    excluded_outliers: 2,
-    exclusion_reason: 'cycle < 1 day',
+    excluded_total: 2,
+    excluded_by_kind: { outlier: 2 },
     excluded_by_reason: { 'cycle < 1 day': 2 },
   },
-  'en reason → exclusion_reason = den reason',
+  'en outlier-reason → kind={outlier:2}',
 )
 
 assertEqual(
   summarizeExclusions({
     kept: [1],
     excluded: [2, 3, 4, 5],
-    excluded_by_reason: { 'cycle < 1 day': 2, 'missing customer': 2 },
+    excluded_by_reason: { 'cycle < 1 day': 2, 'agent_observation': 2 },
+    excluded_by_kind: { outlier: 2, type: 2 },
   }),
   {
-    excluded_outliers: 4,
-    exclusion_reason: 'mixed',
-    excluded_by_reason: { 'cycle < 1 day': 2, 'missing customer': 2 },
+    excluded_total: 4,
+    excluded_by_kind: { outlier: 2, type: 2 },
+    excluded_by_reason: { 'cycle < 1 day': 2, 'agent_observation': 2 },
   },
-  'flera reasons → exclusion_reason = "mixed"',
+  'mixed → båda kinds rapporteras',
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -519,12 +555,13 @@ section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
     'Lars finns inte i per_agent (alla agent_observation exkluderade)',
   )
 
-  const meta = result.metadata as { excluded_outliers: number; exclusion_reason?: string }
-  assertEqual(meta.excluded_outliers, 5, 'metadata.excluded_outliers=5')
+  const meta = result.metadata as { excluded_total: number; excluded_by_kind?: { type?: number; outlier?: number }; excluded_by_reason?: Record<string, number> }
+  assertEqual(meta.excluded_total, 5, 'metadata.excluded_total=5')
+  assertEqual(meta.excluded_by_kind, { type: 5 }, 'kind=type (APPROVE_RATE_EXCLUSIONS markerar type)')
   assertEqual(
-    meta.exclusion_reason,
-    'generic_observation_not_actionable',
-    'exclusion_reason satt',
+    meta.excluded_by_reason,
+    { generic_observation_not_actionable: 5 },
+    'by_reason granular',
   )
 }
 
@@ -536,8 +573,9 @@ section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
   ]
   const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
   assertEqual(result.sample_size, 1, 'sample_size=1 (Hanna agent_insight exkluderad)')
-  const meta = result.metadata as { excluded_outliers: number }
-  assertEqual(meta.excluded_outliers, 1, 'excluded_outliers=1')
+  const meta = result.metadata as { excluded_total: number; excluded_by_kind?: { type?: number } }
+  assertEqual(meta.excluded_total, 1, 'excluded_total=1')
+  assertEqual(meta.excluded_by_kind, { type: 1 }, 'kind=type')
 }
 
 // Bee:s reality-test: bara Lars agent_observation + null testdata
@@ -561,9 +599,9 @@ section('computeApproveRate — APPROVE_RATE_EXCLUSIONS')
     makeApproval('rejected', 'karin', '2026-05-29T11:00:00Z', 'send_invoice'),
   ]
   const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
-  const meta = result.metadata as { excluded_outliers: number; exclusion_reason?: string }
-  assertEqual(meta.excluded_outliers, 0, 'inga exklueringar → 0')
-  assertEqual(meta.exclusion_reason, undefined, 'inget reason när 0 exklueringar')
+  const meta = result.metadata as { excluded_total: number; excluded_by_kind?: unknown }
+  assertEqual(meta.excluded_total, 0, 'inga exklueringar → 0')
+  assertEqual(meta.excluded_by_kind, undefined, 'ingen by_kind när 0 exklueringar')
 }
 
 // Metadata: oldest_sample_days_ago
