@@ -23,6 +23,7 @@ import {
   type ExclusionRule,
 } from '../lib/patterns/exclusions'
 import { extractAgentId } from '../lib/patterns/utils/extract-agent-id'
+import { computeApproveRate, type ApprovalSample } from '../lib/patterns/calculators/approve-rate'
 
 let failed = 0
 let passed = 0
@@ -368,6 +369,144 @@ assertEqual(
   'lisa',
   'tom agent_id → fallback till routed_agent',
 )
+
+// ─────────────────────────────────────────────────────────────────
+// computeApproveRate (ren funktion — DB-fritt)
+// ─────────────────────────────────────────────────────────────────
+
+section('computeApproveRate')
+
+const WINDOW_START = '2026-04-30T00:00:00Z'
+const WINDOW_END = '2026-05-30T00:00:00Z'
+
+function makeApproval(
+  status: string,
+  agentId: string | null,
+  created_at: string,
+): ApprovalSample {
+  return {
+    id: `appr_${Math.random().toString(36).slice(2, 8)}`,
+    status,
+    payload: agentId ? { agent_id: agentId } : {},
+    created_at,
+  }
+}
+
+// Tom samples-array
+{
+  const result = computeApproveRate([], WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 0, 'tom array → sample_size=0')
+  assertEqual(result.pattern_key, 'approve_rate', 'pattern_key korrekt')
+  assertEqual((result.value as { overall_rate: number | null }).overall_rate, null, 'overall_rate=null vid n=0')
+  assertEqual((result.value as { overall_n: number }).overall_n, 0, 'overall_n=0')
+}
+
+// Bara null-agent approvals (autopilot etc) → räknas i overall men ej per-agent
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', null, '2026-05-29T10:00:00Z'),
+    makeApproval('rejected', null, '2026-05-29T11:00:00Z'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, unknown>; overall_rate: number; overall_n: number }
+  assertEqual(result.sample_size, 2, 'sample_size=2 trots null-agents')
+  assertEqual(Object.keys(val.per_agent).length, 0, 'per_agent tomt (null exkluderas)')
+  assertEqual(val.overall_n, 2, 'overall_n=2')
+  assertEqual(val.overall_rate, 0.5, 'overall_rate=0.5 (1 approved av 2)')
+}
+
+// Karin: 3 approved, 1 rejected → rate 75%
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z'),
+    makeApproval('approved', 'karin', '2026-05-29T11:00:00Z'),
+    makeApproval('approved', 'karin', '2026-05-29T12:00:00Z'),
+    makeApproval('rejected', 'karin', '2026-05-29T13:00:00Z'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, { approved: number; rejected: number; edited: number; rate: number | null; n: number }> }
+  assertEqual(val.per_agent.karin.approved, 3, 'Karin approved=3')
+  assertEqual(val.per_agent.karin.rejected, 1, 'Karin rejected=1')
+  assertEqual(val.per_agent.karin.edited, 0, 'Karin edited=0')
+  assertEqual(val.per_agent.karin.rate, 0.75, 'Karin rate=0.75')
+  assertEqual(val.per_agent.karin.n, 4, 'Karin n=4')
+}
+
+// Mix av agenter + edited
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z'),
+    makeApproval('approved', 'karin', '2026-05-29T11:00:00Z'),
+    makeApproval('edited', 'karin', '2026-05-29T12:00:00Z'),
+    makeApproval('approved', 'daniel', '2026-05-29T13:00:00Z'),
+    makeApproval('rejected', 'daniel', '2026-05-29T14:00:00Z'),
+    makeApproval('rejected', 'daniel', '2026-05-29T15:00:00Z'),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, { approved: number; rejected: number; edited: number; rate: number | null; n: number }>; overall_rate: number; overall_n: number }
+
+  // Karin: 2 approved + 1 edited → rate = 2/3
+  assertEqual(val.per_agent.karin.approved, 2, 'Karin approved=2')
+  assertEqual(val.per_agent.karin.edited, 1, 'Karin edited=1')
+  assertEqual(val.per_agent.karin.rate, 2 / 3, 'Karin rate = 2/3 (edited räknas inte som approved)')
+
+  // Daniel: 1 approved + 2 rejected → rate = 1/3
+  assertEqual(val.per_agent.daniel.approved, 1, 'Daniel approved=1')
+  assertEqual(val.per_agent.daniel.rejected, 2, 'Daniel rejected=2')
+  assertEqual(val.per_agent.daniel.rate, 1 / 3, 'Daniel rate = 1/3')
+
+  // Overall: 3 approved + 2 rejected + 1 edited = 6 → rate 3/6 = 0.5
+  assertEqual(val.overall_n, 6, 'overall_n=6')
+  assertEqual(val.overall_rate, 0.5, 'overall_rate=0.5')
+}
+
+// Defensiv: icke-resolved status (pending, expired) ska ignoreras
+{
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', '2026-05-29T10:00:00Z'),
+    makeApproval('pending', 'karin', '2026-05-29T11:00:00Z'),  // exkluderas
+    makeApproval('expired', 'karin', '2026-05-29T12:00:00Z'),  // exkluderas
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, { n: number }> }
+  assertEqual(result.sample_size, 1, 'bara approved räknas (pending/expired exkluderade)')
+  assertEqual(val.per_agent.karin.n, 1, 'Karin n=1')
+}
+
+// routed_agent-fallback fungerar för legacy agent_observation
+{
+  const samples: ApprovalSample[] = [
+    {
+      id: 'a1',
+      status: 'approved',
+      payload: { routed_agent: 'lars' },  // legacy: bara routed_agent
+      created_at: '2026-05-29T10:00:00Z',
+    },
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { per_agent: Record<string, { approved: number }> }
+  assertEqual(val.per_agent.lars.approved, 1, 'routed_agent → lars räknad')
+}
+
+// Metadata: oldest_sample_days_ago
+{
+  const oldDate = new Date(Date.now() - 25 * 86400000).toISOString()  // 25 dagar sen
+  const samples: ApprovalSample[] = [
+    makeApproval('approved', 'karin', oldDate),
+    makeApproval('approved', 'karin', new Date().toISOString()),
+  ]
+  const result = computeApproveRate(samples, WINDOW_START, WINDOW_END)
+  const meta = result.metadata as { oldest_sample_days_ago?: number }
+  // Tillåt ±1 dag drift
+  const age = meta.oldest_sample_days_ago || 0
+  if (age >= 24 && age <= 26) {
+    passed++
+    console.log(`  ✓ oldest_sample_days_ago ~25 dagar (faktiskt: ${age})`)
+  } else {
+    failed++
+    console.log(`  ✗ oldest_sample_days_ago = ${age}, förväntat 24-26`)
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Pattern-config sanity
