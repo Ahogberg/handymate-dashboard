@@ -419,6 +419,16 @@ export function checkSubscriptionStatus(business: any): {
     }
   }
 
+  // 'comp' = co-founder/partner/investor-comp = gratis-access utan Stripe.
+  // Explicit case för klarhet — annars hamnar det i default-fallet och
+  // läsare av koden undrar om vi har glömt något. BillingStatusBanner
+  // visar ingen banner för 'comp' (kollar bara 'trialing'/'past_due').
+  // Sätt subscription_status='comp' i business_config för pilot-businesses
+  // som har gratis-access (Bee Service biz_21wswuhrbhy som första).
+  if (status === 'comp') {
+    return { active: true }
+  }
+
   // active, paid eller okänd status → tillåt (fail-open för att inte bryta befintliga kunder)
   return { active: true }
 }
