@@ -24,6 +24,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { CalculatorResult, ConfidenceAssessment } from './types'
 import { calculateApproveRate } from './calculators/approve-rate'
+import { calculateDealCycle } from './calculators/deal-cycle'
+import { calculateAtaFrequency } from './calculators/ata-frequency'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -100,9 +102,14 @@ async function upsertPattern(
  *
  * Per-calculator try/catch — en fail stoppar inte de andra.
  *
- * TODO Dag 6: lägg till deal_cycle + ata_frequency-calculators.
- * Mönster: anropa calculator, build payload, upsert. Samma struktur
- * som approve-rate-blocket.
+ * Tier A (alla aktiva från Dag 6, 2026-05-30):
+ *   - approve_rate
+ *   - deal_cycle
+ *   - ata_frequency
+ *
+ * För att lägga till ny calculator: kopiera ett block, byt funktion +
+ * pattern_key + ev. metadata-fält. Se lib/patterns/README.md för full
+ * mall.
  */
 export async function runPatternsForBusiness(
   supabase: SupabaseClient,
@@ -123,7 +130,7 @@ export async function runPatternsForBusiness(
       sample_size: result.sample_size,
       confidence: confidence.confidence,
       is_stale: confidence.is_stale,
-      excluded_outliers: (result.metadata as { excluded_outliers?: number }).excluded_outliers ?? 0,
+      excluded_total: (result.metadata as { excluded_total?: number }).excluded_total ?? 0,
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -131,8 +138,40 @@ export async function runPatternsForBusiness(
     console.error(`[patterns/${businessId}] approve_rate failed:`, msg)
   }
 
-  // TODO Dag 6: deal_cycle (calculateDealCycle + buildPatternUpsertPayload + upsertPattern)
-  // TODO Dag 6: ata_frequency (samma mönster)
+  // ── Tier A — deal_cycle ───────────────────────────────────────
+  try {
+    const { result, confidence } = await calculateDealCycle(supabase, businessId, now)
+    const payload = buildPatternUpsertPayload(businessId, result, confidence, now)
+    await upsertPattern(supabase, payload)
+    patternsUpdated.push('deal_cycle')
+    console.log(`[patterns/${businessId}] deal_cycle:`, {
+      sample_size: result.sample_size,
+      confidence: confidence.confidence,
+      is_stale: confidence.is_stale,
+      excluded_total: (result.metadata as { excluded_total?: number }).excluded_total ?? 0,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    errors.push({ pattern: 'deal_cycle', error: msg })
+    console.error(`[patterns/${businessId}] deal_cycle failed:`, msg)
+  }
+
+  // ── Tier A — ata_frequency ────────────────────────────────────
+  try {
+    const { result, confidence } = await calculateAtaFrequency(supabase, businessId, now)
+    const payload = buildPatternUpsertPayload(businessId, result, confidence, now)
+    await upsertPattern(supabase, payload)
+    patternsUpdated.push('ata_frequency')
+    console.log(`[patterns/${businessId}] ata_frequency:`, {
+      sample_size: result.sample_size,
+      confidence: confidence.confidence,
+      is_stale: confidence.is_stale,
+    })
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    errors.push({ pattern: 'ata_frequency', error: msg })
+    console.error(`[patterns/${businessId}] ata_frequency failed:`, msg)
+  }
 
   return {
     business_id: businessId,
