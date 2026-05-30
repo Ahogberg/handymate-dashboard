@@ -26,6 +26,7 @@ import { extractAgentId } from '../lib/patterns/utils/extract-agent-id'
 import { computeApproveRate, type ApprovalSample } from '../lib/patterns/calculators/approve-rate'
 import { buildPatternUpsertPayload } from '../lib/patterns/run-patterns'
 import { computeDealCycle, type DealCycleSample } from '../lib/patterns/calculators/deal-cycle'
+import { computeAtaFrequency, type AtaFrequencySample } from '../lib/patterns/calculators/ata-frequency'
 
 let failed = 0
 let passed = 0
@@ -759,6 +760,139 @@ function makeDeal(id: string, cycleDays: number): DealCycleSample {
   assertEqual(val.avg_days, 15, 'avg_days=15')
   assertEqual(val.min_days, 15, 'min=max för 1 sample')
   assertEqual(val.max_days, 15, 'min=max för 1 sample')
+}
+
+// ─────────────────────────────────────────────────────────────────
+// computeAtaFrequency (Dag 6)
+// ─────────────────────────────────────────────────────────────────
+
+section('computeAtaFrequency')
+
+function makeProject(id: string, ataCount: number, projectType: string | null = null): AtaFrequencySample {
+  return {
+    id,
+    project_type: projectType,
+    created_at: '2026-05-01T10:00:00Z',
+    ata_count: ataCount,
+  }
+}
+
+// Tom samples
+{
+  const result = computeAtaFrequency([], WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 0, 'tom array → sample_size=0')
+  const val = result.value as { total_projects: number; pct_with_ata: number }
+  assertEqual(val.total_projects, 0, 'total_projects=0')
+  assertEqual(val.pct_with_ata, 0, 'pct_with_ata=0 vid n=0')
+}
+
+// Bee-reality: 24 projekt, 0 med ÄTA → 0% (FÖRSTA RIKTIGA UTTALANDET)
+{
+  const samples: AtaFrequencySample[] = Array.from({ length: 24 }, (_, i) =>
+    makeProject(`bee_p${i}`, 0),
+  )
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  assertEqual(result.sample_size, 24, 'sample_size=24')
+  const val = result.value as {
+    total_projects: number
+    projects_with_ata: number
+    pct_with_ata: number
+    avg_ata_per_project: number
+  }
+  assertEqual(val.total_projects, 24, 'total_projects=24')
+  assertEqual(val.projects_with_ata, 0, 'projects_with_ata=0')
+  assertEqual(val.pct_with_ata, 0, 'pct_with_ata=0 (Bee-reality)')
+  assertEqual(val.avg_ata_per_project, 0, 'avg_ata=0')
+
+  const meta = result.metadata as { excluded_total: number; by_project_type?: unknown }
+  assertEqual(meta.excluded_total, 0, 'inga exclusions (alla projekt giltiga)')
+  assertEqual(meta.by_project_type, undefined, 'ingen project_type-breakdown om inga satt')
+}
+
+// Realistisk mix: 10 projekt, 4 med ÄTA → 40%
+{
+  const samples: AtaFrequencySample[] = [
+    makeProject('p1', 0),
+    makeProject('p2', 0),
+    makeProject('p3', 0),
+    makeProject('p4', 0),
+    makeProject('p5', 0),
+    makeProject('p6', 0),
+    makeProject('p7', 1),
+    makeProject('p8', 2),
+    makeProject('p9', 1),
+    makeProject('p10', 3),
+  ]
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as {
+    projects_with_ata: number
+    pct_with_ata: number
+    avg_ata_per_project: number
+  }
+  assertEqual(val.projects_with_ata, 4, 'projects_with_ata=4')
+  assertEqual(val.pct_with_ata, 0.4, 'pct_with_ata=0.4')
+  assertEqual(val.avg_ata_per_project, 0.7, 'avg_ata=7/10=0.7')
+}
+
+// by_project_type-breakdown
+{
+  const samples: AtaFrequencySample[] = [
+    makeProject('p1', 0, 'badrum'),
+    makeProject('p2', 1, 'badrum'),
+    makeProject('p3', 2, 'badrum'),
+    makeProject('p4', 0, 'kök'),
+    makeProject('p5', 0, 'kök'),
+  ]
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  const meta = result.metadata as { by_project_type?: Record<string, { total: number; with_ata: number; pct: number }> }
+  if (!meta.by_project_type) {
+    failed++
+    console.log('  ✗ by_project_type saknas')
+  } else {
+    assertEqual(meta.by_project_type.badrum.total, 3, 'badrum total=3')
+    assertEqual(meta.by_project_type.badrum.with_ata, 2, 'badrum with_ata=2')
+    // pct = 2/3 ≈ 0.6667
+    if (Math.abs(meta.by_project_type.badrum.pct - 2 / 3) < 0.001) {
+      passed++
+      console.log('  ✓ badrum pct ≈ 0.667')
+    } else {
+      failed++
+      console.log(`  ✗ badrum pct=${meta.by_project_type.badrum.pct}, expected ≈0.667`)
+    }
+    assertEqual(meta.by_project_type.kök.total, 2, 'kök total=2')
+    assertEqual(meta.by_project_type.kök.with_ata, 0, 'kök with_ata=0')
+    assertEqual(meta.by_project_type.kök.pct, 0, 'kök pct=0')
+  }
+}
+
+// Blandning: vissa med project_type, andra utan
+{
+  const samples: AtaFrequencySample[] = [
+    makeProject('p1', 1, 'badrum'),
+    makeProject('p2', 0, null),  // utan typ — räknas i total men inte i breakdown
+  ]
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { total_projects: number; pct_with_ata: number }
+  assertEqual(val.total_projects, 2, 'total inkluderar typ-lösa')
+  assertEqual(val.pct_with_ata, 0.5, 'pct räknar alla')
+
+  const meta = result.metadata as { by_project_type?: Record<string, { total: number }> }
+  if (meta.by_project_type) {
+    assertEqual(meta.by_project_type.badrum.total, 1, 'breakdown bara med satt typ')
+  }
+}
+
+// Alla projekt har ÄTA
+{
+  const samples: AtaFrequencySample[] = [
+    makeProject('p1', 1),
+    makeProject('p2', 2),
+    makeProject('p3', 1),
+  ]
+  const result = computeAtaFrequency(samples, WINDOW_START, WINDOW_END)
+  const val = result.value as { pct_with_ata: number; avg_ata_per_project: number }
+  assertEqual(val.pct_with_ata, 1, '100%')
+  assertEqual(val.avg_ata_per_project, 4 / 3, 'avg = 4/3')
 }
 
 // ─────────────────────────────────────────────────────────────────
