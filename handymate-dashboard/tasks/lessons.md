@@ -37,3 +37,17 @@
 - **Idempotens på extern sida:** Sätt `ExternalReference1: <local_id>` på extern payload (om service stödjer det) → möjliggör framtida GET-lookup för in-flight-recovery.
 - **Post-flight automationer (pipeline-flytt, project-stage, notiser) ska BARA triggas vid sync_status='synced'** — annars triggar de på fakturor som inte nådde Fortnox alls.
 - **Referens:** [app/api/invoices/[id]/send-via-fortnox/route.ts](../app/api/invoices/%5Bid%5D/send-via-fortnox/route.ts) + [sql/v58_invoice_fortnox_sync_status.sql](../sql/v58_invoice_fortnox_sync_status.sql). Pilot-fix-plan Steg 4, audit 1 B3.
+
+## SQL-kolumner i prod-DB matchar INTE alltid SQL-filerna i `sql/`
+- **Symptom (2026-05-30):** Skrev `SELECT bc.billing_plan FROM business_config` → `42703: column "billing_plan" does not exist`. Kolumnen finns i `sql/billing.sql` + `sql/inbox_and_fixes.sql` med `ADD COLUMN IF NOT EXISTS`, men kördes aldrig i prod. Senare migration `sql/v14_consolidate_plans.sql` flyttade till `subscription_plan` som primär källa.
+- **Tidigare lessons-rad** ("grep efter faktiska kolumnnamn i `from('table').select(...)`-anrop") är inte tillräcklig — grep mot kod kan visa kolumner som *används* i kod men inte *finns* i prod-DB.
+- **Skärpt regel:** För kolumn-existens i prod, kolla **v_*-migrationer i kronologisk ordning** för senaste konsolidering. `IF NOT EXISTS`-pattern garanterar inte att migrationen kördes — bara att den inte failade om den kördes.
+- **Säkrast vid osäkerhet:** Be Andreas köra `SELECT column_name FROM information_schema.columns WHERE table_name='X'` innan jag baserar query på antagandet.
+- **Generell:** Lessons-raden om kolumn-verifiering ska gälla även när jag SER kolumnen i SQL-filer — `ADD COLUMN IF NOT EXISTS` är inte bevis för att den finns i prod.
+
+## Stripe `subscription_status` är INTE alltid sann mot Stripe-verkligheten
+- **Symptom (2026-05-30):** Drog felaktig slutsats att Christoffer "betalar för dött konto" baserat på `subscription_status='active'` på inaktiv business. Verkligheten: Bee har co-founder-gratis-access, ingen Stripe-debitering sker — `subscription_status`-fältet driftade isär från Stripe utan ekonomisk konsekvens.
+- **Regel:** Status-fält som *speglar* externt system (Stripe, Fortnox, etc) är inte authoritative — de är cache. Anta inte att de stämmer med externt system utan att verifiera.
+- **Innan ekonomisk slutsats:** Fråga om "pengar faktiskt rör sig" är en business-fråga, inte en DB-fråga. Stripe dashboard är sanning, DB är spegel.
+- **Generell:** När jag drar slutsatser om kundpåverkan (pengar, faktura, refund) — verifiera grundantaganden (är detta riktig betalande kund? co-founder-comp? trial?) **innan** jag flaggar akut. Andreas's affärsmodell är inte alltid synlig i koden.
+- **Loggat som separat TD:** [td-stripe-sync-verification.md](td-stripe-sync-verification.md) — verifiera webhook-sync innan första betalande kund onboardas.
