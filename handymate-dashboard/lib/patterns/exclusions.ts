@@ -42,8 +42,16 @@
  */
 export interface ExclusionRule<T> {
   /**
-   * Returnerar true om samplet ska EXKLUDERAS.
-   * Falskt (inkl. undefined) = behåll samplet.
+   * Returnerar `true` om samplet ska EXKLUDERAS.
+   * Falskt (inkl. `undefined`) = behåll samplet.
+   *
+   * VARFÖR `true = exkludera` (inte "behålla"):
+   * Det matchar hur regler läses i kod naturligt. Deklarativ rule:
+   *   { predicate: d => d.cycle_days < 1, reason: 'cycle < 1 day' }
+   * Läses som "exclude samples where cycle_days < 1" — predikat-villkoret
+   * BESKRIVER vad som ska exkluderas. Inverterad konvention (true =
+   * behåll) skulle tvinga negation: `d => !(d.cycle_days < 1)`, vilket
+   * är mindre läsbart.
    */
   predicate: (sample: T) => boolean
 
