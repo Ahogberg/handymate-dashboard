@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { recordLearningEvent } from '@/lib/agent/learning-engine'
+import { sendSmsViaElks } from '@/lib/sms-send'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
@@ -156,8 +158,42 @@ export async function POST(
 }
 
 /**
+ * Internal helper för SMS-baserade approval-cases (Audit-3 Fix A, 2026-06-01).
+ *
+ * Tidigare använde 9 cases `fetch(appUrl + /api/sms/send)` som FAILAR
+ * server-side: /api/sms/send har getAuthenticatedBusiness-check som
+ * returnerar 401 utan cookie/Authorization-header → silent failure
+ * (status='approved' men SMS skickas aldrig).
+ *
+ * Lösning: kalla sendSmsViaElks direkt — bypassar route-layer-auth,
+ * loggar i sms_log, returnerar { success, error }. Samma pattern som
+ * review_request använde redan (rad 215-282 i originalfilen).
+ *
+ * Helpern är scoped till executeApprovalPayload via closure så
+ * business_name fetchas lazy + bara EN gång per execution oavsett hur
+ * många SMS-cases triggas (autopilot_package kan ha flera).
+ */
+async function fetchBusinessName(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('business_config')
+    .select('business_name')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  return data?.business_name || null
+}
+
+/**
  * Execute the payload action based on approval_type.
  * Returns result info (non-fatal — approval is already marked approved).
+ *
+ * TD: Status-flip ordning (Audit-3 Fix B framtida).
+ * Status='approved' sätts i POST-handler INNAN denna funktion kallas.
+ * Vid execution-fail kan vi inte återställa pending utan att skapa
+ * edge-cases (SMS skickat men status fail-back, etc.). Bygg när vi
+ * har pilot-data om vilka edge-cases som faktiskt händer.
  */
 async function executeApprovalPayload(
   approval: { approval_type: string; payload: Record<string, unknown>; business_id: string; package_data?: any },
@@ -167,20 +203,81 @@ async function executeApprovalPayload(
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
 
+  // Lazy supabase + business_name — laddas bara om SMS-case triggas
+  let supabaseClient: SupabaseClient | null = null
+  let businessNameCache: string | null | undefined = undefined  // undefined = ej hämtad än
+  async function getSupabase(): Promise<SupabaseClient> {
+    if (!supabaseClient) supabaseClient = getServerSupabase()
+    return supabaseClient
+  }
+  async function getBusinessName(): Promise<string | null> {
+    if (businessNameCache === undefined) {
+      businessNameCache = await fetchBusinessName(await getSupabase(), businessId)
+    }
+    return businessNameCache
+  }
+
+  /**
+   * Skicka SMS via sendSmsViaElks. Använder cachad supabase + business_name.
+   * Returnerar standardiserad shape som varje case spreader in i sin
+   * return-value: { sms_sent, sms_id?, elks_id?, error?, sms_status? }.
+   */
+  async function sendSms(opts: {
+    to: string
+    message: string
+    customerId?: string | null
+    relatedId?: string | null
+    messageType: string
+  }): Promise<{
+    sms_sent: boolean
+    sms_id?: string
+    elks_id?: string
+    error?: string
+    sms_status?: number | null
+  }> {
+    const supabase = await getSupabase()
+    const businessName = await getBusinessName()
+    const result = await sendSmsViaElks({
+      supabase,
+      businessId,
+      businessName,
+      to: opts.to,
+      message: opts.message,
+      customerId: opts.customerId,
+      relatedId: opts.relatedId,
+      messageType: opts.messageType,
+    })
+    return {
+      sms_sent: result.success,
+      sms_id: result.smsId,
+      elks_id: result.elksId,
+      error: result.error,
+      sms_status: result.status,
+    }
+  }
+  // appUrl används fortfarande av icke-SMS-cases (send_quote, create_booking,
+  // etc.) — separat audit för deras silent-failure-risk (TD).
+
   try {
     switch (approval_type) {
       case 'quote_nudge':
       case 'send_sms': {
-        const res = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: payload.to,
-            message: payload.message,
-          }),
+        // Audit-3 Fix A (2026-06-01): sendSmsViaElks direkt istället för
+        // internal fetch som failade server-side. Karin/Daniel/Lisa typed
+        // actions går via denna case.
+        const to = (payload.to as string | undefined) || (payload.customer_phone as string | undefined)
+        const message = payload.message as string | undefined
+        if (!to || !message) {
+          return { action: 'send_sms', error: 'payload saknar to eller message' }
+        }
+        const r = await sendSms({
+          to,
+          message,
+          customerId: (payload.customer_id as string | undefined) || null,
+          relatedId: (payload.related_id as string | undefined) || null,
+          messageType: approval_type,
         })
-        return { action: 'send_sms', ok: res.ok }
+        return { action: 'send_sms', ...r }
       }
 
       case 'send_quote': {
@@ -318,16 +415,20 @@ async function executeApprovalPayload(
             }
 
             case 'customer_sms': {
-              const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  business_id: businessId,
-                  to: act.data.to,
-                  message: act.data.message,
-                }),
+              // Audit-3 Fix A (2026-06-01)
+              const to = act.data.to as string | undefined
+              const message = act.data.message as string | undefined
+              if (!to || !message) {
+                results.push({ id: act.id, type: 'sms', ok: false, error: 'no to/message' })
+                break
+              }
+              const r = await sendSms({
+                to,
+                message,
+                customerId: (act.data.customer_id as string | undefined) || null,
+                messageType: 'autopilot_customer_sms',
               })
-              results.push({ id: act.id, type: 'sms', ok: smsRes.ok })
+              results.push({ id: act.id, type: 'sms', ok: r.sms_sent, error: r.error })
               break
             }
 
@@ -459,24 +560,23 @@ async function executeApprovalPayload(
         if (!pl.customer_phone || !pl.suggested_sms) {
           return { action: 'proactive_care', skipped: 'no phone or message' }
         }
-        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: pl.customer_phone,
-            message: pl.suggested_sms,
-          }),
+        // Audit-3 Fix A (2026-06-01)
+        const r = await sendSms({
+          to: pl.customer_phone,
+          message: pl.suggested_sms,
+          customerId: pl.customer_id || null,
+          relatedId: pl.project_id || null,
+          messageType: 'proactive_care',
         })
 
         // Logga i v3_automation_logs
-        const supabasePC = (await import('@/lib/supabase')).getServerSupabase()
+        const supabasePC = await getSupabase()
         await supabasePC.from('v3_automation_logs').insert({
           business_id: businessId,
           rule_name: 'proactive_customer_care',
           trigger_type: 'approval_executed',
           action_type: 'send_sms',
-          status: smsRes.ok ? 'success' : 'failed',
+          status: r.sms_sent ? 'success' : 'failed',
           context: {
             customer_id: pl.customer_id,
             customer_name: pl.customer_name,
@@ -488,7 +588,8 @@ async function executeApprovalPayload(
 
         return {
           action: 'proactive_care',
-          sms_sent: smsRes.ok,
+          sms_sent: r.sms_sent,
+          error: r.error,
           customer: pl.customer_name,
           suggested_service: pl.suggested_service,
         }
@@ -499,28 +600,27 @@ async function executeApprovalPayload(
         if (!pl.customer_phone || !pl.suggested_sms) {
           return { action: 'warranty_followup', skipped: 'no phone or message' }
         }
-        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: pl.customer_phone,
-            message: pl.suggested_sms,
-          }),
+        // Audit-3 Fix A (2026-06-01)
+        const r = await sendSms({
+          to: pl.customer_phone,
+          message: pl.suggested_sms,
+          customerId: pl.customer_id || null,
+          relatedId: pl.project_id || null,
+          messageType: 'warranty_followup',
         })
 
         // Logga i automation_logs
-        const supabaseW = (await import('@/lib/supabase')).getServerSupabase()
+        const supabaseW = await getSupabase()
         await supabaseW.from('automation_logs').insert({
           business_id: businessId,
           rule_name: 'warranty_followup',
           trigger_type: 'approval_executed',
-          status: smsRes.ok ? 'completed' : 'failed',
+          status: r.sms_sent ? 'completed' : 'failed',
           input: { project_id: pl.project_id, customer_name: pl.customer_name },
-          output: { sms_sent: smsRes.ok },
+          output: { sms_sent: r.sms_sent, error: r.error },
         })
 
-        return { action: 'warranty_followup', sms_sent: smsRes.ok, customer: pl.customer_name }
+        return { action: 'warranty_followup', sms_sent: r.sms_sent, error: r.error, customer: pl.customer_name }
       }
 
       case 'job_report': {
@@ -545,16 +645,19 @@ async function executeApprovalPayload(
           return { action: 'propose_booking_times', skipped: 'no message or phone' }
         }
 
-        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            business_id: businessId,
-            to: pl.entity.phone,
-            message,
-          }),
+        // Audit-3 Fix A (2026-06-01)
+        const r = await sendSms({
+          to: pl.entity.phone,
+          message,
+          customerId: pl.entity?.customerId || null,
+          messageType: approval_type,
         })
-        return { action: 'propose_booking_times', sms_sent: smsRes.ok, slots_count: pl.available_slots?.length || 0 }
+        return {
+          action: 'propose_booking_times',
+          sms_sent: r.sms_sent,
+          error: r.error,
+          slots_count: pl.available_slots?.length || 0,
+        }
       }
 
       case 'create_quote_draft':
@@ -593,12 +696,14 @@ async function executeApprovalPayload(
         if (!msg || !pl.entity?.phone) {
           return { action: 'send_matte_customer_reply', skipped: 'no message or phone' }
         }
-        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId, to: pl.entity.phone, message: msg }),
+        // Audit-3 Fix A (2026-06-01)
+        const r = await sendSms({
+          to: pl.entity.phone,
+          message: msg,
+          customerId: pl.entity?.customerId || null,
+          messageType: 'matte_customer_reply',
         })
-        return { action: 'send_matte_customer_reply', sms_sent: smsRes.ok }
+        return { action: 'send_matte_customer_reply', sms_sent: r.sms_sent, error: r.error }
       }
 
       case 'low_stock_alert': {
@@ -650,12 +755,14 @@ async function executeApprovalPayload(
           ? `Hej ${pl.entity?.customerName || ''}! Vi skulle gärna komma och titta på jobbet. Passar någon av dessa tider?\n${slotsText}\nSvara med 1, 2 eller 3. //${pl.businessName || ''}`
           : pl.customer_reply_pending || `Hej! Vi vill gärna boka in ett platsbesök. Vilken tid passar dig? //${pl.businessName || ''}`
 
-        const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId, to: pl.entity.phone, message }),
+        // Audit-3 Fix A (2026-06-01)
+        const r = await sendSms({
+          to: pl.entity.phone,
+          message,
+          customerId: pl.entity?.customerId || null,
+          messageType: 'propose_site_visit',
         })
-        return { action: 'propose_site_visit', sms_sent: smsRes.ok }
+        return { action: 'propose_site_visit', sms_sent: r.sms_sent, error: r.error }
       }
 
       case 'four_eyes_project_close': {
@@ -710,16 +817,14 @@ async function executeApprovalPayload(
       case 'customer_reactivation': {
         const pl = payload as any
         if (pl.customer_phone && pl.suggested_sms) {
-          const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              business_id: businessId,
-              to: pl.customer_phone,
-              message: pl.suggested_sms,
-            }),
+          // Audit-3 Fix A (2026-06-01)
+          const r = await sendSms({
+            to: pl.customer_phone,
+            message: pl.suggested_sms,
+            customerId: pl.customer_id || null,
+            messageType: 'customer_reactivation',
           })
-          return { action: 'customer_reactivation', sms_sent: smsRes.ok }
+          return { action: 'customer_reactivation', sms_sent: r.sms_sent, error: r.error }
         }
         return { action: 'customer_reactivation', skipped: 'no phone or message' }
       }
@@ -786,16 +891,14 @@ async function executeApprovalPayload(
         const smsTo = pl.to || pl.customer_phone || pl.entity?.phone
 
         if (smsMessage && smsTo) {
-          const smsRes = await fetch(`${appUrl}/api/sms/send`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              business_id: businessId,
-              to: smsTo,
-              message: smsMessage,
-            }),
+          // Audit-3 Fix A (2026-06-01)
+          const r = await sendSms({
+            to: smsTo,
+            message: smsMessage,
+            customerId: pl.customer_id || pl.entity?.customerId || null,
+            messageType: approval_type,
           })
-          return { action: approval_type, sms_sent: smsRes.ok, fallback: true }
+          return { action: approval_type, sms_sent: r.sms_sent, error: r.error, fallback: true }
         }
 
         // Om inget SMS-data → bara bekräfta (acknowledgement)
