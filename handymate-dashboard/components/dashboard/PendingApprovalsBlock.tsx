@@ -165,10 +165,38 @@ export function PendingApprovalsBlock() {
         body: JSON.stringify({ action }),
       })
       if (res.ok) {
-        setApprovals(prev => prev.filter(a => a.id !== approvalId))
-        setTotalCount(prev => Math.max(0, prev - 1))
-        setFeedback(action === 'approve' ? 'Godkänt!' : 'Avvisat')
-        setTimeout(() => setFeedback(null), 3000)
+        // Audit-3 Fix C (2026-06-01): kolla execution-resultat i body.
+        // res.ok = HTTP 200 (approval-status uppdaterad), men inom kan
+        // execution.error eller execution.sms_sent=false finnas.
+        // Visa då felmeddelande istället för "Godkänt!" så Christoffer
+        // ser att handlingen inte gick igenom.
+        const result = await res.json().catch(() => null) as { execution?: { error?: string; sms_sent?: boolean; ok?: boolean } } | null
+        const execution = result?.execution
+        const executionFailed =
+          action === 'approve' &&
+          execution &&
+          (
+            execution.error ||
+            execution.sms_sent === false ||
+            execution.ok === false
+          )
+
+        if (executionFailed) {
+          // Status är redan 'approved' i DB (status-flip sker före execution),
+          // men handlingen failade. Filtrera bort från listan ändå — annars
+          // ser Christoffer dubbel-trycks-knapp som inte gör något. Visa
+          // tydligt fel istället.
+          setApprovals(prev => prev.filter(a => a.id !== approvalId))
+          setTotalCount(prev => Math.max(0, prev - 1))
+          const errMsg = execution?.error || 'Handlingen kunde inte utföras'
+          setFeedback(`Godkänd — men: ${errMsg}`)
+          setTimeout(() => setFeedback(null), 8000)
+        } else {
+          setApprovals(prev => prev.filter(a => a.id !== approvalId))
+          setTotalCount(prev => Math.max(0, prev - 1))
+          setFeedback(action === 'approve' ? 'Godkänt!' : 'Avvisat')
+          setTimeout(() => setFeedback(null), 3000)
+        }
       } else {
         setFeedback('Kunde inte spara — försök igen')
         setTimeout(() => setFeedback(null), 4000)
@@ -216,12 +244,18 @@ export function PendingApprovalsBlock() {
         )}
       </div>
 
-      {/* Feedback toast */}
-      {feedback && (
-        <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700 font-medium">
-          {feedback}
-        </div>
-      )}
+      {/* Feedback toast — amber/red för execution-fel, emerald för success */}
+      {feedback && (() => {
+        const isError = feedback.startsWith('Godkänd — men:') || feedback.startsWith('Kunde inte')
+        const cls = isError
+          ? 'bg-amber-50 border-amber-300 text-amber-800'
+          : 'bg-emerald-50 border-emerald-200 text-emerald-700'
+        return (
+          <div className={`mb-3 px-3 py-2 border rounded-lg text-sm font-medium ${cls}`}>
+            {feedback}
+          </div>
+        )
+      })()}
 
       {/* Cards */}
       <div className="space-y-2">
