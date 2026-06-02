@@ -822,7 +822,12 @@ async function executeApprovalPayload(
           .update({ status: 'draft' })
           .eq('quote_id', pl.quote_id)
 
-        // Push-notis till skaparen
+        // Push-notis till skaparen. Fire-and-forget — fördröjer inte
+        // approval-response, men loggar fel så vi kan upptäcka push-issues
+        // (TD: bygg push-fail-monitoring-cron eller Sentry-integration).
+        // Audit-4 Fix H (2026-06-02): ersatte `.catch(() => {})` med loggat
+        // catch. /api/push/send har ingen auth-check, så cookie-forwarding
+        // behövs ej här.
         fetch(`${appUrl}/api/push/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -832,7 +837,16 @@ async function executeApprovalPayload(
             body: `Din offert på ${(pl.quote_total || 0).toLocaleString('sv-SE')} kr har godkänts — du kan nu skicka den`,
             url: `/dashboard/quotes/${pl.quote_id}`,
           }),
-        }).catch(() => {})
+        })
+          .then(async (r) => {
+            if (!r.ok) {
+              const errText = await r.text().catch(() => '<unparsable>')
+              console.error(`[four_eyes_quote/push] HTTP ${r.status} from /api/push/send:`, errText)
+            }
+          })
+          .catch((err) => {
+            console.error('[four_eyes_quote/push] fetch failed:', err)
+          })
 
         return { action: 'four_eyes_quote', ok: true, quote_id: pl.quote_id }
       }
