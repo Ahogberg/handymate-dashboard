@@ -165,36 +165,51 @@ export function PendingApprovalsBlock() {
         body: JSON.stringify({ action }),
       })
       if (res.ok) {
-        // Audit-3 Fix C (2026-06-01): kolla execution-resultat i body.
-        // res.ok = HTTP 200 (approval-status uppdaterad), men inom kan
-        // execution.error eller execution.sms_sent=false finnas.
-        // Visa då felmeddelande istället för "Godkänt!" så Christoffer
-        // ser att handlingen inte gick igenom.
-        const result = await res.json().catch(() => null) as { execution?: { error?: string; sms_sent?: boolean; ok?: boolean } } | null
+        // Audit-3 Fix C + Audit-4 Fix DEF (2026-06-02):
+        //   Fix C: kolla execution-resultat (sms_sent=false / error).
+        //   Fix DEF: kolla execution.reason för kontext-känslig feedback
+        //   (permission_denied, four_eyes_required, rate_limited, fail).
+        // Status='approved' är redan satt i DB (status-flip-före-execution
+        // är logged som TD); vi filtrerar bort approval från listan oavsett
+        // utfall för att inte ge dubbel-tryck-illusion.
+        const result = await res.json().catch(() => null) as {
+          execution?: {
+            error?: string
+            sms_sent?: boolean
+            ok?: boolean
+            reason?: 'fail' | 'four_eyes_required' | 'permission_denied' | 'rate_limited'
+            metadata?: Record<string, unknown>
+          }
+        } | null
         const execution = result?.execution
-        const executionFailed =
-          action === 'approve' &&
-          execution &&
-          (
-            execution.error ||
-            execution.sms_sent === false ||
-            execution.ok === false
-          )
 
-        if (executionFailed) {
-          // Status är redan 'approved' i DB (status-flip sker före execution),
-          // men handlingen failade. Filtrera bort från listan ändå — annars
-          // ser Christoffer dubbel-trycks-knapp som inte gör något. Visa
-          // tydligt fel istället.
-          setApprovals(prev => prev.filter(a => a.id !== approvalId))
-          setTotalCount(prev => Math.max(0, prev - 1))
-          const errMsg = execution?.error || 'Handlingen kunde inte utföras'
-          setFeedback(`Godkänd — men: ${errMsg}`)
+        setApprovals(prev => prev.filter(a => a.id !== approvalId))
+        setTotalCount(prev => Math.max(0, prev - 1))
+
+        if (action !== 'approve') {
+          setFeedback('Avvisat')
+          setTimeout(() => setFeedback(null), 3000)
+          return
+        }
+
+        // Approve-path — differentierad feedback
+        const reason = execution?.reason
+        const errText = execution?.error || 'Handlingen kunde inte utföras'
+
+        if (reason === 'four_eyes_required') {
+          setFeedback(`Värdet kräver ny granskning: ${errText}`)
+          setTimeout(() => setFeedback(null), 8000)
+        } else if (reason === 'permission_denied') {
+          setFeedback(`Saknar behörighet: ${errText}`)
+          setTimeout(() => setFeedback(null), 8000)
+        } else if (reason === 'rate_limited') {
+          setFeedback(`För många försök: ${errText}`)
+          setTimeout(() => setFeedback(null), 8000)
+        } else if (execution && (execution.error || execution.sms_sent === false || execution.ok === false)) {
+          setFeedback(`Handling misslyckades: ${errText}`)
           setTimeout(() => setFeedback(null), 8000)
         } else {
-          setApprovals(prev => prev.filter(a => a.id !== approvalId))
-          setTotalCount(prev => Math.max(0, prev - 1))
-          setFeedback(action === 'approve' ? 'Godkänt!' : 'Avvisat')
+          setFeedback('Godkänt och skickat')
           setTimeout(() => setFeedback(null), 3000)
         }
       } else {
@@ -244,9 +259,14 @@ export function PendingApprovalsBlock() {
         )}
       </div>
 
-      {/* Feedback toast — amber/red för execution-fel, emerald för success */}
+      {/* Feedback toast — amber för execution-fel/varning, emerald för success */}
       {feedback && (() => {
-        const isError = feedback.startsWith('Godkänd — men:') || feedback.startsWith('Kunde inte')
+        const isError =
+          feedback.startsWith('Handling misslyckades') ||
+          feedback.startsWith('Saknar behörighet') ||
+          feedback.startsWith('För många försök') ||
+          feedback.startsWith('Värdet kräver') ||
+          feedback.startsWith('Kunde inte')
         const cls = isError
           ? 'bg-amber-50 border-amber-300 text-amber-800'
           : 'bg-emerald-50 border-emerald-200 text-emerald-700'

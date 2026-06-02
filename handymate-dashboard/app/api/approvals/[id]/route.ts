@@ -139,10 +139,16 @@ export async function POST(
         )
       }
       const approvalWithPayload = { ...approval, payload: finalPayload }
+      // Audit-4 Fix DEF (2026-06-02): forward cookies så target-endpoints
+      // (quotes/send, invoices/send, bookings, ai-generate) får giltig
+      // auth-context via samma session som klickade Godkänn. Tidigare
+      // failade alla server-side fetches med 401 → silent failure.
+      const cookieHeader = request.headers.get('cookie')
       executionResult = await executeApprovalPayload(
         approvalWithPayload,
         business.business_id,
-        action_overrides as Record<string, string> | undefined
+        action_overrides as Record<string, string> | undefined,
+        cookieHeader
       )
     }
 
@@ -198,10 +204,78 @@ async function fetchBusinessName(
 async function executeApprovalPayload(
   approval: { approval_type: string; payload: Record<string, unknown>; business_id: string; package_data?: any },
   businessId: string,
-  actionOverrides?: Record<string, string>
+  actionOverrides?: Record<string, string>,
+  cookieHeader?: string | null,
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
+
+  /**
+   * Audit-4 Fix DEF (2026-06-02): bygger headers som forwardar
+   * sessions-cookien till target-endpoints. Utan cookien fallbackar
+   * getAuthenticatedBusiness till 401 → silent failure.
+   */
+  function forwardHeaders(): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (cookieHeader) h['Cookie'] = cookieHeader
+    return h
+  }
+
+  /**
+   * Audit-4 Fix DEF (2026-06-02): klassificera target-endpoint-response
+   * så UI kan visa kontext-känslig feedback istället för bara "ok=true/false".
+   *
+   * Kategorier:
+   *   - permission_denied (HTTP 403): användaren saknar behörighet
+   *   - four_eyes_required (HTTP 200 + requires_approval): högvärdes-flow
+   *   - rate_limited (HTTP 429): för många försök
+   *   - fail (HTTP 401/404/5xx eller body-success=false): hård fail
+   */
+  async function classifyResponse(
+    res: Response,
+  ): Promise<{
+    ok: boolean
+    reason?: 'fail' | 'four_eyes_required' | 'permission_denied' | 'rate_limited'
+    error?: string
+    metadata?: Record<string, unknown>
+  }> {
+    let data: any = null
+    try { data = await res.json() } catch { /* ignore non-JSON */ }
+
+    if (res.status === 401) {
+      return { ok: false, reason: 'fail', error: 'Auth-fel — sessionen kanske gick ut. Logga in på nytt.' }
+    }
+    if (res.status === 403) {
+      return { ok: false, reason: 'permission_denied', error: data?.error || 'Du saknar behörighet för denna handling.' }
+    }
+    if (res.status === 404) {
+      return { ok: false, reason: 'fail', error: 'Endpoint hittades inte (404).' }
+    }
+    if (res.status === 429) {
+      return { ok: false, reason: 'rate_limited', error: data?.error || 'För många försök, vänta en stund.' }
+    }
+    if (!res.ok) {
+      return { ok: false, reason: 'fail', error: data?.error || `HTTP ${res.status}` }
+    }
+
+    // HTTP 200 — kolla body
+    if (data?.requires_approval) {
+      return {
+        ok: false,
+        reason: 'four_eyes_required',
+        error: data.message || `Värdet kräver ny granskning. Ny approval skapad.`,
+        metadata: { new_approval_id: data.approval_id },
+      }
+    }
+    if (data && data.success === false) {
+      const errMsg = Array.isArray(data?.errors) && data.errors.length > 0
+        ? data.errors.join('; ')
+        : (data.error || 'Handlingen genomfördes inte fullt ut.')
+      return { ok: false, reason: 'fail', error: errMsg }
+    }
+
+    return { ok: true, metadata: data || undefined }
+  }
 
   // Lazy supabase + business_name — laddas bara om SMS-case triggas
   let supabaseClient: SupabaseClient | null = null
@@ -281,32 +355,52 @@ async function executeApprovalPayload(
       }
 
       case 'send_quote': {
+        // Audit-4 Fix DEF (2026-06-02): tidigare URL `/api/quotes/[id]/send`
+        // existerade aldrig — failade med 404 silent. Korrekt: `/api/quotes/send`
+        // med body { quoteId, method }.
         if (!payload.quote_id) return { action: 'send_quote', skipped: 'no quote_id' }
-        const res = await fetch(`${appUrl}/api/quotes/${payload.quote_id}/send`, {
+        const res = await fetch(`${appUrl}/api/quotes/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId }),
+          headers: forwardHeaders(),
+          body: JSON.stringify({
+            quoteId: payload.quote_id,
+            method: (payload.method as string) || 'both',
+            extraEmails: payload.extra_emails || [],
+            bccEmails: payload.bcc_emails || [],
+          }),
         })
-        return { action: 'send_quote', ok: res.ok }
+        const r = await classifyResponse(res)
+        return { action: 'send_quote', ...r }
       }
 
       case 'send_invoice': {
+        // Audit-4 Fix DEF (2026-06-02): tidigare URL `/api/invoices/[id]/send`
+        // existerade aldrig — failade med 404 silent. Korrekt: `/api/invoices/send`
+        // med body { invoice_id, send_email, send_sms }.
         if (!payload.invoice_id) return { action: 'send_invoice', skipped: 'no invoice_id' }
-        const res = await fetch(`${appUrl}/api/invoices/${payload.invoice_id}/send`, {
+        const res = await fetch(`${appUrl}/api/invoices/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ business_id: businessId }),
+          headers: forwardHeaders(),
+          body: JSON.stringify({
+            invoice_id: payload.invoice_id,
+            send_email: payload.send_email !== false,
+            send_sms: payload.send_sms !== false,
+          }),
         })
-        return { action: 'send_invoice', ok: res.ok }
+        const r = await classifyResponse(res)
+        return { action: 'send_invoice', ...r }
       }
 
       case 'create_booking': {
+        // Audit-4 Fix DEF (2026-06-02): cookie-forwarding så /api/bookings
+        // POST inte returnerar 401.
         const res = await fetch(`${appUrl}/api/bookings`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: forwardHeaders(),
           body: JSON.stringify({ ...payload, business_id: businessId }),
         })
-        return { action: 'create_booking', ok: res.ok }
+        const r = await classifyResponse(res)
+        return { action: 'create_booking', ...r }
       }
 
       case 'review_request': {
@@ -399,9 +493,10 @@ async function executeApprovalPayload(
               break
 
             case 'booking_suggestion': {
+              // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
               const bookRes = await fetch(`${appUrl}/api/bookings`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: forwardHeaders(),
                 body: JSON.stringify({
                   business_id: businessId,
                   customer_id: act.data.customer_id,
@@ -410,7 +505,8 @@ async function executeApprovalPayload(
                   notes: act.data.notes || '',
                 }),
               })
-              results.push({ id: act.id, type: 'booking', ok: bookRes.ok })
+              const br = await classifyResponse(bookRes)
+              results.push({ id: act.id, type: 'booking', ...br })
               break
             }
 
@@ -663,31 +759,35 @@ async function executeApprovalPayload(
       case 'create_quote_draft':
       case 'quote_request':
       case 'quote_addition': {
+        // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
         const pl = payload as any
         const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: forwardHeaders(),
           body: JSON.stringify({
             textDescription: pl.description || pl.job_description || pl.customer_reply_pending,
             customerId: pl.entity?.customerId,
             businessId,
           }),
         })
-        return { action: 'create_quote_draft', ok: res.ok }
+        const r = await classifyResponse(res)
+        return { action: 'create_quote_draft', ...r }
       }
 
       case 'create_ata_draft': {
+        // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
         const pl = payload as any
         const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: forwardHeaders(),
           body: JSON.stringify({
             textDescription: `ÄTA-tillägg: ${pl.description || ''}`,
             customerId: pl.entity?.customerId,
             businessId,
           }),
         })
-        return { action: 'create_ata_draft', ok: res.ok }
+        const r = await classifyResponse(res)
+        return { action: 'create_ata_draft', ...r }
       }
 
       case 'send_matte_customer_reply': {
@@ -835,27 +935,28 @@ async function executeApprovalPayload(
       }
 
       case 'review_auto_invoice': {
-        // Godkänn = skicka faktura till kund
+        // Godkänn = skicka faktura till kund.
+        // Audit-4 Fix DEF (2026-06-02): cookie-forwarding ersätter död
+        // `_internal_business_id`-workaround (target-route har aldrig
+        // läst det fältet → har failat 401 silent sedan epok).
         const invoiceId = (payload as any)?.invoice_id
         if (!invoiceId) return { action: 'review_auto_invoice', error: 'invoice_id saknas' }
 
         const sendRes = await fetch(`${appUrl}/api/invoices/send`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: forwardHeaders(),
           body: JSON.stringify({
             invoice_id: invoiceId,
             send_email: true,
             send_sms: true,
-            _internal_business_id: businessId,
           }),
         })
-        const sendData = await sendRes.json().catch(() => null)
+        const r = await classifyResponse(sendRes)
         return {
           action: 'review_auto_invoice',
-          invoice_sent: sendRes.ok,
           invoice_id: invoiceId,
           navigate_to: `/dashboard/invoices/${invoiceId}`,
-          detail: sendData?.error || 'Faktura skickad till kund',
+          ...r,
         }
       }
 
