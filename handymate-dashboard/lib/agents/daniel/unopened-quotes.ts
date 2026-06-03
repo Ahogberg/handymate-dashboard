@@ -123,3 +123,29 @@ export function buildUnopenedNudgeMessage(opts: {
   }
   return `${greeting} ${body.slice(0, bodyBudget)}…${signature}`
 }
+
+// ─────────────────────────────────────────────────────────────────
+// Konflikt-avoidance med befintliga approvals
+// ─────────────────────────────────────────────────────────────────
+
+/**
+ * 168h-fönstret för konflikt-avoidance. Spec: "om quote redan har
+ * approval (vilken som helst) senaste 168h → skip". Samma fönster
+ * som dedup-default.
+ */
+export const UNOPENED_CONFLICT_WINDOW_HOURS = 168
+
+/**
+ * Pure filter: ta bort kandidater vars quote_id finns i `conflictingQuoteIds`-Set.
+ *
+ * Generic över T så vi kan filtrera både aggregate-objekt (med quote_id-fält)
+ * och plain ID-listor. Använd från buildDanielAggregate efter att DB-lookupen
+ * returnerat IDs med pågående/nyligen-resolved approvals.
+ */
+export function filterOutConflicting<T extends { quote_id: string }>(
+  candidates: T[],
+  conflictingQuoteIds: Set<string>,
+): T[] {
+  if (conflictingQuoteIds.size === 0) return candidates
+  return candidates.filter(c => !conflictingQuoteIds.has(c.quote_id))
+}

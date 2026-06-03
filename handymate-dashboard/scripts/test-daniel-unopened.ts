@@ -15,9 +15,11 @@ import {
   daysSinceSent,
   extractFirstName,
   buildUnopenedNudgeMessage,
+  filterOutConflicting,
   UNOPENED_WINDOW_MIN_DAYS,
   UNOPENED_WINDOW_MAX_DAYS,
   NUDGE_SMS_MAX_LENGTH,
+  UNOPENED_CONFLICT_WINDOW_HOURS,
   type UnopenedCandidate,
 } from '../lib/agents/daniel/unopened-quotes'
 
@@ -257,6 +259,53 @@ if (longMsg.length <= NUDGE_SMS_MAX_LENGTH) {
   failed++
   console.log(`  ✗ extremt långa namn ger ${longMsg.length} tecken — överstiger limit`)
 }
+
+// ─────────────────────────────────────────────────────────────────
+// filterOutConflicting (Commit 3 — konflikt-avoidance)
+// ─────────────────────────────────────────────────────────────────
+
+section('filterOutConflicting — konflikt-fönster + filtrering')
+
+assertEqual(UNOPENED_CONFLICT_WINDOW_HOURS, 168, 'konflikt-fönster = 168h (7d)')
+
+const candidates = [
+  { quote_id: 'q1', days_since_sent: 7 },
+  { quote_id: 'q2', days_since_sent: 6 },
+  { quote_id: 'q3', days_since_sent: 5 },
+]
+
+assertEqual(
+  filterOutConflicting(candidates, new Set()),
+  candidates,
+  'tom konflikt-set → alla kandidater behålls',
+)
+
+assertEqual(
+  filterOutConflicting(candidates, new Set(['q2'])),
+  [
+    { quote_id: 'q1', days_since_sent: 7 },
+    { quote_id: 'q3', days_since_sent: 5 },
+  ],
+  'q2 har befintlig approval → filtreras bort',
+)
+
+assertEqual(
+  filterOutConflicting(candidates, new Set(['q1', 'q2', 'q3'])),
+  [],
+  'alla i konflikt → tom resultat',
+)
+
+assertEqual(
+  filterOutConflicting(candidates, new Set(['q_notexist'])),
+  candidates,
+  'konflikt-ID matchar ingen kandidat → ingen filtrering',
+)
+
+assertEqual(
+  filterOutConflicting([], new Set(['q1'])),
+  [],
+  'tom kandidat-lista → tom output',
+)
 
 // ─────────────────────────────────────────────────────────────────
 // Resultat

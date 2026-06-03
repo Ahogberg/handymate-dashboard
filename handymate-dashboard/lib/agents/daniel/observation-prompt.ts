@@ -23,7 +23,13 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
-import { isUnopenedActionable, daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
+import {
+  isUnopenedActionable,
+  daysSinceSent,
+  extractFirstName,
+  filterOutConflicting,
+  UNOPENED_CONFLICT_WINDOW_HOURS,
+} from '@/lib/agents/daniel/unopened-quotes'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -314,8 +320,8 @@ async function buildDanielAggregate(
   // ── Obeöppnade offerter (2026-06-03) ───────────────────────
   // Predikat + fönster i lib/agents/daniel/unopened-quotes.ts.
   // Här mappas raw quotes → enriched objekt med phone + customer-namn.
-  // Konflikt-avoidance mot befintliga approvals görs i Commit 3.
-  const actionableUnopenedQuotes = quotes
+  // Konflikt-avoidance mot befintliga approvals i nästa block.
+  const actionableUnopenedQuotesRaw = quotes
     .filter(q => isUnopenedActionable(q, now))
     .map(q => {
       if (!q.customer_id) return null
@@ -336,7 +342,44 @@ async function buildDanielAggregate(
     .filter((x): x is NonNullable<typeof x> => x !== null)
     // Äldsta först (störst risk att gå förlorad)
     .sort((a, b) => b.days_since_sent - a.days_since_sent)
-    .slice(0, 3)
+
+  // ── Konflikt-avoidance (2026-06-03 Commit 3) ────────────────
+  // Skip kandidater som redan har en pending/resolved approval för samma
+  // quote_id senaste 168h. Skyddar mot:
+  //   - Daniel skapade nudge igår och kunden har inte hunnit reagera
+  //   - Karin/Lisa eller manuell approval finns för samma quote
+  //   - Stale-opens-pathen triggade redan (samma quote, annan dedup_key)
+  // Söker brett: matchar mot payload.related_id, payload.quote_id, eller
+  // payload.action.related_id (alla tre används av olika approval-paths).
+  const candidateQuoteIds = actionableUnopenedQuotesRaw.map(c => c.quote_id)
+  let conflictingQuoteIds = new Set<string>()
+  if (candidateQuoteIds.length > 0) {
+    const windowStart = new Date(now - UNOPENED_CONFLICT_WINDOW_HOURS * 3600000).toISOString()
+    const { data: existingApprovals } = await supabase
+      .from('pending_approvals')
+      .select('payload')
+      .eq('business_id', businessId)
+      .gte('created_at', windowStart)
+    for (const row of existingApprovals || []) {
+      const pl = row.payload as Record<string, unknown> | null
+      if (!pl) continue
+      // Plocka quote_id från alla kända placeringar
+      const fromRelated = typeof pl.related_id === 'string' ? pl.related_id : null
+      const fromQuote = typeof pl.quote_id === 'string' ? pl.quote_id : null
+      const action = pl.action as Record<string, unknown> | null | undefined
+      const fromActionRelated = action && typeof action.related_id === 'string' ? action.related_id : null
+      for (const qid of [fromRelated, fromQuote, fromActionRelated]) {
+        if (qid && candidateQuoteIds.includes(qid)) {
+          conflictingQuoteIds.add(qid)
+        }
+      }
+    }
+  }
+
+  const actionableUnopenedQuotes = filterOutConflicting(
+    actionableUnopenedQuotesRaw,
+    conflictingQuoteIds,
+  ).slice(0, 3)
 
   // ── Leads-källor (90d) ─────────────────────────────────────
   const { data: leadsData } = await supabase
