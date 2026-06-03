@@ -529,31 +529,21 @@ export default function CustomerDetailPage() {
   }
 
   /**
-   * Öppna ett dokument — hämta signerad URL via rätt endpoint baserat på källa.
-   * Customer-dokument lagrar publika URL:er som kan 403:a om bucket är privat;
-   * projekt-dokument lagrar bara file_path. Båda mönstrena löses genom att
-   * server genererar 1h signerad URL on-demand.
+   * Öppna ett dokument inline i ny tab. Proxy-route streamar bytes med
+   * Content-Disposition: inline så PDF/bilder visas i browsern direkt
+   * istället för att tvingas ner. Word/Excel m.fl. som browser inte
+   * kan rendera native faller fortfarande tillbaka till download.
+   *
+   * Tidigare flöde: fetch JSON med signedUrl → window.open. Nytt:
+   * window.open direkt till proxy-route. Sparar 1 round-trip och
+   * undviker Supabase's default `attachment`-disposition.
    */
-  async function openDocument(doc: CustomerDocument) {
+  function openDocument(doc: CustomerDocument) {
     const url =
       doc.source === 'project' && doc.project_id
-        ? `/api/projects/${doc.project_id}/documents/${doc.id}`
-        : `/api/customers/${customerId}/documents/${doc.id}`
-    try {
-      const res = await fetch(url)
-      if (!res.ok) {
-        alert('Kunde inte öppna filen. Försök igen.')
-        return
-      }
-      const data = await res.json()
-      if (data.url) {
-        window.open(data.url, '_blank', 'noopener,noreferrer')
-      } else {
-        alert('Filen hittades inte')
-      }
-    } catch {
-      alert('Kunde inte öppna filen. Försök igen.')
-    }
+        ? `/api/projects/${doc.project_id}/documents/${doc.id}?view=inline`
+        : `/api/customers/${customerId}/documents/${doc.id}?view=inline`
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   function formatFileSize(bytes: number | null) {

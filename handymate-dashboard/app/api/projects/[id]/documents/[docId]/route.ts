@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { streamInline } from '@/lib/storage/stream-inline'
+
+const BUCKET = 'project-files'
 
 /**
- * GET /api/projects/[id]/documents/[docId] - Hämta nedladdningslänk
+ * GET /api/projects/[id]/documents/[docId]
+ * Default: returnerar signedUrl JSON (legacy).
+ * ?view=inline: streamar bytes med Content-Disposition: inline så
+ *   PDF/bilder visas i browsern istället för att tvingas ner.
  */
 export async function GET(
   request: NextRequest,
@@ -29,9 +35,14 @@ export async function GET(
       return NextResponse.json({ error: 'Dokument hittades inte' }, { status: 404 })
     }
 
+    const viewMode = request.nextUrl.searchParams.get('view')
+    if (viewMode === 'inline') {
+      return streamInline(supabase, BUCKET, doc.file_path, doc.name || 'dokument', doc.mime_type)
+    }
+
     // Generate signed URL
     const { data: signedUrl, error: urlError } = await supabase.storage
-      .from('project-files')
+      .from(BUCKET)
       .createSignedUrl(doc.file_path, 3600) // 1 hour
 
     if (urlError) throw urlError
@@ -74,7 +85,7 @@ export async function DELETE(
 
     // Delete from storage
     await supabase.storage
-      .from('project-files')
+      .from(BUCKET)
       .remove([doc.file_path])
 
     // Delete record

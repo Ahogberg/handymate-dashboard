@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { streamInline } from '@/lib/storage/stream-inline'
 
 const BUCKET = 'customer-documents'
 
@@ -64,6 +65,15 @@ export async function GET(
       // Fallback — om URL saknar canonical path, returnera den lagrade URL:en
       // (kan vara extern länk eller legacy-data)
       return NextResponse.json({ url: doc.file_url, document: doc })
+    }
+
+    // ?view=inline: streama bytes direkt till browsern med Content-Disposition:
+    // inline så PDF/bilder visas istället för att tvingas ner. Default-flödet
+    // (utan param) returnerar signedUrl för bakåtkompatibilitet med call-sites
+    // som ber om download-länk.
+    const viewMode = request.nextUrl.searchParams.get('view')
+    if (viewMode === 'inline') {
+      return streamInline(supabase, BUCKET, path, doc.file_name || 'dokument', doc.file_type)
     }
 
     const { data: signed, error: signErr } = await supabase.storage
