@@ -719,6 +719,12 @@ export async function syncInvoiceToFortnox(
 
 /**
  * Book (bokför) a Fortnox invoice. Makes it final/immutable.
+ *
+ * @deprecated 2026-06-03 — kräver `bookkeeping`-scope som inte längre
+ * ingår i `FORTNOX_SCOPES` (slimmad till invoice/customer/companyinformation
+ * per tasks/fortnox-scope-audit.md). Lägg tillbaka scope + kräv re-OAuth
+ * innan du anropar denna. Fortnox bokför automatiskt vid betalning så
+ * manuell bokföring från Handymate är sällan motiverat.
  */
 export async function bookFortnoxInvoice(
   businessId: string,
@@ -740,6 +746,13 @@ export async function bookFortnoxInvoice(
 
 /**
  * Register a payment on a Fortnox invoice.
+ *
+ * @deprecated 2026-06-03 — kräver `payment`-scope som inte längre ingår
+ * i `FORTNOX_SCOPES` (slimmad per tasks/fortnox-scope-audit.md). Lägg
+ * tillbaka scope + kräv re-OAuth innan användning. Cron-jobbet syncar
+ * inkommande betalningsstatus via GET /invoices/{id} (Balance-fältet),
+ * vilket kräver bara `invoice`-scope — `payment` behövs endast om vi
+ * vill PUSHA betalningar (kräver bank-integration som inte finns).
  */
 export async function registerFortnoxPayment(
   businessId: string,
@@ -790,6 +803,11 @@ export interface FortnoxOfferResponse {
 
 /**
  * Create an offer in Fortnox
+ *
+ * @deprecated 2026-06-03 — kräver `offer`-scope som inte längre ingår
+ * i `FORTNOX_SCOPES`. Strategiskt val: Handymate äger offert-flödet
+ * (signering, portal, status-tracking); Fortnox behöver bara se den
+ * resulterande fakturan.
  */
 export async function createFortnoxOffer(
   businessId: string,
@@ -806,6 +824,11 @@ export async function createFortnoxOffer(
 
 /**
  * Sync a Handymate quote to Fortnox as an offer.
+ *
+ * @deprecated 2026-06-03 — kräver `offer`-scope (slimmad bort per
+ * tasks/fortnox-scope-audit.md). Kallar createFortnoxOffer som också
+ * är deprecated. Lägg tillbaka `offer`-scope + re-OAuth innan
+ * användning.
  */
 export async function syncQuoteToFortnox(
   businessId: string,
