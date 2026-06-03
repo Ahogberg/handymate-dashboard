@@ -23,6 +23,7 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
+import { isUnopenedActionable, daysSinceSent } from '@/lib/agents/daniel/unopened-quotes'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -58,6 +59,8 @@ interface QuoteRow {
   signed_at: string | null
   accepted_at: string | null
   created_at: string
+  /** 2026-06-03: krävs för obeöppnad-trigger (days_since_sent-beräkning). */
+  sent_at: string | null
   view_count: number | null
   customer_id: string | null
   title: string | null
@@ -107,6 +110,26 @@ export interface DanielAggregate {
     open_count: number
     total_kr: number
     days_since_created: number
+  }>
+  /**
+   * 2026-06-03 — obeöppnad-offert-trigger (per
+   * tasks/agent-triggers-map.md design-gap).
+   *
+   * Offerter med status='sent', view_count=0, sent_at 5-14 dagar sedan,
+   * kund med telefonnummer (E.164). Top 3 sorterat efter days_since_sent
+   * desc (äldsta först — risk att gå förlorad störst).
+   *
+   * Konflikt-avoidance med befintliga approvals för samma quote hanteras
+   * i Commit 3 (separat filtreringsfas före save).
+   */
+  actionable_unopened_quotes: Array<{
+    quote_id: string
+    title: string | null
+    customer_id: string
+    customer_name: string
+    customer_phone_e164: string
+    total_kr: number
+    days_since_sent: number
   }>
   leads_by_source: Record<
     string,
@@ -166,9 +189,10 @@ async function buildDanielAggregate(
   const ninetyDaysAgo = new Date(now - 90 * 86400000)
 
   // ── Quotes (90d) ───────────────────────────────────────────
+  // 2026-06-03: sent_at tillkommer för obeöppnad-trigger.
   const { data: quotesData, error: quotesError } = await supabase
     .from('quotes')
-    .select('quote_id, status, total, signed_at, accepted_at, created_at, view_count, customer_id, title')
+    .select('quote_id, status, total, signed_at, accepted_at, created_at, sent_at, view_count, customer_id, title')
     .eq('business_id', businessId)
     .gte('created_at', ninetyDaysAgo.toISOString())
     .limit(300)
@@ -273,6 +297,33 @@ async function buildDanielAggregate(
     .sort((a, b) => b.open_count - a.open_count)
     .slice(0, 3)
 
+  // ── Obeöppnade offerter (2026-06-03) ───────────────────────
+  // Predikat + fönster i lib/agents/daniel/unopened-quotes.ts.
+  // Här mappas raw quotes → enriched objekt med phone + customer-namn.
+  // Konflikt-avoidance mot befintliga approvals görs i Commit 3.
+  const actionableUnopenedQuotes = quotes
+    .filter(q => isUnopenedActionable(q, now))
+    .map(q => {
+      if (!q.customer_id) return null
+      const phoneE164 = toE164(customerPhoneMap[q.customer_id])
+      if (!phoneE164) return null
+      const days = daysSinceSent(q.sent_at, now)
+      if (days === null) return null
+      return {
+        quote_id: q.quote_id,
+        title: q.title,
+        customer_id: q.customer_id,
+        customer_name: customerNameMap[q.customer_id] || '',
+        customer_phone_e164: phoneE164,
+        total_kr: Math.round(Number(q.total || 0)),
+        days_since_sent: days,
+      }
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    // Äldsta först (störst risk att gå förlorad)
+    .sort((a, b) => b.days_since_sent - a.days_since_sent)
+    .slice(0, 3)
+
   // ── Leads-källor (90d) ─────────────────────────────────────
   const { data: leadsData } = await supabase
     .from('leads')
@@ -326,6 +377,7 @@ async function buildDanielAggregate(
     by_customer_type: byCustomerType,
     stale_opens: staleOpens,
     actionable_nudges: actionableNudges,
+    actionable_unopened_quotes: actionableUnopenedQuotes,
     leads_by_source: leadsBySource,
     hot_leads: hotLeads,
   }
