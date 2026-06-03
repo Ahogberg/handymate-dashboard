@@ -4,8 +4,22 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import crypto from 'crypto'
 
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
-const FORTNOX_SCOPES =
-  'invoice customer article payment bookkeeping settings companyinformation offer order project price time'
+// Slimmad 2026-06-03 per tasks/fortnox-scope-audit.md.
+// Strategi: Handymate äger arbetet, Fortnox äger bokföringen.
+// 9 av 12 scopes var oanvända; slimning sparar Christoffer licens-
+// pengar (Fortnox kräver "Offert & order" / "Tidredovisning"-licenser
+// för respektive scope) och tydliggör scope-positioning.
+//
+// Pilot-flöden som täcks av dessa 3:
+//   - invoice            POST /invoices (skapa), GET /invoices/{id} (status)
+//   - customer           POST /customers + PUT /customers/{id}
+//   - companyinformation GET /companyinformation (OAuth-bekräftelse)
+//
+// Dead-code-funktioner (markerade @deprecated i lib/fortnox.ts) kräver
+// scope-utvidgning + re-OAuth innan användning: bookFortnoxInvoice
+// (bookkeeping), registerFortnoxPayment (payment), syncQuoteToFortnox
+// (offer).
+const FORTNOX_SCOPES = 'invoice customer companyinformation'
 
 function getRedirectUri(): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
