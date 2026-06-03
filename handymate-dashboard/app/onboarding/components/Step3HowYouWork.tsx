@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, ChevronDown } from 'lucide-react'
+import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
-import { SPECIALTIES_BY_TRADE } from '../constants'
+import { SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
 
 interface Step3Props {
   onNext: () => void
@@ -29,6 +30,9 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const priceMin = data.priceMin ?? 600
   const priceMax = data.priceMax ?? 1200
 
+  const [extraSheetOpen, setExtraSheetOpen] = useState(false)
+  const [expandedTrade, setExpandedTrade] = useState<string | null>(null)
+
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
 
@@ -38,6 +42,23 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
       : [...selected, s]
     update({ specialties: next })
   }
+
+  /**
+   * Extra-specialiteter = valda strängar som INTE finns i primär-branschens
+   * lista. Visas separat under primär-grid med "Från [bransch]"-tag.
+   *
+   * Resolver: hitta vilken bransch en specialitet kommer från. Returnerar
+   * första matchande bransch (om samma namn finns i flera, t.ex. "Badrum"
+   * i både plumber och construction, kvittar för UI-purposes).
+   */
+  const findTradeFor = (spec: string): string | null => {
+    for (const [tradeId, list] of Object.entries(SPECIALTIES_BY_TRADE)) {
+      if (tradeId === trade) continue
+      if (list.includes(spec)) return tradeId
+    }
+    return null
+  }
+  const extraSpecs = selected.filter(s => !specs.includes(s))
 
   const toggleDay = (i: number) => {
     const next = [...days]
@@ -86,6 +107,63 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
               </button>
             ))}
           </div>
+
+          {/* Extra-specialiteter från andra branscher */}
+          {extraSpecs.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 11, color: 'var(--ob-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Från andra branscher
+              </div>
+              <div className="ob-chip-grid">
+                {extraSpecs.map(s => {
+                  const sourceTrade = findTradeFor(s)
+                  return (
+                    <button
+                      type="button"
+                      key={`extra-${s}`}
+                      className="ob-chip selected"
+                      onClick={() => toggleSpec(s)}
+                      title={sourceTrade ? `Från ${getTradeLabel(sourceTrade)}` : undefined}
+                      style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '8px 12px', gap: 2 }}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Check size={14} />
+                        {s}
+                      </span>
+                      {sourceTrade && (
+                        <span style={{ fontSize: 10, opacity: 0.7, fontWeight: 500 }}>
+                          {getTradeLabel(sourceTrade)}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* "Lägg till från annan bransch" — öppnar InfoSheet */}
+          <button
+            type="button"
+            onClick={() => setExtraSheetOpen(true)}
+            style={{
+              marginTop: 12,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              borderRadius: 'var(--ob-r-pill)',
+              background: 'var(--ob-bg)',
+              border: '1px dashed var(--ob-border-strong)',
+              color: 'var(--ob-primary-700)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={14} />
+            Lägg till från annan bransch
+          </button>
         </section>
 
         {/* Working hours */}
@@ -186,6 +264,82 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           Fortsätt <ArrowRight size={18} />
         </button>
       </div>
+
+      {/* Multi-bransch-specialitets-väljare */}
+      <InfoSheet
+        open={extraSheetOpen}
+        onClose={() => setExtraSheetOpen(false)}
+        title="Lägg till från annan bransch"
+      >
+        <p style={{ marginTop: 0, marginBottom: 16, color: 'var(--ob-muted)' }}>
+          Plocka specialiteter från andra branscher du också tar jobb inom.
+          Din huvudbransch är <strong>{getTradeLabel(trade)}</strong>.
+        </p>
+        {TRADES.filter(t => t.id !== trade).map(t => {
+          const list = SPECIALTIES_BY_TRADE[t.id] || []
+          const isOpen = expandedTrade === t.id
+          return (
+            <div
+              key={t.id}
+              style={{
+                marginBottom: 8,
+                border: '1px solid var(--ob-border)',
+                borderRadius: 'var(--ob-r-md)',
+                background: 'var(--ob-surface)',
+                overflow: 'hidden',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setExpandedTrade(isOpen ? null : t.id)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 14px',
+                  background: 'transparent',
+                  border: 0,
+                  cursor: 'pointer',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: 'var(--ob-ink)',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <t.icon size={16} color="var(--ob-muted)" />
+                  {t.label}
+                </span>
+                <ChevronDown
+                  size={16}
+                  style={{
+                    transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform var(--ob-t-fast)',
+                    color: 'var(--ob-muted)',
+                  }}
+                />
+              </button>
+              {isOpen && (
+                <div style={{ padding: '4px 14px 14px' }}>
+                  <div className="ob-chip-grid">
+                    {list.map(s => (
+                      <button
+                        type="button"
+                        key={`sheet-${t.id}-${s}`}
+                        className={`ob-chip ${selected.includes(s) ? 'selected' : ''}`}
+                        onClick={() => toggleSpec(s)}
+                      >
+                        {selected.includes(s) && <Check size={14} />}
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </InfoSheet>
     </div>
   )
 }
