@@ -32,6 +32,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
 
   const [extraSheetOpen, setExtraSheetOpen] = useState(false)
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null)
+  const [priceInfoOpen, setPriceInfoOpen] = useState(false)
 
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
@@ -210,7 +211,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
 
         {/* Price */}
         <section>
-          <label className="ob-label">Vad kostar du?</label>
+          <label className="ob-label">Timdebitering (ex moms)</label>
           <DualSlider
             min={300}
             max={2500}
@@ -219,6 +220,28 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             valueMax={priceMax}
             onChange={(a, b) => update({ priceMin: a, priceMax: b })}
           />
+          {/* Andreas pilot-feedback (2026-06-03): visa både ex/inkl moms.
+              Default 25% moms — svenska standard. */}
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--ob-muted)', lineHeight: 1.5 }}>
+            {priceMin}–{priceMax} kr/h ex moms · {Math.round(priceMin * 1.25)}–{Math.round(priceMax * 1.25)} kr/h inkl moms
+          </div>
+          <button
+            type="button"
+            onClick={() => setPriceInfoOpen(true)}
+            style={{
+              marginTop: 6,
+              padding: 0,
+              background: 'transparent',
+              border: 0,
+              color: 'var(--ob-primary-700)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            Vad är skillnaden ex/inkl moms?
+          </button>
           <div
             style={{
               marginTop: 14,
@@ -247,7 +270,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.4 }}>
               Lisa säger:{' '}
               <strong style={{ color: 'var(--ob-primary-700)' }}>
-                ”ungefär {priceMin}–{priceMax} kr per timme”
+                ”ungefär {Math.round(priceMin * 1.25)}–{Math.round(priceMax * 1.25)} kr per timme inkl moms”
               </strong>
             </p>
           </div>
@@ -264,6 +287,31 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           Fortsätt <ArrowRight size={18} />
         </button>
       </div>
+
+      {/* Timdebitering — ex/inkl moms-förklaring */}
+      <InfoSheet
+        open={priceInfoOpen}
+        onClose={() => setPriceInfoOpen(false)}
+        title="Timdebitering ex vs inkl moms"
+      >
+        <p style={{ marginTop: 0 }}>
+          Du anger ditt timpris <strong>exklusive moms</strong> — det är beloppet du faktiskt
+          får in i fickan när fakturan är betald.
+        </p>
+        <p>
+          När vi visar offerten för kunden lägger vi automatiskt på <strong>25 % moms</strong>
+          {' '}(svensk standard). En timme à 600 kr ex moms blir alltså 750 kr på offerten.
+        </p>
+        <p>
+          Svenska konsumenter tänker oftast på inkl-moms-priset (det är det de betalar).
+          Företagskunder tänker ex moms (de drar av momsen själva). Vi visar båda värdena i appen
+          så du kan ha rätt samtal med rätt kund.
+        </p>
+        <p style={{ color: 'var(--ob-muted)', fontSize: 13 }}>
+          Du kan justera momssats per offert i Karins ekonomi-vy senare — t.ex. 0 % för export
+          eller 12 % för ROT-jobb.
+        </p>
+      </InfoSheet>
 
       {/* Multi-bransch-specialitets-väljare */}
       <InfoSheet
