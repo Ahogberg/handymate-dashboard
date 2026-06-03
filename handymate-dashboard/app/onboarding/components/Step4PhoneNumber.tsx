@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, Info } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import InfoSheet from './InfoSheet'
+import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Step4Props {
@@ -23,7 +25,15 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
   const [phase, setPhase] = useState<'reserving' | 'done'>(data.lisaNumber ? 'done' : 'reserving')
   const [number, setNumber] = useState<string>(data.lisaNumber || '')
   const [openOp, setOpenOp] = useState<string | null>(null)
+  const [whatForOpen, setWhatForOpen] = useState(false)
   const mode = data.phoneMode || 'forward'
+
+  // Agenter som faktiskt använder numret för outbound (SMS-utskick).
+  // Lisa = inbound-samtal, Karin/Daniel/Hanna = outbound-SMS.
+  const lisaAvatar   = TEAM.find(a => a.id === 'lisa')?.avatar
+  const karinAvatar  = TEAM.find(a => a.id === 'karin')?.avatar
+  const danielAvatar = TEAM.find(a => a.id === 'daniel')?.avatar
+  const hannaAvatar  = TEAM.find(a => a.id === 'hanna')?.avatar
 
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
@@ -78,9 +88,10 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
     <div className="ob-screen">
       <OnboardingHeader step={2} total={4} onBack={onBack} />
       <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
-        <h1 className="ob-headline">Här är Lisas nummer</h1>
+        <h1 className="ob-headline">Här är ditt Handymate-nummer</h1>
         <p className="ob-sub">
-          Vidarekoppla samtal hit så svarar Lisa när du inte hinner
+          Lisa svarar i telefonen åt dig, och hela teamet använder det
+          för SMS-påminnelser, offert-uppföljning och kund-utskick.
         </p>
 
         {/* Reveal card */}
@@ -159,6 +170,29 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
             </div>
           )}
         </div>
+
+        {/* "Vad används detta nummer till?" — InfoSheet-länk */}
+        <button
+          type="button"
+          onClick={() => setWhatForOpen(true)}
+          style={{
+            marginTop: 10,
+            alignSelf: 'center',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '6px 12px',
+            background: 'transparent',
+            border: 0,
+            color: 'var(--ob-primary-700)',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            textDecoration: 'underline',
+          }}
+        >
+          <Info size={14} /> Vad används detta nummer till?
+        </button>
 
         {/* Mode tabs */}
         <div style={{ marginTop: 24, marginBottom: 14 }}>
@@ -295,6 +329,54 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           Visa instruktioner senare
         </button>
       </div>
+
+      {/* "Vad används numret till?" — per-agent-bullets */}
+      <InfoSheet
+        open={whatForOpen}
+        onClose={() => setWhatForOpen(false)}
+        title="Vad används Handymate-numret till?"
+      >
+        <p style={{ marginTop: 0 }}>
+          Numret är inte bara för Lisa — det är hela teamets utgångspunkt
+          mot dina kunder.
+        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+          {[
+            { avatar: lisaAvatar,   name: 'Lisa',   role: 'Kundservice', text: 'Svarar samtal när du inte hinner, samlar lead-info, bokar in återuppringningar.' },
+            { avatar: karinAvatar,  name: 'Karin',  role: 'Ekonom',      text: 'Skickar fakturapåminnelser via SMS när kund inte betalat i tid.' },
+            { avatar: danielAvatar, name: 'Daniel', role: 'Säljare',     text: 'Följer upp obeöppnade offerter ("Hej Anna! Jag märkte att du inte hunnit titta...").' },
+            { avatar: hannaAvatar,  name: 'Hanna',  role: 'Marknadschef',text: 'Kör säsongskampanjer och kund-reaktivering (Pro+).' },
+          ].map(agent => (
+            <li key={agent.name} style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  flexShrink: 0,
+                  borderRadius: '50%',
+                  backgroundImage: agent.avatar ? `url(${agent.avatar})` : undefined,
+                  backgroundColor: 'var(--ob-primary-50)',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  border: '1.5px solid var(--ob-border)',
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: 'var(--ob-ink)' }}>
+                  {agent.name} <span style={{ fontWeight: 500, color: 'var(--ob-muted)', fontSize: 12 }}>· {agent.role}</span>
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--ob-ink-2)', marginTop: 2 }}>
+                  {agent.text}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p style={{ marginTop: 16, fontSize: 13, color: 'var(--ob-muted)' }}>
+          All trafik (in och ut) loggas i Handymate så du har full koll och kan
+          följa hela kund-konversationen på ett ställe.
+        </p>
+      </InfoSheet>
     </div>
   )
 }
