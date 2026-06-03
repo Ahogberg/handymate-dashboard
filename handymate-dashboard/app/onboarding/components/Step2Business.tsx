@@ -13,6 +13,8 @@ import {
   User,
   Phone,
   ChevronDown,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import type { OnboardingFormData } from '../types-redesign'
@@ -33,6 +35,14 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [showAccount, setShowAccount] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  /**
+   * Andreas pilot-feedback (2026-06-03): "Måste visa vad som saknas för att
+   * kunna gå vidare". attemptedNext sätts till true när användaren klickar
+   * Nästa utan giltig form — då renderas en samlad lista med saknade fält
+   * under knappen. Återställs när formen blir giltig.
+   */
+  const [attemptedNext, setAttemptedNext] = useState(false)
 
   const update = (updates: Partial<OnboardingFormData>) =>
     setData(d => ({ ...d, ...updates }))
@@ -88,8 +98,34 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
 
   const valid = validBusiness && (alreadyRegistered || validAccount)
 
+  /**
+   * Lista human-readable labels för fält som saknas. Endast obligatoriska
+   * fält tas med — krav-listan matchar validBusiness + validAccount.
+   */
+  function getMissingFields(): string[] {
+    const missing: string[] = []
+    if (!data.companyName?.trim()) missing.push('företagsnamn')
+    if (!data.trade) missing.push('bransch')
+    if (data.orgNumber?.length !== 11) missing.push('org.nr (10 siffror)')
+    if (!data.area?.trim()) missing.push('tjänsteområde')
+    if (!data.paymentMethod) missing.push('betalmottagare-typ')
+    if (!data.paymentNumber?.trim()) missing.push('betalmottagare-nummer')
+    if (!alreadyRegistered) {
+      if (!data.contactName?.trim()) missing.push('kontaktnamn')
+      if (!data.email?.trim()) missing.push('e-post')
+      if (!data.password || data.password.length < 6) missing.push('lösenord (min 6 tecken)')
+      if (!data.phone || data.phone.replace(/\D/g, '').length < 10) missing.push('privat mobilnummer')
+    }
+    return missing
+  }
+
   async function handleSubmit() {
-    if (!valid || submitting) return
+    if (submitting) return
+    if (!valid) {
+      setAttemptedNext(true)
+      return
+    }
+    setAttemptedNext(false)
     setError('')
 
     if (alreadyRegistered) {
@@ -498,13 +534,36 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
                     </span>
                     <input
                       className="ob-input"
-                      style={{ paddingLeft: 42 }}
-                      type="password"
+                      style={{ paddingLeft: 42, paddingRight: 44 }}
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="Minst 6 tecken"
                       autoComplete="new-password"
                       value={data.password || ''}
                       onChange={e => update({ password: e.target.value })}
                     />
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setShowPassword(v => !v) }}
+                      aria-label={showPassword ? 'Dölj lösenord' : 'Visa lösenord'}
+                      style={{
+                        position: 'absolute',
+                        right: 10,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 32,
+                        height: 32,
+                        border: 0,
+                        background: 'transparent',
+                        color: 'var(--ob-muted)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: 'var(--ob-r-pill)',
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -514,15 +573,43 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       </div>
 
       <div className="ob-footer">
+        {/* Validation-feedback (Andreas 2026-06-03): visa saknade fält
+            efter att användaren försökt fortsätta utan giltig form. */}
+        {attemptedNext && !valid && (() => {
+          const missing = getMissingFields()
+          if (missing.length === 0) return null
+          return (
+            <div
+              role="alert"
+              style={{
+                marginBottom: 10,
+                padding: '10px 12px',
+                borderRadius: 'var(--ob-r-md)',
+                background: 'var(--ob-rose-50)',
+                border: '1px solid #FECACA',
+                fontSize: 13,
+                color: '#B91C1C',
+              }}
+            >
+              <strong>Fyll i innan du fortsätter:</strong>{' '}
+              {missing.join(', ')}
+            </div>
+          )
+        })()}
         <button
           type="button"
           className="ob-cta"
-          disabled={!valid || submitting}
+          aria-disabled={!valid || submitting}
           onClick={handleSubmit}
+          style={!valid && !submitting ? { opacity: 0.6, cursor: 'pointer' } : undefined}
         >
           {submitting ? (
             <>
               <Loader2 size={18} className="animate-spin" /> Skapar konto…
+            </>
+          ) : !valid ? (
+            <>
+              Fortsätt → ({getMissingFields().length} {getMissingFields().length === 1 ? 'fält saknas' : 'fält saknas'})
             </>
           ) : (
             <>
