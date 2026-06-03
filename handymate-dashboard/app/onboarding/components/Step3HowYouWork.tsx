@@ -5,21 +5,13 @@ import { ArrowRight, Check, ChevronDown } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
+import { SPECIALTIES_BY_TRADE } from '../constants'
 
 interface Step3Props {
   onNext: () => void
   onBack: () => void
   data: OnboardingFormData
   setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
-}
-
-const SPECIALTIES_BY_TRADE: Record<string, string[]> = {
-  electrician:  ['Installation', 'Felsökning', 'Belysning', 'Laddbox', 'Solceller', 'Smart hem', 'Service', 'Industri'],
-  plumber:      ['Badrum', 'Kök', 'Värmepump', 'Avlopp', 'Service', 'Vattenskador', 'Renovering', 'Nybygge'],
-  construction: ['Badrum', 'Kök', 'Tak', 'Fasad', 'Tillbyggnad', 'Altan', 'Garage', 'Renovering'],
-  painter:      ['Inomhus', 'Utomhus', 'Tapetsering', 'Fönsterputs', 'Fasad', 'Trapphus', 'Kontor', 'Detaljmåleri'],
-  roofing:      ['Takomläggning', 'Plåttak', 'Tegeltak', 'Takfönster', 'Hängrännor', 'Skorsten', 'Snöskottning', 'Inspektion'],
-  other:        ['Badrum', 'Kök', 'Måleri', 'Trädgård', 'Mindre el', 'Mindre VVS', 'Snickeri', 'Reparationer'],
 }
 
 const DAYS = ['Mån', 'Tis', 'Ons', 'Tor', 'Fre', 'Lör', 'Sön']

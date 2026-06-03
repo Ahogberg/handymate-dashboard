@@ -7,12 +7,6 @@ import {
   Clock,
   MapPin,
   Upload,
-  Zap,
-  Droplets,
-  Hammer,
-  Paintbrush,
-  Home,
-  Wrench,
   Loader2,
   Mail,
   Lock,
@@ -22,6 +16,7 @@ import {
 } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import type { OnboardingFormData } from '../types-redesign'
+import { TRADES } from '../constants'
 
 interface Step2Props {
   onNext: () => void
@@ -29,15 +24,6 @@ interface Step2Props {
   data: OnboardingFormData
   setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
 }
-
-const TRADES = [
-  { id: 'electrician', label: 'El',       icon: Zap },
-  { id: 'plumber',     label: 'VVS',      icon: Droplets },
-  { id: 'construction',label: 'Bygg',     icon: Hammer },
-  { id: 'painter',     label: 'Måleri',   icon: Paintbrush },
-  { id: 'roofing',     label: 'Tak',      icon: Home },
-  { id: 'other',       label: 'Allround', icon: Wrench },
-]
 
 export default function Step2Business({ onNext, onBack, data, setData }: Step2Props) {
   const searchParams = useSearchParams()

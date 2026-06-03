@@ -1,4 +1,72 @@
 import { Building2, Briefcase, Phone, Link2, Users, Zap, CheckCircle2, Settings, Smartphone } from 'lucide-react'
+import {
+  Droplets,
+  Hammer,
+  Home as HomeIcon,
+  Paintbrush,
+  Shovel,
+  Wrench,
+  type LucideIcon,
+} from 'lucide-react'
+
+// ─── Redesign-onboarding (V3, 2026-05) ──────────────────────────────
+// Step2Business.tsx + Step3HowYouWork.tsx läser nedanstående TRADES +
+// SPECIALTIES_BY_TRADE. Legacy-konstanter (BRANCHES, BRANCH_SERVICES m.fl.
+// längre ner) används fortfarande av Step1BusinessAccount.tsx + StepProgress.tsx
+// och får ligga kvar — bryt inte bakåtkompatibilitet.
+
+export interface Trade {
+  id: string
+  label: string
+  icon: LucideIcon
+}
+
+/**
+ * Branscher i den ordning de visas i Step2 tile-grid.
+ *
+ * 2026-06-03: groundworks (Mark) + general_contractor (Totalentreprenad)
+ * tillagda efter Andreas pilot-feedback. Bakåtkompatibla ID:n behålls för
+ * befintliga businesses.
+ */
+export const TRADES: Trade[] = [
+  { id: 'electrician',         label: 'El',              icon: Zap },
+  { id: 'plumber',             label: 'VVS',             icon: Droplets },
+  { id: 'construction',        label: 'Bygg',            icon: Hammer },
+  { id: 'painter',             label: 'Måleri',          icon: Paintbrush },
+  { id: 'roofing',             label: 'Tak',             icon: HomeIcon },
+  { id: 'groundworks',         label: 'Mark',            icon: Shovel },
+  { id: 'general_contractor',  label: 'Totalentreprenad', icon: Briefcase },
+  { id: 'other',               label: 'Allround',        icon: Wrench },
+]
+
+/**
+ * Specialiteter per bransch — multi-select i Step3.
+ *
+ * 2026-06-03: utökad med groundworks + general_contractor, plus tillägg
+ * i electrician (Laddstolpar) och construction (Stommar, Energirenovering)
+ * efter Andreas önskan att utöka listan.
+ *
+ * Justera direkt här — komponenterna importerar konstanten, ingen inline-
+ * hårdkodning.
+ */
+export const SPECIALTIES_BY_TRADE: Record<string, string[]> = {
+  electrician:        ['Installation', 'Felsökning', 'Belysning', 'Laddbox', 'Laddstolpar', 'Solceller', 'Smart hem', 'Service', 'Industri'],
+  plumber:            ['Badrum', 'Kök', 'Värmepump', 'Avlopp', 'Service', 'Vattenskador', 'Renovering', 'Nybygge'],
+  construction:       ['Badrum', 'Kök', 'Tak', 'Fasad', 'Tillbyggnad', 'Altan', 'Garage', 'Stommar', 'Energirenovering', 'Renovering'],
+  painter:            ['Inomhus', 'Utomhus', 'Tapetsering', 'Fönsterputs', 'Fasad', 'Trapphus', 'Kontor', 'Detaljmåleri'],
+  roofing:            ['Takomläggning', 'Plåttak', 'Tegeltak', 'Takfönster', 'Hängrännor', 'Skorsten', 'Snöskottning', 'Inspektion'],
+  groundworks:        ['Schaktning', 'Dränering', 'Asfaltering', 'Stenläggning', 'Grävning', 'Markarbeten', 'Husgrund', 'VA-grävning'],
+  general_contractor: ['Projektledning', 'Samordning', 'Upphandling', 'Beställarstöd', 'Byggherre-funktion', 'Tidplanering', 'Kvalitetskontroll', 'Slutbesiktning'],
+  other:              ['Badrum', 'Kök', 'Måleri', 'Trädgård', 'Mindre el', 'Mindre VVS', 'Snickeri', 'Reparationer'],
+}
+
+/** Hjälp-lookup: bransch-label från ID (returnerar ID om miss, undvik undefined). */
+export function getTradeLabel(tradeId: string | null | undefined): string {
+  if (!tradeId) return ''
+  return TRADES.find(t => t.id === tradeId)?.label || tradeId
+}
+
+// ─── Legacy V2-konstanter (används av Step1BusinessAccount + StepProgress) ─
 
 // ─── Steps (V2 — bantad till 4 steg) ────────────────────────────────
 
