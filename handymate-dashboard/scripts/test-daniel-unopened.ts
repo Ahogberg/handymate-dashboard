@@ -13,8 +13,11 @@
 import {
   isUnopenedActionable,
   daysSinceSent,
+  extractFirstName,
+  buildUnopenedNudgeMessage,
   UNOPENED_WINDOW_MIN_DAYS,
   UNOPENED_WINDOW_MAX_DAYS,
+  NUDGE_SMS_MAX_LENGTH,
   type UnopenedCandidate,
 } from '../lib/agents/daniel/unopened-quotes'
 
@@ -170,6 +173,89 @@ for (const status of ['draft', 'expired', 'declined', 'signed', 'pending_approva
     false,
     `status='${status}' → ingen trigger`,
   )
+}
+
+// ─────────────────────────────────────────────────────────────────
+// extractFirstName
+// ─────────────────────────────────────────────────────────────────
+
+section('extractFirstName')
+
+assertEqual(extractFirstName(null), '', 'null → tom sträng')
+assertEqual(extractFirstName(undefined), '', 'undefined → tom sträng')
+assertEqual(extractFirstName(''), '', 'tom sträng → tom sträng')
+assertEqual(extractFirstName('   '), '', 'whitespace-only → tom sträng')
+assertEqual(extractFirstName('Erik Svensson'), 'Erik', '"Erik Svensson" → "Erik"')
+assertEqual(extractFirstName('Erik'), 'Erik', 'enkelt namn → samma')
+assertEqual(extractFirstName('  Erik Svensson  '), 'Erik', 'trimmar whitespace')
+assertEqual(extractFirstName('Erik Magnus Svensson'), 'Erik', 'tre namn → första')
+assertEqual(extractFirstName('BRF Lindgården'), 'BRF', 'företagsnamn → första ordet (acceptabelt)')
+
+// ─────────────────────────────────────────────────────────────────
+// buildUnopenedNudgeMessage
+// ─────────────────────────────────────────────────────────────────
+
+section('buildUnopenedNudgeMessage — spec-mall')
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: 'Anna', contactFirstName: 'Christoffer' }),
+  'Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh Christoffer',
+  'full mall med båda namn',
+)
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: 'Anna Lindberg', contactFirstName: 'Christoffer Larsson' }),
+  'Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh Christoffer',
+  'plockar förnamn från fulla namn',
+)
+
+section('buildUnopenedNudgeMessage — fallbacks')
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: null, contactFirstName: 'Christoffer' }),
+  'Hej! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh Christoffer',
+  'kund saknar namn → "Hej!" utan namn',
+)
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: 'Anna', contactFirstName: null }),
+  'Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig?',
+  'hantverkare saknar namn → ingen Mvh-rad',
+)
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: null, contactFirstName: null }),
+  'Hej! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig?',
+  'båda saknas → minimal version',
+)
+
+assertEqual(
+  buildUnopenedNudgeMessage({ customerFirstName: '', contactFirstName: '' }),
+  'Hej! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig?',
+  'tom sträng behandlas som null',
+)
+
+section('buildUnopenedNudgeMessage — längd')
+
+const standardMsg = buildUnopenedNudgeMessage({ customerFirstName: 'Anna', contactFirstName: 'Christoffer' })
+if (standardMsg.length <= NUDGE_SMS_MAX_LENGTH) {
+  passed++
+  console.log(`  ✓ standardmeddelande ${standardMsg.length} <= ${NUDGE_SMS_MAX_LENGTH} tecken`)
+} else {
+  failed++
+  console.log(`  ✗ standardmeddelande ${standardMsg.length} > ${NUDGE_SMS_MAX_LENGTH} tecken`)
+}
+
+// Extremfall: extremt långt namn (osannolikt i verkligheten — men testa graceful behavior)
+const longCustomer = 'Christofferssonsdotterssen'.repeat(5)  // ~125 tecken
+const longContact = 'Magnusssonsdotterssen'.repeat(5)
+const longMsg = buildUnopenedNudgeMessage({ customerFirstName: longCustomer, contactFirstName: longContact })
+if (longMsg.length <= NUDGE_SMS_MAX_LENGTH) {
+  passed++
+  console.log(`  ✓ extremt långa namn klipper meddelandet till ${longMsg.length} tecken`)
+} else {
+  failed++
+  console.log(`  ✗ extremt långa namn ger ${longMsg.length} tecken — överstiger limit`)
 }
 
 // ─────────────────────────────────────────────────────────────────

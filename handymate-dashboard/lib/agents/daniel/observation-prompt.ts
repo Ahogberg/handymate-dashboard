@@ -23,7 +23,7 @@ import {
   type AgentDebugInfo,
 } from '@/lib/agents/shared/thinking-call'
 import { saveAndPush } from '@/lib/agents/shared/save-and-push'
-import { isUnopenedActionable, daysSinceSent } from '@/lib/agents/daniel/unopened-quotes'
+import { isUnopenedActionable, daysSinceSent, extractFirstName } from '@/lib/agents/daniel/unopened-quotes'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -87,6 +87,12 @@ interface QuoteStats {
 
 export interface DanielAggregate {
   period_days: 90
+  /**
+   * 2026-06-03: business contact_name (första ordet) för SMS-signatur.
+   * Null om saknas — AI:n droppar då signaturen istället för att skriva
+   * "Mvh undefined".
+   */
+  business_contact_first_name: string | null
   last_90d: QuoteStats
   by_customer_type: Record<string, QuoteStats>
   stale_opens: Array<{
@@ -208,6 +214,14 @@ async function buildDanielAggregate(
 
   const quotes = quotesData as QuoteRow[]
   const last90d = computeQuoteStats(quotes)
+
+  // 2026-06-03: business contact_name för SMS-signatur (obeöppnad-trigger)
+  const { data: bizConfig } = await supabase
+    .from('business_config')
+    .select('contact_name')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  const businessContactFirstName = extractFirstName(bizConfig?.contact_name) || null
 
   // ── Customer types ─────────────────────────────────────────
   const customerIds = Array.from(
@@ -373,6 +387,7 @@ async function buildDanielAggregate(
 
   return {
     period_days: 90,
+    business_contact_first_name: businessContactFirstName,
     last_90d: last90d,
     by_customer_type: byCustomerType,
     stale_opens: staleOpens,
@@ -459,6 +474,17 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Sätt dedup_key: "daniel_quote_nudge:\${quote_id}" så samma offert inte nudgas dagligen.
    - Confidence: 0.7 (säker på datan, osäkrare på timing — kund kan ha bestämt sig nyss).
 
+6. **Obeöppnade offerter — vänlig påminnelse (2026-06-03, nytt):**
+   - I aggregate.actionable_unopened_quotes finns 0-3 offerter som skickats men kunden har inte öppnat dem (view_count=0, sent_at 5-14 dagar sedan). Kund med telefon registrerad.
+   - För VARJE sådan offert: generera observation med action.send_sms.
+   - Observation-text till hantverkaren: "[Kundnamn] har inte öppnat offerten du skickade [days_since_sent] dagar sedan. Vill du skicka en vänlig påminnelse?"
+   - SMS-text till kunden — EXAKT format (helper-genererad, ändra inte tonen):
+     "Hej [kundens förnamn]! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh [hantverkarens förnamn]"
+     Använd kundens förnamn (första ordet i customer_name) och hantverkarens förnamn (första ordet i ${businessName === businessName ? 'business contact_name — får du via ditt rollnamn' : ''}).
+   - Sätt dedup_key: "daniel_unopened_quote:\${quote_id}" (separat från stale-opens-pathen så de inte kolliderar).
+   - Confidence: 0.65 (försiktigare än stale-opens — kunden kan ha hela mailtråden i SPAM).
+   - knowledge_type: "recommendation"
+
 Generera 1-3 KORTA observationer (max 2-3 meningar var) med konkret suggestion när det är vettigt.
 
 Var inte trivial. "Du har X offerter ute" = data, inte observation.
@@ -514,6 +540,28 @@ EXAKT EXEMPEL — kopiera strukturen:
       "customer_id": "cust_xyz",
       "customer_name": "Erik S.",
       "related_id": "q_abc"
+    }
+  },
+  {
+    "knowledge_type": "recommendation",
+    "title": "Anna L. har inte öppnat offerten på 7 dagar",
+    "observation": "Anna L. har inte öppnat offerten du skickade 7 dagar sedan. Vill du skicka en vänlig påminnelse?",
+    "suggestion": "Skicka påminnelse via SMS.",
+    "confidence": 0.65,
+    "data_basis": {
+      "quote_id": "q_unopened_1",
+      "days_since_sent": 7,
+      "view_count": 0,
+      "total_kr": 32000
+    },
+    "dedup_key": "daniel_unopened_quote:q_unopened_1",
+    "action": {
+      "type": "send_sms",
+      "to": "+46701234567",
+      "message": "Hej Anna! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh Christoffer",
+      "customer_id": "cust_anna",
+      "customer_name": "Anna L.",
+      "related_id": "q_unopened_1"
     }
   }
 ]`
