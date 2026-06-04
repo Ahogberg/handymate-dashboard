@@ -3,33 +3,64 @@
 import { useEffect, useState } from 'react'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
-import { ArrowRight, Check, Loader2, Shield } from 'lucide-react'
+import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
+import InfoSheet from './InfoSheet'
+import { TEAM } from '@/lib/agents/team'
 import type { OnboardingFormData } from '../types-redesign'
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
+/**
+ * Andreas pilot-feedback (2026-06-03): plan-cards behöver visuell ankare
+ * via agent-avatars + rich-content InfoSheet med "vilka fördelar".
+ * agents-array listar vilka TEAM-IDs som ingår; valueBullets används i
+ * InfoSheet för "typiskt värde + när byter folk upp"-kontext.
+ */
 const PLANS = [
   {
     id: 'starter',
     name: 'Bas',
     price: 2495,
     popular: false,
-    features: ['Lisa svarar i telefonen', 'Karin följer fakturor', 'Upp till 50 samtal/mån'],
+    agents: ['lisa', 'karin'],
+    features: ['Lisa svarar i telefonen åt dig', 'Karin följer fakturor', 'Upp till 50 samtal/mån'],
+    valueBullets: [
+      'Du missar inga samtal — Lisa svarar 24/7 även när du är på taket',
+      'Karin nudgar förfallna fakturor automatiskt (med ditt godkännande)',
+      'Passar enmansföretagare som vill släppa telefonen',
+    ],
+    upgradeHint: 'När du börjar skicka 5+ offerter/månad är det dags att titta på Pro (Daniel följer dem).',
   },
   {
     id: 'professional',
     name: 'Pro',
     price: 5995,
     popular: true,
-    features: ['Hela AI-teamet aktivt', 'Obegränsade samtal', 'SMS-kampanjer (Hanna)', 'Offert-uppföljning (Daniel)'],
+    agents: ['lisa', 'karin', 'daniel', 'hanna'],
+    features: ['Hela försäljnings- och kund-teamet', 'Obegränsade samtal', 'Offert-uppföljning + SMS-kampanjer'],
+    valueBullets: [
+      'Daniel följer obeöppnade offerter och föreslår SMS-påminnelser',
+      'Hanna kör säsongs-kampanjer och kund-reaktivering',
+      'Karin + Daniel samarbetar kring offert→faktura-flödet',
+      'Lämplig om du har 3+ pågående offerter samtidigt',
+    ],
+    upgradeHint: 'När ditt team växer eller du vill ha Lars projektledning, gå till Business.',
   },
   {
     id: 'business',
     name: 'Business',
     price: 11995,
     popular: false,
-    features: ['Allt i Pro', 'Egen onboarding-coach', 'Prioriterad support', 'Anpassad röst för Lisa'],
+    agents: ['lisa', 'karin', 'daniel', 'hanna', 'lars', 'matte'],
+    features: ['Allt i Pro', 'Lars projektledning', 'Matte chef-assistent', 'Egen onboarding-coach'],
+    valueBullets: [
+      'Lars håller koll på marginal och flagga projekt som tappar pengar',
+      'Matte är din personliga assistent som koordinerar allt',
+      'Egen onboarding-coach hjälper dig komma igång snabbt',
+      'Passar dig med flera anställda eller 5+ samtidiga projekt',
+    ],
+    upgradeHint: 'Du är på toppen — kontakta oss om ni har special-behov.',
   },
 ]
 
@@ -59,6 +90,7 @@ function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cardReady, setCardReady] = useState(false)
+  const [infoPlanId, setInfoPlanId] = useState<string | null>(null)
 
   useEffect(() => {
     setPlanLoading(true)
@@ -196,6 +228,7 @@ function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
               plan={p}
               active={plan === p.id}
               onSelect={() => setPlan(p.id)}
+              onInfo={() => setInfoPlanId(p.id)}
             />
           ))}
         </div>
@@ -338,21 +371,141 @@ function Step5Inner({ onNext, onBack, data, setData }: Step5Props) {
           {selectedPlan.price.toLocaleString('sv-SE')} kr/mån · Säker betalning via Stripe
         </p>
       </div>
+
+      {/* Plan-fördelar InfoSheet */}
+      {PLANS.map(p => {
+        const planAgents = p.agents
+          .map(id => TEAM.find(a => a.id === id))
+          .filter((a): a is NonNullable<typeof a> => !!a)
+        return (
+          <InfoSheet
+            key={`info-${p.id}`}
+            open={infoPlanId === p.id}
+            onClose={() => setInfoPlanId(null)}
+            title={`${p.name} — vilka fördelar?`}
+          >
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 }}>
+              <strong style={{ fontSize: 18, color: 'var(--ob-ink)' }}>{p.name}</strong>
+              <div>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--ob-ink)' }}>
+                  {p.price.toLocaleString('sv-SE')}
+                </span>
+                <span style={{ fontSize: 13, color: 'var(--ob-muted)', marginLeft: 4 }}>kr/mån</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--ob-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8 }}>
+                Ditt team i {p.name}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {planAgents.map(agent => (
+                  <div
+                    key={agent.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '6px 10px 6px 6px',
+                      background: 'var(--ob-bg)',
+                      border: '1px solid var(--ob-border)',
+                      borderRadius: 'var(--ob-r-pill)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: '50%',
+                        backgroundImage: agent.avatar ? `url(${agent.avatar})` : undefined,
+                        backgroundColor: 'var(--ob-primary-50)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ob-ink)' }}>
+                      {agent.name}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--ob-muted)' }}>
+                      {agent.role}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, color: 'var(--ob-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600, marginBottom: 8 }}>
+                Vad du får
+              </div>
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                {p.valueBullets.map((b, i) => (
+                  <li
+                    key={i}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      fontSize: 14,
+                      color: 'var(--ob-ink-2)',
+                      lineHeight: 1.5,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span style={{ color: 'var(--ob-primary-700)', flexShrink: 0, marginTop: 4 }}>
+                      <Check size={14} strokeWidth={2.5} />
+                    </span>
+                    {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div
+              style={{
+                padding: 12,
+                background: 'var(--ob-primary-50)',
+                border: '1px solid var(--ob-primary-100)',
+                borderRadius: 'var(--ob-r-md)',
+                fontSize: 13,
+                color: 'var(--ob-ink-2)',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong style={{ color: 'var(--ob-primary-700)' }}>När byter folk upp?</strong>
+              <br />
+              {p.upgradeHint}
+            </div>
+          </InfoSheet>
+        )
+      })}
     </div>
   )
 }
 
 interface PlanCardProps {
-  plan: { id: string; name: string; price: number; popular: boolean; features: string[] }
+  plan: {
+    id: string
+    name: string
+    price: number
+    popular: boolean
+    agents: string[]
+    features: string[]
+    valueBullets: string[]
+    upgradeHint: string
+  }
   active: boolean
   onSelect: () => void
+  onInfo: () => void
 }
 
-function PlanCard({ plan, active, onSelect }: PlanCardProps) {
+function PlanCard({ plan, active, onSelect, onInfo }: PlanCardProps) {
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
       style={{
         width: '100%',
         padding: 16,
@@ -391,7 +544,7 @@ function PlanCard({ plan, active, onSelect }: PlanCardProps) {
           display: 'flex',
           alignItems: 'baseline',
           justifyContent: 'space-between',
-          marginBottom: 4,
+          marginBottom: 6,
         }}
       >
         <strong style={{ fontSize: 17, color: 'var(--ob-ink)', letterSpacing: '-0.01em' }}>
@@ -404,7 +557,39 @@ function PlanCard({ plan, active, onSelect }: PlanCardProps) {
           <span style={{ fontSize: 12, color: 'var(--ob-muted)', marginLeft: 2 }}>kr/mån</span>
         </div>
       </div>
-      <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0' }}>
+
+      {/* Agent-avatars (Andreas pilot-feedback 2026-06-03): visuell ankare
+          för "vilka är med i denna plan". Stackade cirklar med svag border. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 8, marginBottom: 10 }}>
+        {plan.agents.map((agentId, i) => {
+          const agent = TEAM.find(a => a.id === agentId)
+          if (!agent) return null
+          return (
+            <div
+              key={agentId}
+              title={`${agent.name} · ${agent.role}`}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                backgroundImage: agent.avatar ? `url(${agent.avatar})` : undefined,
+                backgroundColor: 'var(--ob-primary-50)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                border: '2px solid var(--ob-surface)',
+                marginLeft: i === 0 ? 0 : -8,
+                zIndex: plan.agents.length - i,
+                flexShrink: 0,
+              }}
+            />
+          )
+        })}
+        <span style={{ fontSize: 11, color: 'var(--ob-muted)', marginLeft: 8 }}>
+          {plan.agents.length} agenter
+        </span>
+      </div>
+
+      <ul style={{ listStyle: 'none', padding: 0, margin: '0' }}>
         {plan.features.map(f => (
           <li
             key={f}
@@ -425,6 +610,26 @@ function PlanCard({ plan, active, onSelect }: PlanCardProps) {
           </li>
         ))}
       </ul>
-    </button>
+
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onInfo() }}
+        style={{
+          marginTop: 10,
+          padding: '4px 8px 4px 0',
+          background: 'transparent',
+          border: 0,
+          color: 'var(--ob-primary-700)',
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
+        <Info size={12} /> Vilka fördelar?
+      </button>
+    </div>
   )
 }
