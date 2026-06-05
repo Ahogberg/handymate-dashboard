@@ -28,6 +28,7 @@ import {
   daysSinceSent,
   extractFirstName,
   filterOutConflicting,
+  buildUnopenedNudgeMessage,
   UNOPENED_CONFLICT_WINDOW_HOURS,
 } from '@/lib/agents/daniel/unopened-quotes'
 
@@ -142,6 +143,11 @@ export interface DanielAggregate {
     customer_phone_e164: string
     total_kr: number
     days_since_sent: number
+    /** Deterministisk SMS-text genererad av buildUnopenedNudgeMessage().
+     *  Claude instrueras använda denna ORDAGRANT — inte omformulera. Skydd
+     *  mot LLM-imitation av spec-mall som driftar över tid. Helper är
+     *  truth-source (testad via 43 unit-tester). */
+    suggested_sms: string
   }>
   leads_by_source: Record<
     string,
@@ -329,14 +335,22 @@ async function buildDanielAggregate(
       if (!phoneE164) return null
       const days = daysSinceSent(q.sent_at, now)
       if (days === null) return null
+      const customerName = customerNameMap[q.customer_id] || ''
+      // Deterministisk SMS-text via helper (testad, samma som unit-tests
+      // garanterar). Claude använder denna ordagrant — ingen mall-imitation.
+      const suggestedSms = buildUnopenedNudgeMessage({
+        customerFirstName: customerName,
+        contactFirstName: businessContactFirstName,
+      })
       return {
         quote_id: q.quote_id,
         title: q.title,
         customer_id: q.customer_id,
-        customer_name: customerNameMap[q.customer_id] || '',
+        customer_name: customerName,
         customer_phone_e164: phoneE164,
         total_kr: Math.round(Number(q.total || 0)),
         days_since_sent: days,
+        suggested_sms: suggestedSms,
       }
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -517,13 +531,11 @@ EXAKT EXEMPEL — kopiera strukturen, anpassa siffrorna:
    - Sätt dedup_key: "daniel_quote_nudge:\${quote_id}" så samma offert inte nudgas dagligen.
    - Confidence: 0.7 (säker på datan, osäkrare på timing — kund kan ha bestämt sig nyss).
 
-6. **Obeöppnade offerter — vänlig påminnelse (2026-06-03, nytt):**
+6. **Obeöppnade offerter — vänlig påminnelse (2026-06-03, uppdaterad 2026-06-05):**
    - I aggregate.actionable_unopened_quotes finns 0-3 offerter som skickats men kunden har inte öppnat dem (view_count=0, sent_at 5-14 dagar sedan). Kund med telefon registrerad.
    - För VARJE sådan offert: generera observation med action.send_sms.
    - Observation-text till hantverkaren: "[Kundnamn] har inte öppnat offerten du skickade [days_since_sent] dagar sedan. Vill du skicka en vänlig påminnelse?"
-   - SMS-text till kunden — EXAKT format (helper-genererad, ändra inte tonen):
-     "Hej [kundens förnamn]! Jag märkte att du inte hunnit titta på offerten jag skickade. Är det fortfarande aktuellt för dig? Mvh [hantverkarens förnamn]"
-     Använd kundens förnamn (första ordet i customer_name) och hantverkarens förnamn (första ordet i ${businessName === businessName ? 'business contact_name — får du via ditt rollnamn' : ''}).
+   - **SMS-text till kunden:** Använd fältet \`suggested_sms\` från aggregate.actionable_unopened_quotes-objektet **ORDAGRANT** som action.send_sms.message. Ändra ingenting — inte hej-stavning, inte interpunktion, inte ordval. Helpern buildUnopenedNudgeMessage() i lib/agents/daniel/unopened-quotes.ts är truth-source (testad via 43 unit-tester). LLM-imitation av mall driftar över tid — vi använder helpern istället.
    - Sätt dedup_key: "daniel_unopened_quote:\${quote_id}" (separat från stale-opens-pathen så de inte kolliderar).
    - Confidence: 0.65 (försiktigare än stale-opens — kunden kan ha hela mailtråden i SPAM).
    - knowledge_type: "recommendation"
