@@ -64,12 +64,24 @@ export async function POST(
       updateData.payload = finalPayload
     }
 
-    const { error: updateError } = await supabase
+    // Atomisk compare-and-set: flippa BARA om raden fortfarande är 'pending'.
+    // Utan .eq('status','pending') här är status-checken på rad 47 en ren
+    // TOCTOU-läsning — två snabba klick (eller web+mobil samtidigt) läser båda
+    // 'pending', passerar båda, och exekverar payloaden två gånger (dubbla
+    // SMS/fakturor). Guarden gör att bara den request som faktiskt flippar
+    // går vidare till executeApprovalPayload.
+    const { data: flippedApproval, error: updateError } = await supabase
       .from('pending_approvals')
       .update(updateData)
       .eq('id', params.id)
+      .eq('status', 'pending')
+      .select('id')
 
     if (updateError) throw updateError
+    if (!flippedApproval || flippedApproval.length === 0) {
+      // En parallell request hann före oss mellan fetch och update.
+      return NextResponse.json({ error: `Approval already resolved` }, { status: 409 })
+    }
 
     // Record learning event (non-blocking)
     try {
