@@ -201,7 +201,7 @@ export async function triggerAutopilot(
       description: `${customerName} · ${formatAmount(quote.total || 0)}`,
       status: 'pending',
       risk_level: 'medium',
-      payload: {},
+      payload: { agent_id: 'lars' },
       package_id: approvalId,
       package_type: 'deal_to_delivery',
       package_data: {

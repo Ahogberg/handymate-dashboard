@@ -262,6 +262,7 @@ export async function checkProactiveCare(businessId: string): Promise<{
         title: `Proaktiv kontakt: ${customer.name} — ${lifecycle.suggestedService}`,
         description: `${lifecycle.reason}. Senaste jobb: ${project.name} (${monthsSince} månader sedan)`,
         payload: {
+          agent_id: 'hanna',
           customer_id: customer.id,
           customer_name: customer.name,
           customer_phone: customer.phone_number,

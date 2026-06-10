@@ -186,6 +186,7 @@ export async function suggestDispatch(params: {
     risk_level: 'low',
     status: 'pending',
     payload: {
+      agent_id: 'lars',
       member_id: best.member.id,
       member_name: best.member.name,
       context_type: params.contextType,

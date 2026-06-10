@@ -81,6 +81,7 @@ export async function generateSeasonalCampaign(
     risk_level: 'medium',
     status: 'pending',
     payload: {
+      agent_id: 'hanna',
       theme: theme.theme,
       angle: theme.angle,
       projectTypes: theme.projectTypes,

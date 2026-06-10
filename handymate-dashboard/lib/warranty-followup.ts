@@ -105,6 +105,7 @@ export async function checkWarrantyFollowups(businessId: string): Promise<Warran
       title: `🔧 Garantiuppföljning — ${customer.name}`,
       description: `${project.name} avslutades ${completedDate.toLocaleDateString('sv-SE')}. Skicka uppföljning?`,
       payload: {
+        agent_id: 'hanna',
         project_id: project.id,
         project_name: project.name,
         customer_id: customer.id,
