@@ -87,6 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       risk_level: 'low',
       status: 'pending',
       payload: {
+        agent_id: 'karin',
         report_id: params.id,
         project_id: report.project_id,
         customer_id: report.customer_id,

@@ -31,6 +31,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Incheckning hittades inte' }, { status: 404 })
     }
 
+    // Pre-check (idempotens): redan attesterad? Returnera tidigt så vi inte
+    // skapar en andra time_entry = dubbel fakturerad tid. Den atomiska guarden
+    // på UPDATE nedan är det egentliga race-skyddet vid samtidiga requests;
+    // detta ger ett tydligt svar i det vanliga dubbel-submit-fallet.
+    if (checkin.status === 'approved') {
+      return NextResponse.json({ error: 'Incheckning redan attesterad' }, { status: 409 })
+    }
+
     const minutes = adjusted_minutes ?? checkin.duration_minutes ?? 0
 
     // Resolve hourly_rate: per-user-rate → business-default → 0.
@@ -66,8 +74,10 @@ export async function POST(request: NextRequest) {
 
     const approvedAt = new Date().toISOString()
 
-    // Markera som godkänd
-    await supabase
+    // Markera som godkänd — ATOMISK guard: flippa bara om raden inte redan
+    // är 'approved'. Utan .neq + count-check skapar vilken om-körning som
+    // helst (retry, dubbelklick, web+mobil) en till time_entry nedan.
+    const { data: flippedCheckin } = await supabase
       .from('time_checkins')
       .update({
         status: 'approved',
@@ -76,6 +86,15 @@ export async function POST(request: NextRequest) {
         duration_minutes: minutes,
       })
       .eq('id', checkin_id)
+      .eq('business_id', business.business_id)
+      .neq('status', 'approved')
+      .select('id')
+
+    // Gate:a time_entry-INSERT på att UPDATE faktiskt flippade statusen.
+    // 0 rader = en parallell request hann före → skapa INGEN andra time_entry.
+    if (!flippedCheckin || flippedCheckin.length === 0) {
+      return NextResponse.json({ error: 'Incheckning redan attesterad' }, { status: 409 })
+    }
 
     // Skapa time_entry automatiskt — incheckningen just attesterades, så
     // raden ska skapas med approval_status='approved' direkt (annars

@@ -139,7 +139,7 @@ export async function triggerJobReport(
     approval_type: 'job_report',
     title: `📋 Jobbrapport — ${project.name}`,
     description: `${customer?.name || 'Kund'} · ${workPerformed.length} arbetsmoment · ${materialCount} material · ${photoCount} foton`,
-    payload: reportData,
+    payload: { ...reportData, agent_id: 'lars' },
     status: 'pending',
     risk_level: 'low',
   })

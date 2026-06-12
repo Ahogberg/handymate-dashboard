@@ -134,6 +134,7 @@ async function createApproval(
     title: action.description,
     description: `${entity.customerName ?? 'Okänd kund'}: "${decision.reasoning}"`,
     payload: {
+      agent_id: 'matte',
       ...action.params,
       customer_reply_pending: decision.customerReply?.message,
       available_slots: availableSlots || [],

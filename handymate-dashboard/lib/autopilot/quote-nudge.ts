@@ -81,6 +81,7 @@ export async function createQuoteNudge(
     status: 'pending',
     risk_level: 'medium',
     payload: {
+      agent_id: 'daniel',
       quote_id: quoteId,
       to: customer.phone_number,
       message: nudgeMessage,

@@ -143,6 +143,7 @@ export async function POST(request: NextRequest) {
     title: `Ny lead: ${parsed.name || 'Okänd'}${parsed.source ? ` (via ${parsed.source})` : ''}`,
     description: previewLine,
     payload: {
+      agent_id: 'daniel',
       lead_id: result.leadId,
       parsed: {
         name: parsed.name,

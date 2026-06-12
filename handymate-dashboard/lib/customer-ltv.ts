@@ -121,6 +121,7 @@ export async function calculateCustomerLTV(businessId: string): Promise<{
             title: `Reaktivera ${customer.name}`,
             description: `${customer.name} har betalat ${Math.round(lifetimeValue).toLocaleString('sv-SE')} kr totalt (${jobCount} jobb) men varit tyst i ${monthsSince} månader. Vill du att jag skickar ett personligt SMS?`,
             payload: {
+              agent_id: 'hanna',
               customer_id: customer.customer_id,
               customer_name: customer.name,
               customer_phone: customer.phone_number,

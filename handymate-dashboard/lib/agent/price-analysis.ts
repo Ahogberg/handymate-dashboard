@@ -183,6 +183,7 @@ export async function analyzePriceAdjustments(businessId: string): Promise<{
         title: `Prisjustering — ${analysis.categoryLabel}`,
         description: `Jag har märkt att ${analysis.categoryLabel.toLowerCase()}-jobb tar ${analysis.overrunPercent}% längre tid än du estimerar (snitt ${analysis.avgEstimatedHours}h estimerat vs ${analysis.avgActualHours}h faktiskt, baserat på ${analysis.jobCount} avslutade jobb).${rateText}`,
         payload: {
+          agent_id: 'karin',
           category: analysis.category,
           category_label: analysis.categoryLabel,
           job_count: analysis.jobCount,

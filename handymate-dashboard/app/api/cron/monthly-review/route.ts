@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         approval_type: 'monthly_review',
         title: `📊 Månadsrapport ${report.data.month_label}`,
         description: `${report.recommendations.length} rekommendation${report.recommendations.length === 1 ? '' : 'er'} väntar`,
-        payload: { month: report.data.month, recommendations: report.recommendations.slice(0, 3) },
+        payload: { agent_id: 'matte', month: report.data.month, recommendations: report.recommendations.slice(0, 3) },
         status: 'pending',
         risk_level: 'low',
       })
