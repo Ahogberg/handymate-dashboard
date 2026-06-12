@@ -300,14 +300,20 @@ export async function autoInvoiceOnComplete(
     // 12. Om draft: skapa pending_approval
     if (!autoSend) {
       try {
-        await supabase.from('pending_approvals').insert({
+        // Tidigare bugg: insert med fel kolumnnamn (type/context istället för
+        // approval_type/payload) + approval_type NOT NULL utan default →
+        // PostgREST avvisade raden, men .error lästes aldrig och .insert()
+        // kastar inte → silent failure (review_auto_invoice-draften skapades
+        // aldrig). Korrekt shape + synlig .error-loggning nedan.
+        const { error: approvalErr } = await supabase.from('pending_approvals').insert({
           business_id: businessId,
-          type: 'review_auto_invoice',
+          approval_type: 'review_auto_invoice',
           title: `Granska faktura — ${project.name}`,
           description: `Faktura ${invoiceNumber} på ${total.toLocaleString('sv-SE')} kr skapades automatiskt från avslutat projekt. Granska och skicka till ${customer?.name || 'kund'}.`,
           risk_level: 'medium',
           status: 'pending',
-          context: {
+          payload: {
+            agent_id: 'karin',
             invoice_id: invoice.invoice_id,
             invoice_number: invoiceNumber,
             project_id: projectId,
@@ -320,8 +326,19 @@ export async function autoInvoiceOnComplete(
             rot_rut_type: rotRutType,
           },
         })
-      } catch {
-        // Non-blocking
+        if (approvalErr) {
+          console.error(
+            '[autoInvoiceOnComplete] review_auto_invoice-approval insert failed (non-blocking):',
+            { business_id: businessId, invoice_id: invoice.invoice_id, error: approvalErr.message },
+          )
+        }
+      } catch (err: any) {
+        // Non-blocking — fakturan är redan skapad; approval-kortet är sekundärt.
+        // Loggas synligt så framtida schema-/credits-stopp inte göms.
+        console.error(
+          '[autoInvoiceOnComplete] review_auto_invoice-approval insert threw (non-blocking):',
+          { business_id: businessId, invoice_id: invoice.invoice_id, error: err?.message || String(err) },
+        )
       }
     }
 
