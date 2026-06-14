@@ -22,6 +22,7 @@ import {
   Shield,
   ShieldCheck,
   ShieldAlert,
+  Sparkles,
   ToggleLeft,
   ToggleRight,
   RefreshCw,
@@ -34,6 +35,7 @@ import {
   Code2,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import SavedScoreboard from '@/components/dashboard/SavedScoreboard'
 import { useBusiness } from '@/lib/BusinessContext'
 import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 import MatteChatModal from '@/components/MatteChatModal'
@@ -699,17 +701,35 @@ function RunDetail({ run, onClose }: { run: AgentRun; onClose: () => void }) {
 
 // ── Autonomy Settings ──────────────────────────────────────────────────
 
-function AutonomySettings({ settings, onUpdate, saving }: {
+interface AgentTrust {
+  approved: number
+  rejected: number
+  edited: number
+  rate: number | null
+  n: number
+}
+interface TrustLadderData {
+  has_data: boolean
+  per_agent: Record<string, AgentTrust>
+  thresholds: { preliminary: number; medium: number; high: number }
+}
+
+function AutonomySettings({ settings, onUpdate, saving, trust }: {
   settings: AgentSettings
   onUpdate: (key: keyof AgentSettings, value: boolean | number) => void
   saving: boolean
+  trust: TrustLadderData | null
 }) {
+  // agentId = vilken kollega som äger förmågan (Daniel→offert, Karin→faktura
+  // osv). approve_rate är per AGENT, inte per förmåga — så facit visas som
+  // "den här kollegans facit", en medveten approximation (se plan/granskning).
   const toggles: Array<{
     key: keyof AgentSettings
     label: string
     description: string
     icon: typeof Shield
     risk: 'low' | 'medium' | 'high'
+    agentId: string
   }> = [
     {
       key: 'auto_create_customer',
@@ -717,6 +737,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten skapar nya kundposter vid okända nummer',
       icon: UserPlus,
       risk: 'low',
+      agentId: 'lisa',
     },
     {
       key: 'auto_create_booking',
@@ -724,6 +745,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten bokar in jobb utan att fråga först',
       icon: CalendarCheck,
       risk: 'medium',
+      agentId: 'lars',
     },
     {
       key: 'auto_create_quote',
@@ -731,6 +753,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten skapar och sparar offerter',
       icon: FileText,
       risk: 'medium',
+      agentId: 'daniel',
     },
     {
       key: 'auto_send_sms',
@@ -738,6 +761,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten skickar SMS till kunder utan godkännande',
       icon: Smartphone,
       risk: 'high',
+      agentId: 'lisa',
     },
     {
       key: 'auto_send_email',
@@ -745,6 +769,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten skickar e-post utan godkännande',
       icon: Mail,
       risk: 'high',
+      agentId: 'hanna',
     },
     {
       key: 'auto_create_invoice',
@@ -752,8 +777,48 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       description: 'Agenten skapar fakturor direkt',
       icon: FileText,
       risk: 'high',
+      agentId: 'karin',
     },
   ]
+
+  // Facit per kollega: visar approve_rate bara över preliminary-tröskeln (5).
+  // Under tröskeln → "för lite data än", ALDRIG en påhittad rate.
+  const renderFacit = (agentId: string, isEnabled: boolean) => {
+    const prelim = trust?.thresholds.preliminary ?? 5
+    const medium = trust?.thresholds.medium ?? 15
+    const stat = trust?.per_agent?.[agentId]
+    const name = TEAM.find(a => a.id === agentId)?.name || ''
+
+    if (!stat || stat.n < prelim || stat.rate == null) {
+      const n = stat?.n ?? 0
+      return (
+        <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-gray-400">
+          <Clock className="w-3 h-3" />
+          {name ? `${name}: ` : ''}för lite data än ({n} av {prelim})
+        </div>
+      )
+    }
+
+    const pct = Math.round(stat.rate * 100)
+    const denom = stat.approved + stat.rejected + stat.edited
+    const trusted = pct >= 90 && stat.n >= medium
+    return (
+      <div className="mt-1.5">
+        <div className="flex items-center gap-2 text-[11px] text-primary-700 font-medium">
+          <span className="inline-block w-20 h-1.5 rounded-full bg-primary-100 overflow-hidden align-middle">
+            <span className="block h-full bg-primary-600 rounded-full" style={{ width: `${pct}%` }} />
+          </span>
+          {name}: godkänt {stat.approved} av {denom} · {pct}%
+        </div>
+        {!isEnabled && trusted && (
+          <div className="flex items-center gap-1 mt-1 text-[11px] text-amber-600 font-medium">
+            <Sparkles className="w-3 h-3" />
+            Facit ser tryggt ut — redo att släppas fri?
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const riskColors = {
     low: 'text-emerald-500',
@@ -778,7 +843,10 @@ function AutonomySettings({ settings, onUpdate, saving }: {
       <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield className="w-5 h-5 text-primary-600" />
-          <h3 className="text-sm font-bold text-gray-900">Agentens autonomi</h3>
+          <div>
+            <h3 className="text-sm font-bold text-gray-900">Förtroendetrappan</h3>
+            <p className="text-[11px] text-gray-400">Släpp teamet fritt i din takt — du ser facit innan du höjer ribban</p>
+          </div>
         </div>
         {saving && (
           <span className="flex items-center gap-1 text-xs text-gray-400">
@@ -805,6 +873,7 @@ function AutonomySettings({ settings, onUpdate, saving }: {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{toggle.description}</p>
+                {renderFacit(toggle.agentId, isEnabled)}
               </div>
               <button
                 onClick={() => onUpdate(toggle.key, !isEnabled)}
@@ -968,6 +1037,7 @@ export default function AgentDashboardPage() {
   const [loading, setLoading] = useState(true)
   const [showSettings, setShowSettings] = useState(false)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(DEFAULT_SETTINGS)
+  const [trustData, setTrustData] = useState<TrustLadderData | null>(null)
   const [memoryCounts, setMemoryCounts] = useState<Record<string, number>>({})
   const [teamMessages, setTeamMessages] = useState<Array<{ from_agent: string; to_agent: string; content: string; created_at: string; message_type?: string; metadata?: any }>>([])
   const [showAllMessages, setShowAllMessages] = useState(false)
@@ -1083,6 +1153,11 @@ export default function AgentDashboardPage() {
           if (data.memory_counts) setMemoryCounts(data.memory_counts)
           if (data.messages) setTeamMessages(data.messages)
         })
+        .catch(() => {})
+      // Fetch Förtroendetrappan-facit (approve_rate, non-blocking)
+      fetch('/api/dashboard/trust-ladder', { credentials: 'include' })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => { if (data) setTrustData(data as TrustLadderData) })
         .catch(() => {})
       // Fetch Google status (non-blocking)
       fetch('/api/google/status')
@@ -1245,6 +1320,11 @@ export default function AgentDashboardPage() {
         </button>
       </div>
 
+      {/* Tid-sparad-scoreboard — "Vad teamet sparat åt dig" (denna månad).
+          Flyttad hit från översikten: värde-summering hör hemma på team-sidan,
+          inte staplad på den dagliga vyn. Renderar inget om månadens tid är 0. */}
+      <SavedScoreboard />
+
       {/* Settings Panel (collapsible) */}
       {showSettings && (
         <div className="mb-6">
@@ -1252,6 +1332,7 @@ export default function AgentDashboardPage() {
             settings={agentSettings}
             onUpdate={handleSettingsUpdate}
             saving={savingSettings}
+            trust={trustData}
           />
         </div>
       )}
