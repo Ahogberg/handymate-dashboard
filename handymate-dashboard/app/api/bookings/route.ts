@@ -301,6 +301,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Auto-skapa projekt för OFFERT-LÖSA jobb: bokningen = åtagandet. Guarden
+    // (kund utan aktivt projekt + ingen öppen offert) ligger i helpern, så vi
+    // föregår aldrig accept-flödet. Icke-blockerande.
+    if (customer_id) {
+      try {
+        const { maybeCreateProjectFromBooking } = await import('@/lib/projects/maybe-create-from-booking')
+        const result = await maybeCreateProjectFromBooking(supabase, business.business_id, {
+          customerId: customer_id,
+          bookingId,
+          serviceType: service_type || null,
+        })
+        if (result.created && result.project_id) {
+          booking.project_id = result.project_id
+          console.log(`[bookings] Auto-skapade projekt ${result.project_id} från bokning ${bookingId} (${result.reason})`)
+        }
+      } catch (projErr) {
+        console.error('[bookings] maybeCreateProjectFromBooking failed (non-blocking):', projErr)
+      }
+    }
+
     return NextResponse.json({ booking })
   } catch (error: any) {
     console.error('Create booking error:', error)
