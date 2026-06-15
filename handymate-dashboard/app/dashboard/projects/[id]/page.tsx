@@ -1606,7 +1606,7 @@ export default function ProjectDetailPage() {
       { key: 'leverantorer', label: 'Leverantörer' },
     ]},
     { group: 'DOKUMENTATION', items: [
-      { key: 'checklists', label: 'Checklistor' },
+      { key: 'checklists', label: 'Egenkontroll & checklistor' },
       { key: 'field_reports', label: 'Fältrapporter' },
       { key: 'log', label: 'Byggdagbok' },
       { key: 'documents', label: 'Dokument' },
