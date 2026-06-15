@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getEgenkontrollFormTemplatesForBranch } from '@/lib/form-templates-defaults'
 
 // System form templates (seeded on first GET)
 const SYSTEM_TEMPLATES = [
@@ -60,16 +61,30 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const businessId = business.business_id
 
-    // Check if templates exist, seed if not
-    const { data: existing } = await supabase
-      .from('form_templates')
-      .select('id')
+    // Branschspecifika egenkontroll-formulär (branschfiltrerade som checklistor)
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('branch')
       .eq('business_id', businessId)
-      .limit(1)
+      .maybeSingle()
+    const branch = config?.branch || ''
 
-    if (!existing || existing.length === 0) {
+    // Önskade systemmallar = generiska + branschspecifika egenkontroller.
+    const desired = [...SYSTEM_TEMPLATES, ...getEgenkontrollFormTemplatesForBranch(branch)]
+
+    // Seed-missing (idempotent backfill): seedar bara systemmallar som saknas
+    // — så befintliga företag får nya branschmallar utan dubbletter, och
+    // soft-deletade mallar (is_active=false men namnet finns) återskapas inte.
+    const { data: existingSystem } = await supabase
+      .from('form_templates')
+      .select('name')
+      .eq('business_id', businessId)
+      .eq('is_system', true)
+    const existingNames = new Set((existingSystem || []).map(t => t.name))
+    const toInsert = desired.filter(t => !existingNames.has(t.name))
+    if (toInsert.length > 0) {
       await supabase.from('form_templates').insert(
-        SYSTEM_TEMPLATES.map(t => ({
+        toInsert.map(t => ({
           business_id: businessId,
           ...t,
           is_active: true,
