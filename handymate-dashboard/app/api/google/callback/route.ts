@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Decode and validate state
-    let state: { business_id: string; user_id: string; timestamp: number }
+    let state: { business_id: string; user_id: string; timestamp: number; source?: string }
     try {
       state = JSON.parse(Buffer.from(stateParam, 'base64').toString('utf-8'))
     } catch {
@@ -123,9 +123,11 @@ export async function GET(request: NextRequest) {
       })
       .eq('business_id', state.business_id)
 
-    return NextResponse.redirect(
-      `${APP_URL}/dashboard/settings?tab=integrations&google=connected`
-    )
+    // source=onboarding → tillbaka till onboardingen; annars settings (som förr)
+    const successDest = state.source === 'onboarding'
+      ? `${APP_URL}/onboarding?google=connected`
+      : `${APP_URL}/dashboard/settings?tab=integrations&google=connected`
+    return NextResponse.redirect(successDest)
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
     console.error('Google callback error:', msg)

@@ -57,12 +57,17 @@ export async function GET(request: NextRequest) {
       userId = inserted.id
     }
 
-    // Generate state token with business_id, user_id and timestamp
+    // source=onboarding → callback ska returnera till onboardingen istället
+    // för settings (icke-brytande: default/avsaknad = settings som förr).
+    const source = request.nextUrl.searchParams.get('source') || undefined
+
+    // Generate state token with business_id, user_id, timestamp (+ source)
     const state = Buffer.from(
       JSON.stringify({
         business_id: business.business_id,
         user_id: userId,
         timestamp: Date.now(),
+        source,
       })
     ).toString('base64')
 
