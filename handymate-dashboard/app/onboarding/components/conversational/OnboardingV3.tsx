@@ -5,13 +5,22 @@
    Kvar (6b-ii..iv): fas D (import/kalender/telefon), Stripe-betalning, fas E finish.
    D/E renderas tills vidare som statiska demo-skärmar. */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { loadStripe } from '@stripe/stripe-js'
+import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import {
   Matte, InlineCard, Panel, PanelGroup, PanelItem, SplitShell, MobileShell, Icon,
 } from './parts'
 import { PhaseE, type Variant } from './screens'
 import { supabase } from '@/lib/supabase'
 import { parseCSV, autoMapColumns, prepareRows, importCustomers } from '@/lib/customers/import-core'
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const PLANS = [
+  { id: 'starter', name: 'Bas', price: 2495 },
+  { id: 'professional', name: 'Pro', price: 5995 },
+  { id: 'business', name: 'Business', price: 11995 },
+] as const
 
 interface V3Data {
   website: string
@@ -104,7 +113,11 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
         setPhase(4)
       }} />
   }
-  // 6b-iii: byt mot betalning före E.
+  if (phase === 4) {
+    return <PhasePayment variant={variant} data={data} onEscape={onEscape}
+      onDone={async () => { await save(5, {}); setPhase(5) }} />
+  }
+  // 6b-iv: byt mot wired E (team-reveal + finish).
   return <PhaseE variant={variant} onEscape={onEscape} />
 }
 
@@ -467,4 +480,99 @@ function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape }
   return variant === 'mobile'
     ? <MobileShell active={3} dialog={dialog} dock={dock} panelSummary={`${tools} verktyg kopplade`} panelDrawer={panelBody} onEscape={onEscape} />
     : <SplitShell active={3} dialog={dialog} dock={dock} panel={<Panel pct={85}>{panelBody}</Panel>} onEscape={onEscape} />
+}
+
+/* ---------- Betalning (wired): Stripe Elements, återbruk billing-flödet ---------- */
+function PhasePayment({ variant, data, onDone, onEscape }: {
+  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void
+}) {
+  return (
+    <Elements stripe={stripePromise}>
+      <PaymentInner variant={variant} data={data} onDone={onDone} onEscape={onEscape} />
+    </Elements>
+  )
+}
+
+function PaymentInner({ variant, onDone, onEscape }: {
+  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void
+}) {
+  const stripe = useStripe()
+  const elements = useElements()
+  const [plan, setPlan] = useState<string>('professional')
+  const [clientSecret, setClientSecret] = useState<string | null>(null)
+  const [planLoading, setPlanLoading] = useState(true)
+  const [processing, setProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setPlanLoading(true); setError(null); setClientSecret(null)
+    fetch('/api/billing/setup-intent', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId: plan }),
+    })
+      .then(r => r.json())
+      .then(d => { if (d.clientSecret) setClientSecret(d.clientSecret); else setError(d.error || 'Kunde inte initiera betalning') })
+      .catch(() => setError('Nätverksfel — försök igen'))
+      .finally(() => setPlanLoading(false))
+  }, [plan])
+
+  async function pay() {
+    if (!stripe || !elements || !clientSecret || processing) return
+    setProcessing(true); setError(null)
+    const cardEl = elements.getElement(CardElement)
+    if (!cardEl) { setProcessing(false); return }
+    const { setupIntent, error: stripeError } = await stripe.confirmCardSetup(clientSecret, { payment_method: { card: cardEl } })
+    if (stripeError) { setError(stripeError.message || 'Kortfel — kontrollera uppgifterna'); setProcessing(false); return }
+    if (setupIntent?.status === 'succeeded') {
+      const res = await fetch('/api/billing/confirm', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ setupIntentId: setupIntent.id, planId: plan }),
+      })
+      if (res.ok) onDone()
+      else { const d = await res.json().catch(() => ({})); setError(d.error || 'Kunde inte bekräfta betalning'); setProcessing(false) }
+    } else setProcessing(false)
+  }
+
+  const selected = PLANS.find(p => p.id === plan) || PLANS[1]
+  const dialog = (
+    <>
+      <Matte>Sista biten — välj plan så aktiverar jag teamet på riktigt.</Matte>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {PLANS.map(p => (
+          <div key={p.id} className={`m3-tool ${plan === p.id ? 'done' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setPlan(p.id)}>
+            <div className="m3-tool-ic" style={{ background: plan === p.id ? 'var(--primary-50)' : 'var(--bg)', color: plan === p.id ? 'var(--primary-700)' : 'var(--subtle)' }}>
+              <Icon name={plan === p.id ? 'check' : 'zap'} size={20} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="m3-tool-title">{p.name}</div>
+              <div className="m3-tool-sub">{p.price.toLocaleString('sv-SE')} kr/mån exkl. moms</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {error && <div className="m3-scrape" style={{ background: '#FFF1F2', borderColor: '#FECDD3', color: '#BE123C' }}><Icon name="x" size={16} /> {error}</div>}
+    </>
+  )
+  const dock = (
+    <InlineCard accent>
+      <div className="m3-inline-label"><Icon name="shield" size={13} /> Kortuppgifter</div>
+      <div style={{ border: '1px solid var(--ob-border)', borderRadius: 'var(--ob-r-md)', padding: '13px 14px', background: 'var(--ob-surface)', marginBottom: 12 }}>
+        <CardElement options={{ style: { base: { fontSize: '15px', color: '#0F172A' } } }} />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <button className="m3-go" onClick={pay} disabled={!clientSecret || processing || planLoading}>
+          {processing ? 'Behandlar…' : <>Aktivera {selected.name} <Icon name="arrowRight" size={15} /></>}
+        </button>
+      </div>
+    </InlineCard>
+  )
+  const panelBody = (
+    <PanelGroup label="Din plan" icon="zap">
+      <PanelItem icon="zap" k="Plan" v={`${selected.name} · ${selected.price.toLocaleString('sv-SE')} kr/mån`} state="confirmed" tag="Vald" />
+      <PanelItem icon="shield" v="14 dagars trial — avsluta när du vill" state="future" tag="Trial" />
+    </PanelGroup>
+  )
+  return variant === 'mobile'
+    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary={`${selected.name} · ${selected.price.toLocaleString('sv-SE')} kr`} panelDrawer={panelBody} onEscape={onEscape} />
+    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={95}>{panelBody}</Panel>} onEscape={onEscape} />
 }
