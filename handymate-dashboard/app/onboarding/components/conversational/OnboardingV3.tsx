@@ -6,12 +6,14 @@
    D/E renderas tills vidare som statiska demo-skärmar. */
 
 import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { loadStripe } from '@stripe/stripe-js'
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js'
 import {
   Matte, InlineCard, Panel, PanelGroup, PanelItem, SplitShell, MobileShell, Icon,
 } from './parts'
-import { PhaseE, type Variant } from './screens'
+import { getAgentById } from '@/lib/agents/team'
+import { type Variant } from './screens'
 import { supabase } from '@/lib/supabase'
 import { parseCSV, autoMapColumns, prepareRows, importCustomers } from '@/lib/customers/import-core'
 
@@ -65,6 +67,7 @@ function buildWorkingHours(start: string, end: string) {
 }
 
 export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape?: () => void }) {
+  const router = useRouter()
   const [phase, setPhase] = useState(0)
   const [data, setData] = useState<V3Data>(EMPTY)
   const set = (patch: Partial<V3Data>) => setData(d => ({ ...d, ...patch }))
@@ -78,6 +81,19 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
         body: JSON.stringify({ step, config, data: extra || {} }),
       })
     } catch { /* tyst — resume täcker */ }
+  }
+
+  // Slutför: onboarding_step=10 + completed_at + seedAllDefaults, sen dashboard.
+  async function finish() {
+    if (data.businessId) {
+      try {
+        await fetch('/api/onboarding', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rot_enabled: data.rot }),
+        })
+      } catch { /* icke-blockerande */ }
+    }
+    router.push('/dashboard')
   }
 
   if (phase === 0) {
@@ -117,8 +133,7 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
     return <PhasePayment variant={variant} data={data} onEscape={onEscape}
       onDone={async () => { await save(5, {}); setPhase(5) }} />
   }
-  // 6b-iv: byt mot wired E (team-reveal + finish).
-  return <PhaseE variant={variant} onEscape={onEscape} />
+  return <PhaseEWired variant={variant} data={data} onFinish={finish} onEscape={onEscape} />
 }
 
 /* ---------- Fas A (wired): skrapning + kontoskapande ---------- */
@@ -575,4 +590,66 @@ function PaymentInner({ variant, onDone, onEscape }: {
   return variant === 'mobile'
     ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary={`${selected.name} · ${selected.price.toLocaleString('sv-SE')} kr`} panelDrawer={panelBody} onEscape={onEscape} />
     : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={95}>{panelBody}</Panel>} onEscape={onEscape} />
+}
+
+/* ---------- Fas E (wired): team-reveal + finish ---------- */
+const TEAM_E = [
+  { id: 'lisa', name: 'Lisa', line: 'svarar i telefonen åt er', live: true },
+  { id: 'karin', name: 'Karin', line: 'sköter fakturor och bokföring' },
+  { id: 'daniel', name: 'Daniel', line: 'följer upp era offerter' },
+  { id: 'lars', name: 'Lars', line: 'håller koll på projekt och bokningar' },
+  { id: 'hanna', name: 'Hanna', line: 'sköter SMS och påminnelser' },
+]
+
+function PhaseEWired({ variant, data, onFinish, onEscape }: {
+  variant: Variant; data: V3Data; onFinish: () => void; onEscape?: () => void
+}) {
+  const [finishing, setFinishing] = useState(false)
+  const dialog = (
+    <>
+      <Matte>Allt klart! Det här är teamet jag satt ihop åt er — <strong>konfigurerat efter era tjänster och tider</strong>.</Matte>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
+        {TEAM_E.map(t => (
+          <div key={t.id} className="m3-teamcard">
+            <div className="av" style={{ backgroundImage: `url(${getAgentById(t.id)?.avatar || ''})` }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="m3-team-name">{t.name}</div>
+              <div className="m3-team-line">{t.line}</div>
+            </div>
+            {t.live && <span className="m3-live"><i /> Live</span>}
+          </div>
+        ))}
+      </div>
+      <Matte role={false}>Dag ett vet jag bara det ni berättat. Men <strong>ju mer ni använder mig, desto bättre lär jag känna era mönster</strong> — vilka kunder som återkommer, när det är läge att skicka offert.</Matte>
+      <div className="m3-firstwin" style={{ marginLeft: 50 }}>
+        <Icon name="phone" size={18} /> Vill du höra det funka? <strong style={{ marginLeft: 4 }}>Ring ert eget nummer och hör Lisa svara.</strong>
+      </div>
+    </>
+  )
+  const dock = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span style={{ fontSize: 12.5, color: 'var(--muted)', flex: 1 }}>Teamet börjar jobba så fort du kör igång.</span>
+      <button className="m3-go" style={{ height: 48, padding: '0 24px', fontSize: 15 }} onClick={() => { setFinishing(true); onFinish() }} disabled={finishing}>
+        <Icon name="rocket" size={17} /> {finishing ? 'Startar…' : 'Kör igång'}
+      </button>
+    </div>
+  )
+  const panelBody = (
+    <>
+      <PanelGroup label="Ditt företag" icon="check">
+        <PanelItem icon="home" v={`${data.companyName || '—'}${data.ort ? ' · ' + data.ort : ''}`} state="confirmed" tag="Bekräftat" />
+        <PanelItem icon="wrench" k="Tjänster & ton" v={`${data.services.join(' · ') || '—'} — ${TONE_LABEL[data.tone] || ''}`} state="confirmed" tag="Bekräftat" />
+        <PanelItem icon="clock" k="Tider & pris" v={`Mån–Fre ${data.workStart}–${data.workEnd} · ${data.priceMin}–${data.priceMax} kr/h · ROT ${data.rot ? 'på' : 'av'}`} state="confirmed" tag="Bekräftat" />
+        <PanelItem icon="zap" k="Verktyg" v={`${data.importedCount ? data.importedCount + ' kunder' : '—'}${data.calendarConnected ? ' · Kalender' : ''}`} state="confirmed" tag="Bekräftat" />
+      </PanelGroup>
+      <PanelGroup label="Lär mig över tid" icon="sparkles">
+        <PanelItem icon="users" v="Era vanligaste kunder & mönster" state="future" tag="Lär mig" />
+        <PanelItem icon="target" v="Bästa läget att skicka offert" state="future" tag="Lär mig" />
+        <PanelItem icon="calendar" v="Återkommande jobb & säsonger" state="future" tag="Lär mig" />
+      </PanelGroup>
+    </>
+  )
+  return variant === 'mobile'
+    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary="Komplett · teamet redo" panelDrawer={panelBody} onEscape={onEscape} />
+    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={100}>{panelBody}</Panel>} onEscape={onEscape} />
 }
