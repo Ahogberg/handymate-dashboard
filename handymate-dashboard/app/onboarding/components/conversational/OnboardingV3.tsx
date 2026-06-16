@@ -19,9 +19,18 @@ import { parseCSV, autoMapColumns, prepareRows, importCustomers } from '@/lib/cu
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 const PLANS = [
-  { id: 'starter', name: 'Bas', price: 2495 },
-  { id: 'professional', name: 'Pro', price: 5995 },
-  { id: 'business', name: 'Business', price: 11995 },
+  {
+    id: 'starter', name: 'Bas', price: 2495, popular: false, tagline: 'För enmansföretagaren',
+    features: ['Lisa svarar i telefonen åt dig', 'Karin bevakar och påminner om fakturor', 'Upp till 50 samtal/mån'],
+  },
+  {
+    id: 'professional', name: 'Pro', price: 5995, popular: true, tagline: 'Mest populär',
+    features: ['Hela sälj- & kundteamet (Lisa, Karin, Daniel, Hanna)', 'Obegränsade samtal', 'Offert-uppföljning + SMS-kampanjer'],
+  },
+  {
+    id: 'business', name: 'Business', price: 11995, popular: false, tagline: 'För växande team',
+    features: ['Allt i Pro', 'Lars – projektledning & marginalkoll', 'Matte – chefsassistent som koordinerar', 'Egen onboarding-coach'],
+  },
 ] as const
 
 interface V3Data {
@@ -186,6 +195,9 @@ function PhaseAWired({ variant, data, set, onDone, onEscape }: {
             businessName: data.companyName, contactName: data.contactName,
             displayName: data.companyName, phone: data.phone || undefined,
             serviceArea: data.ort || undefined, orgNumber: data.orgNumber || undefined,
+            // TODO: fånga riktig bransch (fråga i A, eller mappa från scrapade
+            // tjänster) — 'other' ger generisk kunskapsbas + generiska defaults.
+            branch: 'other',
           },
         }),
       })
@@ -441,16 +453,34 @@ function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape }
         </div>
 
         {/* Telefon-val */}
-        <div className="m3-tool">
-          <div className="m3-tool-ic" style={{ background: '#FEF3C7', color: 'var(--amber-600)' }}><Icon name="phone" size={20} /></div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="m3-tool-title">Lisas telefonnummer</div>
-            <div className="m3-tool-sub">{data.phoneMode === 'forward' ? 'Behåll ert nummer — vidarekoppla till Lisa' : 'Använd ett nytt Handymate-nummer'}</div>
-            <div className="m3-seg" style={{ marginTop: 8 }}>
-              <button className={data.phoneMode === 'forward' ? 'on' : ''} onClick={() => set({ phoneMode: 'forward' })}>Behåll mitt nr</button>
-              <button className={data.phoneMode === 'primary' ? 'on' : ''} onClick={() => set({ phoneMode: 'primary' })}>Nytt nummer</button>
+        <div className="m3-tool" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
+            <div className="m3-tool-ic" style={{ background: '#FEF3C7', color: 'var(--amber-600)' }}><Icon name="phone" size={20} /></div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="m3-tool-title">Telefon — så når kunderna er</div>
+              <div className="m3-tool-sub">Hur ska inkommande samtal tas emot? Går att ändra senare.</div>
             </div>
           </div>
+          {([
+            { mode: 'forward', title: 'Behåll ert befintliga nummer', desc: 'Kunderna ringer samma nummer som idag. Samtalen vidarekopplas till teamet som svarar, bokar och tar meddelanden. Ni aktiverar vidarekoppling hos er operatör — vi visar hur.' },
+            { mode: 'primary', title: 'Få ett nytt Handymate-nummer', desc: 'Ni får ett nytt nummer som teamet svarar på direkt. Bra om ni vill hålla ert privata nummer privat. Använd det i annonser, på sajten och i offerter.' },
+          ] as const).map(opt => {
+            const on = data.phoneMode === opt.mode
+            return (
+              <button key={opt.mode} onClick={() => set({ phoneMode: opt.mode })}
+                style={{
+                  textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit', padding: '11px 13px',
+                  border: `1.5px solid ${on ? 'var(--primary-700)' : 'var(--border)'}`,
+                  borderRadius: 'var(--r-md)', background: on ? 'var(--primary-50)' : 'var(--surface)',
+                }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+                  <span style={{ width: 16, height: 16, borderRadius: '50%', flexShrink: 0, border: `2px solid ${on ? 'var(--primary-700)' : 'var(--border-strong)'}`, background: on ? 'var(--primary-700)' : 'transparent', boxShadow: on ? 'inset 0 0 0 2px #fff' : 'none' }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{opt.title}</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.45, paddingLeft: 25 }}>{opt.desc}</div>
+              </button>
+            )
+          })}
         </div>
 
         {/* Kommer snart */}
@@ -554,14 +584,26 @@ function PaymentInner({ variant, onDone, onEscape }: {
       <Matte>Sista biten — välj plan så aktiverar jag teamet på riktigt.</Matte>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {PLANS.map(p => (
-          <div key={p.id} className={`m3-tool ${plan === p.id ? 'done' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setPlan(p.id)}>
-            <div className="m3-tool-ic" style={{ background: plan === p.id ? 'var(--primary-50)' : 'var(--bg)', color: plan === p.id ? 'var(--primary-700)' : 'var(--subtle)' }}>
-              <Icon name={plan === p.id ? 'check' : 'zap'} size={20} />
+          <div key={p.id} className={`m3-tool ${plan === p.id ? 'done' : ''}`} style={{ cursor: 'pointer', alignItems: 'flex-start', flexDirection: 'column', gap: 10 }} onClick={() => setPlan(p.id)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 13, width: '100%' }}>
+              <div className="m3-tool-ic" style={{ background: plan === p.id ? 'var(--primary-50)' : 'var(--bg)', color: plan === p.id ? 'var(--primary-700)' : 'var(--subtle)' }}>
+                <Icon name={plan === p.id ? 'check' : 'zap'} size={20} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="m3-tool-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {p.name}
+                  {p.popular && <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--primary-700)', background: 'var(--primary-50)', padding: '2px 7px', borderRadius: 999 }}>Populär</span>}
+                </div>
+                <div className="m3-tool-sub">{p.price.toLocaleString('sv-SE')} kr/mån exkl. moms · {p.tagline}</div>
+              </div>
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className="m3-tool-title">{p.name}</div>
-              <div className="m3-tool-sub">{p.price.toLocaleString('sv-SE')} kr/mån exkl. moms</div>
-            </div>
+            <ul style={{ margin: 0, padding: '0 0 0 2px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 5, width: '100%' }}>
+              {p.features.map(f => (
+                <li key={f} style={{ display: 'flex', gap: 8, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.4 }}>
+                  <Icon name="check" size={13} color="var(--primary-600)" /> <span style={{ flex: 1 }}>{f}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>
