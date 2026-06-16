@@ -5,11 +5,13 @@
    Kvar (6b-ii..iv): fas D (import/kalender/telefon), Stripe-betalning, fas E finish.
    D/E renderas tills vidare som statiska demo-skärmar. */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Matte, InlineCard, Panel, PanelGroup, PanelItem, SplitShell, MobileShell, Icon,
 } from './parts'
-import { PhaseD, PhaseE, type Variant } from './screens'
+import { PhaseE, type Variant } from './screens'
+import { supabase } from '@/lib/supabase'
+import { parseCSV, autoMapColumns, prepareRows, importCustomers } from '@/lib/customers/import-core'
 
 interface V3Data {
   website: string
@@ -30,12 +32,17 @@ interface V3Data {
   priceMin: string
   priceMax: string
   rot: boolean
+  // fas D
+  importedCount: number
+  calendarConnected: boolean
+  phoneMode: 'forward' | 'primary'
 }
 
 const EMPTY: V3Data = {
   website: '', companyName: '', ort: '', services: [], tone: 'professionell',
   orgNumber: '', address: '', contactName: '', email: '', password: '', phone: '',
   workStart: '07:00', workEnd: '16:00', priceMin: '650', priceMax: '850', rot: true,
+  importedCount: 0, calendarConnected: false, phoneMode: 'forward',
 }
 
 type ScrapeState = 'idle' | 'loading' | 'done' | 'failed'
@@ -84,8 +91,20 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
         setPhase(3)
       }} />
   }
-  // 6b-ii..iv: byt mot wired D / betalning / E.
-  if (phase === 3) return <PhaseD variant={variant} onEscape={onEscape} />
+  if (phase === 3) {
+    return <PhaseDWired variant={variant} data={data} set={set} onEscape={onEscape}
+      onConnectCalendar={async () => {
+        // Persistera progress innan full-page-redirect (resume i increment 7).
+        await save(4, {})
+        window.location.href = '/api/google/connect?source=onboarding'
+      }}
+      onNext={async () => {
+        // Numret provisioneras vid betalning/confirm; här sparas bara valet.
+        await save(4, { phone_setup_type: data.phoneMode === 'forward' ? 'keep_existing' : 'new_number' })
+        setPhase(4)
+      }} />
+  }
+  // 6b-iii: byt mot betalning före E.
   return <PhaseE variant={variant} onEscape={onEscape} />
 }
 
@@ -335,4 +354,117 @@ function PhaseCWired({ variant, data, set, onNext, onEscape }: {
   return variant === 'mobile'
     ? <MobileShell active={2} dialog={dialog} dock={dock} panelSummary="Tider & pris" panelDrawer={panelBody} panelOpen onEscape={onEscape} />
     : <SplitShell active={2} dialog={dialog} dock={dock} panel={<Panel pct={68}>{panelBody}</Panel>} onEscape={onEscape} />
+}
+
+/* ---------- Fas D (wired): import + kalender + telefon ---------- */
+function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape }: {
+  variant: Variant; data: V3Data; set: (p: Partial<V3Data>) => void
+  onConnectCalendar: () => void; onNext: () => void; onEscape?: () => void
+}) {
+  const [importing, setImporting] = useState(false)
+  const [importErr, setImportErr] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleFile(file: File) {
+    if (!data.businessId) return
+    setImporting(true); setImportErr(null)
+    try {
+      const text = await file.text()
+      const { headers, rows } = parseCSV(text)
+      const mapping = autoMapColumns(headers)
+      if (mapping.phone_number === null) { setImportErr('Hittade ingen telefonkolumn i filen.'); setImporting(false); return }
+      const prepared = prepareRows(rows, mapping)
+      const result = await importCustomers(supabase, data.businessId, prepared, { skipDuplicates: false })
+      set({ importedCount: result.success })
+    } catch {
+      setImportErr('Kunde inte läsa filen.')
+    }
+    setImporting(false)
+  }
+
+  const csvDone = data.importedCount > 0
+  const dialog = (
+    <>
+      <Matte>Nu kopplar vi era verktyg så teamet kan börja jobba på riktigt — inte bara öva.</Matte>
+      <input ref={fileRef} type="file" accept=".csv,.txt" style={{ display: 'none' }}
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Import */}
+        <div className={`m3-tool ${csvDone ? 'done' : ''}`}>
+          <div className="m3-tool-ic" style={{ background: csvDone ? 'var(--primary-50)' : '#DBEAFE', color: csvDone ? 'var(--primary-700)' : 'var(--blue-600)' }}><Icon name="users" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="m3-tool-title">Importera kunder</div>
+            <div className="m3-tool-sub">{csvDone ? `${data.importedCount} kunder importerade` : importing ? 'Importerar…' : 'Ladda upp en CSV — Karin tar hand om resten'}</div>
+          </div>
+          {csvDone ? <span className="m3-tool-ok"><Icon name="check" size={15} /> Klart</span>
+            : <button className="m3-tool-btn primary" onClick={() => fileRef.current?.click()} disabled={importing}>{importing ? 'Importerar…' : 'Välj fil'}</button>}
+        </div>
+        {importErr && <div className="m3-scrape" style={{ background: '#FFF1F2', borderColor: '#FECDD3', color: '#BE123C' }}><Icon name="x" size={16} /> {importErr}</div>}
+
+        {/* Kalender */}
+        <div className={`m3-tool ${data.calendarConnected ? 'done' : ''}`}>
+          <div className="m3-tool-ic" style={{ background: data.calendarConnected ? 'var(--primary-50)' : '#D1FAE5', color: data.calendarConnected ? 'var(--primary-700)' : 'var(--emerald-600)' }}><Icon name="calendar" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="m3-tool-title">Koppla Google Calendar</div>
+            <div className="m3-tool-sub">{data.calendarConnected ? 'Lisa kan nu boka riktiga tider' : 'Låter Lisa boka in jobb utan dubbelbokning'}</div>
+          </div>
+          {data.calendarConnected ? <span className="m3-tool-ok"><Icon name="check" size={15} /> Kopplad</span>
+            : <button className="m3-tool-btn oauth" onClick={onConnectCalendar}><Icon name="calendar" size={14} /> Anslut</button>}
+        </div>
+
+        {/* Telefon-val */}
+        <div className="m3-tool">
+          <div className="m3-tool-ic" style={{ background: '#FEF3C7', color: 'var(--amber-600)' }}><Icon name="phone" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="m3-tool-title">Lisas telefonnummer</div>
+            <div className="m3-tool-sub">{data.phoneMode === 'forward' ? 'Behåll ert nummer — vidarekoppla till Lisa' : 'Använd ett nytt Handymate-nummer'}</div>
+            <div className="m3-seg" style={{ marginTop: 8 }}>
+              <button className={data.phoneMode === 'forward' ? 'on' : ''} onClick={() => set({ phoneMode: 'forward' })}>Behåll mitt nr</button>
+              <button className={data.phoneMode === 'primary' ? 'on' : ''} onClick={() => set({ phoneMode: 'primary' })}>Nytt nummer</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Kommer snart */}
+        <div className="m3-tool soon">
+          <div className="m3-tool-ic" style={{ background: 'var(--bg)', color: 'var(--subtle)' }}><Icon name="messageCircle" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="m3-tool-title">Email-vidarekoppling</div>
+            <div className="m3-tool-sub">Teamet läser och svarar på kundmejl</div>
+          </div>
+          <span className="m3-tool-badge">Kommer snart</span>
+        </div>
+        <div className="m3-tool soon">
+          <div className="m3-tool-ic" style={{ background: 'var(--bg)', color: 'var(--subtle)' }}><Icon name="fileText" size={20} /></div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="m3-tool-title">Fortnox</div>
+            <div className="m3-tool-sub">Synka fakturor och bokföring automatiskt</div>
+          </div>
+          <span className="m3-tool-badge">Kommer snart</span>
+        </div>
+      </div>
+    </>
+  )
+  const dock = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <span style={{ fontSize: 12.5, color: 'var(--muted)', flex: 1 }}>Du kan koppla fler verktyg senare i inställningarna.</span>
+      <button className="m3-go" onClick={onNext}>Fortsätt <Icon name="arrowRight" size={15} /></button>
+    </div>
+  )
+  const panelBody = (
+    <>
+      <PanelGroup label="Företaget" icon="home">
+        <PanelItem icon="home" v={`${data.companyName || '—'}${data.ort ? ' · ' + data.ort : ''}`} state="confirmed" tag="Bekräftat" />
+        <PanelItem icon="clock" k="Tider & pris" v={`${data.workStart}–${data.workEnd} · ${data.priceMin}–${data.priceMax} kr/h`} state="confirmed" tag="Bekräftat" />
+      </PanelGroup>
+      <PanelGroup label="Verktyg" icon="zap">
+        <PanelItem icon="users" k="Kundregister" v={csvDone ? `${data.importedCount} kunder` : 'Inga ännu'} state={csvDone ? 'confirmed' : 'future'} tag={csvDone ? 'Bekräftat' : 'Väntar'} />
+        <PanelItem icon="calendar" k="Kalender" v={data.calendarConnected ? 'Kopplad' : 'Ej kopplad'} state={data.calendarConnected ? 'confirmed' : 'future'} tag={data.calendarConnected ? 'Bekräftat' : 'Väntar'} />
+      </PanelGroup>
+    </>
+  )
+  const tools = (csvDone ? 1 : 0) + (data.calendarConnected ? 1 : 0)
+  return variant === 'mobile'
+    ? <MobileShell active={3} dialog={dialog} dock={dock} panelSummary={`${tools} verktyg kopplade`} panelDrawer={panelBody} onEscape={onEscape} />
+    : <SplitShell active={3} dialog={dialog} dock={dock} panel={<Panel pct={85}>{panelBody}</Panel>} onEscape={onEscape} />
 }
