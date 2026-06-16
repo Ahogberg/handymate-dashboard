@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
-import FirecrawlApp from '@mendable/firecrawl-js'
 
 // Firecrawl kan vara långsam — kräver Pro (Hobby cappar på 10s).
 export const maxDuration = 60
@@ -46,13 +45,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, reason: 'not_configured' })
     }
 
-    // 1. Skrapa (graceful)
+    // 1. Skrapa via Firecrawl REST-API (fetch — undviker SDK:ns undici-beroende
+    //    som inte går att bundla i Next). Graceful.
     let markdown = ''
     try {
-      const app = new FirecrawlApp({ apiKey: process.env.FIRECRAWL_API_KEY })
-      const fc: any = (app as any).v1 ?? app
-      const res: any = await fc.scrapeUrl(url, { formats: ['markdown'], timeout: 15000 })
-      markdown = res?.markdown || res?.data?.markdown || ''
+      const fcRes = await fetch('https://api.firecrawl.dev/v1/scrape', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.FIRECRAWL_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, formats: ['markdown'] }),
+        signal: AbortSignal.timeout(20000),
+      })
+      const fcJson: any = await fcRes.json().catch(() => null)
+      markdown = fcJson?.data?.markdown || fcJson?.markdown || ''
     } catch (e) {
       console.error('[onboarding/scrape] firecrawl error:', e)
       return NextResponse.json({ ok: false, reason: 'scrape_failed' })
