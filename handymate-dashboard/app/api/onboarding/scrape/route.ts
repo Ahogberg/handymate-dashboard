@@ -23,18 +23,22 @@ function normalizeUrl(raw: string): string | null {
   try { return new URL(s).href } catch { return null }
 }
 
+const BRANCH_KEYS = ['electrician', 'plumber', 'carpenter', 'painter', 'hvac', 'locksmith', 'construction', 'roofing', 'flooring', 'gardening', 'cleaning', 'moving', 'other'] as const
+
 const EXTRACT_PROMPT = `Du analyserar en svensk hantverkares hemsida (markdown). Extrahera företagsinfo.
 Returnera ENDAST JSON (ingen markdown):
 {
   "company_name": "exakt företagsnamn eller null",
   "ort": "huvudort/stad eller null",
   "services": ["tjänst1", "tjänst2"],
-  "tone": "personlig" | "professionell" | "rak"
+  "tone": "personlig" | "professionell" | "rak",
+  "branch": "en av: electrician, plumber, carpenter, painter, hvac, locksmith, construction, roofing, flooring, gardening, cleaning, moving, other"
 }
 Regler:
 - services: 2–6 konkreta tjänster på svenska (t.ex. "Badrumsrenovering", "Elinstallation"). Tom array om oklart.
 - tone: bedöm språkets ton mot kund. Default "professionell" om oklart.
-- Hitta INTE på. Sätt null/[] hellre än att gissa.`
+- branch: hantverkarens huvudbransch. Välj den BÄST matchande nyckeln. "other" om oklart/blandat.
+- Hitta INTE på. Sätt null/[]/"other" hellre än att gissa.`
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     if (!m) return NextResponse.json({ ok: false, reason: 'no_extract' })
 
     const parsed = JSON.parse(m[0]) as {
-      company_name: string | null; ort: string | null; services: string[]; tone: string
+      company_name: string | null; ort: string | null; services: string[]; tone: string; branch: string
     }
     return NextResponse.json({
       ok: true,
@@ -84,6 +88,7 @@ export async function POST(request: NextRequest) {
       ort: parsed.ort || null,
       services: Array.isArray(parsed.services) ? parsed.services.slice(0, 6) : [],
       tone: ['personlig', 'professionell', 'rak'].includes(parsed.tone) ? parsed.tone : 'professionell',
+      branch: (BRANCH_KEYS as readonly string[]).includes(parsed.branch) ? parsed.branch : 'other',
     })
   } catch (e) {
     console.error('[onboarding/scrape] error:', e)

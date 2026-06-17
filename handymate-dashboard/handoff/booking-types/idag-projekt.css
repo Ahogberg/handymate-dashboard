@@ -1,0 +1,626 @@
+/* Idag & Projekt – prototype-only styles
+   Layered on top of colors_and_type.css. Self-contained, doesn't depend on
+   the production mobile.css so this prototype can evolve freely. */
+
+/* ─── Frame chrome ─── */
+.ip-page {
+  background: #FAFAFB;
+  min-height: 100vh;
+  padding: 32px 24px 80px;
+  font-family: 'DM Sans', system-ui;
+}
+.ip-doc-head {
+  max-width: 1280px;
+  margin: 0 auto 24px;
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 24px;
+}
+.ip-doc-head h1 {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 28px;
+  color: #0F172A; letter-spacing: -0.02em; margin: 0;
+}
+.ip-doc-head p { color: #475569; font-size: 14px; max-width: 640px; margin: 6px 0 0; line-height: 1.5; }
+.ip-brand { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748B; font-weight: 600; }
+.ip-brand img { width: 22px; height: 22px; border-radius: 5px; }
+
+.ip-section { max-width: 1280px; margin: 0 auto 48px; }
+.ip-section-title {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 16px;
+  color: #0F2E2A; margin: 0 0 4px;
+}
+.ip-section-sub { color: #64748B; font-size: 13px; margin: 0 0 16px; line-height: 1.5; }
+
+.ip-row { display: flex; gap: 24px; flex-wrap: wrap; }
+.ip-frame-wrap { display: flex; flex-direction: column; gap: 10px; }
+.ip-frame-label {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px;
+  color: #0F2E2A;
+  display: flex; align-items: center; gap: 6px;
+}
+.ip-frame-label .num {
+  display: inline-block; width: 22px; height: 22px; border-radius: 11px;
+  background: #0F766E; color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ip-frame-desc { font-size: 12px; color: #64748B; line-height: 1.45; max-width: 380px; }
+
+/* ─── iPhone frame ─── */
+.ip-iphone {
+  width: 402px; height: 874px;
+  border-radius: 48px; overflow: hidden;
+  background: #F8FAFC; position: relative;
+  box-shadow: 0 30px 60px rgba(15,23,42,0.18), 0 0 0 1px rgba(15,23,42,0.1);
+  flex-shrink: 0;
+}
+.ip-iphone .notch {
+  position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+  width: 126px; height: 37px; border-radius: 24px; background: #000; z-index: 60;
+}
+.ip-iphone .status {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 50;
+  display: flex; justify-content: space-between; padding: 18px 36px 0;
+  font-family: -apple-system, 'SF Pro', system-ui;
+  font-weight: 600; font-size: 15px; color: #000;
+}
+.ip-iphone .status.dark { color: #fff; }
+.ip-iphone .home-bar {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: 139px; height: 5px; border-radius: 100px;
+  background: rgba(0,0,0,0.25); z-index: 70;
+}
+.ip-iphone .screen {
+  position: absolute; inset: 0; padding-top: 48px; overflow: hidden;
+}
+
+/* ─── App shell ─── */
+.ip-app { width: 100%; height: 100%; display: flex; flex-direction: column; background: #F8FAFC; }
+.ip-app-body { flex: 1; overflow: hidden; padding-bottom: 76px; }
+
+/* ─── Hem · Idag header ─── */
+.ip-greet { padding: 14px 20px 4px; }
+.ip-greet h1 {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 26px;
+  color: #0F172A; letter-spacing: -0.02em; margin: 0; line-height: 1.1;
+}
+.ip-greet .date { font-size: 13px; color: #64748B; margin-top: 4px; }
+
+.ip-kpi {
+  margin: 12px 16px 4px; padding: 12px 14px;
+  background: linear-gradient(135deg, #0F2E2A, #115E59);
+  border-radius: 14px; color: #fff;
+  display: flex; align-items: center; gap: 14px;
+}
+.ip-kpi .v {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.ip-kpi .l { font-size: 12px; opacity: 0.85; }
+.ip-kpi .sep { width: 1px; height: 22px; background: rgba(255,255,255,0.2); }
+
+/* ─── Section header (smart-hide) ─── */
+.ip-section-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 18px 20px 10px;
+}
+.ip-section-head .label {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+  color: #94A3B8; text-transform: uppercase;
+}
+.ip-section-head .count {
+  font-size: 11px; font-weight: 600; color: #CBD5E1;
+  font-variant-numeric: tabular-nums;
+}
+.ip-section-head .rule {
+  flex: 1; height: 1px; background: #E2E8F0; margin-left: 4px;
+}
+
+/* ─── Booking cards ─── */
+.ip-card {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 14px;
+  margin: 0 16px 10px; padding: 14px 16px;
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ip-card.project {
+  border-left: 4px solid var(--band, #7C3AED);
+  padding-left: 14px;
+}
+.ip-card .row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.ip-card .time {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px;
+  color: #0F2E2A; font-variant-numeric: tabular-nums;
+}
+.ip-card .dur { color: #94A3B8; font-weight: 500; font-size: 11px; margin-left: 6px; }
+.ip-card .customer { font-size: 15px; font-weight: 600; color: #1E293B; }
+.ip-card .addr { font-size: 12px; color: #64748B; }
+
+.ip-card .proj-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600;
+  color: var(--band, #7C3AED);
+}
+.ip-card .proj-tag .day { color: #94A3B8; font-weight: 500; }
+
+.ip-card .progress {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px;
+  margin-top: 4px;
+}
+.ip-card .progress .seg {
+  height: 4px; border-radius: 3px; background: #E2E8F0;
+}
+.ip-card .progress .seg.done { background: var(--band, #7C3AED); }
+.ip-card .progress .seg.current {
+  background: var(--band, #7C3AED);
+  animation: ip-pulse 1.6s ease-in-out infinite;
+}
+@keyframes ip-pulse { 0%,100% { opacity: 0.45; } 50% { opacity: 1; } }
+
+.ip-card .task {
+  font-size: 12px; color: #475569; margin-top: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ip-card .task::before {
+  content: ''; width: 4px; height: 4px; border-radius: 2px;
+  background: #94A3B8;
+}
+
+/* ─── Tab bar (mobile) ─── */
+.ip-tabbar {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 76px; background: #fff;
+  border-top: 1px solid #E2E8F0;
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  padding: 8px 0 24px;
+  z-index: 40;
+}
+.ip-tabbar .tab {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 10px; font-weight: 600; color: #94A3B8;
+}
+.ip-tabbar .tab.active { color: #0F766E; }
+
+/* ─── Job detail ─── */
+.ip-detail-head {
+  padding: 12px 16px; display: flex; align-items: center; gap: 12px;
+  background: transparent;
+}
+.ip-icon-btn {
+  width: 36px; height: 36px; border-radius: 18px;
+  border: 1px solid #E2E8F0; background: #fff; color: #475569;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Project banner – sets context for project-bookings only */
+.ip-banner {
+  margin: 8px 16px 4px; padding: 16px 18px;
+  border-radius: 18px; color: #fff;
+  background: linear-gradient(135deg, var(--banner, #7C3AED) 0%, var(--banner-2, #5B21B6) 100%);
+  position: relative; overflow: hidden;
+}
+.ip-banner.final {
+  background: linear-gradient(135deg, #0F2E2A 0%, #115E59 60%, #0F766E 100%);
+}
+.ip-banner.final::before {
+  content: ''; position: absolute; top: -40%; right: -20%;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(94,234,212,0.35) 0%, transparent 60%);
+  pointer-events: none;
+}
+.ip-banner .name {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 19px;
+  letter-spacing: -0.01em;
+}
+.ip-banner .day-line {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; opacity: 0.9; margin-top: 4px;
+}
+.ip-banner .day-line .pill {
+  background: rgba(255,255,255,0.2);
+  padding: 2px 8px; border-radius: 8px;
+  font-size: 11px; font-weight: 600;
+}
+.ip-banner .stage-bar {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px;
+  margin-top: 14px;
+}
+.ip-banner .stage-bar .seg {
+  height: 6px; border-radius: 3px;
+  background: rgba(255,255,255,0.18);
+}
+.ip-banner .stage-bar .seg.done { background: rgba(255,255,255,0.85); }
+.ip-banner .stage-bar .seg.current {
+  background: #fff;
+  animation: ip-pulse 1.6s ease-in-out infinite;
+}
+.ip-banner .stage-bar .seg.last-done { background: #5EEAD4; }
+.ip-banner .open-link {
+  margin-top: 10px;
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; font-weight: 600;
+  color: rgba(255,255,255,0.85);
+}
+.ip-banner.final .celebrate {
+  position: absolute; top: 12px; right: 14px;
+  font-size: 12px; font-weight: 700; color: #FCD34D;
+  letter-spacing: 0.04em;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* Detail body */
+.ip-detail { padding: 0 16px 200px; }
+.ip-detail h3 {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 11px;
+  color: #94A3B8; text-transform: uppercase; letter-spacing: 0.12em;
+  margin: 18px 0 10px;
+}
+.ip-time-block {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 28px;
+  color: #0F2E2A; line-height: 1.05;
+  font-variant-numeric: tabular-nums; margin-top: 12px;
+}
+.ip-time-block .dur { color: #94A3B8; font-weight: 500; font-size: 14px; margin-left: 8px; }
+.ip-customer-block { font-size: 17px; font-weight: 600; color: #1E293B; margin-top: 12px; }
+.ip-addr-block {
+  font-size: 14px; color: #64748B; margin-top: 4px;
+  display: flex; align-items: center; gap: 4px;
+}
+
+.ip-quick {
+  display: flex; gap: 8px; margin-top: 14px;
+}
+.ip-quick .btn {
+  flex: 1; padding: 12px; border-radius: 12px;
+  background: #fff; border: 1px solid #E2E8F0;
+  color: #0F2E2A; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.ip-quick .btn.primary { background: #F0FDF9; border-color: #99F6E0; color: #0F766E; }
+
+.ip-task-list { margin: 0; padding: 0; list-style: none; }
+.ip-task-list li {
+  font-size: 14px; color: #1E293B; padding: 10px 0;
+  display: flex; align-items: flex-start; gap: 10px;
+  border-bottom: 1px solid #F1F5F9;
+}
+.ip-task-list li::before {
+  content: ''; width: 6px; height: 6px; border-radius: 3px;
+  background: #0F766E; margin-top: 8px; flex-shrink: 0;
+}
+.ip-task-list.next li { color: #64748B; }
+.ip-task-list.next li::before { background: #CBD5E1; }
+.ip-task-list.next .label {
+  font-size: 11px; font-weight: 700; color: #94A3B8;
+  letter-spacing: 0.06em; text-transform: uppercase; margin-left: auto;
+}
+
+.ip-notes {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 14px;
+  padding: 14px; font-size: 13px; color: #475569; line-height: 1.5;
+}
+.ip-notes .author {
+  font-size: 11px; font-weight: 600; color: #0F766E;
+  text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px;
+}
+
+/* ─── Sticky CTA ─── */
+.ip-cta-wrap {
+  position: absolute; left: 0; right: 0; bottom: 76px;
+  padding: 12px 16px 16px;
+  background: linear-gradient(180deg, transparent 0%, #F8FAFC 30%);
+  z-index: 30;
+}
+.ip-cta {
+  width: 100%; padding: 16px 20px; border-radius: 16px;
+  background: #0F766E; color: #fff;
+  font-family: 'Space Grotesk'; font-weight: 700;
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: 0 8px 20px rgba(15,118,110,0.3);
+  text-align: left;
+}
+.ip-cta .label { font-size: 16px; line-height: 1.1; }
+.ip-cta .ctx { font-size: 11px; font-weight: 500; opacity: 0.85; margin-top: 4px; }
+.ip-cta .arrow { font-size: 22px; }
+
+.ip-cta.final {
+  background: linear-gradient(135deg, #0F2E2A 0%, #115E59 50%, #0F766E 100%);
+  position: relative; overflow: hidden;
+  box-shadow: 0 12px 30px rgba(13,148,136,0.4), 0 0 0 1px rgba(94,234,212,0.3);
+}
+.ip-cta.final::before {
+  content: ''; position: absolute; top: -50%; right: -20%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(94,234,212,0.25) 0%, transparent 60%);
+  pointer-events: none;
+}
+.ip-cta.final .flag { font-size: 22px; margin-right: 4px; }
+
+/* ─── Desktop frame ─── */
+.ip-desktop {
+  width: 1280px; max-width: 100%; height: 760px;
+  background: #fff; border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(15,23,42,0.12), 0 0 0 1px rgba(15,23,42,0.06);
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.ip-desktop-chrome {
+  height: 44px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;
+  display: flex; align-items: center; gap: 16px; padding: 0 18px;
+  flex-shrink: 0;
+}
+.ip-desktop-chrome .dots { display: flex; gap: 6px; }
+.ip-desktop-chrome .dot { width: 12px; height: 12px; border-radius: 6px; }
+.ip-desktop-chrome .dot.r { background: #FF5F57; }
+.ip-desktop-chrome .dot.y { background: #FEBC2E; }
+.ip-desktop-chrome .dot.g { background: #28C840; }
+.ip-desktop-chrome .url {
+  flex: 1; max-width: 360px; padding: 5px 14px;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 8px;
+  font-size: 12px; color: #64748B;
+}
+
+.ip-desktop-body { display: flex; flex: 1; min-height: 0; }
+.ip-side {
+  width: 220px; background: #0F2E2A; color: #fff;
+  padding: 18px 14px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ip-side .brand {
+  display: flex; align-items: center; gap: 10px; padding: 0 8px 18px;
+  border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px;
+}
+.ip-side .brand img { width: 28px; height: 28px; border-radius: 7px; }
+.ip-side .brand b { font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px; }
+.ip-side .nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.7);
+}
+.ip-side .nav-item.active {
+  background: rgba(94,234,212,0.12); color: #5EEAD4;
+}
+.ip-side .nav-item .icon { font-size: 14px; opacity: 0.9; }
+
+.ip-main { flex: 1; padding: 24px 28px; overflow: auto; }
+.ip-main-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.ip-main-head h2 {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px;
+  color: #0F2E2A; letter-spacing: -0.01em; margin: 0;
+}
+.ip-main-head .week-nav {
+  display: flex; align-items: center; gap: 6px;
+  background: #F1F5F9; border-radius: 10px; padding: 4px;
+}
+.ip-main-head .week-nav button {
+  border: none; background: transparent; padding: 6px 10px;
+  font-size: 12px; font-weight: 600; color: #64748B; border-radius: 6px;
+}
+.ip-main-head .week-nav .label {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px;
+  color: #0F2E2A; padding: 4px 12px;
+}
+
+/* Schema · Project lanes (week timeline) */
+.ip-schedule-lane {
+  margin-bottom: 14px;
+}
+.ip-schedule-section {
+  font-size: 11px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  margin: 18px 0 10px; display: flex; align-items: center; gap: 8px;
+}
+.ip-schedule-section .rule { flex: 1; height: 1px; background: #E2E8F0; }
+
+.ip-lane-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: var(--lane-bg, #F0FDF9); border-radius: 12px 12px 0 0;
+  border: 1px solid var(--lane-border, #99F6E0);
+  border-bottom: none;
+}
+.ip-lane-head .name {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 14px;
+  color: var(--lane-text, #0F766E);
+}
+.ip-lane-head .meta { font-size: 12px; color: var(--lane-text-soft, #115E59); opacity: 0.8; }
+.ip-lane-head .progress {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; color: var(--lane-text, #0F766E);
+}
+.ip-lane-head .progress .bar {
+  width: 80px; height: 4px; border-radius: 2px; background: rgba(15,118,110,0.15);
+  overflow: hidden;
+}
+.ip-lane-head .progress .bar .fill {
+  height: 100%; background: var(--lane-text, #0F766E); border-radius: 2px;
+}
+
+.ip-lane-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 1px;
+  background: #E2E8F0; padding: 1px;
+  border: 1px solid var(--lane-border, #99F6E0); border-top: none;
+  border-radius: 0 0 12px 12px;
+  min-height: 64px;
+}
+.ip-lane-grid .day {
+  background: #fff; padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  position: relative;
+}
+.ip-lane-grid .day.today {
+  background: var(--lane-bg-soft, #F0FDF9);
+  outline: 2px solid var(--lane-text, #0F766E);
+  outline-offset: -2px;
+  z-index: 2;
+}
+.ip-lane-grid .day .day-num {
+  font-size: 10px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.ip-lane-grid .day.today .day-num { color: var(--lane-text, #0F766E); }
+.ip-lane-grid .day .booking {
+  font-size: 11px; color: #1E293B; line-height: 1.3;
+  padding-left: 6px; position: relative;
+}
+.ip-lane-grid .day .booking::before {
+  content: ''; position: absolute; left: 0; top: 2px; bottom: 2px;
+  width: 2px; border-radius: 2px; background: var(--lane-text, #0F766E);
+}
+.ip-lane-grid .day .booking .t {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 11px;
+  color: #475569; font-variant-numeric: tabular-nums;
+}
+.ip-lane-grid .day.empty { background: #FAFAFB; }
+.ip-lane-grid .day.empty::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 16px; height: 1px; background: #CBD5E1;
+  transform: translate(-50%, -50%);
+}
+
+/* Standalone bookings grid */
+.ip-loose-grid {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin-top: 8px;
+}
+.ip-loose-day {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 10px;
+  padding: 10px 12px; min-height: 72px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ip-loose-day .day-num {
+  font-size: 10px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.ip-loose-day.today { background: #F0FDF9; border-color: #99F6E0; }
+.ip-loose-day.today .day-num { color: #0F766E; }
+.ip-loose-day .booking {
+  font-size: 11px; color: #1E293B; line-height: 1.3;
+}
+.ip-loose-day .booking .t {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 11px;
+  color: #475569; font-variant-numeric: tabular-nums; display: block;
+}
+
+/* ─── Projekt-detalj ─── */
+.ip-proj-head {
+  background: linear-gradient(135deg, #0F2E2A 0%, #115E59 100%);
+  color: #fff; border-radius: 14px;
+  padding: 20px 24px; margin-bottom: 18px;
+  display: flex; gap: 24px; align-items: center;
+}
+.ip-proj-head .icon {
+  width: 56px; height: 56px; border-radius: 14px;
+  background: rgba(94,234,212,0.18);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+}
+.ip-proj-head .name {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px;
+  letter-spacing: -0.01em;
+}
+.ip-proj-head .sub { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+.ip-proj-head .num {
+  margin-left: auto;
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+.ip-proj-head .num .small { font-size: 12px; font-weight: 500; opacity: 0.7; display: block; }
+
+.ip-stages {
+  display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px;
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 14px;
+  padding: 14px; margin-bottom: 18px;
+}
+.ip-stage {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ip-stage .bar {
+  height: 6px; border-radius: 3px; background: #E2E8F0;
+}
+.ip-stage.done .bar { background: var(--c, #0F766E); }
+.ip-stage.current .bar { background: var(--c, #7C3AED); animation: ip-pulse 1.6s ease-in-out infinite; }
+.ip-stage .label {
+  font-size: 10px; font-weight: 600; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: 0.04em;
+}
+.ip-stage.done .label { color: #1E293B; }
+.ip-stage.current .label { color: var(--c, #7C3AED); }
+.ip-stage .dates { font-size: 11px; color: #64748B; font-variant-numeric: tabular-nums; }
+
+/* Bookings list under project */
+.ip-book-table {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 14px;
+  overflow: hidden;
+}
+.ip-book-week {
+  background: #F8FAFC; padding: 8px 16px;
+  font-size: 11px; font-weight: 700; color: #94A3B8;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  border-bottom: 1px solid #E2E8F0;
+}
+.ip-book-row {
+  display: grid; grid-template-columns: 110px 1fr auto auto;
+  gap: 14px; align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #F1F5F9;
+}
+.ip-book-row:last-child { border-bottom: none; }
+.ip-book-row.today { background: #F0FDF9; }
+.ip-book-row .when {
+  display: flex; flex-direction: column;
+}
+.ip-book-row .when .day {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px; color: #0F2E2A;
+  text-transform: capitalize;
+}
+.ip-book-row .when .date {
+  font-size: 11px; color: #94A3B8; font-variant-numeric: tabular-nums;
+}
+.ip-book-row .what { font-size: 14px; color: #1E293B; }
+.ip-book-row .what .desc { font-size: 12px; color: #64748B; margin-top: 2px; }
+.ip-book-row .hours {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 13px;
+  color: #475569; font-variant-numeric: tabular-nums;
+}
+.ip-book-row .status {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 8px;
+  font-size: 11px; font-weight: 600;
+}
+.ip-book-row .status.done { background: #F0FDF4; color: #16A34A; }
+.ip-book-row .status.current { background: #F0FDF9; color: #0F766E; }
+.ip-book-row .status.planned { background: #F8FAFC; color: #94A3B8; border: 1px solid #E2E8F0; }
+.ip-book-row .status .dot { width: 6px; height: 6px; border-radius: 3px; background: currentColor; }
+.ip-book-row .status.current .dot { animation: ip-pulse 1.4s infinite; }
+
+.ip-add-booking {
+  padding: 14px 16px; text-align: center;
+  background: #FAFAFB;
+  border-top: 1px dashed #CBD5E1;
+  font-size: 13px; font-weight: 600; color: #0F766E;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+
+/* Cards above bookings table – quick stats */
+.ip-stats {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 18px;
+}
+.ip-stat {
+  background: #fff; border: 1px solid #E2E8F0; border-radius: 12px;
+  padding: 14px;
+}
+.ip-stat .l { font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.08em; }
+.ip-stat .v {
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px;
+  color: #0F2E2A; font-variant-numeric: tabular-nums; margin-top: 4px;
+}
+.ip-stat .delta { font-size: 11px; font-weight: 600; margin-top: 2px; }
+.ip-stat .delta.ok { color: #16A34A; }
+.ip-stat .delta.warn { color: #B45309; }

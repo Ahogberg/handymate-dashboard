@@ -10,3 +10,4 @@ test-results/
 
 # Scraping output
 scripts/scraping/output/*.csv
+.env*.local

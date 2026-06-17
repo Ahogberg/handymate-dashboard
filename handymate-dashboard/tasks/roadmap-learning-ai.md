@@ -132,7 +132,5 @@ Bee blir inte bara första pilotkund — de blir första instansen där Handymat
 - Generera fallstudie för sälj till andra (5+ piloter)
 - Bygga moat på Bee specifikt (omöjligt för dem att byta efter 6 mån)
 
-## Vad jag inte vet säkert (testa mot Bee)
-
-- "Lärande AI" är min hypotes om hero-feature. Bee:s riktiga reaktioner är data. När Christoffer säger "wow" — notera VAD som triggade. Justera roadmap efter verkligheten.
+## Vad jag inte vet säkert (testa mot Bee)0tioner är data. När Christoffer säger "wow" — notera VAD som triggade. Justera roadmap *Ä_.,m nefter verkligheten.
 - Frågor till Christoffer aktivt: "Vilken funktion får dig att tänka 'det här hade jag inte i Easoft'?" "Vad använder du mest utan att tänka på det?"

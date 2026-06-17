@@ -37,6 +37,7 @@ interface V3Data {
   website: string
   companyName: string
   ort: string
+  branch: string
   services: string[]
   tone: string
   orgNumber: string
@@ -59,7 +60,7 @@ interface V3Data {
 }
 
 const EMPTY: V3Data = {
-  website: '', companyName: '', ort: '', services: [], tone: 'professionell',
+  website: '', companyName: '', ort: '', branch: '', services: [], tone: 'professionell',
   orgNumber: '', address: '', contactName: '', email: '', password: '', phone: '',
   workStart: '07:00', workEnd: '16:00', priceMin: '650', priceMax: '850', rot: true,
   importedCount: 0, calendarConnected: false, phoneMode: 'forward',
@@ -68,6 +69,14 @@ const EMPTY: V3Data = {
 type ScrapeState = 'idle' | 'loading' | 'done' | 'failed'
 
 const TONE_LABEL: Record<string, string> = { personlig: 'Personlig', professionell: 'Professionell', rak: 'Rak & tydlig' }
+
+// Bransch-nycklar (matchar BRANCH_MAPPING/BRANCH_CHECKLISTS) → svensk etikett.
+const BRANCH_OPTIONS: [string, string][] = [
+  ['electrician', 'Elektriker'], ['plumber', 'Rörmokare'], ['carpenter', 'Snickare'],
+  ['painter', 'Målare'], ['hvac', 'VVS'], ['locksmith', 'Låssmed'],
+  ['construction', 'Bygg'], ['roofing', 'Tak'], ['flooring', 'Golv'],
+  ['gardening', 'Trädgård'], ['cleaning', 'Städ'], ['moving', 'Flytt'], ['other', 'Annat'],
+]
 
 function buildWorkingHours(start: string, end: string) {
   const wd = { active: true, start, end }
@@ -129,6 +138,7 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
               businessId: d.business_id,
               companyName: d.business_name || prev.companyName,
               ort: d.service_area || prev.ort,
+              branch: d.branch || prev.branch,
               orgNumber: d.org_number || prev.orgNumber,
               contactName: d.contact_name || prev.contactName,
               email: d.contact_email || prev.email,
@@ -215,6 +225,7 @@ function PhaseAWired({ variant, data, set, onDone, onEscape }: {
         set({
           companyName: j.company_name || data.companyName,
           ort: j.ort || data.ort,
+          branch: j.branch || data.branch,
           services: Array.isArray(j.services) ? j.services : [],
           tone: j.tone || data.tone,
         })
@@ -244,9 +255,9 @@ function PhaseAWired({ variant, data, set, onDone, onEscape }: {
             businessName: data.companyName, contactName: data.contactName,
             displayName: data.companyName, phone: data.phone || undefined,
             serviceArea: data.ort || undefined, orgNumber: data.orgNumber || undefined,
-            // TODO: fånga riktig bransch (fråga i A, eller mappa från scrapade
-            // tjänster) — 'other' ger generisk kunskapsbas + generiska defaults.
-            branch: 'other',
+            // Bransch (nyckel) styr kunskapsbas + branschspecifika defaults/
+            // egenkontroll-mallar. Förifylls från skrapning, väljs/bekräftas i A.
+            branch: data.branch || 'other',
           },
         }),
       })
@@ -297,6 +308,10 @@ function PhaseAWired({ variant, data, set, onDone, onEscape }: {
           <div className="m3-inline-label"><Icon name="fileText" size={13} /> Företag & konto</div>
           <div className="m3-field2">
             <input className="m3-input2" placeholder="Företagsnamn" value={data.companyName} onChange={e => set({ companyName: e.target.value })} />
+            <select className="m3-input2" value={data.branch} onChange={e => set({ branch: e.target.value })} style={{ color: data.branch ? 'var(--ink)' : 'var(--subtle)' }}>
+              <option value="">Välj bransch…</option>
+              {BRANCH_OPTIONS.map(([k, l]) => <option key={k} value={k} style={{ color: 'var(--ink)' }}>{l}</option>)}
+            </select>
             <div className="m3-fieldrow">
               <input className="m3-input2" placeholder="Org-nummer" value={data.orgNumber} onChange={e => set({ orgNumber: e.target.value })} />
               <input className="m3-input2" placeholder="Ort" value={data.ort} onChange={e => set({ ort: e.target.value })} />
