@@ -78,6 +78,7 @@ function buildWorkingHours(start: string, end: string) {
 export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape?: () => void }) {
   const router = useRouter()
   const [phase, setPhase] = useState(0)
+  const [ready, setReady] = useState(false)
   const [data, setData] = useState<V3Data>(EMPTY)
   const set = (patch: Partial<V3Data>) => setData(d => ({ ...d, ...patch }))
 
@@ -107,6 +108,51 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
 
   // Bakåt — golvar vid fas B (1), backar aldrig in i kontoskapandet (A).
   const back = () => setPhase(p => Math.max(1, p - 1))
+
+  // Resume: vid mount, läs befintlig progress (om inloggad). Klar → dashboard;
+  // pågående konto → återställ data + hoppa till rätt fas; ?google=connected
+  // (retur från kalender-OAuth) → fas D med kalender markerad. Defensiv: saknade
+  // fält faller tillbaka på default. (Ofarlig i förhandsläget — ej default-route.)
+  useEffect(() => {
+    let off = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/onboarding')
+        if (res.ok) {
+          const d = await res.json()
+          if (d?.onboarding_completed_at) { router.push('/dashboard'); return }
+          if (d?.business_id) {
+            const od = (d.onboarding_data || {}) as Record<string, any>
+            const wh = d.working_hours?.monday
+            setData(prev => ({
+              ...prev,
+              businessId: d.business_id,
+              companyName: d.business_name || prev.companyName,
+              ort: d.service_area || prev.ort,
+              orgNumber: d.org_number || prev.orgNumber,
+              contactName: d.contact_name || prev.contactName,
+              email: d.contact_email || prev.email,
+              services: Array.isArray(d.specialties) && d.specialties.length ? d.specialties : (od.services || prev.services),
+              tone: od.tone || prev.tone,
+              priceMin: d.hourly_rate_min != null ? String(d.hourly_rate_min) : prev.priceMin,
+              priceMax: d.hourly_rate_max != null ? String(d.hourly_rate_max) : prev.priceMax,
+              rot: typeof od.rot === 'boolean' ? od.rot : prev.rot,
+              ...(wh ? { workStart: wh.start, workEnd: wh.end } : {}),
+            }))
+            const googleConnected = new URLSearchParams(window.location.search).get('google') === 'connected'
+            const step = d.onboarding_step || 0
+            let ph = step >= 5 ? 5 : step >= 4 ? 4 : step >= 3 ? 3 : step >= 2 ? 2 : 1
+            if (googleConnected) { ph = 3; setData(p => ({ ...p, calendarConnected: true })) }
+            if (!off) setPhase(ph)
+          }
+        }
+      } catch { /* ny användare / ej inloggad — börja från A */ }
+      if (!off) setReady(true)
+    })()
+    return () => { off = true }
+  }, [router])
+
+  if (!ready) return null
 
   if (phase === 0) {
     return <PhaseAWired variant={variant} data={data} set={set} onEscape={onEscape} onDone={() => setPhase(1)} />
