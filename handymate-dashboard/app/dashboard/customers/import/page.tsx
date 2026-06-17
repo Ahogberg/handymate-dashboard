@@ -15,22 +15,15 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
-
-interface ParsedRow {
-  name: string
-  phone_number: string
-  email: string
-  address: string
-  raw: string[]
-  isDuplicate?: boolean
-}
-
-interface ColumnMapping {
-  name: number | null
-  phone_number: number | null
-  email: number | null
-  address: number | null
-}
+import {
+  parseCSV,
+  autoMapColumns,
+  prepareRows,
+  flagDuplicates,
+  importCustomers,
+  type ColumnMapping,
+  type ParsedRow,
+} from '@/lib/customers/import-core'
 
 export default function ImportCustomersPage() {
   const router = useRouter()
@@ -53,77 +46,16 @@ export default function ImportCustomersPage() {
   const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[]; importedIds: string[] } | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
-  const parseCSV = (text: string): { headers: string[]; rows: string[][] } => {
-    const lines = text.split(/\r?\n/).filter(line => line.trim())
-    if (lines.length === 0) return { headers: [], rows: [] }
-
-    // Detect delimiter (comma, semicolon, or tab)
-    const firstLine = lines[0]
-    let delimiter = ','
-    if (firstLine.includes(';') && !firstLine.includes(',')) delimiter = ';'
-    if (firstLine.includes('\t') && !firstLine.includes(',') && !firstLine.includes(';')) delimiter = '\t'
-
-    const parseRow = (line: string): string[] => {
-      const result: string[] = []
-      let current = ''
-      let inQuotes = false
-      
-      for (let i = 0; i < line.length; i++) {
-        const char = line[i]
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === delimiter && !inQuotes) {
-          result.push(current.trim())
-          current = ''
-        } else {
-          current += char
-        }
-      }
-      result.push(current.trim())
-      return result
-    }
-
-    const headers = parseRow(lines[0])
-    const rows = lines.slice(1).map(parseRow).filter(row => row.some(cell => cell))
-
-    return { headers, rows }
-  }
-
   const handleFile = useCallback((selectedFile: File) => {
     setFile(selectedFile)
-    
+
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result as string
       const { headers: parsedHeaders, rows: parsedRows } = parseCSV(text)
       setHeaders(parsedHeaders)
       setRows(parsedRows)
-      
-      // Auto-detect column mapping
-      const autoMapping: ColumnMapping = {
-        name: null,
-        phone_number: null,
-        email: null,
-        address: null
-      }
-      
-      parsedHeaders.forEach((header, index) => {
-        const h = header.toLowerCase()
-        if (h.includes('namn') || h.includes('name') || h.includes('kund')) {
-          autoMapping.name = index
-        }
-        if (h.includes('telefon') || h.includes('phone') || h.includes('mobil') || h.includes('tel')) {
-          autoMapping.phone_number = index
-        }
-        if (h.includes('mail') || h.includes('e-post') || h.includes('epost')) {
-          autoMapping.email = index
-        }
-        if (h.includes('adress') || h.includes('address') || h.includes('gata') || h.includes('street')) {
-          autoMapping.address = index
-        }
-      })
-      
-      setMapping(autoMapping)
+      setMapping(autoMapColumns(parsedHeaders))
       setStep(2)
     }
     reader.readAsText(selectedFile, 'UTF-8')
@@ -145,125 +77,24 @@ export default function ImportCustomersPage() {
     }
   }
 
-  const formatPhoneNumber = (phone: string): string => {
-    // Ta bort allt utom siffror och +
-    let cleaned = phone.replace(/[^\d+]/g, '')
-    
-    // Om det börjar med 0, ersätt med +46
-    if (cleaned.startsWith('0')) {
-      cleaned = '+46' + cleaned.slice(1)
-    }
-    
-    // Om det inte börjar med +, anta Sverige
-    if (!cleaned.startsWith('+')) {
-      cleaned = '+46' + cleaned
-    }
-    
-    return cleaned
-  }
-
-  const validatePhoneNumber = (phone: string): boolean => {
-    const formatted = formatPhoneNumber(phone)
-    // Svensk mobilnummer: +46 7X XXX XX XX (10 siffror efter +46)
-    // Svensk fast: +46 X XXX XXX (7-9 siffror efter +46)
-    return /^\+46\d{7,10}$/.test(formatted)
-  }
-
   const prepareData = async () => {
     if (mapping.phone_number === null) return
 
-    const prepared: ParsedRow[] = rows.map(row => ({
-      name: mapping.name !== null ? row[mapping.name] || '' : '',
-      phone_number: formatPhoneNumber(row[mapping.phone_number!] || ''),
-      email: mapping.email !== null ? row[mapping.email] || '' : '',
-      address: mapping.address !== null ? row[mapping.address] || '' : '',
-      raw: row
-    })).filter(row => row.phone_number && validatePhoneNumber(row.phone_number))
-
-    // Check for existing customers (duplicates)
-    const phones = prepared.map(r => r.phone_number)
-    const { data: existingCustomers } = await supabase
-      .from('customer')
-      .select('phone_number')
-      .eq('business_id', business.business_id)
-      .in('phone_number', phones)
-
-    const existingPhones = new Set((existingCustomers || []).map((c: { phone_number: string }) => c.phone_number))
-    const withDuplicates = prepared.map(row => ({
-      ...row,
-      isDuplicate: existingPhones.has(row.phone_number)
-    }))
-    const dupes = withDuplicates.filter(r => r.isDuplicate).length
+    const prepared = prepareRows(rows, mapping)
+    const { rows: withDuplicates, duplicateCount: dupes } = await flagDuplicates(
+      supabase,
+      business.business_id,
+      prepared,
+    )
     setDuplicateCount(dupes)
-
     setParsedData(withDuplicates)
     setStep(3)
   }
 
   const handleImport = async () => {
     setImporting(true)
-
-    let success = 0
-    let failed = 0
-    const errors: string[] = []
-    const importedIds: string[] = []
-
-    const rowsToImport = skipDuplicates
-      ? parsedData.filter(r => !r.isDuplicate)
-      : parsedData
-
-    for (const row of rowsToImport) {
-      try {
-        // Kolla om kunden redan finns (baserat på telefonnummer)
-        const { data: existing } = await supabase
-          .from('customer')
-          .select('customer_id')
-          .eq('business_id', business.business_id)
-          .eq('phone_number', row.phone_number)
-          .maybeSingle()
-
-        if (existing) {
-          // Uppdatera befintlig kund
-          await supabase
-            .from('customer')
-            .update({
-              name: row.name || undefined,
-              email: row.email || undefined,
-              address_line: row.address || undefined,
-            })
-            .eq('customer_id', existing.customer_id)
-          importedIds.push(existing.customer_id)
-          success++
-        } else {
-          // Skapa ny kund
-          const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
-          const { error } = await supabase
-            .from('customer')
-            .insert({
-              customer_id: customerId,
-              business_id: business.business_id,
-              name: row.name || 'Okänd',
-              phone_number: row.phone_number,
-              email: row.email || null,
-              address_line: row.address || null,
-              created_at: new Date().toISOString(),
-            })
-
-          if (error) {
-            failed++
-            errors.push(`${row.name || row.phone_number}: ${error.message}`)
-          } else {
-            importedIds.push(customerId)
-            success++
-          }
-        }
-      } catch (err: any) {
-        failed++
-        errors.push(`${row.name || row.phone_number}: ${err.message}`)
-      }
-    }
-
-    setImportResult({ success, failed, errors, importedIds })
+    const result = await importCustomers(supabase, business.business_id, parsedData, { skipDuplicates })
+    setImportResult(result)
     setStep(4)
     setImporting(false)
   }
