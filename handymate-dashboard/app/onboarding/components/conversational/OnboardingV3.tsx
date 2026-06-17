@@ -105,6 +105,9 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
     router.push('/dashboard')
   }
 
+  // Bakåt — golvar vid fas B (1), backar aldrig in i kontoskapandet (A).
+  const back = () => setPhase(p => Math.max(1, p - 1))
+
   if (phase === 0) {
     return <PhaseAWired variant={variant} data={data} set={set} onEscape={onEscape} onDone={() => setPhase(1)} />
   }
@@ -113,7 +116,7 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
       onNext={async (services, tone) => { await save(2, { specialties: services }, { tone }); setPhase(2) }} />
   }
   if (phase === 2) {
-    return <PhaseCWired variant={variant} data={data} set={set} onEscape={onEscape}
+    return <PhaseCWired variant={variant} data={data} set={set} onEscape={onEscape} onBack={back}
       onNext={async (d) => {
         const mid = Math.round((Number(d.priceMin || 0) + Number(d.priceMax || 0)) / 2)
         await save(3, {
@@ -126,7 +129,7 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
       }} />
   }
   if (phase === 3) {
-    return <PhaseDWired variant={variant} data={data} set={set} onEscape={onEscape}
+    return <PhaseDWired variant={variant} data={data} set={set} onEscape={onEscape} onBack={back}
       onConnectCalendar={async () => {
         // Persistera progress innan full-page-redirect (resume i increment 7).
         await save(4, {})
@@ -139,10 +142,10 @@ export function OnboardingV3({ variant, onEscape }: { variant: Variant; onEscape
       }} />
   }
   if (phase === 4) {
-    return <PhasePayment variant={variant} data={data} onEscape={onEscape}
+    return <PhasePayment variant={variant} data={data} onEscape={onEscape} onBack={back}
       onDone={async () => { await save(5, {}); setPhase(5) }} />
   }
-  return <PhaseEWired variant={variant} data={data} onFinish={finish} onEscape={onEscape} />
+  return <PhaseEWired variant={variant} data={data} onFinish={finish} onEscape={onEscape} onBack={back} />
 }
 
 /* ---------- Fas A (wired): skrapning + kontoskapande ---------- */
@@ -344,9 +347,9 @@ function PhaseBWired({ variant, data, set, onNext, onEscape }: {
 }
 
 /* ---------- Fas C (wired): tider + pris + ROT ---------- */
-function PhaseCWired({ variant, data, set, onNext, onEscape }: {
+function PhaseCWired({ variant, data, set, onNext, onEscape, onBack }: {
   variant: Variant; data: V3Data; set: (p: Partial<V3Data>) => void
-  onNext: (d: V3Data) => void; onEscape?: () => void
+  onNext: (d: V3Data) => void; onEscape?: () => void; onBack?: () => void
 }) {
   const dialog = (
     <>
@@ -392,14 +395,14 @@ function PhaseCWired({ variant, data, set, onNext, onEscape }: {
     </>
   )
   return variant === 'mobile'
-    ? <MobileShell active={2} dialog={dialog} dock={dock} panelSummary="Tider & pris" panelDrawer={panelBody} panelOpen onEscape={onEscape} />
-    : <SplitShell active={2} dialog={dialog} dock={dock} panel={<Panel pct={68}>{panelBody}</Panel>} onEscape={onEscape} />
+    ? <MobileShell active={2} dialog={dialog} dock={dock} panelSummary="Tider & pris" panelDrawer={panelBody} panelOpen onEscape={onEscape} onBack={onBack} />
+    : <SplitShell active={2} dialog={dialog} dock={dock} panel={<Panel pct={68}>{panelBody}</Panel>} onEscape={onEscape} onBack={onBack} />
 }
 
 /* ---------- Fas D (wired): import + kalender + telefon ---------- */
-function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape }: {
+function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape, onBack }: {
   variant: Variant; data: V3Data; set: (p: Partial<V3Data>) => void
-  onConnectCalendar: () => void; onNext: () => void; onEscape?: () => void
+  onConnectCalendar: () => void; onNext: () => void; onEscape?: () => void; onBack?: () => void
 }) {
   const [importing, setImporting] = useState(false)
   const [importErr, setImportErr] = useState<string | null>(null)
@@ -523,23 +526,23 @@ function PhaseDWired({ variant, data, set, onConnectCalendar, onNext, onEscape }
   )
   const tools = (csvDone ? 1 : 0) + (data.calendarConnected ? 1 : 0)
   return variant === 'mobile'
-    ? <MobileShell active={3} dialog={dialog} dock={dock} panelSummary={`${tools} verktyg kopplade`} panelDrawer={panelBody} onEscape={onEscape} />
-    : <SplitShell active={3} dialog={dialog} dock={dock} panel={<Panel pct={85}>{panelBody}</Panel>} onEscape={onEscape} />
+    ? <MobileShell active={3} dialog={dialog} dock={dock} panelSummary={`${tools} verktyg kopplade`} panelDrawer={panelBody} onEscape={onEscape} onBack={onBack} />
+    : <SplitShell active={3} dialog={dialog} dock={dock} panel={<Panel pct={85}>{panelBody}</Panel>} onEscape={onEscape} onBack={onBack} />
 }
 
 /* ---------- Betalning (wired): Stripe Elements, återbruk billing-flödet ---------- */
-function PhasePayment({ variant, data, onDone, onEscape }: {
-  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void
+function PhasePayment({ variant, data, onDone, onEscape, onBack }: {
+  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void; onBack?: () => void
 }) {
   return (
     <Elements stripe={stripePromise}>
-      <PaymentInner variant={variant} data={data} onDone={onDone} onEscape={onEscape} />
+      <PaymentInner variant={variant} data={data} onDone={onDone} onEscape={onEscape} onBack={onBack} />
     </Elements>
   )
 }
 
-function PaymentInner({ variant, onDone, onEscape }: {
-  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void
+function PaymentInner({ variant, onDone, onEscape, onBack }: {
+  variant: Variant; data: V3Data; onDone: () => void; onEscape?: () => void; onBack?: () => void
 }) {
   const stripe = useStripe()
   const elements = useElements()
@@ -630,8 +633,8 @@ function PaymentInner({ variant, onDone, onEscape }: {
     </PanelGroup>
   )
   return variant === 'mobile'
-    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary={`${selected.name} · ${selected.price.toLocaleString('sv-SE')} kr`} panelDrawer={panelBody} onEscape={onEscape} />
-    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={95}>{panelBody}</Panel>} onEscape={onEscape} />
+    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary={`${selected.name} · ${selected.price.toLocaleString('sv-SE')} kr`} panelDrawer={panelBody} onEscape={onEscape} onBack={onBack} />
+    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={95}>{panelBody}</Panel>} onEscape={onEscape} onBack={onBack} />
 }
 
 /* ---------- Fas E (wired): team-reveal + finish ---------- */
@@ -643,8 +646,8 @@ const TEAM_E = [
   { id: 'hanna', name: 'Hanna', line: 'sköter SMS och påminnelser' },
 ]
 
-function PhaseEWired({ variant, data, onFinish, onEscape }: {
-  variant: Variant; data: V3Data; onFinish: () => void; onEscape?: () => void
+function PhaseEWired({ variant, data, onFinish, onEscape, onBack }: {
+  variant: Variant; data: V3Data; onFinish: () => void; onEscape?: () => void; onBack?: () => void
 }) {
   const [finishing, setFinishing] = useState(false)
   const dialog = (
@@ -692,6 +695,6 @@ function PhaseEWired({ variant, data, onFinish, onEscape }: {
     </>
   )
   return variant === 'mobile'
-    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary="Komplett · teamet redo" panelDrawer={panelBody} onEscape={onEscape} />
-    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={100}>{panelBody}</Panel>} onEscape={onEscape} />
+    ? <MobileShell active={4} dialog={dialog} dock={dock} panelSummary="Komplett · teamet redo" panelDrawer={panelBody} onEscape={onEscape} onBack={onBack} />
+    : <SplitShell active={4} dialog={dialog} dock={dock} panel={<Panel pct={100}>{panelBody}</Panel>} onEscape={onEscape} onBack={onBack} />
 }

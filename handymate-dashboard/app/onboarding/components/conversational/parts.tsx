@@ -11,7 +11,7 @@ import React, { useState } from 'react'
 import {
   Home, MapPin, FileText, Wrench, MessageCircle, Clock, DollarSign, Shield,
   Users, Calendar, Zap, Check, X, Plus, Sparkles, Target, Phone, Rocket,
-  Upload, ArrowRight, ChevronDown, ListChecks,
+  Upload, ArrowRight, ArrowLeft, ChevronDown, ListChecks,
 } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 
@@ -23,7 +23,7 @@ const ICONS = {
   messageCircle: MessageCircle, clock: Clock, dollarSign: DollarSign, shield: Shield,
   users: Users, calendar: Calendar, zap: Zap, check: Check, x: X, plus: Plus,
   sparkles: Sparkles, target: Target, phone: Phone, rocket: Rocket, upload: Upload,
-  arrowRight: ArrowRight, chevronDown: ChevronDown, listChecks: ListChecks,
+  arrowRight: ArrowRight, arrowLeft: ArrowLeft, chevronDown: ChevronDown, listChecks: ListChecks,
 } as const
 
 export type IconName = keyof typeof ICONS
@@ -173,14 +173,24 @@ interface ShellProps {
   dialog: React.ReactNode
   dock?: React.ReactNode
   onEscape?: () => void
+  onBack?: () => void
+}
+
+function BackBtn({ onBack }: { onBack: () => void }) {
+  return (
+    <button className="m3-escape" onClick={onBack} title="Tillbaka" style={{ padding: '7px 10px' }}>
+      <Icon name="arrowLeft" size={15} />
+    </button>
+  )
 }
 
 /* Desktop split 60/40 */
-export function SplitShell({ active, dialog, dock, panel, onEscape }: ShellProps & { panel: React.ReactNode }) {
+export function SplitShell({ active, dialog, dock, panel, onEscape, onBack }: ShellProps & { panel: React.ReactNode }) {
   return (
     <div className="m3-split">
       <div className="m3-dialog-col">
         <div className="m3-dhead">
+          {onBack && <BackBtn onBack={onBack} />}
           <PhaseRail active={active} />
           <Escape onClick={onEscape} />
         </div>
@@ -193,13 +203,14 @@ export function SplitShell({ active, dialog, dock, panel, onEscape }: ShellProps
 }
 
 /* Mobil: dialog + hopfällbar panel-sammanfattning överst */
-export function MobileShell({ active, dialog, dock, panelSummary, panelDrawer, panelOpen, onEscape }: ShellProps & {
+export function MobileShell({ active, dialog, dock, panelSummary, panelDrawer, panelOpen, onEscape, onBack }: ShellProps & {
   panelSummary: React.ReactNode; panelDrawer: React.ReactNode; panelOpen?: boolean
 }) {
   const [open, setOpen] = useState(!!panelOpen)
   return (
     <div className="m3-mob">
       <div className="m3-dhead">
+        {onBack && <BackBtn onBack={onBack} />}
         <PhaseRail active={active} />
       </div>
       <div className={`m3-mobpanel ${open ? 'open' : ''}`}>
