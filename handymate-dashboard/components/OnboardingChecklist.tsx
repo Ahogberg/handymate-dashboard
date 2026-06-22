@@ -91,6 +91,13 @@ export default function OnboardingChecklist({
       title: 'Fas 2 — Automationer',
       items: [
         {
+          id: 'automations',
+          label: 'Granska vad teamet gör automatiskt',
+          completed: false,
+          optional: true,
+          link: '/dashboard/automations',
+        },
+        {
           id: 'calendar',
           label: 'Koppla Google Kalender',
           completed: !!(businessConfig.google_connected || businessConfig.google_calendar_connected),
