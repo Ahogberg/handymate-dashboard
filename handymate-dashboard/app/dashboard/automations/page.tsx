@@ -23,7 +23,7 @@ interface AutomationRule {
   last_run_status: string | null
 }
 
-type TabType = 'library' | 'custom' | 'log'
+type TabType = 'library' | 'custom' | 'log' | 'settings'
 
 // ── Automationsbibliotek med kategorier ───────────────────────────
 
@@ -85,7 +85,7 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Offertuppföljning dag 5',
     description: 'Följer upp obesvarade offerter efter 5 dagar',
     category: 'quotes',
-    matchRuleNames: ['Offertuppföljning dag 5', 'quote_followup_day1', 'quote_follow_up'],
+    matchRuleNames: ['Offertuppföljning dag 5', 'quote_followup_day1', 'quote_follow_up', 'Följ upp skickad offert'],
     defaultTiming: 'dag 5',
     previewText: 'Hej! Vi skickade en offert för 5 dagar sedan. Har du hunnit titta på den?',
   },
@@ -124,7 +124,7 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Faktura eskalering dag 7',
     description: 'Striktare påminnelse efter 7 dagar — kräver godkännande',
     category: 'invoices',
-    matchRuleNames: ['Faktura eskalering dag 7', 'invoice_reminder_day2', 'eskalering'],
+    matchRuleNames: ['Faktura eskalering dag 7', 'invoice_reminder_day2', 'eskalering', 'Påminn om förfallen faktura'],
     defaultTiming: 'dag 7',
   },
 
@@ -377,7 +377,7 @@ export default function AutomationsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Automationer</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Styr vad ditt team gör automatiskt — du godkänner alltid innan något skickas
+          Styr vad ditt team gör automatiskt — vissa körs direkt, andra kräver ditt godkännande. Du bestämmer per automation och globalt under Inställningar.
         </p>
       </div>
 
@@ -387,6 +387,7 @@ export default function AutomationsPage() {
           { key: 'library' as TabType, label: 'Bibliotek' },
           { key: 'custom' as TabType, label: `Egna regler${customRules.length > 0 ? ` (${customRules.length})` : ''}` },
           { key: 'log' as TabType, label: 'Historik' },
+          { key: 'settings' as TabType, label: 'Inställningar' },
         ]).map(tab => (
           <button
             key={tab.key}
@@ -633,6 +634,9 @@ export default function AutomationsPage() {
 
       {/* Tab: Historik */}
       {activeTab === 'log' && <AutomationLog />}
+
+      {/* Tab: Inställningar (globala växlar — godkännande, arbetstider, nattläge) */}
+      {activeTab === 'settings' && <AutomationSettings />}
 
       {/* Rule builder modal */}
       {showBuilder && (

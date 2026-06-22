@@ -30,7 +30,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'approve',
     title: 'Här godkänner du beslut',
-    body: 'AI-teamet jobbar autonomt — du ser bara det som behöver din input.',
+    body: 'AI-teamet jobbar autonomt — du ser bara det som behöver din input. Under Automationer styr du själv vad som körs direkt och vad som kräver ditt godkännande.',
   },
   {
     id: 'setup',

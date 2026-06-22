@@ -814,8 +814,17 @@ export async function executeRule(
     }
   }
 
-  // 6. If requires_approval → create approval instead of executing
-  if (typedRule.requires_approval && typedRule.action_type !== 'create_approval') {
+  // 6. If requires_approval → create approval instead of executing.
+  // Globala godkännande-växlar (Inställningar) gäller UTÖVER regelns egen flagga:
+  // slår hantverkaren på "kräv godkännande för SMS" globalt kräver alla SMS-/
+  // mejlregler godkännande oavsett vad den enskilda regeln säger.
+  const globalApproval =
+    ((typedRule.action_type === 'send_sms' || typedRule.action_type === 'send_email') && settings.require_approval_send_sms) ||
+    (typedRule.action_type === 'generate_quote' && settings.require_approval_send_quote) ||
+    (typedRule.action_type === 'create_booking' && settings.require_approval_create_booking)
+  const needsApproval = typedRule.requires_approval || globalApproval
+
+  if (needsApproval && typedRule.action_type !== 'create_approval') {
     const approvalResult = await handleCreateApproval(supabase, typedRule.business_id, {
       title: typedRule.name,
       description: typedRule.description || '',
