@@ -15,7 +15,10 @@ export async function seedAllDefaults(
   branch: string
 ) {
   const results = await Promise.allSettled([
-    seedAutomationRules(supabase, businessId),
+    // OBS: legacy seedAutomationRules (automation_rules/automation_queue) är
+    // borttaget — det systemet är inert (ingen incheckad konsument: ingen
+    // pg_cron, inget i appen enqueue:ar, edge-funktionen scheduled-triggers är
+    // oschemalagd). v3_automation_rules nedan är den levande motorn.
     seedV3AutomationRules(supabase, businessId),
     seedLeadScoringRules(supabase, businessId),
     seedPipelineStages(supabase, businessId),
@@ -31,19 +34,6 @@ export async function seedAllDefaults(
   }
 
   return { total: results.length, succeeded: results.length - failed.length, failed: failed.length }
-}
-
-async function seedAutomationRules(supabase: SupabaseClient, businessId: string) {
-  // Check if already seeded
-  const { data: existing } = await supabase
-    .from('automation_rule')
-    .select('id')
-    .eq('business_id', businessId)
-    .limit(1)
-
-  if (existing && existing.length > 0) return
-
-  await supabase.rpc('seed_automation_rules', { p_business_id: businessId })
 }
 
 /**
@@ -148,7 +138,7 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
 
 async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string) {
   const { data: existing } = await supabase
-    .from('lead_scoring_rule')
+    .from('lead_scoring_rules')
     .select('id')
     .eq('business_id', businessId)
     .limit(1)
@@ -158,6 +148,13 @@ async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string
   await supabase.rpc('seed_lead_scoring_rules', { p_business_id: businessId })
 }
 
+/**
+ * OBS — två separata stage-system samexisterar (avsiktligt, olika syften):
+ *   • `pipeline_stage` (SINGULAR) = Kanban-deals-boarden. Seedas här.
+ *   • `pipeline_stages` (PLURAL) = V4 lead-pipeline (lib/pipeline-stages.ts),
+ *     self-seedar lazy vid första läsning — seedas alltså INTE här.
+ * Förväxla inte tabellerna när du skriver queries.
+ */
 async function seedPipelineStages(supabase: SupabaseClient, businessId: string) {
   const { data: existing } = await supabase
     .from('pipeline_stage')
