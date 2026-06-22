@@ -10,6 +10,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { generateOCR } from '@/lib/ocr'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 interface AutoInvoiceResult {
   success: boolean
@@ -165,14 +166,30 @@ export async function autoInvoiceOnComplete(
     const vatAmount = Math.round(subtotal * (vatRate / 100))
     const total = subtotal + vatAmount
 
-    // Recalkulera ROT/RUT om ÄTA ändrade totalen
-    if (rotRutType && ataItems.length > 0) {
-      const rotPercent = rotRutType === 'rut' ? 0.5 : 0.3
-      const eligibleItems = allItems.filter(i => i.is_rot_eligible && i.item_type !== 'discount')
-      const eligibleTotal = eligibleItems.reduce((sum, i) => sum + (i.total || 0), 0)
-      rotRutDeduction = Math.round(eligibleTotal * rotPercent)
-      customerPays = total - rotRutDeduction
-    } else if (rotRutType && !customerPays) {
+    // ROT/RUT med årstaksvalidering. Tidigare användes rå procentsats (0.3/0.5)
+    // utan tak → avdraget kunde överskrida kundens årsutrymme och nekas av
+    // Skatteverket. Kapa mot kundens återstående utrymme i båda grenarna.
+    if (rotRutType) {
+      const rate = rotRutType === 'rut' ? 0.5 : 0.3
+      let eligibleLabor: number
+      if (ataItems.length > 0) {
+        // ÄTA ändrade totalen → räkna om underlaget från ROT-berättigade rader
+        eligibleLabor = allItems
+          .filter(i => i.is_rot_eligible && i.item_type !== 'discount')
+          .reduce((sum, i) => sum + (i.total || 0), 0)
+      } else {
+        // Härled underlaget från offertens (kopierade) avdrag
+        eligibleLabor = rotRutDeduction ? rotRutDeduction / rate : 0
+      }
+      if (eligibleLabor > 0) {
+        const capped = await calculateCappedDeduction(
+          project.customer_id,
+          businessId,
+          rotRutType as 'rot' | 'rut',
+          eligibleLabor,
+        )
+        rotRutDeduction = capped.deduction
+      }
       customerPays = total - rotRutDeduction
     }
 

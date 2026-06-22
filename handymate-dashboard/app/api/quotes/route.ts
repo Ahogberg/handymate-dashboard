@@ -449,6 +449,42 @@ export async function POST(request: NextRequest) {
       } catch (dealErr) {
         console.error('Deal sync error (non-blocking):', dealErr)
       }
+    } else if (quote.quote_id && quote.customer_id) {
+      // Fristående offert (skapad utanför en deal-länk, t.ex. från Offert-sidan
+      // eller kundkortet): koppla till kundens öppna deal som ännu saknar offert.
+      // Annars hittade pipeline-övergångarna (skickad/öppnad/vunnen) ingen deal
+      // via quote_id och dealen fastnade tyst i första steget.
+      try {
+        const { data: openDeal } = await supabase
+          .from('deal')
+          .select('id, lead_id')
+          .eq('business_id', business.business_id)
+          .eq('customer_id', quote.customer_id)
+          .is('quote_id', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (openDeal) {
+          const dealUpdate: Record<string, unknown> = { quote_id: quote.quote_id }
+          if (quote.total) dealUpdate.value = quote.total
+          await supabase
+            .from('deal')
+            .update(dealUpdate)
+            .eq('id', openDeal.id)
+            .eq('business_id', business.business_id)
+
+          // Spegla lead_id till offerten om den saknar det (paritet med deal_id-vägen)
+          if (openDeal.lead_id && !quote.lead_id) {
+            await supabase
+              .from('quotes')
+              .update({ lead_id: openDeal.lead_id })
+              .eq('quote_id', quote.quote_id)
+          }
+        }
+      } catch (linkErr) {
+        console.error('Standalone quote→deal link error (non-blocking):', linkErr)
+      }
     }
 
     return NextResponse.json({ quote })

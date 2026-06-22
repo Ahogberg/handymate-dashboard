@@ -115,44 +115,23 @@ export async function POST(request: NextRequest) {
     // Auto-skapa lead om det inte redan finns en kund (ny uppringare)
     if (!customerId && from) {
       try {
-        // Skapa kund
-        const newCustomerId = 'cust_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)
-        await supabase.from('customer').insert({
-          customer_id: newCustomerId,
-          business_id: business.business_id,
+        // Golden Path: skapa kund + lead + DEAL via samma helper som webb-intake.
+        // Tidigare skrevs customer/lead direkt med source 'phone_call' — ogiltig
+        // enligt valid_source-CHECK (v56) → lead-inserten failade tyst, OCH ingen
+        // deal skapades → telefon-leads hamnade aldrig i pipelinen. 'vapi_call' är
+        // en giltig källa; createLeadAndDeal skapar deal + fireEvent('lead_received').
+        const { createLeadAndDeal } = await import('@/lib/leads/golden-path')
+        const gp = await createLeadAndDeal({
+          businessId: business.business_id,
+          businessPhoneNumber: null, // telefonflödet notifierar redan separat (missat samtal/transfer)
           name: `Ny kund (${from})`,
-          phone_number: from,
-          source: 'phone_call',
-        })
-        customerId = newCustomerId
-
-        // Skapa lead i pipeline
-        const leadId = 'lead_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)
-        await supabase.from('leads').insert({
-          lead_id: leadId,
-          business_id: business.business_id,
-          customer_id: newCustomerId,
-          customer_name: `Ny kund (${from})`,
           phone: from,
-          source: 'phone_call',
-          status: 'new',
-          title: 'Inkommande samtal',
-          description: `Inkommande samtal från ${from}`,
-          urgency: 'medium',
-        })
-
-        // Fire lead_created event → trigger bekräftelse-SMS etc.
-        try {
-          const { fireEvent } = await import('@/lib/automation-engine')
-          await fireEvent(supabase, 'lead_created', business.business_id, {
-            lead_id: leadId,
-            customer_id: newCustomerId,
-            phone: from,
-            source: 'phone_call',
-          })
-        } catch { /* non-blocking */ }
-
-        console.log(`[Voice] Auto-created lead ${leadId} + customer ${newCustomerId} from ${from}`)
+          email: null,
+          message: 'Inkommande samtal',
+          source: 'vapi_call',
+        }, supabase)
+        customerId = gp.customerId
+        console.log(`[Voice] Golden Path: lead ${gp.leadId} + deal ${gp.dealId} + customer ${gp.customerId} from ${from}`)
       } catch (leadErr) {
         console.error('[Voice] Auto-lead creation error (non-blocking):', leadErr)
       }

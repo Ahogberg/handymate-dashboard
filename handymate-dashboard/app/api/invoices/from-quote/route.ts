@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 /**
  * POST - Skapa faktura från offert (eller dry_run för att hämta items)
@@ -114,6 +115,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ROT/RUT med årstaksvalidering — kopiera INTE quote-värdet rakt av (det
+    // kringgick kundens årstak och kunde ge för högt avdrag som Skatteverket
+    // nekar). Räkna om mot kundens återstående utrymme.
+    let rotRutDeduction = quote.rot_rut_deduction || 0
+    let customerPays = quote.customer_pays || total
+    if (quote.rot_rut_type && quote.customer_id) {
+      const rate = quote.rot_rut_type === 'rot' ? 0.30 : 0.50
+      const workCost = quote.rot_rut_type === 'rot' ? quote.rot_work_cost : quote.rut_work_cost
+      const laborCost = workCost || (quote.rot_rut_deduction ? quote.rot_rut_deduction / rate : 0)
+      if (laborCost > 0) {
+        const capped = await calculateCappedDeduction(
+          quote.customer_id,
+          business_id,
+          quote.rot_rut_type as 'rot' | 'rut',
+          laborCost,
+        )
+        rotRutDeduction = capped.deduction
+        customerPays = total - rotRutDeduction
+      }
+    }
+
     const { data: invoice, error: insertError } = await supabase
       .from('invoice')
       .insert({
@@ -130,8 +152,8 @@ export async function POST(request: NextRequest) {
         vat_amount: vatAmount,
         total,
         rot_rut_type: quote.rot_rut_type || null,
-        rot_rut_deduction: quote.rot_rut_deduction || 0,
-        customer_pays: quote.customer_pays || total,
+        rot_rut_deduction: rotRutDeduction,
+        customer_pays: customerPays,
         personnummer: quote.personnummer || null,
         fastighetsbeteckning: quote.fastighetsbeteckning || null,
         invoice_date: invoiceDate.toISOString().split('T')[0],
