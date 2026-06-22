@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -190,17 +191,23 @@ export async function POST(request: NextRequest) {
   let rutDeduction = 0
   let customerPays = total
 
+  // Kapa mot kundens ÅRSUTRYMME (ej bara engångstaket) — annars kan avdraget
+  // bli för högt om kunden redan använt sitt ROT/RUT och Skatteverket nekar.
   if (rot_rut_type === 'rot') {
     rotWorkCost = items
       .filter((i: any) => i.is_rot_eligible)
       .reduce((s: number, i: any) => s + (i.total || 0), 0)
-    rotDeduction = Math.min(Math.round(rotWorkCost * 0.3), 50000)
+    rotDeduction = customer_id && rotWorkCost > 0
+      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rot', rotWorkCost)).deduction
+      : Math.min(Math.round(rotWorkCost * 0.3), 50000)
     customerPays = total - rotDeduction
   } else if (rot_rut_type === 'rut') {
     rutWorkCost = items
       .filter((i: any) => i.is_rut_eligible)
       .reduce((s: number, i: any) => s + (i.total || 0), 0)
-    rutDeduction = Math.min(Math.round(rutWorkCost * 0.5), 75000)
+    rutDeduction = customer_id && rutWorkCost > 0
+      ? (await calculateCappedDeduction(customer_id, business.business_id, 'rut', rutWorkCost)).deduction
+      : Math.min(Math.round(rutWorkCost * 0.5), 75000)
     customerPays = total - rutDeduction
   }
 

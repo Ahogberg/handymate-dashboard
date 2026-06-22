@@ -119,16 +119,28 @@ export async function POST(
         return NextResponse.json({ error: 'Ange ett skäl för avböjandet' }, { status: 400 })
       }
 
+      // Skriv garanterat giltiga kolumner först (status + declined_at). Tidigare
+      // skrevs lost_reason i samma update — den kolumnen saknas i schemat → hela
+      // avböjningen kastade och kunden fick ett generiskt 500.
       const { error: updateError } = await supabase
         .from('quotes')
         .update({
           status: 'declined',
           declined_at: new Date().toISOString(),
-          lost_reason: reason,
         })
         .eq('sign_token', token)
 
       if (updateError) throw updateError
+
+      // lost_reason är en valfri kolumn (sql/add_quote_lost_reason.sql) — best
+      // effort, blockera aldrig avböjningen om kolumnen inte finns.
+      if (reason) {
+        const { error: reasonErr } = await supabase
+          .from('quotes')
+          .update({ lost_reason: reason })
+          .eq('sign_token', token)
+        if (reasonErr) console.warn('[quote decline] lost_reason ej sparat (kör add_quote_lost_reason.sql):', reasonErr.message)
+      }
 
       // Trigger agent automation for declined quote (non-blocking)
       try {
@@ -146,6 +158,13 @@ export async function POST(
     }
 
     // ── Sign ──────────────────────────────────────────────────────────────────
+    // Spärra signering av utgången offert — annars kunde kunden binda
+    // hantverkaren till ett pris som löpt ut. (Statusguarderna ovan täckte bara
+    // accepted/declined, inte expired/passerat valid_until.)
+    if (quote.status === 'expired' || (quote.valid_until && new Date(quote.valid_until) < new Date())) {
+      return NextResponse.json({ error: 'Offerten har gått ut. Kontakta oss för en uppdaterad offert.' }, { status: 400 })
+    }
+
     if (!name || !signature_data) {
       return NextResponse.json({ error: 'Namn och signatur krävs' }, { status: 400 })
     }

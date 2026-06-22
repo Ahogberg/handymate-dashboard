@@ -207,7 +207,7 @@ async function sendAutoReminders() {
     const { data: overdueInvoices, error } = await supabase
       .from('invoice')
       .select(`
-        invoice_id, invoice_number, due_date, business_id, customer_id,
+        invoice_id, invoice_number, ocr_number, due_date, business_id, customer_id,
         total, customer_pays, rot_rut_type, reminder_count,
         last_reminder_at, next_reminder_at,
         customer:customer_id (name, phone_number, email)
@@ -303,7 +303,7 @@ async function sendAutoReminders() {
       const businessName = cfg.business_name
       const bankgiro = cfg.bankgiro
       const amountToPay = inv.rot_rut_type ? inv.customer_pays : inv.total
-      const ocrNumber = generateOCR(inv.invoice_number || '')
+      const ocrNumber = inv.ocr_number || generateOCR(inv.invoice_number || '')
 
       // Beräkna dröjsmålsränta
       const interestAmount = calculateInterest(amountToPay || 0, cfg.penalty_interest, daysOverdue)

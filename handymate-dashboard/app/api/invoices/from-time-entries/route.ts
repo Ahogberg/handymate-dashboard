@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateOCR } from '@/lib/ocr'
+import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 
 /**
  * POST - Skapa faktura från tidrapporter
@@ -114,6 +115,21 @@ export async function POST(request: NextRequest) {
       fastighetsbeteckning = customerData.property_designation || null
     }
 
+    // ROT/RUT-avdrag (kapat mot kundens årsutrymme). Tidigare sattes bara
+    // rot_rut_type men inget avdrag → kunden fakturerades fullt belopp trots ROT.
+    let rotRutDeduction = 0
+    let customerPays = total
+    if (rot_rut_type && resolvedCustomerId) {
+      const eligibleLabor = items
+        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible)
+        .reduce((s: number, i: any) => s + (i.total || 0), 0)
+      if (eligibleLabor > 0) {
+        const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor)
+        rotRutDeduction = capped.deduction
+        customerPays = total - rotRutDeduction
+      }
+    }
+
     const { data: invoice, error: insertError } = await supabase
       .from('invoice')
       .insert({
@@ -128,6 +144,8 @@ export async function POST(request: NextRequest) {
         vat_amount: vatAmount,
         total,
         rot_rut_type: rot_rut_type || null,
+        rot_rut_deduction: rotRutDeduction,
+        customer_pays: customerPays,
         personnummer,
         fastighetsbeteckning,
         invoice_date: invoiceDate.toISOString().split('T')[0],

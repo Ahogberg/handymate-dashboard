@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const { data: expiredQuotes } = await supabase
       .from('quotes')
       .update({ status: 'expired' })
-      .eq('status', 'sent')
+      .in('status', ['sent', 'opened']) // 'opened' missades förut → öppnade-men-obesvarade offerter blev aldrig expired
       .lt('valid_until', today)
       .select('quote_id')
 

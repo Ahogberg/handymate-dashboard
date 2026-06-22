@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
             rotRutType: invoice.rot_rut_type,
             rotRutDeduction: invoice.rot_rut_deduction,
             bankgiro: business?.bankgiro,
-            ocrNumber: generateOCR(invoice.invoice_number || ''),
+            ocrNumber: invoice.ocr_number || generateOCR(invoice.invoice_number || ''),
             swishNumber: businessConfig?.swish_number,
             orgNumber: business?.org_number,
             contactEmail: business?.contact_email,

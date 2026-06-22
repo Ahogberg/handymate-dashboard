@@ -22,11 +22,14 @@ async function sendSMS(to: string, message: string, from: string): Promise<{ suc
       }),
     })
 
-    const result = await response.json()
-
+    // 46elks svarar ofta plaintext vid fel — läs text först och parsa
+    // defensivt (tidigare kastade .json() före .ok-koll → vilseledande fel).
+    const raw = await response.text()
     if (!response.ok) {
-      return { success: false, error: result.message || 'Unknown error' }
+      return { success: false, error: raw || 'Unknown error' }
     }
+    let result: any = {}
+    try { result = JSON.parse(raw) } catch { /* plaintext-svar */ }
 
     return { success: true, elksId: result.id }
   } catch (error: any) {

@@ -5,6 +5,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { resolveSenderId } from '@/lib/sms/sender-id'
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -697,6 +698,10 @@ async function sendNurtureSMS(params: {
     return { success: false, error: '46elks inte konfigurerat' }
   }
 
+  // Avsändar-ID = hantverkarens företagsnamn (ej hårdkodat 'Handymate' — det
+  // såg ut som spam och bröt white-label).
+  const fromName = await resolveSenderId(getServerSupabase(), { businessId: params.businessId })
+
   try {
     const response = await fetch('https://api.46elks.com/a1/sms', {
       method: 'POST',
@@ -705,7 +710,7 @@ async function sendNurtureSMS(params: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        from: 'Handymate',
+        from: fromName,
         to: params.to,
         message: params.message,
       }).toString(),
