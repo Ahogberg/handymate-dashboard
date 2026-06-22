@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
         const hours = Number(action.data.hours) || 0
         const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
 
-        await supabase.from('time_entry').insert({
+        const { error: teError } = await supabase.from('time_entry').insert({
           time_entry_id: entryId,
           business_id: businessId,
           customer_id: customer.customer_id,
@@ -51,6 +51,10 @@ export async function POST(request: NextRequest) {
           work_date: action.data.date || new Date().toISOString().split('T')[0],
           is_billable: true,
         })
+        if (teError) {
+          console.error('[voice/execute] time_entry insert error:', teError)
+          return NextResponse.json({ success: false, error: 'Kunde inte spara tidrapport' }, { status: 500 })
+        }
 
         return NextResponse.json({
           success: true,
@@ -71,13 +75,17 @@ export async function POST(request: NextRequest) {
 
         const logId = 'pl_' + Math.random().toString(36).substr(2, 9)
 
-        await supabase.from('project_log').insert({
+        const { error: wlError } = await supabase.from('project_log').insert({
           id: logId,
           order_id: project?.project_id || null,
           business_id: businessId,
           date: new Date().toISOString().split('T')[0],
           work_performed: action.data.description || '',
         })
+        if (wlError) {
+          console.error('[voice/execute] work_log insert error:', wlError)
+          return NextResponse.json({ success: false, error: 'Kunde inte spara arbetslogg' }, { status: 500 })
+        }
 
         return NextResponse.json({
           success: true,
@@ -102,6 +110,7 @@ export async function POST(request: NextRequest) {
 
         if (error) {
           console.error('[voice/execute] Material log error:', error)
+          return NextResponse.json({ success: false, error: 'Kunde inte logga material' }, { status: 500 })
         }
 
         return NextResponse.json({
@@ -115,7 +124,7 @@ export async function POST(request: NextRequest) {
         const customer = await findOrCreateCustomer(supabase, businessId, action.data.customer_name)
         const quoteId = 'q_' + Math.random().toString(36).substr(2, 9)
 
-        await supabase.from('quotes').insert({
+        const { error: invError } = await supabase.from('quotes').insert({
           quote_id: quoteId,
           business_id: businessId,
           customer_id: customer.customer_id,
@@ -123,6 +132,10 @@ export async function POST(request: NextRequest) {
           status: 'draft',
           created_at: new Date().toISOString(),
         })
+        if (invError) {
+          console.error('[voice/execute] invoice draft insert error:', invError)
+          return NextResponse.json({ success: false, error: 'Kunde inte skapa faktura-utkast' }, { status: 500 })
+        }
 
         return NextResponse.json({
           success: true,
@@ -136,7 +149,7 @@ export async function POST(request: NextRequest) {
         const quoteId = 'q_' + Math.random().toString(36).substr(2, 9)
         const amount = Number(action.data.estimated_amount) || 0
 
-        await supabase.from('quotes').insert({
+        const { error: qError } = await supabase.from('quotes').insert({
           quote_id: quoteId,
           business_id: businessId,
           customer_id: customer.customer_id,
@@ -149,6 +162,10 @@ export async function POST(request: NextRequest) {
           valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           created_at: new Date().toISOString(),
         })
+        if (qError) {
+          console.error('[voice/execute] quote insert error:', qError)
+          return NextResponse.json({ success: false, error: 'Kunde inte skapa offert' }, { status: 500 })
+        }
 
         return NextResponse.json({
           success: true,
@@ -161,13 +178,17 @@ export async function POST(request: NextRequest) {
         // Store as project_log entry (no dedicated notes table)
         const noteId = 'note_' + Math.random().toString(36).substr(2, 9)
 
-        await supabase.from('project_log').insert({
+        const { error: noteError } = await supabase.from('project_log').insert({
           id: noteId,
           business_id: businessId,
           date: new Date().toISOString().split('T')[0],
           work_performed: action.data.title || 'Anteckning',
           description: action.data.content || '',
         })
+        if (noteError) {
+          console.error('[voice/execute] note insert error:', noteError)
+          return NextResponse.json({ success: false, error: 'Kunde inte spara anteckning' }, { status: 500 })
+        }
 
         return NextResponse.json({
           success: true,

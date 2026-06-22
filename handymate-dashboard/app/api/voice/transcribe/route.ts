@@ -121,7 +121,10 @@ export async function POST(request: NextRequest) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
       fetch(`${appUrl}/api/voice/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-internal-secret': process.env.CRON_SECRET || '',
+        },
         body: JSON.stringify({ recording_id })
       }).catch(err => console.error('Failed to trigger analysis:', err))
     }

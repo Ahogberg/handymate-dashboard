@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { registerPartner } from '@/lib/partners/auth'
+import { signApproveToken } from '@/lib/partners/approve-token'
 
 /**
  * POST /api/partners/register
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
             <p><strong>E-post:</strong> ${partner.email}</p>
             <p><strong>Kod:</strong> ${partner.referral_code}</p>
             <br>
-            <p><a href="${appUrl}/api/admin/partners/${partner.id}/approve">Godkänn partner →</a></p>
+            <p><a href="${appUrl}/api/admin/partners/${partner.id}/approve?token=${signApproveToken(partner.id)}">Godkänn partner →</a></p>
           `,
         })
       }

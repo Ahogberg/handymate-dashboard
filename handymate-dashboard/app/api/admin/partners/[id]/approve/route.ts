@@ -1,15 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { verifyApproveToken } from '@/lib/partners/approve-token'
+import { isAdmin } from '@/lib/admin-auth'
 
 /**
- * GET /api/admin/partners/[id]/approve
+ * GET /api/admin/partners/[id]/approve?token=...
  * Godkänn en partner — ändrar status till 'active' + skickar välkomstmail.
+ * Behörighet: giltig capability-token (från admin-mejlet) ELLER inloggad admin.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
+
+  // Behörighetskontroll — tidigare helt öppen (vem som helst kunde aktivera
+  // partner via gissat id). Token från mejllänken räcker; annars admin-session.
+  const token = new URL(request.url).searchParams.get('token')
+  let authorized = verifyApproveToken(id, token)
+  if (!authorized) {
+    const { isAdmin: admin } = await isAdmin(request)
+    authorized = admin
+  }
+  if (!authorized) {
+    return new NextResponse(
+      '<html><body style="font-family: sans-serif; padding: 40px; text-align: center;"><h1>Ej behörig</h1><p>Länken är ogiltig eller så saknar du behörighet.</p></body></html>',
+      { status: 403, headers: { 'Content-Type': 'text/html' } }
+    )
+  }
+
   const supabase = getServerSupabase()
 
   // Verify partner exists and is pending

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 import Anthropic from '@anthropic-ai/sdk'
 import { getClaudeModel } from '@/lib/ai/get-model'
 
@@ -25,6 +26,17 @@ interface AISuggestion {
  */
 export async function POST(request: NextRequest) {
   try {
+    // Behörighet: antingen inloggat företag (dashboard) eller internt anrop
+    // (transcribe-kedjan server-till-server med CRON_SECRET). Routen skrev
+    // tidigare kunddata helt oautentiserat på gissningsbart recording_id.
+    const authed = await getAuthenticatedBusiness(request)
+    const internalOk =
+      !!process.env.CRON_SECRET &&
+      request.headers.get('x-internal-secret') === process.env.CRON_SECRET
+    if (!authed && !internalOk) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     let supabase
     try {
       supabase = getServerSupabase()

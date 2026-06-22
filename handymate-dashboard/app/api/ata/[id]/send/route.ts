@@ -177,16 +177,13 @@ export async function POST(
         return NextResponse.json({ error: 'Ingen e-postadress att skicka till' }, { status: 400 })
       }
 
-      // TODO: Implement email sending when email service is ready
-      // For now, just update status
-      await supabase
-        .from('project_change')
-        .update({
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          sent_to_email: email,
-        })
-        .eq('change_id', params.id)
+      // E-postutskick av ÄTA är inte implementerat än. Markera ALDRIG som
+      // skickad utan att kunden faktiskt fått länken — det dolde tidigare ett
+      // tyst leveransfel. Be användaren skicka via SMS tills e-post finns.
+      return NextResponse.json(
+        { error: 'E-postutskick av ÄTA är inte tillgängligt än — skicka via SMS istället.' },
+        { status: 501 },
+      )
     }
 
     // Fire event (non-blocking)
