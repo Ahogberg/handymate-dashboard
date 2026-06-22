@@ -78,12 +78,14 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
           })
 
           await supabase.from('sms_log').insert({
+            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
             business_id: customer.business_id,
             customer_id: customer.customer_id,
-            direction: 'outgoing',
-            phone_number: customer.phone_number,
+            direction: 'outbound',
+            phone_to: customer.phone_number,
             message_type: 'portal_welcome',
             status: 'sent',
+            sent_at: new Date().toISOString(),
           })
         } catch (err) {
           console.error('[portal] welcome SMS failed:', err)

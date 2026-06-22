@@ -121,13 +121,15 @@ export async function GET(request: NextRequest) {
             if (smsRes.ok) {
               expiryNudgesSent++
               await supabase.from('sms_log').insert({
+                sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
                 business_id: q.business_id,
                 customer_id: q.customer_id,
-                direction: 'outgoing',
-                phone_number: customer.phone_number,
+                direction: 'outbound',
+                phone_to: customer.phone_number,
                 message_type: 'quote_expiry_nudge',
                 related_id: q.quote_id,
                 status: 'sent',
+                sent_at: new Date().toISOString(),
               })
             }
           } catch { /* non-blocking */ }

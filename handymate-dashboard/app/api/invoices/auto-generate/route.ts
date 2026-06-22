@@ -184,12 +184,13 @@ async function generateInvoicesForBusiness(params: {
           items,
           subtotal,
           vat_rate: vatRate,
-          vat,
+          vat_amount: vat,
           total,
           customer_pays: total,
           due_date: dueDate.toISOString().split('T')[0],
-          source: 'auto_generated',
-          notes: `Auto-genererad från ${entries.length} tidrapport${entries.length > 1 ? 'er' : ''}`,
+          // OBS: kolumnerna 'vat'/'source'/'notes' finns inte i invoice-schemat
+          // och fick varje insert att kasta (auto-fakturering skapade 0 fakturor
+          // men rapporterade success). vat → vat_amount; source/notes borttagna.
         })
         .select('invoice_id')
         .single()

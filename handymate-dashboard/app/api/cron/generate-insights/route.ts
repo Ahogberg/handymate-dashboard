@@ -20,7 +20,14 @@ export const maxDuration = 60
  * Runs every Sunday at 06:00 (vercel.json cron).
  * Generates 3-5 predictive insights per active business using Claude.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Auth: cron-routen var helt öppen — vem som helst kunde trigga Claude-anrop
+  // (kostnad) + push-spam. Kräv CRON_SECRET som övriga cron-jobb.
+  const authHeader = request.headers.get('authorization')
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
   const supabase = getServerSupabase()
 
   try {

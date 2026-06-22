@@ -466,28 +466,34 @@ async function sendAutoReminders() {
           ? new Date(dueDate.getTime() + nextDays * 24 * 60 * 60 * 1000).toISOString()
           : null
 
-        await supabase
+        // OBS: 'reminder_sent_at' finns INTE i invoice-schemat. Den gjorde att
+        // hela UPDATE:n kastade (felet sväljdes) → reminder_count/next_reminder_at
+        // uppdaterades aldrig → kunden fick samma påminnelse varje dygn och
+        // max-gränsen nåddes aldrig. Borttagen + synlig felkontroll.
+        const { error: updErr } = await supabase
           .from('invoice')
           .update({
             status: 'overdue',
             reminder_count: nextCount,
             last_reminder_at: today.toISOString(),
             next_reminder_at: nextReminderAt,
-            reminder_sent_at: today.toISOString(),
           })
           .eq('invoice_id', inv.invoice_id)
+        if (updErr) console.error('[send-reminders] invoice update failed (påminnelse-räknare ej uppdaterad):', inv.invoice_id, updErr)
 
         // Logga SMS
         if (smsSent) {
           await supabase.from('sms_log').insert({
+            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
             business_id: inv.business_id,
             customer_id: inv.customer_id,
-            direction: 'outgoing',
-            phone_number: customer?.phone_number,
+            direction: 'outbound',
+            phone_to: customer?.phone_number,
             message: messages.sms,
             message_type: 'invoice_reminder',
             related_id: inv.invoice_id,
             status: 'sent',
+            sent_at: new Date().toISOString(),
           })
         }
 

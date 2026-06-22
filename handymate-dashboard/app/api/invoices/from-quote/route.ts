@@ -35,8 +35,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
     }
 
-    // Mappa QuoteItem → InvoiceItem
-    const quoteItems = quote.items || []
+    // Mappa QuoteItem → InvoiceItem. Moderna offerter lagrar rader i
+    // quote_items-tabellen och sätter JSONB items:[] — läs därför strukturerade
+    // rader när JSONB är tom, annars blir fakturan TOM (0 kr, 0 ROT).
+    let quoteItems = quote.items || []
+    if (!quoteItems.length) {
+      const { data: structured } = await supabase
+        .from('quote_items')
+        .select('*')
+        .eq('quote_id', quote_id)
+        .order('sort_order', { ascending: true })
+      if (structured && structured.length) quoteItems = structured
+    }
     const items = quoteItems.map((item: any, i: number) => ({
       id: 'ii_' + Math.random().toString(36).substr(2, 12),
       item_type: item.item_type || 'item',

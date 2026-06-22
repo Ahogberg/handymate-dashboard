@@ -192,14 +192,16 @@ export async function POST(
     // Log SMS
     if (smsSent) {
       await supabase.from('sms_log').insert({
+        sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
         business_id: business.business_id,
         customer_id: invoice.customer_id,
-        direction: 'outgoing',
-        phone_number: invoice.customer?.phone_number,
+        direction: 'outbound',
+        phone_to: invoice.customer?.phone_number,
         message: message,
         message_type: 'invoice_reminder',
         related_id: invoiceId,
-        status: 'sent'
+        status: 'sent',
+        sent_at: new Date().toISOString()
       })
     }
 

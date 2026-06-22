@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       const { data: matRows, error: matError } = await supabase
         .from('project_material')
         .select('*')
-        .in('id', project_material_ids)
+        .in('material_id', project_material_ids)
         .eq('business_id', business_id)
         .eq('invoiced', false)
 
@@ -360,7 +360,7 @@ export async function POST(request: NextRequest) {
       await supabase
         .from('project_material')
         .update({ invoice_id: invoice.invoice_id, invoiced: true })
-        .in('id', project_material_ids)
+        .in('material_id', project_material_ids)
     }
 
     // V3 Automation Engine: fire invoice_created event

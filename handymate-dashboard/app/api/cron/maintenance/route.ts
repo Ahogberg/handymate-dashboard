@@ -146,13 +146,15 @@ export async function GET(request: NextRequest) {
           reviewsSent++
           await supabase.from('pending_approvals').update({ status: 'approved' }).eq('id', review.id)
           await supabase.from('sms_log').insert({
+            sms_id: 'sms_' + Math.random().toString(36).slice(2, 12),
             business_id: review.business_id,
             customer_id: p.customer_id,
-            direction: 'outgoing',
-            phone_number: p.customer_phone,
+            direction: 'outbound',
+            phone_to: p.customer_phone,
             message_type: 'review_request',
             related_id: p.invoice_id,
             status: 'sent',
+            sent_at: new Date().toISOString(),
           })
           // Komplettera SMS:et med ett portal-mail (kunden får båda kanalerna)
           if (p.customer_id) {

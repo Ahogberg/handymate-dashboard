@@ -18,14 +18,28 @@ export async function GET(request: NextRequest) {
   const supabase = getServerSupabase()
 
   // Hämta projekt + kund
+  // Rätt tabell heter `project` (PK project_id), inte `projects`/`id` — den
+  // gamla pluralqueryn returnerade alltid null → 404 och projektfakturering var
+  // helt blockerad. Kund hämtas separat (embed-FK föll tyst på PGRST200 förut).
   const { data: project } = await supabase
-    .from('projects')
-    .select('id, name, customer_id, customer:customers(customer_id, name, email, phone_number, personal_number, address_line)')
-    .eq('id', projectId)
+    .from('project')
+    .select('project_id, name, customer_id')
+    .eq('project_id', projectId)
     .eq('business_id', business.business_id)
     .single()
 
   if (!project) return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+
+  let projectCustomer: any = null
+  if (project.customer_id) {
+    const { data: c } = await supabase
+      .from('customer')
+      .select('customer_id, name, email, phone_number, personal_number, address_line')
+      .eq('customer_id', project.customer_id)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+    projectCustomer = c
+  }
 
   // Hämta ofakturerade tidposter
   const { data: timeEntries } = await supabase
@@ -88,9 +102,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     project: {
-      id: project.id,
+      id: project.project_id,
       name: project.name,
-      customer: project.customer,
+      customer: projectCustomer,
     },
     labor: { lines: laborLines, total: laborTotal },
     materials: { lines: materialLines, total: materialTotal },
