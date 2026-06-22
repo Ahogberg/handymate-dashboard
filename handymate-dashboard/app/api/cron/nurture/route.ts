@@ -60,16 +60,25 @@ export async function GET(request: NextRequest) {
       // Advance enrollment state
       const nextStepIndex = details.current_step + 1
       if (nextStepIndex >= steps.length) {
-        await supabase.from('nurture_enrollment').update({
+        const { error: doneErr } = await supabase.from('nurture_enrollment').update({
           status: 'completed',
           completed_at: new Date().toISOString(),
         }).eq('id', enrollment.id)
+        if (doneErr) console.error('[nurture] complete update failed:', enrollment.id, doneErr)
       } else {
-        const nextDelay = steps[nextStepIndex]?.delay_hours || 24
-        await supabase.from('nurture_enrollment').update({
+        // Skriv next_action_at (kolumnen getDueEnrollments filtrerar på) — INTE
+        // next_step_at som inte finns → update kastade tyst och enrollmenten
+        // fastnade "due" och re-processades varje körning. Sekvenssteg anger
+        // delay i DAGAR (delay_days); delay_hours som fallback.
+        const step = steps[nextStepIndex]
+        const delayMs = step?.delay_days != null
+          ? step.delay_days * 24 * 60 * 60 * 1000
+          : (step?.delay_hours || 24) * 60 * 60 * 1000
+        const { error: advErr } = await supabase.from('nurture_enrollment').update({
           current_step: nextStepIndex,
-          next_step_at: new Date(Date.now() + nextDelay * 60 * 60 * 1000).toISOString(),
+          next_action_at: new Date(Date.now() + delayMs).toISOString(),
         }).eq('id', enrollment.id)
+        if (advErr) console.error('[nurture] advance update failed:', enrollment.id, advErr)
       }
     }
 

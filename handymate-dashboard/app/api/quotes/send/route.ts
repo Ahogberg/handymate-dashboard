@@ -6,6 +6,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { sendApprovalPush } from '@/lib/notifications/approval-push'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -322,6 +323,20 @@ export async function POST(request: NextRequest) {
         console.error('[quotes/send] Failed to update quote status:', statusErr)
         return NextResponse.json({ error: 'Godkännande skapad men offertens status kunde inte uppdateras' }, { status: 500 })
       }
+
+      // Notifiera admin via push — annars skapades en high-risk approval helt
+      // tyst (ingen template + ingen push) och offerten fastnade utan att någon
+      // visste att den väntade på godkännande. Fire-and-forget.
+      void sendApprovalPush({
+        business_id: quote.business_id,
+        approval_type: 'four_eyes_quote',
+        payload: {
+          quote_id: quoteId,
+          quote_title: quote.title,
+          quote_total: quoteTotal,
+          requested_by: currentUser?.name || 'Användare',
+        },
+      })
 
       return NextResponse.json({
         requires_approval: true,

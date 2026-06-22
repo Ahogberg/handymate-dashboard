@@ -59,6 +59,14 @@ function buildPushTemplate(
   payload: Record<string, any>,
 ): PushTemplate | null {
   switch (approvalType) {
+    case 'four_eyes_quote': {
+      return {
+        title: `Offert kräver godkännande — ${formatKr(payload.quote_total)}`,
+        body: `${truncate(payload.quote_title || 'Offert', 40)} (begärd av ${payload.requested_by || 'kollega'}) väntar på ditt godkännande`,
+        url: payload.quote_id ? `/dashboard/quotes/${payload.quote_id}` : '/dashboard/approvals',
+      }
+    }
+
     case 'ata_signed_notification': {
       const name = payload.signed_by_name || 'Kund'
       const ataNumber = payload.ata_number ?? ''
