@@ -235,7 +235,19 @@ async function handleSendSms(
 
   message = message.replace(/\{\{business_name\}\}/g, business?.business_name || 'Handymate')
 
-  const to = (context.phone as string) || (context.customer_phone as string)
+  let to = (context.phone as string) || (context.customer_phone as string)
+  // Många event (lead_received, threshold-regler m.fl.) bär bara customer_id,
+  // inte telefonnummer. Slå då upp numret så SMS-regler faktiskt kan skickas
+  // i stället för att tyst dead-letter:a på "inget telefonnummer".
+  if (!to && context.customer_id) {
+    const { data: cust } = await supabase
+      .from('customer')
+      .select('phone_number')
+      .eq('business_id', businessId)
+      .eq('customer_id', context.customer_id as string)
+      .maybeSingle()
+    to = (cust?.phone_number as string) || ''
+  }
   if (!to) {
     return { success: false, error: 'Inget telefonnummer i kontext' }
   }

@@ -16,6 +16,7 @@ export async function seedAllDefaults(
 ) {
   const results = await Promise.allSettled([
     seedAutomationRules(supabase, businessId),
+    seedV3AutomationRules(supabase, businessId),
     seedLeadScoringRules(supabase, businessId),
     seedPipelineStages(supabase, businessId),
     seedQuoteStandardTexts(supabase, businessId, branch),
@@ -43,6 +44,106 @@ async function seedAutomationRules(supabase: SupabaseClient, businessId: string)
   if (existing && existing.length > 0) return
 
   await supabase.rpc('seed_automation_rules', { p_business_id: businessId })
+}
+
+/**
+ * Seedar default-regler i v3_automation_rules — den LEVANDE automationsmotorn
+ * (fireEvent + evaluate-thresholds-cron). Utan dessa får nya företag noll
+ * automationer. Posture: snabbsvar mot kund auto-skickas; allt som rör pengar
+ * (fakturapåminnelse) kräver godkännande. Alla respekterar arbetstider/nattläge.
+ */
+async function seedV3AutomationRules(supabase: SupabaseClient, businessId: string) {
+  const { data: existing } = await supabase
+    .from('v3_automation_rules')
+    .select('id')
+    .eq('business_id', businessId)
+    .eq('is_system', true)
+    .limit(1)
+
+  if (existing && existing.length > 0) return
+
+  const rules: Array<{
+    name: string
+    description: string
+    trigger_type: string
+    trigger_config: Record<string, unknown>
+    action_type: string
+    action_config: Record<string, unknown>
+    requires_approval: boolean
+  }> = [
+    {
+      name: 'Snabbsvar på ny lead',
+      description: 'Skickar ett tack-SMS direkt när en ny förfrågan kommer in.',
+      trigger_type: 'event',
+      trigger_config: { event_name: 'lead_received' },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej {{customer_name}}! Tack för din förfrågan till {{business_name}}. Vi återkommer så snart vi kan.' },
+      requires_approval: false,
+    },
+    {
+      name: 'Svar på missat samtal',
+      description: 'SMS:ar tillbaka automatiskt när ett samtal missas.',
+      trigger_type: 'event',
+      trigger_config: { event_name: 'call_missed' },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej! Vi missade tyvärr ditt samtal till {{business_name}} men återkommer så snart vi kan.' },
+      requires_approval: false,
+    },
+    {
+      name: 'Följ upp skickad offert',
+      description: 'Skapar en uppföljningspåminnelse 3 dagar efter att en offert skickats.',
+      trigger_type: 'event',
+      trigger_config: { event_name: 'quote_sent' },
+      action_type: 'schedule_followup',
+      action_config: { days_until: 3, description: 'Följ upp skickad offert' },
+      requires_approval: false,
+    },
+    {
+      name: 'Kund öppnade offert',
+      description: 'Notifierar dig när en kund öppnar sin offert — bra läge att höra av sig.',
+      trigger_type: 'event',
+      trigger_config: { event_name: 'quote_opened' },
+      action_type: 'notify_owner',
+      action_config: { title: 'Kund tittar på offerten', body: 'En kund har precis öppnat sin offert. Passa på att höra av dig medan den är aktuell.' },
+      requires_approval: false,
+    },
+    {
+      name: 'Påminn om förfallen faktura',
+      description: 'Föreslår en betalningspåminnelse när en faktura är 7+ dagar försenad. Kräver ditt godkännande innan den skickas.',
+      trigger_type: 'threshold',
+      trigger_config: { entity: 'invoice', field: 'days_overdue', operator: '>=', value: 7 },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej! En vänlig påminnelse om en faktura från {{business_name}} som har förfallit. Hör gärna av dig om du har frågor.' },
+      requires_approval: true,
+    },
+    {
+      name: 'Be om recension efter avslutat jobb',
+      description: 'Skapar en påminnelse att be kunden om ett omdöme dagen efter att ett jobb avslutats.',
+      trigger_type: 'event',
+      trigger_config: { event_name: 'job_completed' },
+      action_type: 'schedule_followup',
+      action_config: { days_until: 1, description: 'Be kunden om en recension' },
+      requires_approval: false,
+    },
+  ]
+
+  await supabase.from('v3_automation_rules').insert(
+    rules.map((r, i) => ({
+      id: `v3r_${businessId}_${i}`,
+      business_id: businessId,
+      name: r.name,
+      description: r.description,
+      is_active: true,
+      is_system: true,
+      trigger_type: r.trigger_type,
+      trigger_config: r.trigger_config,
+      action_type: r.action_type,
+      action_config: r.action_config,
+      requires_approval: r.requires_approval,
+      respects_work_hours: true,
+      respects_night_mode: true,
+    }))
+  )
 }
 
 async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string) {
