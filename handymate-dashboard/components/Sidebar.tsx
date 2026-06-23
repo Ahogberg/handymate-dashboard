@@ -88,6 +88,7 @@ const NAV: NavItem[] = [
       { label: 'Offerter', href: '/dashboard/quotes' },
       { label: 'Projekt', href: '/dashboard/projects' },
       { label: 'Fakturor', href: '/dashboard/invoices' },
+      { label: 'ROT/RUT till Skatteverket', href: '/dashboard/invoices/rot-payment' },
       { label: 'Dokument', href: '/dashboard/documents' },
     ],
   },
@@ -479,7 +480,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
   const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound'])
-  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
+  const HIDDEN_CHILDREN_FOR_EMPLOYEE = new Set(['/dashboard/invoices', '/dashboard/invoices/rot-payment', '/dashboard/settings', '/dashboard/settings/my-prices', '/dashboard/settings/pricelist', '/dashboard/billing', '/dashboard/settings?tab=team', '/dashboard/automations', '/dashboard/settings/quote-templates', '/dashboard/settings/quote-texts', '/dashboard/orders', '/dashboard/campaigns', '/dashboard/website', '/dashboard/analytics'])
 
   function filterNavForRole(items: NavItem[]): NavItem[] {
     if (!isEmployee) return items
