@@ -382,6 +382,12 @@ export default function StorefrontClient({
                 {link.label}
               </button>
             ))}
+            <a
+              href={`/site/${storefront.slug}/boka`}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              Boka tid
+            </a>
             {phone && (
               <a
                 href={`tel:${phone.replace(/\s/g, '')}`}
