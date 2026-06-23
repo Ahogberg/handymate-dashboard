@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Download, AlertTriangle, Check, Info } from 'lucide-react'
+import { ArrowLeft, Download, AlertTriangle, Check, Info, FileUp } from 'lucide-react'
 import { validateInvoiceForSkv } from '@/lib/skv/validate-rot-request'
 import { categoriesForType } from '@/lib/skv/categories'
 
@@ -43,6 +43,8 @@ export default function RotPaymentPage() {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<RowType | null>(null)
 
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -52,6 +54,18 @@ export default function RotPaymentPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  const importDecision = useCallback(async (file: File) => {
+    setImportMsg('Läser beslutsfil…')
+    try {
+      const text = await file.text()
+      const res = await fetch('/api/rot-payment/import-decision', { method: 'POST', body: text })
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) setImportMsg(j.error || 'Kunde inte läsa beslutsfilen')
+      else setImportMsg(`Beslut inläst: ${j.approved} godkända, ${j.rejected} avslagna, ${j.matched} matchade${j.unmatched ? `, ${j.unmatched} ej matchade` : ''}.`)
+      load()
+    } catch { setImportMsg('Något gick fel vid inläsning') }
+  }, [load])
 
   if (loading) return <div className="p-8 text-gray-400">Laddar…</div>
 
@@ -68,6 +82,17 @@ export default function RotPaymentPage() {
       <div className="ml-11 mb-6 flex items-start gap-2 p-3 bg-sky-50 border border-sky-200 rounded-xl text-sm text-sky-800">
         <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
         <span>Ladda upp den genererade XML-filen i Skatteverkets e-tjänst <strong>&quot;Rot och rut – företag&quot;</strong> och logga in med BankID. ROT och RUT laddas upp som separata filer.</span>
+      </div>
+
+      <div className="ml-11 mb-6 flex flex-wrap items-center gap-3 p-3 bg-white border border-gray-200 rounded-xl text-sm">
+        <FileUp className="w-4 h-4 text-gray-400" />
+        <span className="text-gray-600">Har du fått ett <strong>beslut</strong> från Skatteverket? Läs in JSON-filen för att stämma av godkänt/avslaget:</span>
+        <label className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg cursor-pointer text-gray-700 font-medium">
+          Välj beslutsfil
+          <input type="file" accept=".json,application/json" className="hidden"
+            onChange={ev => { const f = ev.target.files?.[0]; if (f) importDecision(f) }} />
+        </label>
+        {importMsg && <span className="text-emerald-700">{importMsg}</span>}
       </div>
 
       {!data?.org_number && (
