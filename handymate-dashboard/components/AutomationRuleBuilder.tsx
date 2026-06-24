@@ -34,7 +34,6 @@ const EVENT_GROUPS = [
       { value: 'sms_received', label: 'Inkommande SMS' },
       { value: 'call_missed', label: 'Missat samtal' },
       { value: 'pipeline_stage_changed', label: 'Lead bytte steg i pipeline' },
-      { value: 'customer_reactivation', label: 'Kund inaktiv 6+ månader' },
     ],
   },
   {
@@ -48,7 +47,6 @@ const EVENT_GROUPS = [
   {
     label: 'Jobb & bokningar',
     options: [
-      { value: 'booking_created', label: 'Bokning skapad' },
       { value: 'job_completed', label: 'Jobb avslutat' },
     ],
   },

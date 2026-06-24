@@ -1011,6 +1011,23 @@ async function executeApprovalPayload(
         }
       }
 
+      case 'automation': {
+        // En v3-automationsregel med requires_approval skapar denna approval och
+        // lägger rule_action_type/rule_action_config i payloaden. Utan detta case
+        // föll den till default → no-op (åtgärden utfördes ALDRIG vid godkännande).
+        const pl = payload as any
+        const actionType = pl.rule_action_type
+        if (!actionType) {
+          return { action: 'automation', acknowledged: true, note: 'Ingen åtgärd i payload' }
+        }
+        const { runApprovedAutomationAction } = await import('@/lib/automation-engine')
+        const supabaseAuto = getServerSupabase()
+        const res = await runApprovedAutomationAction(
+          supabaseAuto, businessId, actionType, (pl.rule_action_config || {}) as Record<string, unknown>, pl,
+        )
+        return { action: 'automation', action_type: actionType, ...res }
+      }
+
       default: {
         // Smart fallback: om payload har SMS-data → skicka SMS
         const pl = payload as any

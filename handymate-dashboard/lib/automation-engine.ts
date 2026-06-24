@@ -328,12 +328,19 @@ async function handleSendSms(
 }
 
 async function handleSendEmail(
-  _supabase: SupabaseClient,
+  supabase: SupabaseClient,
   businessId: string,
   config: Record<string, unknown>,
   context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
-  const to = (context.email as string) || (context.customer_email as string)
+  let to = (context.email as string) || (context.customer_email as string)
+  // Slå upp e-post från customer_id om context saknar den (parallellt med SMS-
+  // handlern) — annars är email-regler en no-op för de flesta triggers.
+  if (!to && context.customer_id) {
+    const { data: cust } = await supabase
+      .from('customer').select('email').eq('business_id', businessId).eq('customer_id', context.customer_id as string).maybeSingle()
+    to = (cust?.email as string) || ''
+  }
   if (!to) return { success: false, error: 'Ingen e-postadress i kontext' }
 
   const subject = (config.subject as string) || 'Meddelande'
@@ -615,13 +622,19 @@ async function handleScheduleFollowup(
 
   const description = (config.description as string) || 'Uppföljning schemalagd'
 
+  // OBS: inbox_item har kolumnerna inbox_item_id (PK, ingen default), channel
+  // (NOT NULL), customer_id, summary, status, related_id — INTE type/title/
+  // description/priority/scheduled_at. Den gamla insertet failade alltid tyst →
+  // inga uppföljningar skapades. (Tabellen saknar scheduled_at → datum i summary.)
   const { error: insertErr } = await supabase.from('inbox_item').insert({
+    inbox_item_id: 'inbox_' + Math.random().toString(36).slice(2, 11),
     business_id: businessId,
-    type: 'followup',
-    title: description,
-    description: `Automatisk uppföljning från regel. Kontext: ${JSON.stringify(context).substring(0, 500)}`,
-    priority: 'medium',
-    scheduled_at: followupDate.toISOString(),
+    channel: 'followup',
+    customer_id: (context.customer_id as string) || null,
+    summary: `${description} (senast ${followupDate.toLocaleDateString('sv-SE')})`,
+    status: 'new',
+    related_id: (context.entity_id as string) || (context.lead_id as string) || (context.quote_id as string) || null,
+    created_at: new Date().toISOString(),
   })
   if (insertErr) console.error('[automation-engine] Failed to create followup:', insertErr.message)
 
@@ -747,6 +760,21 @@ async function executeAction(
     default:
       return { success: false, error: `Okänd åtgärdstyp: ${actionType}` }
   }
+}
+
+/**
+ * Kör en automationsåtgärd som skjutits upp för godkännande. Anropas av
+ * approvals-routen när en 'automation'-approval godkänns — utan denna var
+ * godkännandet en no-op (åtgärden utfördes aldrig).
+ */
+export async function runApprovedAutomationAction(
+  supabase: SupabaseClient,
+  businessId: string,
+  actionType: string,
+  actionConfig: Record<string, unknown>,
+  context: ExecutionContext,
+): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
+  return executeAction(supabase, businessId, actionType, actionConfig, context, 'Godkänd automation')
 }
 
 // ── Public API ──────────────────────────────────────────
@@ -1044,20 +1072,24 @@ async function queryThresholdEntities(
         const cutoffDate = new Date(now)
         cutoffDate.setMonth(cutoffDate.getMonth() - value)
 
-        // Find customers whose latest booking/project is older than cutoff
+        // Kunder vars senaste jobb är äldre än cutoff. OBS: kolumnen job_status
+        // finns INTE — använd last_job_date (sätts av lib/customer-ltv.ts). Tidigare
+        // failade queryn tyst → reaktiveringsregler fyrade aldrig.
+        const cutoffDay = cutoffDate.toISOString().slice(0, 10)
         const { data } = await supabase
           .from('customer')
-          .select('customer_id, name, phone_number, email, updated_at')
+          .select('customer_id, name, phone_number, email, last_job_date')
           .eq('business_id', businessId)
-          .eq('job_status', 'completed')
-          .lte('updated_at', cutoffDate.toISOString())
+          .not('last_job_date', 'is', null)
+          .lte('last_job_date', cutoffDay)
 
         return (data || []).map((c: Record<string, unknown>) => ({
           id: c.customer_id,
+          customer_id: c.customer_id,
           customer_name: c.name,
           phone: c.phone_number,
           email: c.email,
-          months_since_last_job: Math.floor((now.getTime() - new Date(c.updated_at as string).getTime()) / (30 * 24 * 60 * 60 * 1000)),
+          months_since_last_job: Math.floor((now.getTime() - new Date(c.last_job_date as string).getTime()) / (30 * 24 * 60 * 60 * 1000)),
         }))
       }
       return []
