@@ -300,9 +300,10 @@ Basera svaret enbart på faktiska mönster. Om otillräcklig data — returnera 
       return { success: false, error: 'Invalid JSON from Claude' }
     }
 
-    // Upserta till business_preferences
+    // Upserta till ai_learned_preferences (egen tabell — key/value-tabellen
+    // business_preferences har inte dessa sammanfattningskolumner).
     const { error: upsertError } = await supabase
-      .from('business_preferences')
+      .from('ai_learned_preferences')
       .upsert(
         {
           business_id: businessId,

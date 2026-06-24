@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
     let learnedPreferences: any = null
     try {
       const { data: prefs } = await supabase
-        .from('business_preferences')
+        .from('ai_learned_preferences')
         .select('communication_tone, pricing_tendency, lead_response_style, preferred_sms_length, custom_preferences')
         .eq('business_id', businessId)
         .maybeSingle()

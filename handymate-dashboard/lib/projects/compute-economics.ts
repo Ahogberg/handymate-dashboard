@@ -319,6 +319,19 @@ export async function computeProjectEconomics(
     if (s.billable_to_customer) materialBillable += v
   }
 
+  // Material registrerat via materials-UI (project_material) — saknades helt i
+  // marginalberäkningen förut (bara supplier_invoices räknades) → material_inkop
+  // blev 0 och marginalen uppblåst. Inköp = total_purchase, fakturerbart = total_sell.
+  const { data: projectMaterials } = await supabase
+    .from('project_material')
+    .select('total_purchase, total_sell')
+    .eq('business_id', businessId)
+    .eq('project_id', projectId)
+  for (const m of (projectMaterials || []) as Array<{ total_purchase: number | null; total_sell: number | null }>) {
+    materialInkop += Number(m.total_purchase || 0)
+    materialBillable += Number(m.total_sell || 0)
+  }
+
   // ── 6. Project cost (manuella kostnader: UE, övrigt) ─────────
   // project_cost (sql/easoft_parity.sql:48) — användarinmatade kostnader
   // utöver tid och leverantörsfakturor. Återinfört i Etapp 2.3 efter att
