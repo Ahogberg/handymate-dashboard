@@ -458,7 +458,7 @@ export async function GET(
   if (filter === 'all' || filter === 'leads') {
     const { data: dealRows } = await supabase
       .from('deal')
-      .select('id, title, deal_number, stage_id, value, created_at, stage:pipeline_stage(label)')
+      .select('id, title, deal_number, stage_id, value, created_at, stage:pipeline_stage(name)')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
@@ -471,7 +471,7 @@ export async function GET(
         title: `Ärende #${d.deal_number || d.id.slice(0, 6)} skapat`,
         description: `${d.title}${d.value ? ` — ${formatSEK(d.value)}` : ''}`,
         timestamp: d.created_at,
-        metadata: { deal_id: d.id, deal_number: d.deal_number, stage: (d.stage as any)?.label, value: d.value },
+        metadata: { deal_id: d.id, deal_number: d.deal_number, stage: (d.stage as any)?.name, value: d.value },
       })
     }
 

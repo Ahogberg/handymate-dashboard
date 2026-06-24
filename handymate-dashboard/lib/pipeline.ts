@@ -223,8 +223,8 @@ export async function createDealFromCall(params: {
 }): Promise<Deal> {
   const supabase = getServerSupabase()
 
-  // Get lead stage
-  const leadStage = await getStageBySlug(params.businessId, 'lead')
+  // Get lead stage (V28-slug är 'new_inquiry', inte 'lead')
+  const leadStage = await getStageBySlug(params.businessId, 'new_inquiry')
   if (!leadStage) throw new Error('Lead stage not found')
 
   // Find or reference customer
@@ -314,7 +314,7 @@ export async function getPipelineStats(businessId: string): Promise<{
   })
 
   const today = new Date().toISOString().split('T')[0]
-  const leadStage = stages.find((s: any) => s.slug === 'lead')
+  const leadStage = stages.find((s: any) => s.slug === 'new_inquiry')
   const wonStage = stages.find((s: any) => s.is_won)
   const lostStage = stages.find((s: any) => s.is_lost)
 

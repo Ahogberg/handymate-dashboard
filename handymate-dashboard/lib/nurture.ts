@@ -374,7 +374,7 @@ export async function processEnrollmentStep(enrollmentId: string): Promise<{
   // Try to get deal/quote context if available
   if (enrollment.deal_id) {
     const { data: deal } = await supabase
-      .from('pipeline_deal')
+      .from('deal')
       .select('title, value')
       .eq('id', enrollment.deal_id)
       .single()
@@ -596,7 +596,7 @@ async function escalateCompletedSequence(params: {
       description: `Uppföljningssekvensen "${sequenceName}" slutfördes utan att kunden svarade. Ring eller besök kunden för personlig kontakt.`,
       priority: 'high',
       status: 'pending',
-      suggested_data: {
+      action_data: {
         reason: 'nurture_sequence_completed_without_conversion',
         sequence_name: sequenceName,
         sequence_id: params.sequenceId,

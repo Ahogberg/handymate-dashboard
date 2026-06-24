@@ -95,6 +95,30 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
+  // Idempotens: Stripe levererar minst-en-gång och retriar. Hoppa över om
+  // eventet redan bearbetats — annars dubbla referral-belöningar/notiser.
+  const { data: alreadyProcessed } = await supabase
+    .from('billing_event').select('id').eq('stripe_event_id', event.id).maybeSingle()
+  if (alreadyProcessed) {
+    console.log('[Billing] event redan bearbetat, hoppar över:', event.id)
+    return
+  }
+
+  // Leads-addon-köp: uppdatera INTE subscription_plan (annars nedgraderas
+  // kundens riktiga plan till 'starter'). Sätt addon-fälten och hoppa över
+  // plan-uppdatering + referral (det är inte en första-betalning).
+  if (session.metadata?.addon === 'leads') {
+    const tier = session.metadata?.tier || null
+    await supabase.from('business_config')
+      .update({ leads_addon: true, leads_addon_tier: tier, stripe_customer_id: session.customer as string })
+      .eq('business_id', businessId)
+    await supabase.from('billing_event').insert({
+      business_id: businessId, event_type: 'leads_addon_activated', stripe_event_id: event.id,
+      data: { tier, customer_id: session.customer },
+    })
+    return
+  }
+
   const updates: Record<string, any> = {
     stripe_customer_id: session.customer as string,
     subscription_plan: planId || 'starter',

@@ -178,7 +178,7 @@ export async function processCallForPipeline(params: {
         await moveDeal({
           dealId: deal.id,
           businessId: params.businessId,
-          toStageSlug: 'accepted',
+          toStageSlug: 'quote_accepted',
           triggeredBy: 'ai',
           aiConfidence: analysis.intentConfidence,
           aiReason: analysis.reasoning,

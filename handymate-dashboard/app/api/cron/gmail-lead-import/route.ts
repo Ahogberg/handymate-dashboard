@@ -169,15 +169,11 @@ export async function GET(request: NextRequest) {
           // Stage 1: Haiku first-pass
           const likelyLead = await isLikelyLead(emailInput, approvedSenders, blockedSenders)
 
-          // Record in idempotency table (even non-leads, so we never re-process)
-          await supabase.from('gmail_imported_message').insert({
-            id: msg.id,
-            business_id: businessId,
-            was_lead: likelyLead,
-            lead_id: null,
-          })
-
           if (!likelyLead) {
+            // Icke-lead: registrera i idempotens-tabellen direkt (inget lead att tappa).
+            await supabase.from('gmail_imported_message').insert({
+              id: msg.id, business_id: businessId, was_lead: false, lead_id: null,
+            })
             // Mark as read so it doesn't appear in next run's unread query
             await gmail.users.messages.modify({
               userId: 'me',
@@ -187,6 +183,9 @@ export async function GET(request: NextRequest) {
             skipped++
             continue
           }
+          // OBS: för LEADS registreras idempotensen FÖRST efter att leadet skapats
+          // (nedan) — tidigare skedde det här, så ett insert-fel konsumerade mailet
+          // och leadet tappades permanent.
 
           // Stage 2: Sonnet full parse
           const leadData = await parseLeadFromEmail(emailInput)
@@ -212,9 +211,10 @@ export async function GET(request: NextRequest) {
           // Create customer if new
           if (!customerId && leadData.name) {
             const customerNumber = await getNextCustomerNumber(supabase, businessId)
-            const { data: newCustomer } = await supabase
+            const { data: newCustomer, error: custErr } = await supabase
               .from('customer')
               .insert({
+                customer_id: 'cust_' + Math.random().toString(36).slice(2, 11),
                 business_id: businessId,
                 name: leadData.name,
                 email: leadData.email || null,
@@ -225,6 +225,7 @@ export async function GET(request: NextRequest) {
               })
               .select('customer_id')
               .single()
+            if (custErr) console.error('[gmail-lead-import] customer insert error:', custErr.message)
 
             customerId = newCustomer?.customer_id || null
           }
@@ -235,9 +236,10 @@ export async function GET(request: NextRequest) {
             : subject.slice(0, 80)
 
           const leadNumber = await getNextLeadNumber(supabase, businessId)
-          const { data: newLead } = await supabase
+          const { data: newLead, error: leadErr } = await supabase
             .from('leads')
             .insert({
+              lead_id: 'lead_' + Math.random().toString(36).slice(2, 11),
               business_id: businessId,
               customer_id: customerId,
               name: leadData.name || leadData.email || 'Okänd',
@@ -255,12 +257,22 @@ export async function GET(request: NextRequest) {
             })
             .select('lead_id')
             .single()
+          if (leadErr) console.error('[gmail-lead-import] lead insert error:', leadErr.message)
 
           const leadId = newLead?.lead_id || null
+
+          // Registrera idempotens FÖRST när leadet faktiskt skapats. Misslyckas
+          // det (leadId null) lämnas mailet oläst → re-processas nästa körning.
+          if (leadId) {
+            await supabase.from('gmail_imported_message').insert({
+              id: msg.id, business_id: businessId, was_lead: true, lead_id: leadId,
+            })
+          }
 
           // Log lead activity
           if (leadId) {
             await supabase.from('lead_activities').insert({
+              activity_id: 'act_' + Math.random().toString(36).slice(2, 11),
               lead_id: leadId,
               business_id: businessId,
               activity_type: 'created',
@@ -282,9 +294,10 @@ export async function GET(request: NextRequest) {
               if (savedAttachments.length > 0 && leadId) {
                 const fileList = savedAttachments.map((a) => `• ${a.filename}`).join('\n')
                 await supabase.from('lead_activities').insert({
+                  activity_id: 'act_' + Math.random().toString(36).slice(2, 11),
                   lead_id: leadId,
                   business_id: businessId,
-                  activity_type: 'note',
+                  activity_type: 'note_added',
                   description: `${savedAttachments.length} bilaga(r) hämtades automatiskt från Gmail:\n${fileList}`,
                 })
               }

@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getDueEnrollments } from '@/lib/nurture'
-import { getServerSupabase } from '@/lib/supabase'
-import { triggerAgentInternal, makeIdempotencyKey } from '@/lib/agent-trigger'
+import { getDueEnrollments, processEnrollmentStep } from '@/lib/nurture'
 
 /**
- * Cron job: Process due nurture-enrollments via AI agent.
- * Keeps: Finding due enrollments, enrollment state management.
- * Delegates: Message composition and sending to AI agent.
+ * Cron job: bearbeta förfallna nurture-enrollments.
+ * Använder processEnrollmentStep (interpolerar mall + skickar SMS/email +
+ * avancerar steg + slutför/eskalerar). Tidigare gick cronen via embed-joins
+ * (som failade pga saknade FK) + en agent-väg → INGET skickades.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -25,87 +24,25 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const supabase = getServerSupabase()
-    const today = new Date().toISOString().split('T')[0]
-
-    // Group by business
-    const byBusiness = new Map<string, Array<{ enrollment: any; customer: any; step: any }>>()
-
+    let sent = 0, completed = 0, failed = 0
     for (const enrollment of dueEnrollments) {
-      // Get enrollment details for agent context
-      const { data: details } = await supabase
-        .from('nurture_enrollment')
-        .select(`
-          id, business_id, customer_id, current_step, status,
-          customer:customer_id (name, phone_number, email),
-          sequence:sequence_id (name, steps)
-        `)
-        .eq('id', enrollment.id)
-        .single()
-
-      if (!details || !details.customer) continue
-
-      const steps = (details.sequence as any)?.steps || []
-      const currentStep = steps[details.current_step] || null
-      if (!currentStep) continue
-
-      const list = byBusiness.get(details.business_id) || []
-      list.push({
-        enrollment: details,
-        customer: details.customer,
-        step: currentStep,
-      })
-      byBusiness.set(details.business_id, list)
-
-      // Advance enrollment state
-      const nextStepIndex = details.current_step + 1
-      if (nextStepIndex >= steps.length) {
-        const { error: doneErr } = await supabase.from('nurture_enrollment').update({
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-        }).eq('id', enrollment.id)
-        if (doneErr) console.error('[nurture] complete update failed:', enrollment.id, doneErr)
-      } else {
-        // Skriv next_action_at (kolumnen getDueEnrollments filtrerar på) — INTE
-        // next_step_at som inte finns → update kastade tyst och enrollmenten
-        // fastnade "due" och re-processades varje körning. Sekvenssteg anger
-        // delay i DAGAR (delay_days); delay_hours som fallback.
-        const step = steps[nextStepIndex]
-        const delayMs = step?.delay_days != null
-          ? step.delay_days * 24 * 60 * 60 * 1000
-          : (step?.delay_hours || 24) * 60 * 60 * 1000
-        const { error: advErr } = await supabase.from('nurture_enrollment').update({
-          current_step: nextStepIndex,
-          next_action_at: new Date(Date.now() + delayMs).toISOString(),
-        }).eq('id', enrollment.id)
-        if (advErr) console.error('[nurture] advance update failed:', enrollment.id, advErr)
+      try {
+        const res = await processEnrollmentStep(enrollment.id)
+        if (!res.success) { failed++; continue }
+        if (res.action === 'completed_and_escalated') completed++
+        else sent++
+      } catch (e) {
+        failed++
+        console.error('[nurture] processEnrollmentStep error:', enrollment.id, e)
       }
-    }
-
-    // Trigger agent per business
-    let agentTriggered = 0
-    for (const [businessId, items] of Array.from(byBusiness)) {
-      const stepList = items.map((item: any) => {
-        const c = item.customer as any
-        return `- Kund: ${c?.name || 'Okänd'}, telefon: ${c?.phone_number || 'saknas'}, email: ${c?.email || 'saknas'}. Kanal: ${item.step.channel || 'sms'}. Mall: "${item.step.template || item.step.message || 'Uppföljningsmeddelande'}"`
-      }).join('\n')
-
-      const result = await triggerAgentInternal(
-        businessId,
-        'cron',
-        {
-          cron_type: 'nurture',
-          instruction: `Bearbeta nurture-steg: skicka personliga meddelanden till följande kunder. Anpassa tonen efter mallen men gör det naturligt:\n\n${stepList}`,
-        },
-        makeIdempotencyKey('nurture', businessId, today, String(items.length))
-      )
-      if (result.success) agentTriggered++
     }
 
     return NextResponse.json({
       success: true,
       processed: dueEnrollments.length,
-      agent_triggered: agentTriggered,
+      sent,
+      completed,
+      failed,
     })
   } catch (error: any) {
     console.error('Nurture cron error:', error)

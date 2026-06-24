@@ -3,6 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { sendSmsViaElks } from '@/lib/sms-send'
+import { checkSmsAllowance, trackSmsSent } from '@/lib/sms-usage'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -97,10 +99,19 @@ export async function POST(request: NextRequest) {
     // Get sender name from business_config
     const { data: biz } = await supabase
       .from('business_config')
-      .select('business_name')
+      .select('business_name, subscription_plan')
       .eq('business_id', businessId)
       .single()
     const senderName = biz?.business_name || 'Handymate'
+    const plan = (biz?.subscription_plan || 'starter') as any
+
+    // Kvotkontroll: kampanjutskick räknades INTE mot SMS-kvoten förut → kunde
+    // blasta obegränsat. Stoppa om kvoten är slut.
+    const allowance = await checkSmsAllowance(businessId, plan)
+    if (!allowance.allowed) {
+      return NextResponse.json({ error: 'SMS-kvoten är slut för månaden — uppgradera planen för fler SMS.' }, { status: 429 })
+    }
+
     let deliveredCount = 0
     let failedCount = 0
 
@@ -126,10 +137,22 @@ export async function POST(request: NextRequest) {
         continue
       }
 
-      const result = await sendSMS(recipient.phone_number, campaign.message, senderName)
+      // Använd kanoniska sändaren → loggar till sms_log (kampanjer var osynliga
+      // för analytics/audit förut då lokala sendSMS inte loggade).
+      const result = await sendSmsViaElks({
+        supabase,
+        businessId,
+        businessName: senderName,
+        to: recipient.phone_number,
+        message: campaign.message,
+        customerId: recipient.customer_id || null,
+        relatedId: campaignId,
+        messageType: 'campaign',
+      })
 
       if (result.success) {
         deliveredCount++
+        await trackSmsSent(businessId, plan) // räkna mot kvoten
         await supabase
           .from('sms_campaign_recipient')
           .update({
