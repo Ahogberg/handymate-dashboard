@@ -198,7 +198,7 @@ export async function POST(
           await moveDeal({
             dealId: deal.id,
             businessId: quote.business_id,
-            toStageSlug: 'accepted',
+            toStageSlug: 'quote_accepted',
             triggeredBy: 'system',
           })
         }

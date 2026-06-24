@@ -136,7 +136,7 @@ async function runPostPaymentAutomations(
         await moveDeal({
           dealId: deal.id,
           businessId,
-          toStageSlug: 'paid',
+          toStageSlug: 'won',
           triggeredBy: 'user',
           aiReason: 'Manuell betal-markering',
         })

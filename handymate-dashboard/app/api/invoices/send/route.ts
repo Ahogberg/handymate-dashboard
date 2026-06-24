@@ -247,7 +247,9 @@ export async function POST(request: NextRequest) {
             await moveDeal({
               dealId: deal.id,
               businessId: business.business_id,
-              toStageSlug: 'invoiced',
+              // Ingen 'invoiced'-stage finns; fakturan är skickad men inte betald
+              // → håll dealen i 'quote_accepted'. 'won' triggas vid betalning.
+              toStageSlug: 'quote_accepted',
               triggeredBy: 'system',
             })
           }

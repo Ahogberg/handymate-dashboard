@@ -142,6 +142,21 @@ export async function moveDeal(params: {
 
   if (deal.stage_id === toStage.id) return // Already in this stage
 
+  // Riktningsskydd: systemutlösta övergångar får ALDRIG flytta en deal bakåt
+  // (utom till 'lost'). Annars kan en sen händelse — t.ex. "projekt slutfört"
+  // eller "faktura skickad" som mappar till 'quote_accepted' — dra tillbaka en
+  // redan vunnen deal. Användarens manuella drag tillåts korrigera åt båda håll.
+  if (params.triggeredBy !== 'user' && !toStage.is_lost) {
+    const { data: fromStage } = await supabase
+      .from('pipeline_stage')
+      .select('sort_order')
+      .eq('id', deal.stage_id)
+      .maybeSingle()
+    if (fromStage && typeof fromStage.sort_order === 'number' && toStage.sort_order < fromStage.sort_order) {
+      return // bakåtflytt blockerad för icke-användare
+    }
+  }
+
   // Update deal
   const updateData: any = {
     stage_id: toStage.id,
@@ -363,13 +378,42 @@ export async function findDealByQuote(businessId: string, quoteId: string): Prom
 
 export async function findDealByInvoice(businessId: string, invoiceId: string): Promise<Deal | null> {
   const supabase = getServerSupabase()
-  const { data } = await supabase
+
+  // 1. Direktlänk på deal.invoice_id.
+  const { data: direct } = await supabase
     .from('deal')
     .select('*')
     .eq('business_id', businessId)
     .eq('invoice_id', invoiceId)
-    .single()
-  return data
+    .maybeSingle()
+  if (direct) return direct
+
+  // 2. Fallback via offert-kedjan: invoice.quote_id → deal.quote_id.
+  //    INGEN kodväg sätter deal.invoice_id vid fakturaskapande (from-quote/
+  //    from-project/auto-invoice m.fl.), så utan detta hittar varken faktura-
+  //    skickad eller faktura-betald sin deal → offert-baserade deals fastnar i
+  //    'quote_accepted' och når ALDRIG 'won' när fakturan betalas (fel win-rate
+  //    + intäktsstatistik). Self-heal:ar genom att persistera kopplingen.
+  const { data: inv } = await supabase
+    .from('invoice')
+    .select('quote_id')
+    .eq('invoice_id', invoiceId)
+    .eq('business_id', businessId)
+    .maybeSingle()
+
+  if (inv?.quote_id) {
+    const deal = await findDealByQuote(businessId, inv.quote_id)
+    if (deal) {
+      await supabase
+        .from('deal')
+        .update({ invoice_id: invoiceId })
+        .eq('id', deal.id)
+        .eq('business_id', businessId)
+      return { ...deal, invoice_id: invoiceId }
+    }
+  }
+
+  return null
 }
 
 export async function getAutomationSettings(businessId: string) {

@@ -79,7 +79,7 @@ export async function PATCH(
             await moveDeal({
               dealId: deal.id,
               businessId: business.business_id,
-              toStageSlug: 'paid',
+              toStageSlug: 'won',
               triggeredBy: 'system',
             })
           }

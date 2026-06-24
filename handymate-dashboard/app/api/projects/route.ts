@@ -582,7 +582,10 @@ export async function PUT(request: NextRequest) {
           await moveDeal({
             dealId: linkedDeal.id,
             businessId: business.business_id,
-            toStageSlug: 'invoiced',
+            // Ingen 'invoiced'-stage finns; projekt klart men betalning kvarstår
+            // → 'quote_accepted'. Riktningsskyddet i moveDeal hindrar att en
+            // redan vunnen deal dras tillbaka. 'won' triggas vid betalning.
+            toStageSlug: 'quote_accepted',
             triggeredBy: 'system',
             aiReason: 'Projekt markerat som slutfört',
           })

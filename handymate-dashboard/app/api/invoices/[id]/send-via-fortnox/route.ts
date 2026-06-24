@@ -333,7 +333,9 @@ async function runPostSendAutomations(
         await moveDeal({
           dealId: deal.id,
           businessId,
-          toStageSlug: 'invoiced',
+          // Ingen 'invoiced'-stage finns; faktura skickad men ej betald
+          // → håll i 'quote_accepted'. 'won' triggas vid betalning.
+          toStageSlug: 'quote_accepted',
           triggeredBy: 'system',
         })
       }
