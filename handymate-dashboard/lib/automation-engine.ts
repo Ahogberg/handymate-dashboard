@@ -1014,23 +1014,25 @@ async function queryThresholdEntities(
     }
 
     case 'booking': {
-      // hours_until: bookings happening within X hours
+      // hours_until: bokningar inom X timmar.
+      // OBS: kolumnen heter scheduled_start (INTE start_time) och title/address
+      // finns inte på booking → den gamla queryn frågade obefintliga kolumner och
+      // returnerade alltid tomt, så bokningspåminnelser fyrade ALDRIG.
       if (field === 'hours_until') {
         const maxTime = new Date(now.getTime() + value * 60 * 60 * 1000)
         const { data } = await supabase
           .from('booking')
-          .select('booking_id, customer_id, start_time, title, address')
+          .select('booking_id, customer_id, scheduled_start, notes')
           .eq('business_id', businessId)
           .eq('status', 'confirmed')
-          .gte('start_time', now.toISOString())
-          .lte('start_time', maxTime.toISOString())
+          .gte('scheduled_start', now.toISOString())
+          .lte('scheduled_start', maxTime.toISOString())
 
         return (data || []).map((b: Record<string, unknown>) => ({
           id: b.booking_id,
           customer_id: b.customer_id,
-          time: b.start_time,
-          title: b.title,
-          address: b.address,
+          time: b.scheduled_start,
+          title: b.notes,
         }))
       }
       return []

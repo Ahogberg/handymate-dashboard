@@ -37,6 +37,15 @@ interface AutomationTemplate {
   defaultTiming?: string
   previewText?: string
   requiresIntegration?: string // Visas grått om ej konfigurerad
+  /** Om satt: mallen kan aktiveras med ett klick (skapar v3-regeln). Endast satt
+   *  för mallar vars trigger+action är VERIFIERAT att motorn faktiskt kör. */
+  activation?: {
+    trigger_type: 'event' | 'threshold' | 'cron'
+    trigger_config: Record<string, unknown>
+    action_type: string
+    action_config: Record<string, unknown>
+    requires_approval?: boolean
+  }
 }
 
 const CATEGORIES = [
@@ -88,6 +97,12 @@ const TEMPLATES: AutomationTemplate[] = [
     matchRuleNames: ['Offertuppföljning dag 5', 'quote_followup_day1', 'quote_follow_up', 'Följ upp skickad offert'],
     defaultTiming: 'dag 5',
     previewText: 'Hej! Vi skickade en offert för 5 dagar sedan. Har du hunnit titta på den?',
+    activation: {
+      trigger_type: 'threshold',
+      trigger_config: { entity: 'quote', field: 'days_since_sent', operator: '>=', value: 5 },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej {{customer_name}}! Vi skickade en offert för några dagar sedan — har du hunnit titta på den? Hör gärna av dig vid frågor. /{{business_name}}' },
+    },
   },
   {
     key: 'quote_followup_10',
@@ -117,6 +132,12 @@ const TEMPLATES: AutomationTemplate[] = [
     matchRuleNames: ['Fakturapåminnelse dag 1', 'invoice_reminder_day1', 'Fakturapåminnelse'],
     defaultTiming: 'dag 1',
     previewText: 'Hej! Din faktura förföll igår. Vänligen betala så snart du kan.',
+    activation: {
+      trigger_type: 'threshold',
+      trigger_config: { entity: 'invoice', field: 'days_overdue', operator: '>=', value: 1 },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej {{customer_name}}! En vänlig påminnelse om en faktura från {{business_name}} som förfallit. Hör av dig om du har frågor.' },
+    },
   },
   {
     key: 'invoice_escalation',
@@ -174,9 +195,15 @@ const TEMPLATES: AutomationTemplate[] = [
     title: 'Bokningspåminnelse 24h innan',
     description: 'Kunden får en påminnelse dagen innan bokad tid',
     category: 'bookings',
-    matchRuleNames: ['Bokningspåminnelse', 'booking_reminder', 'appointment_reminder'],
+    matchRuleNames: ['Bokningspåminnelse 24h innan', 'Bokningspåminnelse', 'booking_reminder', 'appointment_reminder'],
     defaultTiming: '24 timmar innan',
     previewText: 'Hej! Påminnelse om din bokade tid imorgon. Välkommen!',
+    activation: {
+      trigger_type: 'threshold',
+      trigger_config: { entity: 'booking', field: 'hours_until', operator: '<=', value: 24 },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej {{customer_name}}! En påminnelse om din bokade tid hos {{business_name}} imorgon. Hör av dig om du behöver ändra.' },
+    },
   },
   {
     key: 'job_report',
@@ -328,6 +355,7 @@ export default function AutomationsPage() {
   const [showBuilder, setShowBuilder] = useState(false)
   const [editRule, setEditRule] = useState<AutomationRule | null>(null)
   const [toggling, setToggling] = useState<string | null>(null)
+  const [activating, setActivating] = useState<string | null>(null)
   const [expandedTemplate, setExpandedTemplate] = useState<string | null>(null)
 
   const fetchRules = useCallback(async () => {
@@ -355,6 +383,33 @@ export default function AutomationsPage() {
       }
     } catch { /* ignore */ }
     setToggling(null)
+  }
+
+  // Aktivera en mall = skapa v3-regeln (med mallens titel som namn så den matchas
+  // tillbaka till mallen) och uppdatera listan så toggeln dyker upp.
+  const activateTemplate = async (tmpl: AutomationTemplate) => {
+    if (!tmpl.activation) return
+    setActivating(tmpl.key)
+    try {
+      const res = await fetch('/api/automation/rules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: tmpl.title,
+          description: tmpl.description,
+          trigger_type: tmpl.activation.trigger_type,
+          trigger_config: tmpl.activation.trigger_config,
+          action_type: tmpl.activation.action_type,
+          action_config: tmpl.activation.action_config,
+          requires_approval: tmpl.activation.requires_approval ?? false,
+        }),
+      })
+      if (res.ok) {
+        const created = await res.json()
+        setRules(prev => [...prev, created])
+      }
+    } catch { /* ignore */ }
+    setActivating(null)
   }
 
   // Build a map: template key → matched rule
@@ -478,9 +533,17 @@ export default function AutomationsPage() {
                               <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1 italic">
                                 {tmpl.requiresIntegration}
                               </span>
+                            ) : tmpl.activation ? (
+                              <button
+                                onClick={() => activateTemplate(tmpl)}
+                                disabled={activating === tmpl.key}
+                                className="text-xs font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 px-3 py-1.5 rounded-lg shrink-0 mt-1 disabled:opacity-50"
+                              >
+                                {activating === tmpl.key ? 'Aktiverar…' : 'Aktivera'}
+                              </button>
                             ) : (
-                              <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1">
-                                Ej aktiverad
+                              <span className="text-xs text-gray-400 bg-gray-50 px-2.5 py-1 rounded-lg shrink-0 mt-1 italic">
+                                Kommer snart
                               </span>
                             )}
                           </div>
