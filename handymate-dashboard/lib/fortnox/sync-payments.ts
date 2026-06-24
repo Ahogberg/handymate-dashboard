@@ -59,7 +59,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
   // Fakturor att synka: har Fortnox-kopplat ID + ej slutbehandlad i Handymate
   const { data: invoices, error } = await supabase
     .from('invoice')
-    .select('invoice_id, business_id, status, fortnox_invoice_number, fortnox_document_number, due_date, customer_id, total, total_amount')
+    .select('invoice_id, business_id, status, fortnox_invoice_number, fortnox_document_number, due_date, customer_id, total')
     .eq('business_id', businessId)
     .not('fortnox_invoice_number', 'is', null)
     .not('status', 'in', '(paid,cancelled)')
@@ -97,7 +97,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
             const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
             await sendPortalNotification(businessId, inv.customer_id, 'invoice_paid', {
               context: {
-                amount: inv.total ?? inv.total_amount ?? null,
+                amount: inv.total ?? null,
                 invoice_number: inv.fortnox_invoice_number || inv.invoice_id,
               },
             })

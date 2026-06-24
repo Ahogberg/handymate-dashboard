@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         {
           recording_id,
           transcript,
-          phone_number: recording.phone_from || recording.phone_to || '',
+          phone_number: recording.phone_number || '',
           duration_seconds: recording.duration_seconds || 0,
           direction: recording.direction || 'inbound',
         },

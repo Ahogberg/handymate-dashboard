@@ -36,7 +36,7 @@ export async function POST(
     // Hämta faktura
     const { data: invoice, error: fetchErr } = await supabase
       .from('invoice')
-      .select('invoice_id, status, customer_id, fortnox_invoice_number, total, total_amount')
+      .select('invoice_id, status, customer_id, fortnox_invoice_number, total')
       .eq('invoice_id', invoiceId)
       .eq('business_id', business.business_id)
       .single()
@@ -70,7 +70,7 @@ export async function POST(
     if (invoice.fortnox_invoice_number) {
       const connected = await isFortnoxConnected(business.business_id)
       if (connected) {
-        const amount = Number(body?.amount ?? invoice.total ?? invoice.total_amount ?? 0)
+        const amount = Number(body?.amount ?? invoice.total ?? 0)
         if (amount > 0) {
           fortnoxResult = await registerFortnoxPayment(
             business.business_id,
@@ -93,7 +93,7 @@ export async function POST(
         const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
         await sendPortalNotification(business.business_id, invoice.customer_id, 'invoice_paid', {
           context: {
-            amount: invoice.total ?? invoice.total_amount ?? null,
+            amount: invoice.total ?? null,
             invoice_number: invoice.fortnox_invoice_number || invoiceId,
           },
         })

@@ -262,8 +262,8 @@ export async function POST(request: NextRequest) {
       introduction_text: introduction_text || null,
       conclusion_text: conclusion_text || null,
       bankgiro_number: config?.bankgiro_number || null,
-      plusgiro: config?.plusgiro || null,
-      swish_number: config?.swish_number || null,
+      // OBS: plusgiro/swish_number finns INTE som kolumner på invoice (PDF/utskick
+      // läser betalkonton från business_config) — tidigare kastade hela inserten.
     })
     .select('invoice_id')
     .single()

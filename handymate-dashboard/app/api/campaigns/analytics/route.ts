@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
           .from('sms_log')
           .select('*', { count: 'exact', head: true })
           .eq('business_id', business.business_id)
-          .eq('direction', 'incoming')
+          .eq('direction', 'inbound')
           .gte('created_at', sentTime.toISOString())
           .lte('created_at', windowEnd.toISOString())
 

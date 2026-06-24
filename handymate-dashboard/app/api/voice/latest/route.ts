@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabase
     .from('call_recording')
-    .select('recording_id, phone_from, phone_to, direction, duration_seconds, created_at')
+    // call_recording har phone_number + direction (INTE phone_from/phone_to) —
+    // den gamla selecten failade alltid → routen svarade evigt {found:false}.
+    .select('recording_id, phone_number, direction, duration_seconds, created_at')
     .eq('business_id', auth.business_id)
     .gte('created_at', twoMinAgo)
     .order('created_at', { ascending: false })
@@ -24,11 +26,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ found: false })
   }
 
+  const inbound = data.direction !== 'outbound'
   return NextResponse.json({
     found: true,
     call: {
-      from: data.phone_from,
-      to: data.phone_to,
+      from: inbound ? data.phone_number : null,
+      to: inbound ? null : data.phone_number,
       direction: data.direction,
       duration: data.duration_seconds,
       created_at: data.created_at,

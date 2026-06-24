@@ -581,7 +581,7 @@ async function executeApprovalPayload(
             assigned_user_id: memberId,
           }).eq('booking_id', ctxId)
         } else if (ctxType === 'work_order' && ctxId) {
-          await supabaseDispatch.from('work_order').update({
+          await supabaseDispatch.from('work_orders').update({
             assigned_to: memberName,
           }).eq('id', ctxId)
         }

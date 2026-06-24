@@ -709,7 +709,7 @@ async function qualifyLead(
       .single()
     if (recording) {
       transcript = recording.transcript || recording.transcript_summary || ''
-      phone = phone || recording.phone_from || recording.phone_to || ''
+      phone = phone || recording.phone_number || ''
       source = 'vapi_call'
     }
   }
