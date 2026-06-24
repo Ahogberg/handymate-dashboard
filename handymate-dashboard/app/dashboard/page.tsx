@@ -206,7 +206,7 @@ export default function DashboardPage() {
 
   // Realtime + polling: uppdatera när samtal/SMS/uppgifter/godkännanden händer
   useRealtimeRefresh({
-    tables: ['pending_approvals', 'task', 'sms_conversation', 'booking', 'customer_activity'],
+    tables: ['pending_approvals', 'task', 'sms_conversation', 'booking', 'customer_activity', 'deal'],
     businessId: business.business_id,
     onChange: () => fetchData(),
     pollIntervalMs: 30_000,
@@ -639,13 +639,14 @@ export default function DashboardPage() {
             <span className="capitalize">
               {new Date().toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })}
             </span>
-            {teamSummaryText && (
-              <>
-                {' · '}
-                <span>{teamSummaryText}</span>
-              </>
-            )}
           </p>
+          {/* "Vad gjorde teamet åt dig" — lyft från grå bisats till tydligt bevis-band */}
+          {teamSummaryText && (
+            <div className="mt-3 px-4 py-3 rounded-xl bg-primary-50 border border-primary-100 flex items-center gap-2">
+              <span className="text-base">⚡</span>
+              <p className="text-sm sm:text-base font-semibold text-primary-800">{teamSummaryText}</p>
+            </div>
+          )}
         </div>
 
         {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h.

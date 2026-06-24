@@ -167,6 +167,15 @@ const TEMPLATES: AutomationTemplate[] = [
     category: 'relations',
     matchRuleNames: ['Reaktivering 6 månader', 'reaktivering', 'reactivation', 'inactive_customer'],
     defaultTiming: '6 månader',
+    activation: {
+      trigger_type: 'threshold',
+      trigger_config: { entity: 'customer', field: 'months_since_last_job', operator: '>=', value: 6 },
+      action_type: 'send_sms',
+      action_config: { template: 'Hej {{customer_name}}! Det var ett tag sedan vi hördes. Hör gärna av dig om du behöver hjälp med något — vi finns här. /{{business_name}}' },
+      // Kräver godkännande: reaktivering träffar ofta MÅNGA gamla kunder samtidigt
+      // (särskilt direkt efter en kundimport). Skapa förslag, blasta aldrig automatiskt.
+      requires_approval: true,
+    },
   },
   {
     key: 'warranty_followup',
