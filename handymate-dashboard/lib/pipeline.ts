@@ -289,6 +289,83 @@ export async function createDealFromCall(params: {
   return deal
 }
 
+/**
+ * Säkerställ att en deal finns för en offert (Golden Path för hantverkar-
+ * initierade offerter — t.ex. skapade från kundkortet utan en inkommande lead).
+ * Ordning: 1) deal redan länkad via quote_id, 2) kundens öppna deal utan offert
+ * → länka (undvik dubbletter), 3) skapa ny deal i 'quote_sent'.
+ *
+ * Skapar ALDRIG en deal utan kund — en offert utan kund är ingen pipeline-
+ * möjlighet (returnerar null). En kund läggs INTE in i pipelinen bara för att
+ * den finns; först när det finns en faktisk offert/möjlighet.
+ */
+export async function ensureDealForQuote(params: {
+  businessId: string
+  quoteId: string
+  customerId: string | null
+  title?: string | null
+  value?: number | null
+}): Promise<Deal | null> {
+  const supabase = getServerSupabase()
+
+  // 1. Redan länkad
+  const existing = await findDealByQuote(params.businessId, params.quoteId)
+  if (existing) return existing
+
+  if (!params.customerId) return null
+
+  // 2. Länka kundens senaste öppna deal som saknar offert (undvik dubbletter).
+  //    Riktningsskyddet i moveDeal hindrar att en redan vunnen deal regrederas.
+  const { data: openDeal } = await supabase
+    .from('deal')
+    .select('*')
+    .eq('business_id', params.businessId)
+    .eq('customer_id', params.customerId)
+    .is('quote_id', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (openDeal) {
+    const update: Record<string, unknown> = { quote_id: params.quoteId }
+    if (params.value != null) update.value = params.value
+    await supabase.from('deal').update(update).eq('id', openDeal.id).eq('business_id', params.businessId)
+    return { ...openDeal, quote_id: params.quoteId }
+  }
+
+  // 3. Skapa ny deal direkt i 'quote_sent' (offerten skickas just nu).
+  const sentStage = await getStageBySlug(params.businessId, 'quote_sent')
+  if (!sentStage) throw new Error("Stage 'quote_sent' not found")
+
+  const { data: deal, error } = await supabase
+    .from('deal')
+    .insert({
+      business_id: params.businessId,
+      customer_id: params.customerId,
+      quote_id: params.quoteId,
+      title: params.title || 'Offert',
+      value: params.value ?? null,
+      stage_id: sentStage.id,
+      source: 'quote',
+      priority: 'medium',
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+
+  await supabase.from('pipeline_activity').insert({
+    business_id: params.businessId,
+    deal_id: deal.id,
+    activity_type: 'deal_created',
+    description: 'Deal skapad från offert',
+    to_stage_id: sentStage.id,
+    triggered_by: 'system',
+  })
+
+  return deal
+}
+
 export async function getPipelineStats(businessId: string): Promise<{
   byStage: Array<{ stage: string; slug: string; color: string; count: number; value: number }>
   totalDeals: number

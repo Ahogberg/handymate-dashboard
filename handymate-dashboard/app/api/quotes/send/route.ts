@@ -600,19 +600,23 @@ ${suffix}`
       console.error('Portal notification quote_sent error (non-blocking):', notifErr)
     }
 
-    // Golden Path: flytta deal till "Offert skickad" automatiskt
+    // Golden Path: säkerställ att en deal finns (skapa-eller-länka) och flytta
+    // den till "Offert skickad". Tidigare flyttades bara EN redan befintlig deal
+    // → fristående offerter (skapade utan inkommande lead) syntes aldrig i
+    // pipelinen. ensureDealForQuote dedup:ar mot kundens öppna deal och skapar
+    // bara om ingen finns (aldrig utan kund).
     try {
-      const { data: linkedDeal } = await supabase
-        .from('deal')
-        .select('id')
-        .eq('business_id', business.business_id)
-        .eq('quote_id', quoteId)
-        .maybeSingle()
-
-      if (linkedDeal) {
-        const { moveDeal } = await import('@/lib/pipeline')
+      const { ensureDealForQuote, moveDeal } = await import('@/lib/pipeline')
+      const deal = await ensureDealForQuote({
+        businessId: business.business_id,
+        quoteId,
+        customerId: quote.customer_id,
+        title: quote.title,
+        value: quote.total,
+      })
+      if (deal) {
         await moveDeal({
-          dealId: linkedDeal.id,
+          dealId: deal.id,
           businessId: business.business_id,
           toStageSlug: 'quote_sent',
           triggeredBy: 'system',
