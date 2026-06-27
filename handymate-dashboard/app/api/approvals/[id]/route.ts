@@ -156,11 +156,15 @@ export async function POST(
       // auth-context via samma session som klickade Godkänn. Tidigare
       // failade alla server-side fetches med 401 → silent failure.
       const cookieHeader = request.headers.get('cookie')
+      // B2-fix (2026-06-27): mobilen autentiserar med Authorization: Bearer
+      // utan cookie → forwarda även den, annars 401 tyst på icke-SMS-actions.
+      const authHeader = request.headers.get('authorization')
       executionResult = await executeApprovalPayload(
         approvalWithPayload,
         business.business_id,
         action_overrides as Record<string, string> | undefined,
-        cookieHeader
+        cookieHeader,
+        authHeader
       )
     }
 
@@ -218,6 +222,7 @@ async function executeApprovalPayload(
   businessId: string,
   actionOverrides?: Record<string, string>,
   cookieHeader?: string | null,
+  authHeader?: string | null,
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
@@ -230,6 +235,13 @@ async function executeApprovalPayload(
   function forwardHeaders(): Record<string, string> {
     const h: Record<string, string> = { 'Content-Type': 'application/json' }
     if (cookieHeader) h['Cookie'] = cookieHeader
+    // B2-fix (2026-06-27): forwarda även Authorization — mobilen skickar Bearer
+    // utan cookie → icke-SMS-actions (send_quote/send_invoice/create_booking)
+    // failade TYST med 401 vid mobil-godkännande (status flippades till
+    // 'approved' men handlingen skedde aldrig).
+    // TD: ta bort i execution-chain Steg 6 (städning) — efter Steg 3 kör
+    // execute.ts lib direkt utan HTTP-forward → forwardHeaders blir överflödig.
+    if (authHeader) h['Authorization'] = authHeader
     return h
   }
 
