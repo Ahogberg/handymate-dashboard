@@ -39,6 +39,7 @@ import OnboardingChecklist from '@/components/OnboardingChecklist'
 import OnMyWayButton from '@/components/OnMyWayButton'
 import TeamActivityStrip, { buildSummaryText } from '@/components/TeamActivityStrip'
 import { PendingApprovalsBlock } from '@/components/dashboard/PendingApprovalsBlock'
+import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
 import IdentityPill from '@/components/IdentityPill'
 
 interface Booking {
@@ -648,6 +649,10 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Veckovärde — "Din vecka med Handymate": bekräftade kr + fångad
+            potential + sparad tid. Lyfter värdet från /dashboard/agent hit. */}
+        <WeeklyValueDigest />
 
         {/* Team Activity Strip — vad varje AI-medlem gjort senaste 24h.
             Observationer (insikter, mönster, avvikelser, förslag) renderas
