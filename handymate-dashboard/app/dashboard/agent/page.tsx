@@ -1066,7 +1066,7 @@ export default function AgentDashboardPage() {
       if (alreadyOpened) return
     } catch { /* noop */ }
 
-    fetch('/api/matte/conversations')
+    fetch('/api/matte/threads')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         const latest = data?.conversations?.[0]

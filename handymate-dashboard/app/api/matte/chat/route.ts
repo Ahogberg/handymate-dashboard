@@ -653,16 +653,15 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Thread-state ────────────────────────────────────────────────────
-    // Skapa eller hämta tråd om vi har customer/project context, eller om
-    // bilder bifogats (auto-routing + audit kräver thread). Utan något av
-    // detta kör vi i "engångsmode" med Matte som default-agent.
+    // EN tråd per konversation — ALLTID, även allmän chatt utan kund/projekt,
+    // så historiken persisteras och syns i webbens lista (gemensam historik
+    // webb+mobil). explicitThreadId → fortsätt den tråden; annars kund/projekt-
+    // tråd; annars en ny allmän tråd (getOrCreateThread skapar ny vid tom kontext).
     let thread: Awaited<ReturnType<typeof getOrCreateThread>> | null = null
-    if (customerId || projectId || explicitThreadId || hasImages) {
-      try {
-        thread = await getOrCreateThread({ businessId, customerId, projectId })
-      } catch (err) {
-        console.error('[matte/chat] thread fetch/create failed (non-blocking):', err)
-      }
+    try {
+      thread = await getOrCreateThread({ businessId, customerId, projectId, threadId: explicitThreadId })
+    } catch (err) {
+      console.error('[matte/chat] thread fetch/create failed (non-blocking):', err)
     }
     let currentAgent: AgentId = (thread?.current_agent_id as AgentId) || 'matte'
 

@@ -10,7 +10,9 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   created_at?: string
-  delegated_to?: string | null
+  /** Vilken agent som skrev (matte/lars/karin/daniel/hanna/lisa). */
+  agent?: string | null
+  is_handoff_announcement?: boolean
 }
 
 interface Conversation {
@@ -56,7 +58,7 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
   const fetchConversations = useCallback(async () => {
     setLoadingConversations(true)
     try {
-      const res = await fetch('/api/matte/conversations')
+      const res = await fetch('/api/matte/threads')
       if (res.ok) {
         const data = await res.json()
         setConversations(data.conversations || [])
@@ -72,28 +74,28 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
     setActiveId(id)
     setMessages([])
     try {
-      const res = await fetch(`/api/matte/conversations/${id}`)
+      const res = await fetch(`/api/matte/threads/${id}`)
       if (res.ok) {
         const data = await res.json()
-        setMessages(data.messages || [])
+        // Trådmeddelanden bär agent + handoff-flagga → mappa till ChatMessage.
+        setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; created_at: string; agent?: string | null; is_handoff_announcement?: boolean }) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          created_at: m.created_at,
+          agent: m.agent ?? null,
+          is_handoff_announcement: m.is_handoff_announcement,
+        })))
       }
     } catch { /* noop */ }
   }, [])
 
-  // Skapa ny konversation
-  const createNewConversation = useCallback(async (): Promise<string | null> => {
-    try {
-      const res = await fetch('/api/matte/conversations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-      if (!res.ok) return null
-      const data = await res.json()
-      const id = data.conversation?.id as string
-      if (!id) return null
-      setActiveId(id)
-      setMessages([])
-      fetchConversations()
-      return id
-    } catch { return null }
-  }, [fetchConversations])
+  // Ny konversation: rensa bara state. Tråden skapas server-side vid första
+  // skickade meddelandet (POST /api/matte/chat utan threadId → returnerar thread_id).
+  const createNewConversation = useCallback(() => {
+    setActiveId(null)
+    setMessages([])
+  }, [])
 
   // Vid öppning: ladda historik och välj senaste
   useEffect(() => {
@@ -138,22 +140,21 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
     const text = input.trim()
     if (!text || sending) return
 
-    let convId = activeId
-    if (!convId) {
-      convId = await createNewConversation()
-      if (!convId) return
-    }
-
     const userMsg: ChatMessage = { role: 'user', content: text, created_at: new Date().toISOString() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setSending(true)
 
     try {
-      const res = await fetch(`/api/matte/conversations/${convId}/messages`, {
+      // Samma motor som mobilen: servern laddar trådhistoriken själv via threadId,
+      // så vi skickar bara det nya meddelandet. Utan threadId skapas en ny tråd.
+      const res = await fetch('/api/matte/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: text }),
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: text }],
+          context: { threadId: activeId },
+        }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: 'Okänt fel' }))
@@ -161,30 +162,33 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
         return
       }
       const data = await res.json()
-      if (data.assistant_message) {
-        setMessages(prev => [...prev, {
-          id: data.assistant_message.id,
-          role: 'assistant',
-          content: data.assistant_message.content,
-          created_at: data.assistant_message.created_at,
-          delegated_to: data.assistant_message.delegated_to || null,
-        }])
-      }
+      if (data.thread_id) setActiveId(data.thread_id)
+      // Rendera HELA agent-kedjan (handoff syns) — fallback till reply om tomt.
+      const chain: Array<{ agent?: string; content: string }> = data.messages?.length
+        ? data.messages
+        : [{ agent: data.current_agent || 'matte', content: data.reply || '' }]
+      const now = new Date().toISOString()
+      setMessages(prev => [...prev, ...chain.map(m => ({
+        role: 'assistant' as const,
+        content: m.content,
+        agent: m.agent ?? null,
+        created_at: now,
+      }))])
       fetchConversations()
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Kunde inte nå servern — försök igen om en stund.', created_at: new Date().toISOString() }])
     } finally {
       setSending(false)
     }
-  }, [input, sending, activeId, createNewConversation, fetchConversations])
+  }, [input, sending, activeId, fetchConversations])
 
-  const startNew = useCallback(async () => {
-    await createNewConversation()
+  const startNew = useCallback(() => {
+    createNewConversation()
   }, [createNewConversation])
 
   const deleteConv = useCallback(async (id: string) => {
     if (!confirm('Ta bort konversationen?')) return
-    await fetch(`/api/matte/conversations/${id}`, { method: 'DELETE' })
+    await fetch(`/api/matte/threads/${id}`, { method: 'DELETE' })
     if (activeId === id) {
       setActiveId(null)
       setMessages([])
@@ -345,8 +349,8 @@ export default function MatteChatModal({ open, onClose, avatarUrl, initialPrompt
                         <div className="prose prose-sm max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0 [&_strong]:font-semibold [&_a]:text-primary-700">
                           <ReactMarkdown>{msg.content}</ReactMarkdown>
                         </div>
-                        {msg.delegated_to && (() => {
-                          const agent = getAgentById(msg.delegated_to)
+                        {msg.agent && msg.agent !== 'matte' && (() => {
+                          const agent = getAgentById(msg.agent)
                           if (!agent) return null
                           return (
                             <div className="flex items-center gap-1.5 mt-2 pt-2 border-t border-gray-100 text-[11px] text-gray-500">

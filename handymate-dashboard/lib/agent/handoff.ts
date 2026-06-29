@@ -52,9 +52,24 @@ export async function getOrCreateThread(opts: {
   businessId: string
   customerId?: string | null
   projectId?: string | null
+  threadId?: string | null
 }): Promise<AgentThread> {
   const supabase = getSupabase()
-  const { businessId, customerId, projectId } = opts
+  const { businessId, customerId, projectId, threadId } = opts
+
+  // Explicit threadId → ladda exakt den tråden (scoped business_id). Gör
+  // "fortsätt konversation" möjligt för både webb-listan och mobilen — tidigare
+  // ignorerades threadId, så varje turn utan kund/projekt skapade en NY tråd.
+  if (threadId) {
+    const { data: byId } = await supabase
+      .from('agent_threads')
+      .select('*')
+      .eq('id', threadId)
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (byId) return byId as AgentThread
+    // Hittas ej (raderad/fel id) → fall igenom och skapa ny i stället för krasch.
+  }
 
   // Första: hitta existerande aktiv tråd. Vi prioriterar customer_id-matchning;
   // project_id-matchning används bara om ingen customer-tråd finns.
