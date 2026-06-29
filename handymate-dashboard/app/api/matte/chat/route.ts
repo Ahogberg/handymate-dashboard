@@ -18,6 +18,8 @@ import {
 } from '@/lib/agent/thread-messages'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
+import { filterTools, fetchBusinessContext, type ToolContext } from '@/lib/agent/agents/shared'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -160,46 +162,23 @@ function buildContextSection(ctx: Awaited<ReturnType<typeof getBusinessContext>>
 // Tool definitions — Tier 1 + send_invoice_reminder
 // ────────────────────────────────────────────────────────────────────────────
 
-const TOOLS = [
-  {
-    name: 'send_sms',
-    description: 'Skickar ett SMS till en kund via 46elks. Använd när hantverkaren explicit ber dig kontakta en kund.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        phone: { type: 'string', description: 'Telefonnummer i format +46701234567 eller 0701234567' },
-        message: { type: 'string', description: 'SMS-meddelandet på svenska, max 160 tecken' },
-        customer_name: { type: 'string', description: 'Kundens namn för bekräftelse till hantverkaren' },
-      },
-      required: ['phone', 'message', 'customer_name'],
-    },
-  },
-  {
-    name: 'create_approval',
-    description: 'Skapar ett godkännande som hantverkaren måste bekräfta innan action utförs. Använd för känsliga actions som att skicka offerter eller fakturor.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        type: { type: 'string', description: 'Typ: send_quote, send_invoice, send_campaign, other' },
-        title: { type: 'string', description: 'Kort beskrivning som visas för hantverkaren' },
-        description: { type: 'string', description: 'Längre beskrivning av vad som kommer att hända' },
-        payload: { type: 'object', description: 'Data som behövs för att utföra actionen vid godkännande' },
-      },
-      required: ['type', 'title', 'payload'],
-    },
-  },
-  {
-    name: 'send_invoice_reminder',
-    description: 'Skickar en betalningspåminnelse för en förfallen faktura. Använd invoice_id från AKTUELL AFFÄRSSTATUS.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        invoice_id: { type: 'string', description: 'Internt ID på fakturan (från affärsstatus)' },
-        invoice_number: { type: 'string', description: 'Fakturanummer för bekräftelse, t.ex. FV-2026-031' },
-      },
-      required: ['invoice_id', 'invoice_number'],
-    },
-  },
+// Kurerad delmängd av de DELADE verktygen (agent/trigger/tool-definitions) —
+// samma ENDA auditerade implementation som den autonoma agenten kör, så de kan
+// aldrig driva isär. Uteslutna: rent autonoma (trigger_fortnox_sync,
+// log/get_automation_*), trasiga update_business_preference, och agent-messaging
+// (chatten använder handoff_to_agent istället).
+const CURATED_TOOL_NAMES = [
+  'get_customer', 'search_customers', 'create_customer', 'update_customer',
+  'create_quote', 'get_quotes', 'create_invoice',
+  'check_calendar', 'create_booking', 'update_project', 'log_time',
+  'send_sms', 'send_email', 'read_customer_emails',
+  'qualify_lead', 'update_lead_status', 'get_lead', 'search_leads',
+  'get_daily_stats', 'create_approval_request', 'check_pending_approvals',
+  'get_project_profitability', 'get_pricing_suggestion', 'check_fortnox_status',
+]
+
+const TOOLS: any[] = [
+  ...filterTools(CURATED_TOOL_NAMES),
   {
     name: 'navigate',
     description: 'Navigerar användaren till en specifik sida. Använd när hantverkaren vill öppna en sida eller när det är naturligt efter en action.',
@@ -210,18 +189,6 @@ const TOOLS = [
         reason: { type: 'string', description: 'Kort förklaring varför vi navigerar dit' },
       },
       required: ['path'],
-    },
-  },
-  {
-    name: 'create_quote_draft',
-    description: 'Skapar ett tomt offert-utkast och navigerar hantverkaren till redigeringsvyn. Använd när hantverkaren vill skapa en ny offert.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        customer_id: { type: 'string', description: 'ID på kunden offerten gäller (lämna tom om okänd)' },
-        title: { type: 'string', description: 'Offertens titel/beskrivning' },
-      },
-      required: ['title'],
     },
   },
   {
@@ -265,6 +232,12 @@ interface ToolResult {
   action?: { type: string; target?: string; approval_id?: string }
 }
 
+/**
+ * @deprecated EJ längre anropad. Verktygsexekveringen går nu genom den delade
+ * tool-router:n (executeSharedTool) — denna lokala kopia (med dess gamla
+ * send_sms/create_approval/send_invoice_reminder) ersattes i hopslagning Stage 1.
+ * Behålls tillfälligt; tas bort i städning (Stage 3).
+ */
 async function executeTool(
   toolName: string,
   toolInput: Record<string, any>,
@@ -429,8 +402,8 @@ async function callClaude(opts: {
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
+      model: 'claude-sonnet-4-6',
+      max_tokens: 2048,
       system: opts.system,
       tools: TOOLS,
       messages: opts.messages,
@@ -494,7 +467,7 @@ ${outOfScope}
 
 VID HANDOFF: Var transparent men kort. Använd handoff_to_agent-verktyget — säg inte "Hej, jag är X" till användaren, det säger nästa agent. Skriv en kort context_for_next_agent så nästa agent kan svara direkt utan att fråga om.
 
-Du har också tillgång till verktyg för SMS, godkännanden, fakturor, navigering och offert-utkast. Använd dem bara om frågan ligger inom ditt expertområde.${imageBlock}
+Du har tillgång till verktyg för kunder, offerter (skapa riktiga offerter med ROT/RUT), fakturor, bokningar, kalender, tidrapporter, leads, SMS, e-post och navigering. Använd dem för att faktiskt UTFÖRA det hantverkaren ber om — men bara inom ditt expertområde.${imageBlock}
 
 Var vänlig, professionell och effektiv. Använd du-tilltal.`
 }
@@ -522,9 +495,10 @@ async function runAgentTurn(opts: {
   systemArray: any[]
   initialMessages: any[]
   businessId: string
-  userCookie: string | null
+  supabase: ReturnType<typeof getServerSupabase>
+  toolContext: ToolContext
 }): Promise<AgentTurnResult> {
-  const MAX_TOOL_ITERATIONS = 3
+  const MAX_TOOL_ITERATIONS = 5
   let response = await callClaude({
     apiKey: opts.apiKey,
     system: opts.systemArray,
@@ -558,12 +532,19 @@ async function runAgentTurn(opts: {
       }
     }
 
-    // Standard tool-execution för andra tools
+    // navigate är ett rent UI-verktyg (ingen server-effekt). Allt annat går genom
+    // den DELADE tool-router:n — samma auditerade implementation som den autonoma
+    // agenten, mot supabase/lib direkt (inga interna HTTP-anrop → ingen auth-
+    // forward behövs, B2-klassen försvinner).
     const toolResults = await Promise.all(
       toolUseBlocks.map(async (block: any) => {
-        const result = await executeTool(block.name, block.input || {}, opts.businessId, opts.userCookie)
-        if (result.action) finalAction = result.action
-        return { type: 'tool_result', tool_use_id: block.id, content: result.result }
+        if (block.name === 'navigate') {
+          finalAction = { type: 'navigate', target: block.input?.path || '' }
+          return { type: 'tool_result', tool_use_id: block.id, content: `Navigerar till ${block.input?.path || ''}` }
+        }
+        const r: any = await executeSharedTool(block.name, block.input || {}, opts.supabase, opts.businessId, opts.toolContext as any)
+        const content = r?.error ? `Fel: ${r.error}` : JSON.stringify(r?.data ?? r)
+        return { type: 'tool_result', tool_use_id: block.id, content }
       })
     )
 
@@ -661,7 +642,15 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const userCookie = request.headers.get('cookie')
+    // Verktygskontext för de delade tool-router-verktygen (samma som den
+    // autonoma agenten) — ger bl.a. Google-koppling för kalender/bokning.
+    const supabase = getServerSupabase()
+    const bizCtx = await fetchBusinessContext(supabase, businessId)
+    const toolContext: ToolContext = bizCtx?.toolContext ?? {
+      businessName,
+      contactEmail: '',
+      googleConnection: null,
+    }
 
     // ── Thread-state ────────────────────────────────────────────────────
     // Skapa eller hämta tråd om vi har customer/project context, eller om
@@ -829,7 +818,8 @@ export async function POST(request: NextRequest) {
         systemArray,
         initialMessages: outerMessages,
         businessId,
-        userCookie,
+        supabase,
+        toolContext,
       })
 
       if (turn.action && !finalAction) finalAction = turn.action
