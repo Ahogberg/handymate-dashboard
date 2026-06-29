@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 export const maxDuration = 30
 
 export async function POST(request: NextRequest) {
   try {
+    // Auth: annars kan vem som helst bränna OpenAI Whisper-krediter.
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       return NextResponse.json(

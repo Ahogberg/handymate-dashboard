@@ -17,6 +17,7 @@ import {
   type ThreadImage,
 } from '@/lib/agent/thread-messages'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { getAuthenticatedBusiness } from '@/lib/auth'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -598,9 +599,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'messages krävs' }, { status: 400 })
     }
 
+    // Auth: härled businessId från token (Bearer/cookie) — lita ALDRIG på
+    // context.businessId från bodyn (annars korstenant-läcka: vem som helst
+    // kunde läsa/agera mot valfritt företag). Mobilen autentiserar med Bearer.
+    const business = await getAuthenticatedBusiness(request)
+    if (!business) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const userName = context?.userName || 'hantverkaren'
     const businessName = context?.businessName || 'företaget'
-    const businessId = context?.businessId
+    const businessId = business.business_id
     // Optionella thread-params — bakåtkompat: utan dessa beter sig endpoint
     // som tidigare (Matte tar varje meddelande, ingen thread skapas).
     const customerId: string | null = context?.customerId || null
