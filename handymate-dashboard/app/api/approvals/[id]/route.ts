@@ -693,6 +693,9 @@ async function executeApprovalPayload(
         const supabasePC = await getSupabase()
         await supabasePC.from('v3_automation_logs').insert({
           business_id: businessId,
+          // Attribuera till agenten som föreslog (Hanna proaktiv säljmotor) så
+          // den syns i per-agent-scoreboardet; null för icke-agent-flöden.
+          agent_id: pl.agent || null,
           rule_name: 'proactive_customer_care',
           trigger_type: 'approval_executed',
           action_type: 'send_sms',
