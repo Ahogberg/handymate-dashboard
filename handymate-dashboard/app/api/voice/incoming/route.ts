@@ -204,7 +204,8 @@ export async function POST(request: NextRequest) {
       // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)
       return NextResponse.json({
         play: `${APP_URL}/api/voice/greeting?business_id=${business.business_id}`,
-        whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+        // handled=1: call_missed redan fyrat ovan → voice/missed ska INTE dubbla det.
+        whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`,
       })
     }
 

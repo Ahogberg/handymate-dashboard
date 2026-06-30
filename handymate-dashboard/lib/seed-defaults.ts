@@ -76,7 +76,7 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
       trigger_type: 'event',
       trigger_config: { event_name: 'call_missed' },
       action_type: 'send_sms',
-      action_config: { template: 'Hej! Vi missade tyvärr ditt samtal till {{business_name}} men återkommer så snart vi kan.' },
+      action_config: { template: 'Hej! Vi missade tyvärr ditt samtal till {{business_name}}. Svara på detta SMS med vad du behöver hjälp med, så återkommer vi direkt — eller ringer upp så snart vi kan.' },
       requires_approval: false,
     },
     {
