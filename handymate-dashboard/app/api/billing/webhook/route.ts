@@ -11,6 +11,16 @@ function getStripe() {
   })
 }
 
+/** Unix-sekunder → ISO, eller null om värdet saknas/ogiltigt. Skyddar mot att
+ *  new Date(undefined*1000).toISOString() kastar (current_period_* flyttade till
+ *  subscription items i nyare API-versioner → kan vara undefined). */
+function toIsoOrNull(unixSeconds: unknown): string | null {
+  const n = Number(unixSeconds)
+  if (!n || !isFinite(n)) return null
+  const d = new Date(n * 1000)
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
 /**
  * POST /api/billing/webhook - Stripe webhook handler
  * Ingen auth -- Stripe skickar webhooks direkt.
@@ -230,10 +240,16 @@ async function updateSubscriptionData(
 
   const updates: Record<string, any> = {
     subscription_status: billingStatus,
-    billing_period_start: new Date((subscription as any).current_period_start * 1000).toISOString(),
-    billing_period_end: new Date((subscription as any).current_period_end * 1000).toISOString(),
     stripe_subscription_id: subscription.id
   }
+
+  // Guardat: kastar aldrig om current_period_* saknas → handlern 500:ar inte →
+  // ingen Stripe-retry-loop. Status persisteras alltid (det är det viktiga;
+  // billing_period_* är bara informativt och används inte i gating).
+  const periodStart = toIsoOrNull((subscription as any).current_period_start)
+  const periodEnd = toIsoOrNull((subscription as any).current_period_end)
+  if (periodStart) updates.billing_period_start = periodStart
+  if (periodEnd) updates.billing_period_end = periodEnd
 
   if (planId) {
     updates.subscription_plan = planId
