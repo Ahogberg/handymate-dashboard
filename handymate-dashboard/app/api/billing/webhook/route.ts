@@ -52,6 +52,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
+    // Idempotens (centralt för ALLA event-typer): Stripe levererar minst-en-gång
+    // och retriar. Varje handler loggar en billing_event med stripe_event_id — om
+    // raden redan finns har vi bearbetat eventet → hoppa över (annars dubbla
+    // notiser/referral-belöningar/loggrader). Race-skydd: unikt index i sql/v64.
+    const { data: alreadyProcessed } = await supabase
+      .from('billing_event')
+      .select('id')
+      .eq('stripe_event_id', event.id)
+      .maybeSingle()
+    if (alreadyProcessed) {
+      console.log('[Billing] event redan bearbetat, hoppar över:', event.id)
+      return NextResponse.json({ received: true, duplicate: true })
+    }
+
     switch (event.type) {
       case 'checkout.session.completed': {
         await handleCheckoutCompleted(supabase, event, stripe)
@@ -105,14 +119,7 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
-  // Idempotens: Stripe levererar minst-en-gång och retriar. Hoppa över om
-  // eventet redan bearbetats — annars dubbla referral-belöningar/notiser.
-  const { data: alreadyProcessed } = await supabase
-    .from('billing_event').select('id').eq('stripe_event_id', event.id).maybeSingle()
-  if (alreadyProcessed) {
-    console.log('[Billing] event redan bearbetat, hoppar över:', event.id)
-    return
-  }
+  // (Idempotens hanteras nu centralt i POST innan dispatch.)
 
   // Leads-addon-köp: uppdatera INTE subscription_plan (annars nedgraderas
   // kundens riktiga plan till 'starter'). Sätt addon-fälten och hoppa över
