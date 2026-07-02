@@ -49,8 +49,9 @@ export async function POST(
     }
 
     // For edit action: merge edited_payload into original payload
+    // edited: true stämplas så streak-räkningen (förtjänad autonomi) inte räknar korrigerade förslag som blind tillit.
     const finalPayload = action === 'edit'
-      ? { ...approval.payload, ...edited_payload }
+      ? { ...approval.payload, ...edited_payload, edited: true }
       : approval.payload
 
     // Update status
@@ -451,14 +452,14 @@ async function executeApprovalPayload(
         const { grantAutonomy, isAllowlistedKey } = await import('@/lib/autonomy/earned-autonomy')
         const key = payload.autonomy_key
         if (!isAllowlistedKey(key)) {
-          return { action: 'autonomy_offer', error: `Okänd autonomi-nyckel: ${String(key)}` }
+          return { action: 'autonomy_offer', ok: false, error: `Okänd autonomi-nyckel: ${String(key)}` }
         }
         const supabaseAO = (await import('@/lib/supabase')).getServerSupabase()
         try {
           await grantAutonomy(supabaseAO, businessId, key)
-          return { action: 'autonomy_offer', granted: true, autonomy_key: key }
+          return { action: 'autonomy_offer', ok: true, granted: true, autonomy_key: key }
         } catch (err: any) {
-          return { action: 'autonomy_offer', error: err?.message || 'Kunde inte spara' }
+          return { action: 'autonomy_offer', ok: false, error: err?.message || 'Kunde inte spara' }
         }
       }
 
