@@ -119,6 +119,24 @@ export async function POST(
       // Non-blocking — learning event failure should not break approval flow
     }
 
+    // Förtjänad autonomi (non-blocking): godkännande av allowlistad typ kan
+    // trigga erbjudande vid 15 raka; avvisning nedgraderar + nollar streak
+    // (streaken nollas implicit — den avvisade raden ligger nu i historiken).
+    try {
+      const { autonomyKeyFromApproval, maybeCreateOffer, revokeAutonomy } =
+        await import('@/lib/autonomy/earned-autonomy')
+      const autonomyKeyForRow = autonomyKeyFromApproval(approval)
+      if (autonomyKeyForRow) {
+        if (action === 'approve') {
+          await maybeCreateOffer(supabase, business.business_id, autonomyKeyForRow)
+        } else if (action === 'reject') {
+          await revokeAutonomy(supabase, business.business_id, autonomyKeyForRow)
+        }
+      }
+    } catch (autonomyErr) {
+      console.error('[approvals] earned-autonomy hook error (non-blocking):', autonomyErr)
+    }
+
     // Reject-side-effect för specifika types som behöver mer än status-flip
     if (action === 'reject' && approval.approval_type === 'lead_review') {
       const leadId = (approval.payload as Record<string, unknown>)?.lead_id as string | undefined
@@ -425,6 +443,23 @@ async function executeApprovalPayload(
         })
         const r = await classifyResponse(res)
         return { action: 'create_booking', ...r }
+      }
+
+      case 'autonomy_offer': {
+        // Beviljar förtjänad autonomi för en åtgärdstyp. Ingen extern effekt —
+        // endast settings-skrivning (låg risk). Kräver att sql/v65 är körd.
+        const { grantAutonomy, isAllowlistedKey } = await import('@/lib/autonomy/earned-autonomy')
+        const key = payload.autonomy_key
+        if (!isAllowlistedKey(key)) {
+          return { action: 'autonomy_offer', error: `Okänd autonomi-nyckel: ${String(key)}` }
+        }
+        const supabaseAO = (await import('@/lib/supabase')).getServerSupabase()
+        try {
+          await grantAutonomy(supabaseAO, businessId, key)
+          return { action: 'autonomy_offer', granted: true, autonomy_key: key }
+        } catch (err: any) {
+          return { action: 'autonomy_offer', error: err?.message || 'Kunde inte spara' }
+        }
       }
 
       case 'review_request': {
