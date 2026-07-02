@@ -9,6 +9,7 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { deriveAutonomyKey, isAutonomous as isAutonomyGranted } from '@/lib/autonomy/earned-autonomy'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -852,12 +853,31 @@ export async function executeRule(
     (typedRule.action_type === 'create_booking' && settings.require_approval_create_booking)
   const needsApproval = typedRule.requires_approval || globalApproval
 
-  if (needsApproval && typedRule.action_type !== 'create_approval') {
+  // Förtjänad autonomi: om regeln mappar till en allowlistad nyckel OCH
+  // hantverkaren beviljat autonomi för den → hoppa över approval-grenen och
+  // fall igenom till exekvering (steg 7). Markera i context för logg/digest.
+  const autonomyKey = deriveAutonomyKey(typedRule)
+  let autonomousBypass = false
+  if (needsApproval && autonomyKey) {
+    try {
+      autonomousBypass = await isAutonomyGranted(supabase, typedRule.business_id, autonomyKey)
+    } catch { autonomousBypass = false }
+  }
+  if (autonomousBypass) context.earned_autonomy = true
+
+  if (needsApproval && !autonomousBypass && typedRule.action_type !== 'create_approval') {
     const approvalResult = await handleCreateApproval(supabase, typedRule.business_id, {
       title: typedRule.name,
       description: typedRule.description || '',
       approval_type: 'automation',
-    }, { ...context, rule_id: ruleId, rule_action_type: typedRule.action_type, rule_action_config: typedRule.action_config })
+    }, {
+      ...context,
+      rule_id: ruleId,
+      rule_action_type: typedRule.action_type,
+      rule_action_config: typedRule.action_config,
+      // Stämpla nyckeln → streak-räkning kan mappa raden (autonomyKeyFromApproval)
+      ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
+    })
 
     await logExecution(supabase, {
       businessId: typedRule.business_id,
@@ -887,6 +907,22 @@ export async function executeRule(
   )
 
   const status: LogStatus = result.success ? 'success' : 'failed'
+
+  // Förtjänad autonomi: ett autonomt utskick som failar får inte svälta tyst —
+  // hantverkaren har delegerat och måste få veta när delegationen fallerar.
+  if (status === 'failed' && context.earned_autonomy === true) {
+    try {
+      await fetch(`${APP_URL}/api/push/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          business_id: typedRule.business_id,
+          title: 'Självständig åtgärd misslyckades',
+          body: `${typedRule.name} kunde inte utföras — kontrollera i loggen.`,
+        }),
+      })
+    } catch { /* non-blocking */ }
+  }
 
   // 8. Log execution
   await logExecution(supabase, {
