@@ -863,7 +863,9 @@ export async function executeRule(
       autonomousBypass = await isAutonomyGranted(supabase, typedRule.business_id, autonomyKey)
     } catch { autonomousBypass = false }
   }
-  if (autonomousBypass) context.earned_autonomy = true
+  // Muta ALDRIG caller-ägda context (fireEvent delar payload-objektet över
+  // regler i loopen) — härled en lokal kopia för den autonoma vägen.
+  const execContext = autonomousBypass ? { ...context, earned_autonomy: true } : context
 
   if (needsApproval && !autonomousBypass && typedRule.action_type !== 'create_approval') {
     const approvalResult = await handleCreateApproval(supabase, typedRule.business_id, {
@@ -902,7 +904,7 @@ export async function executeRule(
     typedRule.business_id,
     typedRule.action_type,
     typedRule.action_config,
-    context,
+    execContext,
     typedRule.name
   )
 
@@ -910,7 +912,7 @@ export async function executeRule(
 
   // Förtjänad autonomi: ett autonomt utskick som failar får inte svälta tyst —
   // hantverkaren har delegerat och måste få veta när delegationen fallerar.
-  if (status === 'failed' && context.earned_autonomy === true) {
+  if (status === 'failed' && autonomousBypass) {
     try {
       await fetch(`${APP_URL}/api/push/send`, {
         method: 'POST',
@@ -919,6 +921,7 @@ export async function executeRule(
           business_id: typedRule.business_id,
           title: 'Självständig åtgärd misslyckades',
           body: `${typedRule.name} kunde inte utföras — kontrollera i loggen.`,
+          url: '/dashboard/automations',
         }),
       })
     } catch { /* non-blocking */ }
@@ -932,7 +935,7 @@ export async function executeRule(
     triggerType: typedRule.trigger_type,
     actionType: typedRule.action_type,
     status,
-    context,
+    context: execContext,
     result: result.data,
     errorMessage: result.error,
   })
