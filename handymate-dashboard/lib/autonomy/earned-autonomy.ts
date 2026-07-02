@@ -221,7 +221,9 @@ export async function maybeCreateOffer(
     approval_type: 'autonomy_offer',
     title: `Låt ${meta.agentName} sköta ${meta.label} själv?`,
     description: `Du har godkänt de ${streak} senaste ${meta.label}na utan ändringar. Godkänner du detta skickas de automatiskt framöver — du ser allt i loggen och kan alltid ta tillbaka ratten under Förtroendetrappan.`,
-    payload: { autonomy_key: key, streak, agent: meta.agent },
+    // routed_agent → agent-avatar i approval-korten (prejudikat: review-requests-cron).
+    // agent behålls parallellt för streak/attribution-kompat.
+    payload: { autonomy_key: key, streak, agent: meta.agent, routed_agent: meta.agent },
     status: 'pending',
     risk_level: 'low',
     expires_at: new Date(Date.now() + OFFER_EXPIRES_DAYS * 24 * 3600_000).toISOString(),

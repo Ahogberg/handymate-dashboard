@@ -92,6 +92,7 @@ const TYPE_LABEL: Record<string, string> = {
   quote_nudge: 'Manuell åtgärd',
   review_request: 'Recension',
   manual_project_create: 'Skapa projekt',
+  autonomy_offer: 'Förtroende',
 }
 
 function timeAgo(iso: string): string {
@@ -174,6 +175,8 @@ export function PendingApprovalsBlock() {
         // utfall för att inte ge dubbel-tryck-illusion.
         const result = await res.json().catch(() => null) as {
           execution?: {
+            action?: string
+            granted?: boolean
             error?: string
             sms_sent?: boolean
             ok?: boolean
@@ -207,6 +210,10 @@ export function PendingApprovalsBlock() {
           setTimeout(() => setFeedback(null), 8000)
         } else if (execution && (execution.error || execution.sms_sent === false || execution.ok === false)) {
           setFeedback(`Handling misslyckades: ${errText}`)
+          setTimeout(() => setFeedback(null), 8000)
+        } else if (execution?.action === 'autonomy_offer' && execution.granted === true) {
+          // Hjärtat i förtjänad autonomi — beviljandet förtjänar egen copy.
+          setFeedback('Självständighet beviljad — teamet sköter detta framöver. Du kan alltid ta tillbaka ratten.')
           setTimeout(() => setFeedback(null), 8000)
         } else {
           setFeedback('Godkänt och skickat')

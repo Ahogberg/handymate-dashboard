@@ -116,6 +116,15 @@ trigger_config) i payload/context. Planen pinnar exakta fält.
   state genom hela kedjan.
 - Mobil-regress: `autonomy_offer` renderas och kan godkännas/avvisas.
 
+## Byggda avvikelser/förtydliganden (efter granskningsrundor)
+
+- Redigerade godkännanden räknas EJ i streaken och nollar den EJ (payload.edited-stämpel; en korrigering är inte blind tillit).
+- Motor-typernas streaks börjar räknas från deploy (autonomy_key stämplas i approval-payload framåt; historiska automation-rader saknar nyckeln). review_request räknar full historik via approval_type.
+- Streak sorteras på resolved_at (beslutsordning) med delad 200-raders budget i fönstret — kan underskatta, aldrig överskatta (fail-safe).
+- UTGÅNGET (ej avvisat) erbjudande har ingen cooldown → återkommer vid nästa godkännande. Endast AVVISAT erbjudande ger 30 dagars cooldown.
+- Review-cronen: misslyckat autonomt utskick faller tillbaka till ett godkännande-kort (utöver logg + notis) — kunden tappas aldrig.
+- KÄND ASYMMETRI (v2-kandidat): efter beviljande skapas inga approvals av motor-typerna → auto-nedgradering via avvisning är onåbar för dem post-grant; manuell återkallning (Förtroendetrappan) är enda utvägen. review_request har en organisk väg (fail → kort → avvisa → nedgradering). v2-förslag: stickprovs-gating eller motor-fail→kort.
+
 ## Utanför scope (v2+)
 
 Fler åtgärdstyper (kräver nytt scope-beslut), autonomi-nivåer (t.ex. "autonom

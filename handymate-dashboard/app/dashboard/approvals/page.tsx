@@ -96,6 +96,8 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   create_invoice_from_report: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   dispatch_suggestion: { label: 'Tilldelning', icon: Zap, bgColor: 'bg-violet-50', textColor: 'text-violet-600' },
   review_request: { label: 'Recension', icon: Star, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
+  // Förtjänad autonomi: erbjudande om att låta agenten sköta typen själv.
+  autonomy_offer: { label: 'Förtroende', icon: CheckCircle, bgColor: 'bg-emerald-50', textColor: 'text-emerald-700' },
   lead_review: { label: 'Ny lead', icon: Phone, bgColor: 'bg-amber-50', textColor: 'text-amber-700' },
   // Akut: kund tror de har ett projekt men auto-skapande failade. Röd för
   // att signalera att hantverkaren måste agera nu (skapa projekt manuellt

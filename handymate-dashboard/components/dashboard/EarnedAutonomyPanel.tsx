@@ -53,7 +53,7 @@ export default function EarnedAutonomyPanel() {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
-      <h3 className="text-sm font-bold text-gray-900 mb-1">Självständighet</h3>
+      <h3 className="text-sm font-bold text-gray-900 mb-1">Förtroendetrappan</h3>
       <p className="text-xs text-gray-400 mb-4">
         Teamet förtjänar rätten att agera själv — i takt med att du godkänner. Du kan alltid ta tillbaka ratten.
       </p>
