@@ -14,6 +14,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 export const STREAK_TARGET = 15
 export const WINDOW_DAYS = 60
 const OFFER_EXPIRES_DAYS = 14
+const REJECTED_OFFER_COOLDOWN_DAYS = 30
 
 export type AutonomyKey =
   | 'invoice_reminder'
@@ -189,6 +190,20 @@ export async function maybeCreateOffer(
     .eq('status', 'pending')
     .contains('payload', { autonomy_key: key })
   if ((count || 0) > 0) return false
+
+  // Tjat-skydd: ett AVVISAT erbjudande = "inte nu". Erbjud inte om igen förrän
+  // cooldownen passerat — annars återkommer erbjudandet vid nästa godkännande
+  // (streaken ligger kvar ≥ tröskeln). resolved_at sätts vid status-flippen.
+  const cooldownIso = new Date(Date.now() - REJECTED_OFFER_COOLDOWN_DAYS * 24 * 3600_000).toISOString()
+  const { count: rejectedRecently } = await supabase
+    .from('pending_approvals')
+    .select('*', { count: 'exact', head: true })
+    .eq('business_id', businessId)
+    .eq('approval_type', 'autonomy_offer')
+    .eq('status', 'rejected')
+    .gte('resolved_at', cooldownIso)
+    .contains('payload', { autonomy_key: key })
+  if ((rejectedRecently || 0) > 0) return false
 
   const streak = await computeStreak(supabase, businessId, key)
   if (streak < STREAK_TARGET) return false

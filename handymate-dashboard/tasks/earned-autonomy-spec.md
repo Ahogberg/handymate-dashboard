@@ -39,7 +39,8 @@ kod — inga andra typer kan graderas ens av misstag.
    av ny typ **`autonomy_offer`** — "Du har godkänt Karins 15 senaste
    fakturapåminnelser. Låt henne sköta dem själv? Du kan alltid ta tillbaka
    ratten." Autonomin godkänns alltså i samma godkännande-UI (webb + mobil,
-   befintligt). Max ett öppet erbjudande per typ (dedup mot pending).
+   befintligt). Max ett öppet erbjudande per typ (dedup mot pending) + 30 dagars
+   cooldown efter AVVISAT erbjudande (tjat-skydd).
 4. **Beviljat** (`autonomy_offer` godkänns) → exekveringen skriver
    `earned_autonomy`-state (se datamodell). Ingen extern effekt → låg risk.
 5. **Autonomt läge:** åtgärden skickas direkt (samma `sendSmsViaElks`-väg som
