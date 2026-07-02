@@ -205,6 +205,74 @@ export async function GET(request: NextRequest) {
         message: smsText,
       }
 
+      // Förtjänad autonomi: om hantverkaren beviljat Hanna autonomi för
+      // recensionsförfrågningar → skicka direkt (samma sendSmsViaElks-väg som
+      // approve-exekveringen) istället för att skapa godkännande.
+      const { isAutonomous } = await import('@/lib/autonomy/earned-autonomy')
+      if (await isAutonomous(supabase, biz.business_id, 'review_request')) {
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsResult = await sendSmsViaElks({
+          supabase,
+          businessId: biz.business_id,
+          businessName: biz.business_name || null,
+          to: customer.phone_number,
+          message: smsText,
+          customerId: customer.customer_id,
+          relatedId: project.project_id,
+          messageType: 'review_request',
+        })
+
+        if (smsResult.success) {
+          // Spegla approve-vägen: markera kunden så 180d-spärren (checken
+          // ovan) gäller även autonoma utskick — annars kan en kund med två
+          // projekt få dubbla SMS. Non-blocking: SMS:et är redan ute.
+          const { error: sentAtErr } = await supabase
+            .from('customer')
+            .update({ review_request_sent_at: new Date().toISOString() })
+            .eq('customer_id', customer.customer_id)
+            .eq('business_id', biz.business_id)
+          if (sentAtErr) {
+            console.warn('[cron/review-requests] review_request_sent_at update failed (SMS redan skickat):', sentAtErr)
+          }
+        }
+
+        await supabase.from('v3_automation_logs').insert({
+          business_id: biz.business_id,
+          agent_id: 'hanna',
+          rule_name: 'review_request',
+          trigger_type: 'cron',
+          action_type: 'send_sms',
+          status: smsResult.success ? 'success' : 'failed',
+          context: {
+            earned_autonomy: true,
+            customer_id: customer.customer_id,
+            project_id: project.project_id,
+          },
+          result: smsResult.success ? {} : { error: smsResult.error || 'okänt fel' },
+        })
+
+        if (!smsResult.success) {
+          // Ingen tyst svält: misslyckat autonomt utskick → notifiera ägaren
+          // (samma push-mönster som automation-motorns autonomi-fail).
+          try {
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+            await fetch(`${appUrl}/api/push/send`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                business_id: biz.business_id,
+                title: 'Autonom recensionsförfrågan misslyckades',
+                body: `SMS till ${customer.phone_number} gick inte fram — kontrollera numret.`,
+                url: '/dashboard/automations',
+              }),
+            })
+          } catch { /* non-blocking */ }
+        }
+
+        approvalsCreated++ // räknaren betyder nu "hanterade" — behåll för cron-svaret
+        continue
+      }
+
       const { error: insertError } = await supabase
         .from('pending_approvals')
         .insert({
