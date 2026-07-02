@@ -102,24 +102,26 @@ export function computeStreakFromRows(rows: ResolvedApprovalRow[], key: Autonomy
 
 type AutonomyState = Record<string, { status: 'autonomous'; granted_at: string }>
 
-async function readState(supabase: SupabaseClient, businessId: string): Promise<AutonomyState> {
-  try {
-    const { data } = await supabase
-      .from('v3_automation_settings')
-      .select('earned_autonomy')
-      .eq('business_id', businessId)
-      .maybeSingle()
-    return (data?.earned_autonomy as AutonomyState) || {}
-  } catch {
-    // Kolumn saknas (v65 ej körd) eller transient fel → behandla som gatad.
-    return {}
-  }
+async function readState(
+  supabase: SupabaseClient, businessId: string
+): Promise<{ state: AutonomyState; error: string | null }> {
+  const { data, error } = await supabase
+    .from('v3_automation_settings')
+    .select('earned_autonomy')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  // Fel (t.ex. v65 ej körd → kolumn saknas, eller transient) → surfa felet.
+  // Läsaren avgör riktning: isAutonomous behandlar fel som gatad (fail-safe),
+  // grant/revoke får ALDRIG skriva på ett misslyckat läs (skulle radera
+  // syskon-nycklars beviljanden i read-modify-write).
+  if (error) return { state: {}, error: error.message }
+  return { state: (data?.earned_autonomy as AutonomyState) || {}, error: null }
 }
 
 export async function isAutonomous(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<boolean> {
-  const state = await readState(supabase, businessId)
+  const { state } = await readState(supabase, businessId)
   return state[key]?.status === 'autonomous'
 }
 
@@ -136,7 +138,8 @@ async function writeState(
 export async function grantAutonomy(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<void> {
-  const state = await readState(supabase, businessId)
+  const { state, error: readError } = await readState(supabase, businessId)
+  if (readError) throw new Error(`earned_autonomy read failed (skriver inte på trasigt läs): ${readError}`)
   state[key] = { status: 'autonomous', granted_at: new Date().toISOString() }
   await writeState(supabase, businessId, state)
 }
@@ -144,7 +147,8 @@ export async function grantAutonomy(
 export async function revokeAutonomy(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<void> {
-  const state = await readState(supabase, businessId)
+  const { state, error: readError } = await readState(supabase, businessId)
+  if (readError) throw new Error(`earned_autonomy read failed (skriver inte på trasigt läs): ${readError}`)
   if (!state[key]) return
   delete state[key]
   await writeState(supabase, businessId, state)
@@ -163,6 +167,7 @@ export async function computeStreak(
     .in('status', ['approved', 'rejected'])
     .gte('created_at', sinceIso)
     .order('created_at', { ascending: false })
+    // Delad budget över typer/nycklar i fönstret — kan UNDERskatta streak vid hög volym (aldrig överskatta = fail-safe).
     .limit(200)
   return computeStreakFromRows((data as ResolvedApprovalRow[]) || [], key)
 }

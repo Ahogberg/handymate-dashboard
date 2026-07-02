@@ -73,6 +73,10 @@ test.describe('computeStreakFromRows (rader sorterade NYAST först)', () => {
     const rows = [row({}), row({ payload: { rule_id: 'x' } }), row({})]
     expect(computeStreakFromRows(rows, 'invoice_reminder')).toBe(2)
   })
+  test('pending/expired är inte beslut — hoppas över', () => {
+    const rows = [row({}), row({ status: 'pending' }), row({ status: 'expired' }), row({})]
+    expect(computeStreakFromRows(rows, 'invoice_reminder')).toBe(2)
+  })
   test('tom lista → 0', () => {
     expect(computeStreakFromRows([], 'review_request')).toBe(0)
   })
