@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
   }
 
   let approvalsCreated = 0
+  let autonomousSends = 0
   let projectsScanned = 0
   let skipped = {
     invalid_place_id: 0,
@@ -103,6 +105,12 @@ export async function GET(request: NextRequest) {
       continue
     }
 
+    // Förtjänad autonomi (beror bara på business_id — kolla en gång per
+    // business, inte per projekt): har hantverkaren beviljat Hanna autonomi
+    // för recensionsförfrågningar?
+    const { isAutonomous } = await import('@/lib/autonomy/earned-autonomy')
+    const reviewAutonomous = await isAutonomous(supabase, biz.business_id, 'review_request')
+
     for (const project of projects || []) {
       projectsScanned++
 
@@ -142,7 +150,8 @@ export async function GET(request: NextRequest) {
         .from('sms_log')
         .select('sms_id')
         .eq('business_id', biz.business_id)
-        .eq('phone_to', customer.phone_number)
+        // sms_log.phone_to lagras E.164-normaliserat (sendSmsViaElks) — normalisera för match.
+        .eq('phone_to', normalizeSwedishPhone(customer.phone_number))
         .eq('status', 'failed')
         .gte('created_at', twentyFourHoursAgo.toISOString())
         .limit(1)
@@ -205,11 +214,11 @@ export async function GET(request: NextRequest) {
         message: smsText,
       }
 
-      // Förtjänad autonomi: om hantverkaren beviljat Hanna autonomi för
-      // recensionsförfrågningar → skicka direkt (samma sendSmsViaElks-väg som
-      // approve-exekveringen) istället för att skapa godkännande.
-      const { isAutonomous } = await import('@/lib/autonomy/earned-autonomy')
-      if (await isAutonomous(supabase, biz.business_id, 'review_request')) {
+      // Förtjänad autonomi: skicka direkt (samma sendSmsViaElks-väg som
+      // approve-exekveringen) istället för att skapa godkännande. Vid
+      // misslyckat utskick faller vi IGENOM till approval-inserten nedan
+      // så ett hanterbart kort skapas — kunden tappas aldrig tyst.
+      if (reviewAutonomous) {
         const { sendSmsViaElks } = await import('@/lib/sms-send')
         const smsResult = await sendSmsViaElks({
           supabase,
@@ -222,21 +231,7 @@ export async function GET(request: NextRequest) {
           messageType: 'review_request',
         })
 
-        if (smsResult.success) {
-          // Spegla approve-vägen: markera kunden så 180d-spärren (checken
-          // ovan) gäller även autonoma utskick — annars kan en kund med två
-          // projekt få dubbla SMS. Non-blocking: SMS:et är redan ute.
-          const { error: sentAtErr } = await supabase
-            .from('customer')
-            .update({ review_request_sent_at: new Date().toISOString() })
-            .eq('customer_id', customer.customer_id)
-            .eq('business_id', biz.business_id)
-          if (sentAtErr) {
-            console.warn('[cron/review-requests] review_request_sent_at update failed (SMS redan skickat):', sentAtErr)
-          }
-        }
-
-        await supabase.from('v3_automation_logs').insert({
+        const { error: logError } = await supabase.from('v3_automation_logs').insert({
           business_id: biz.business_id,
           agent_id: 'hanna',
           rule_name: 'review_request',
@@ -250,27 +245,41 @@ export async function GET(request: NextRequest) {
           },
           result: smsResult.success ? {} : { error: smsResult.error || 'okänt fel' },
         })
+        if (logError) console.warn('[review-requests] autonom logg-insert misslyckades:', logError.message)
 
-        if (!smsResult.success) {
-          // Ingen tyst svält: misslyckat autonomt utskick → notifiera ägaren
-          // (samma push-mönster som automation-motorns autonomi-fail).
-          try {
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-            await fetch(`${appUrl}/api/push/send`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                business_id: biz.business_id,
-                title: 'Autonom recensionsförfrågan misslyckades',
-                body: `SMS till ${customer.phone_number} gick inte fram — kontrollera numret.`,
-                url: '/dashboard/automations',
-              }),
-            })
-          } catch { /* non-blocking */ }
+        if (smsResult.success) {
+          // Spegla approve-vägen: markera kunden så 180d-spärren (checken
+          // ovan) gäller även autonoma utskick — annars kan en kund med två
+          // projekt få dubbla SMS. Non-blocking: SMS:et är redan ute.
+          const { error: sentAtErr } = await supabase
+            .from('customer')
+            .update({ review_request_sent_at: new Date().toISOString() })
+            .eq('customer_id', customer.customer_id)
+            .eq('business_id', biz.business_id)
+          if (sentAtErr) {
+            console.warn('[cron/review-requests] review_request_sent_at update failed (SMS redan skickat):', sentAtErr)
+          }
+
+          autonomousSends++
+          continue
         }
 
-        approvalsCreated++ // räknaren betyder nu "hanterade" — behåll för cron-svaret
-        continue
+        // Misslyckat autonomt utskick: notifiera ägaren (samma push-mönster
+        // som automation-motorns autonomi-fail) och fall igenom till
+        // approval-inserten nedan — INGEN continue, ingen stämpling.
+        try {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+          await fetch(`${appUrl}/api/push/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              business_id: biz.business_id,
+              title: 'Autonom recensionsförfrågan misslyckades',
+              body: `SMS till ${customer.phone_number} gick inte fram — ett godkännande-kort har skapats så du kan hantera det manuellt.`,
+              url: '/dashboard/automations',
+            }),
+          })
+        } catch { /* non-blocking */ }
       }
 
       const { error: insertError } = await supabase
@@ -328,6 +337,7 @@ export async function GET(request: NextRequest) {
     businesses_scanned: businesses?.length || 0,
     projects_scanned: projectsScanned,
     approvals_created: approvalsCreated,
+    autonomous_sends: autonomousSends,
     skipped,
     errors: errors.slice(0, 20), // skapa inte response-blob om många errors
     total_errors: errors.length,
