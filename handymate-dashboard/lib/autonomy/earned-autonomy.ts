@@ -84,14 +84,19 @@ export function autonomyKeyFromApproval(row: {
 }
 
 /**
- * Räkna raka godkännanden av `key` ur rader SORTERADE NYAST FÖRST.
- * Andra nycklar/nyckellösa rader hoppas över; 'rejected' av samma nyckel
- * stoppar. 'pending'/'expired' är inte beslut → hoppas över.
+ * Räkna raka godkännanden av `key` ur rader SORTERADE PÅ BESLUTSTID
+ * (resolved_at), NYAST FÖRST. Andra nycklar/nyckellösa rader hoppas över;
+ * 'rejected' av samma nyckel stoppar. 'pending'/'expired' är inte beslut →
+ * hoppas över. Redigerade godkännanden (payload.edited === true) hoppas
+ * också över — de räknas inte i streaken men nollar den inte.
  */
 export function computeStreakFromRows(rows: ResolvedApprovalRow[], key: AutonomyKey): number {
   let streak = 0
   for (const r of rows) {
     if (autonomyKeyFromApproval(r) !== key) continue
+    // Redigerade godkännanden är korrigeringar — inte blind tillit. De räknas
+    // inte i streaken (hoppar, nollar inte — användaren godkände ju ändå).
+    if ((r.payload as Record<string, unknown> | null)?.edited === true) continue
     if (r.status === 'approved') { streak++; continue }
     if (r.status === 'rejected') break
     // pending/expired → inget beslut, hoppa
@@ -167,7 +172,7 @@ export async function computeStreak(
     .in('approval_type', ['automation', 'review_request'])
     .in('status', ['approved', 'rejected'])
     .gte('created_at', sinceIso)
-    .order('created_at', { ascending: false })
+    .order('resolved_at', { ascending: false })
     // Delad budget över typer/nycklar i fönstret — kan UNDERskatta streak vid hög volym (aldrig överskatta = fail-safe).
     .limit(200)
   return computeStreakFromRows((data as ResolvedApprovalRow[]) || [], key)
