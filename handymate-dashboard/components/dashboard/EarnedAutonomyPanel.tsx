@@ -20,13 +20,20 @@ export default function EarnedAutonomyPanel() {
   const [items, setItems] = useState<AutonomyItem[]>([])
   const [busy, setBusy] = useState<string | null>(null)
 
-  const load = () => {
+  const load = () =>
     fetch('/api/autonomy')
       .then(r => (r.ok ? r.json() : null))
       .then(d => setItems(d?.items || []))
       .catch(() => {})
-  }
-  useEffect(load, [])
+
+  useEffect(() => {
+    let active = true
+    fetch('/api/autonomy')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (active) setItems(d?.items || []) })
+      .catch(() => {})
+    return () => { active = false }
+  }, [])
 
   async function revoke(key: string) {
     if (!confirm('Ta tillbaka ratten? Åtgärderna kräver ditt godkännande igen.')) return
@@ -37,8 +44,9 @@ export default function EarnedAutonomyPanel() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       })
-      load()
-    } finally { setBusy(null) }
+      await load()
+    } catch { /* nätverksfel — state förblir sanningen från servern vid nästa load */ }
+    finally { setBusy(null) }
   }
 
   if (items.length === 0) return null
