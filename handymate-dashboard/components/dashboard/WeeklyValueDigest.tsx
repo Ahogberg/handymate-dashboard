@@ -16,6 +16,7 @@ interface WeeklyValue {
   captured_kr: number
   time_minutes: number
   time_hours: number
+  autonomous_count: number
 }
 
 function kr(n: number): string {
@@ -78,6 +79,11 @@ export default function WeeklyValueDigest() {
           <div className="text-2xl sm:text-3xl font-extrabold text-gray-900">~{data.time_hours} tim</div>
           <div className="text-sm font-medium text-gray-700">sparat åt dig</div>
           <div className="text-xs text-gray-400">uppskattat</div>
+          {data.autonomous_count > 0 && (
+            <div className="text-xs text-primary-700 mt-1">
+              varav {data.autonomous_count} utförda självständigt
+            </div>
+          )}
         </div>
       </div>
     </div>

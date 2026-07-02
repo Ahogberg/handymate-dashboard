@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import SavedScoreboard from '@/components/dashboard/SavedScoreboard'
+import EarnedAutonomyPanel from '@/components/dashboard/EarnedAutonomyPanel'
 import { useBusiness } from '@/lib/BusinessContext'
 import { isAgentAllowed, type PlanType } from '@/lib/feature-gates'
 import MatteChatModal from '@/components/MatteChatModal'
@@ -1324,6 +1325,12 @@ export default function AgentDashboardPage() {
           Flyttad hit från översikten: värde-summering hör hemma på team-sidan,
           inte staplad på den dagliga vyn. Renderar inget om månadens tid är 0. */}
       <SavedScoreboard />
+
+      {/* Förtroendetrappan — vilka åtgärdstyper teamet sköter självständigt,
+          med streak-status och möjlighet att ta tillbaka ratten. */}
+      <div className="mt-4">
+        <EarnedAutonomyPanel />
+      </div>
 
       {/* Settings Panel (collapsible) */}
       {showSettings && (

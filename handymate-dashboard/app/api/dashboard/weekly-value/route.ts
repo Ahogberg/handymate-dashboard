@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   const businessId = business.business_id
   const sinceIso = new Date(Date.now() - ROLLING_DAYS * 24 * 3600_000).toISOString()
 
-  const [runsRes, logsRes, leadsRes] = await Promise.all([
+  const [runsRes, logsRes, leadsRes, autonomousRes] = await Promise.all([
     supabase
       .from('agent_runs')
       .select('trigger_type')
@@ -63,6 +63,13 @@ export async function GET(request: NextRequest) {
       .eq('business_id', businessId)
       .gte('created_at', sinceIso)
       .limit(5000),
+    supabase
+      .from('v3_automation_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('business_id', businessId)
+      .eq('status', 'success')
+      .gte('created_at', sinceIso)
+      .contains('context', { earned_autonomy: true }),
   ])
 
   const runs = runsRes.data || []
@@ -153,5 +160,6 @@ export async function GET(request: NextRequest) {
     captured_kr: Math.round(capturedKr),
     time_minutes: timeMinutes,
     time_hours: Math.round((timeMinutes / 60) * 10) / 10,
+    autonomous_count: autonomousRes.count || 0,
   })
 }
