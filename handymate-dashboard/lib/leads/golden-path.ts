@@ -181,7 +181,7 @@ export async function createLeadAndDeal(
 
     if (firstPipelineStage) {
       const nextNumber = await getNextCaseNumber(supabase, businessId)
-      const { data: newDeal } = await supabase
+      const { data: newDeal, error: dealError } = await supabase
         .from('deal')
         .insert({
           business_id: businessId,
@@ -193,9 +193,16 @@ export async function createLeadAndDeal(
           deal_number: nextNumber,
           priority: 'medium',
         })
-        .select('deal_id')
+        .select('id')
         .maybeSingle()
-      dealId = newDeal?.deal_id || null
+      // OBS: deal-tabellens PK är 'id' (inte 'deal_id'). Tidigare select på den
+      // obefintliga kolumnen fick PostgREST att fela → HELA inserten rullades
+      // tillbaka → inga deals skapades för golden-path-leads, tyst (supabase
+      // kastar inte; felet lästes aldrig). Logga alltid insert-felet.
+      if (dealError) {
+        console.error('[golden-path] Deal-insert misslyckades:', dealError.message)
+      }
+      dealId = newDeal?.id || null
     }
   } catch (err) {
     console.error('[golden-path] Auto-deal creation failed:', err)
@@ -278,7 +285,7 @@ export async function activatePendingLead(
     if (firstPipelineStage) {
       const nextNumber = await getNextCaseNumber(supabase, lead.business_id)
       const message = lead.notes
-      const { data: newDeal } = await supabase
+      const { data: newDeal, error: dealError } = await supabase
         .from('deal')
         .insert({
           business_id: lead.business_id,
@@ -290,9 +297,14 @@ export async function activatePendingLead(
           deal_number: nextNumber,
           priority: 'medium',
         })
-        .select('deal_id')
+        .select('id')
         .maybeSingle()
-      dealId = newDeal?.deal_id || null
+      // Samma PK-bugg som ovan: 'deal_id' finns inte → select felade → HELA
+      // inserten rullades tillbaka tyst. PK är 'id'; logga alltid felet.
+      if (dealError) {
+        console.error('[activatePendingLead] Deal-insert misslyckades:', dealError.message)
+      }
+      dealId = newDeal?.id || null
     }
   } catch (err) {
     console.error('[activatePendingLead] Deal creation failed:', err)
