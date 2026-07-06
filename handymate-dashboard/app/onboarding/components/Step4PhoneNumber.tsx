@@ -21,6 +21,267 @@ const OPERATORS: { id: string; name: string; code: string }[] = [
   { id: 'telavox', name: 'Telavox', code: 'Logga in → Vidarekoppling' },
 ]
 
+// Reservation-placeholder som visas när backend-endpointen saknas (env-lös dev).
+// Test-kortet renderas aldrig för placeholder-numret.
+const PLACEHOLDER_NUMBER = '+46 76 000 00 00'
+
+interface TestCallStatus {
+  armed?: boolean
+  called_at?: string | null
+  sms_sent?: boolean
+  sms_error?: string | null
+  lead_id?: string | null
+}
+
+/** "Testa Lisa nu" — live-checklista som lyser upp medan användaren ringer sitt nya nummer. */
+function TestLisaCard() {
+  const [visible, setVisible] = useState(true)
+  const [armed, setArmed] = useState(false)
+  const [status, setStatus] = useState<TestCallStatus>({})
+  const [timedOut, setTimedOut] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleted, setDeleted] = useState(false)
+  const [armAttempt, setArmAttempt] = useState(0)
+
+  const success = !!(status.called_at && status.sms_sent && status.lead_id)
+  // Sluta polla när samtalet är fångat och SMS-utfallet (skickat eller fel) är känt.
+  const finished = !!(status.called_at && status.lead_id && (status.sms_sent || status.sms_error))
+
+  // Armera test-läget vid mount (och vid "Prova igen").
+  useEffect(() => {
+    let active = true
+    async function arm() {
+      try {
+        const res = await fetch('/api/onboarding/test-call/arm', { method: 'POST' })
+        if (!active) return
+        if (!res.ok) { setVisible(false); return }
+        const json = await res.json()
+        if (!active) return
+        if (!json.available) { setVisible(false); return }
+        setArmed(true)
+      } catch {
+        if (active) setVisible(false)
+      }
+    }
+    arm()
+    return () => { active = false }
+  }, [armAttempt])
+
+  // Polla status varannan sekund medan testet är armerat.
+  useEffect(() => {
+    if (!armed || finished) return
+    let active = true
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch('/api/onboarding/test-call/status')
+        if (!res.ok || !active) return
+        const json: TestCallStatus = await res.json()
+        if (!active) return
+        setStatus(json)
+      } catch {
+        // nätverksglapp — försök igen vid nästa tick
+      }
+    }, 2000)
+    return () => {
+      active = false
+      clearInterval(interval)
+    }
+  }, [armed, finished])
+
+  // 90 sekunder utan upptäckt samtal → visa tips (t.ex. dolt nummer).
+  useEffect(() => {
+    if (!armed || status.called_at) return
+    const timer = setTimeout(() => setTimedOut(true), 90_000)
+    return () => clearTimeout(timer)
+  }, [armed, status.called_at, armAttempt])
+
+  const retry = () => {
+    setTimedOut(false)
+    setArmAttempt(a => a + 1)
+  }
+
+  const removeTestLead = async () => {
+    if (!confirm('Ta bort test-leadet?')) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/onboarding/test-call/lead', { method: 'DELETE' })
+      if (res.ok) setDeleted(true)
+    } catch {
+      // behåll knappen så användaren kan försöka igen
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  if (!visible) return null
+
+  const rows: { icon: string; label: string; lit: boolean }[] = [
+    { icon: '📞', label: 'Samtal upptäckt', lit: !!status.called_at },
+    { icon: '💬', label: 'SMS skickat — kolla din telefon', lit: !!status.sms_sent },
+    { icon: '✅', label: 'Lead fångat', lit: !!status.lead_id },
+  ]
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        padding: '18px 16px',
+        background: 'var(--ob-surface)',
+        border: '1px solid var(--ob-primary-100)',
+        borderRadius: 'var(--ob-r-lg)',
+        animation: 'ob-pop-in 400ms ease-out',
+      }}
+    >
+      {success ? (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ob-ink)', lineHeight: 1.45 }}>
+            Det där var Lisa. Precis så snabbt möter hon dina kunder.
+            Nu aktiverar vi henne på riktigt.
+          </div>
+          {deleted ? (
+            <p style={{ marginTop: 10, fontSize: 12, color: 'var(--ob-muted)' }}>Borttaget ✓</p>
+          ) : (
+            <button
+              type="button"
+              onClick={removeTestLead}
+              disabled={deleting}
+              style={{
+                marginTop: 10,
+                padding: '6px 12px',
+                background: 'transparent',
+                border: 0,
+                color: 'var(--ob-muted)',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: deleting ? 'default' : 'pointer',
+                textDecoration: 'underline',
+                opacity: deleting ? 0.5 : 1,
+                fontFamily: 'inherit',
+              }}
+            >
+              {deleting ? 'Tar bort…' : 'Ta bort testet'}
+            </button>
+          )}
+        </div>
+      ) : (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--ob-primary-700)',
+              marginBottom: 6,
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: 'var(--ob-green-600)',
+                animation: 'ob-pulse-ring 2s infinite',
+                flexShrink: 0,
+              }}
+            />
+            Testa Lisa nu
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', margin: '0 0 12px' }}>
+            Ring numret nu från din mobil — och håll telefonen redo.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {rows.map(row => (
+              <div
+                key={row.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 13,
+                  fontWeight: row.lit ? 600 : 500,
+                  color: row.lit ? 'var(--ob-ink)' : 'var(--ob-muted)',
+                  opacity: row.lit ? 1 : 0.55,
+                  transition: 'all var(--ob-t-fast)',
+                }}
+              >
+                <span style={{ fontSize: 15, filter: row.lit ? 'none' : 'grayscale(1)' }}>
+                  {row.icon}
+                </span>
+                {row.label}
+              </div>
+            ))}
+          </div>
+
+          {status.sms_error && (
+            <p style={{ fontSize: 12, color: 'var(--ob-ink-2)', margin: '10px 0 0' }}>
+              Samtalet fångades, men SMS:et kunde inte skickas just nu.
+            </p>
+          )}
+
+          {timedOut && !status.called_at && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: '10px 12px',
+                background: 'var(--ob-primary-50)',
+                borderRadius: 'var(--ob-r-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 10,
+                flexWrap: 'wrap',
+              }}
+            >
+              <span style={{ fontSize: 12, color: 'var(--ob-ink-2)' }}>
+                Ringde du med dolt nummer? Prova igen.
+              </span>
+              <button
+                type="button"
+                onClick={retry}
+                style={{
+                  padding: '6px 12px',
+                  background: 'var(--ob-surface)',
+                  border: '1px solid var(--ob-primary-100)',
+                  borderRadius: 'var(--ob-r-pill)',
+                  color: 'var(--ob-primary-700)',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                Prova igen
+              </button>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setVisible(false)}
+            style={{
+              marginTop: 12,
+              padding: 0,
+              background: 'transparent',
+              border: 0,
+              color: 'var(--ob-muted)',
+              fontSize: 12,
+              fontWeight: 500,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              fontFamily: 'inherit',
+            }}
+          >
+            Testa senare
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step4Props) {
   const [phase, setPhase] = useState<'reserving' | 'done'>(data.lisaNumber ? 'done' : 'reserving')
   const [number, setNumber] = useState<string>(data.lisaNumber || '')
@@ -58,7 +319,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
         // Fallback om backend-endpointen inte finns: använd reservation-placeholder
         // (riktigt nummer aktiveras vid betalning, samma beteende som befintliga Step3Phone)
         if (!assigned) {
-          assigned = '+46 76 000 00 00'
+          assigned = PLACEHOLDER_NUMBER
         }
 
         if (!cancelled) {
@@ -68,7 +329,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
         }
       } catch {
         if (!cancelled) {
-          setNumber('+46 76 000 00 00')
+          setNumber(PLACEHOLDER_NUMBER)
           setPhase('done')
         }
       }
@@ -170,6 +431,9 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
             </div>
           )}
         </div>
+
+        {/* "Testa Lisa nu" — bara med riktigt nummer (aldrig för placeholder i env-lös dev) */}
+        {phase === 'done' && number !== PLACEHOLDER_NUMBER && <TestLisaCard />}
 
         {/* "Vad används detta nummer till?" — InfoSheet-länk */}
         <button
