@@ -10,9 +10,36 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
   const accent50 = mixWithWhite(accent, 0.94)
   const accent100 = mixWithWhite(accent, 0.85)
 
-  const itemsHtml = data.quote.items.map((item, i) => `
+  // Löpande numrering räknar bara riktiga artikelrader — rubriker,
+  // fritext, delsummor och rabatter får ingen siffra.
+  let itemNo = 0
+  const itemsHtml = data.quote.items.map(item => {
+    const itemType = item.itemType || 'item'
+    if (itemType === 'heading') {
+      return `<div class="group-heading">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'text') {
+      return `<div class="group-text">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'subtotal') {
+      return `<div class="subtotal-line"><span class="lbl">${escapeHtml(item.name || 'Delsumma')}</span><span class="val">${formatCurrency(item.total)}</span></div>`
+    }
+    if (itemType === 'discount') {
+      return `
+    <div class="item-card discount">
+      <div class="item-num">−</div>
+      <div class="item-body">
+        <div class="name">${escapeHtml(item.name || 'Rabatt')}</div>
+        <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(Math.abs(item.unitPrice))}</div>
+      </div>
+      <div class="item-amt">−${formatCurrency(Math.abs(item.total))}</div>
+    </div>
+  `
+    }
+    itemNo += 1
+    return `
     <div class="item-card">
-      <div class="item-num">${i + 1}</div>
+      <div class="item-num">${itemNo}</div>
       <div class="item-body">
         <div class="name">${escapeHtml(item.name)}</div>
         ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
@@ -20,7 +47,8 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
       </div>
       <div class="item-amt">${formatCurrency(item.total)}</div>
     </div>
-  `).join('')
+  `
+  }).join('')
 
   const customerLines = [
     [data.customer.address, data.customer.postalCode, data.customer.city].filter(Boolean).join(', '),
@@ -87,7 +115,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .party-line { font-size: 13px; color: var(--ink); margin-top: 2px; }
 .party-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
 .job .quote-title { font-weight: 700; font-size: 22px; color: var(--ink); letter-spacing: -0.01em; margin-bottom: 4px; }
-.job .quote-sub { color: var(--muted); font-size: 13px; }
+.job .quote-sub { color: var(--muted); font-size: 13px; white-space: pre-line; }
+.job .quote-sub + .quote-sub { margin-top: 8px; }
 .badges { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; }
 .badge .dot { width: 6px; height: 6px; border-radius: 50%; }
@@ -101,9 +130,17 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .item-card { display: grid; grid-template-columns: 36px 1fr auto; gap: 14px; align-items: flex-start; padding: 14px 16px; background: var(--bg); border-radius: 12px; border: 1px solid rgba(15,23,42,0.04); }
 .item-num { width: 30px; height: 30px; border-radius: 50%; background: var(--teal-100); color: var(--teal-dark); font-weight: 700; font-size: 13px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .item-body .name { font-weight: 600; color: var(--ink); font-size: 14px; }
-.item-body .desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 2px; }
+.item-body .desc { color: var(--muted); font-size: 12px; line-height: 1.5; margin-top: 2px; white-space: pre-line; }
 .item-body .qty { color: var(--muted); font-size: 11px; margin-top: 4px; font-weight: 500; }
 .item-amt { text-align: right; font-weight: 700; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; align-self: center; }
+.group-heading { font-weight: 700; font-size: 14px; color: var(--ink); padding: 8px 4px 0; }
+.group-text { color: var(--muted); font-size: 12px; line-height: 1.6; padding: 0 4px; white-space: pre-line; }
+.subtotal-line { display: flex; justify-content: flex-end; gap: 16px; padding: 2px 16px 4px; font-size: 13px; }
+.subtotal-line .lbl { color: var(--muted); font-weight: 600; }
+.subtotal-line .val { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.item-card.discount .item-num { background: var(--green-bg); color: #166534; }
+.item-card.discount .item-amt { color: #166534; }
+.conclusion-text { color: var(--muted); font-size: 13px; white-space: pre-line; }
 .totals-card { padding: 22px 24px; }
 .totals-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .total-row { display: flex; justify-content: space-between; font-size: 13px; }
@@ -123,7 +160,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .footer-card { padding: 14px 22px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
 .footer-card .l { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 2px; }
 .footer-card .v { color: var(--ink); font-weight: 600; font-size: 12px; }
-.terms { font-size: 11px; color: var(--muted); padding: 0 8px; line-height: 1.7; }
+.terms { font-size: 11px; color: var(--muted); padding: 0 8px; line-height: 1.7; white-space: pre-line; }
 .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--bg); padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
 .print-btn { background: var(--teal); color: #fff; border: none; padding: 10px 24px; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .print-btn.secondary { background: #f3f4f6; color: #374151; }
@@ -179,7 +216,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
   <section class="card job">
     <div class="card-title">Det här gäller</div>
     <div class="quote-title">${escapeHtml(data.quote.title)}</div>
-    ${data.quote.description ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>` : data.quote.introductionText ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>` : ''}
+    ${data.quote.description ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>` : ''}
+    ${data.quote.introductionText ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>` : ''}
     <div class="badges">${badges.join('')}</div>
   </section>
 
@@ -205,6 +243,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
       <div class="val">${formatCurrency(data.quote.amountToPay)}</div>
     </div>
   </section>
+
+  ${data.quote.conclusionText ? `<section class="card"><p class="conclusion-text">${escapeHtml(data.quote.conclusionText)}</p></section>` : ''}
 
   <section class="pay-row">
     ${data.business.swish ? `<div class="card pay-card"><div class="pay-icon">S</div><div><div class="l">Swish företag</div><div class="v">${escapeHtml(data.business.swish)}</div></div></div>` : ''}

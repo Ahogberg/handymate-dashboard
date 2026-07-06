@@ -10,7 +10,21 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
   const accentLight = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
 
-  const itemsHtml = data.quote.items.map(item => `
+  const itemsHtml = data.quote.items.map(item => {
+    const itemType = item.itemType || 'item'
+    if (itemType === 'heading') {
+      return `<tr class="row-heading"><td colspan="4">${escapeHtml(item.name)}</td></tr>`
+    }
+    if (itemType === 'text') {
+      return `<tr class="row-text"><td colspan="4">${escapeHtml(item.name)}</td></tr>`
+    }
+    if (itemType === 'subtotal') {
+      return `<tr class="row-subtotal"><td colspan="3">${escapeHtml(item.name || 'Delsumma')}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
+    }
+    if (itemType === 'discount') {
+      return `<tr class="row-discount"><td><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></td><td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td><td class="num">${formatCurrency(Math.abs(item.unitPrice))}</td><td class="num">−${formatCurrency(Math.abs(item.total))}</td></tr>`
+    }
+    return `
     <tr>
       <td>
         <div class="item-name">${escapeHtml(item.name)}</div>
@@ -20,7 +34,8 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
       <td class="num">${formatCurrency(item.unitPrice)}</td>
       <td class="num">${formatCurrency(item.total)}</td>
     </tr>
-  `).join('')
+  `
+  }).join('')
 
   const rotRow = data.quote.rotDeduction
     ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
@@ -29,11 +44,17 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
     ? `<div class="total-row rot"><span class="lbl">RUT-avdrag (50% av arbete)</span><span class="val">−${formatCurrency(data.quote.rutDeduction)}</span></div>`
     : ''
 
-  const introHtml = data.quote.description
+  // Pilot-feedback 2026-05-20: rendera BÅDE beskrivning och inledningstext
+  // som separata stycken när båda finns — beskrivningen först, sedan intro.
+  const descriptionHtml = data.quote.description
     ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>`
-    : data.quote.introductionText
-      ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>`
-      : ''
+    : ''
+  const introHtml = data.quote.introductionText
+    ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>`
+    : ''
+  const conclusionHtml = data.quote.conclusionText
+    ? `<p class="quote-sub conclusion">${escapeHtml(data.quote.conclusionText)}</p>`
+    : ''
 
   const customerLines = [
     data.customer.address,
@@ -102,15 +123,20 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .party-line { font-size: 13px; color: var(--ink); margin-top: 2px; }
 .party-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
 .quote-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; color: var(--ink); letter-spacing: -0.015em; margin-bottom: 4px; }
-.quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; white-space: pre-line; }
 table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
 thead th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); border-bottom: 1.5px solid var(--ink); }
 thead th.num { text-align: right; }
 tbody td { padding: 12px; vertical-align: top; font-size: 13px; }
 tbody tr:nth-child(even) { background: var(--row-alt); }
 .item-name { font-weight: 600; color: var(--ink); }
-.item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
+.item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; white-space: pre-line; }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr.row-heading, tbody tr.row-text, tbody tr.row-subtotal { background: transparent; }
+tbody tr.row-heading td { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: var(--ink); padding: 18px 12px 6px; border-bottom: 1px solid var(--border); }
+tbody tr.row-text td { color: var(--muted); font-size: 12px; white-space: pre-line; }
+tbody tr.row-subtotal td { font-weight: 600; color: var(--ink); text-align: right; border-top: 1px solid var(--border); }
+tbody tr.row-discount .item-name, tbody tr.row-discount td.num { color: var(--teal); }
 .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 28px; }
 .totals { width: 50%; min-width: 280px; }
 .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
@@ -129,7 +155,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
 .swish-mark { background: #fff; border: 1px solid var(--teal-100); border-radius: 8px; padding: 8px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 110px; }
 .swish-mark .label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em; }
 .swish-mark .num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; color: var(--ink); letter-spacing: -0.01em; }
-.terms { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 28px; }
+.terms { font-size: 11px; color: var(--muted); line-height: 1.7; margin-bottom: 28px; white-space: pre-line; }
 .terms strong { color: var(--ink); font-weight: 600; }
 .footer { margin-top: auto; padding-top: 18px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; font-size: 10px; color: var(--muted); }
 .footer .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 2px; }
@@ -190,6 +216,7 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
   </section>
 
   <h1 class="quote-title">${escapeHtml(data.quote.title)}</h1>
+  ${descriptionHtml}
   ${introHtml}
 
   <table>
@@ -215,13 +242,12 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: now
     </div>
   </div>
 
+  ${conclusionHtml}
   ${swishBox}
 
-  <p class="terms">
-    <strong>Villkor.</strong> ${data.quote.termsText
+  <p class="terms"><strong>Villkor.</strong> ${data.quote.termsText
       ? escapeHtml(data.quote.termsText)
-      : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning. Alla priser är exkl. moms om inte annat anges.`}${data.quote.notIncluded ? `<br/><br/><strong>Ej inkluderat:</strong> ${escapeHtml(data.quote.notIncluded)}` : ''}${data.quote.warrantyText ? `<br/><br/><strong>Garanti:</strong> ${escapeHtml(data.quote.warrantyText)}` : ''}
-  </p>
+      : `Offerten gäller till ${escapeHtml(data.quote.validUntilDate)}. ${data.quote.rotDeduction ? 'ROT-avdrag förutsätter att kund äger fastigheten och har utrymme i avdrag. ' : ''}Eventuellt tilläggsarbete debiteras enligt löpande räkning. Alla priser är exkl. moms om inte annat anges.`}${data.quote.notIncluded ? `<br/><br/><strong>Ej inkluderat:</strong> ${escapeHtml(data.quote.notIncluded)}` : ''}${data.quote.warrantyText ? `<br/><br/><strong>Garanti:</strong> ${escapeHtml(data.quote.warrantyText)}` : ''}</p>
 
   <footer class="footer">
     ${data.business.orgNumber ? `<div><div class="l">Org.nr</div><div class="v">${escapeHtml(data.business.orgNumber)}</div></div>` : ''}

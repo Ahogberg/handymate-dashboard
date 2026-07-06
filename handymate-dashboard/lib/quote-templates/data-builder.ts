@@ -51,22 +51,37 @@ export function buildQuoteTemplateData(
   let items: QuoteTemplateItem[] = []
 
   if (structured.length > 0) {
-    items = structured
-      .filter(i => i.item_type === 'item')
-      .map(i => ({
+    // Mappa ALLA radtyper i ursprunglig ordning — rubriker, fritext,
+    // delsummor och rabatter är del av dokumentet, inte bara 'item'-rader.
+    const knownTypes = ['item', 'heading', 'text', 'subtotal', 'discount']
+    items = structured.map(i => {
+      const itemType: QuoteTemplateItem['itemType'] =
+        knownTypes.includes(i.item_type) ? i.item_type : 'item'
+      const quantity = Number(i.quantity || 0)
+      const unitPrice = Number(i.unit_price || 0)
+      let total = Number(i.total || quantity * unitPrice)
+      if (itemType === 'discount') {
+        // recalculateItems lagrar rabatt-total negativt, men normalisera
+        // oavsett lagrat tecken så mallarna alltid kan visa "−X kr"
+        total = -Math.abs(total)
+      }
+      return {
+        itemType,
         name: i.description || '',
         description: i.long_description || null,
-        quantity: Number(i.quantity || 0),
+        quantity,
         unit: unitLabel(i.unit),
-        unitPrice: Number(i.unit_price || 0),
-        total: Number(i.total || (Number(i.quantity || 0) * Number(i.unit_price || 0))),
+        unitPrice,
+        total,
         isRotEligible: !!i.is_rot_eligible || i.rot_rut_type === 'rot',
         isRutEligible: !!i.is_rut_eligible || i.rot_rut_type === 'rut',
-      }))
+      }
+    })
   } else {
     // Legacy: items JSONB array med { type, description, qty, price, total }
     const legacy: any[] = quote.items || []
     items = legacy.map(i => ({
+      itemType: 'item' as const,
       name: i.description || i.name || '',
       description: i.long_description || null,
       quantity: Number(i.qty || i.quantity || 1),

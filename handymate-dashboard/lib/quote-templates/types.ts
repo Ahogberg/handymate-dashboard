@@ -33,7 +33,19 @@ export interface QuoteTemplateCustomer {
   reference?: string | null
 }
 
+/** Radtyp — speglar quote_items.item_type i databasen. */
+export type QuoteTemplateItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+
 export interface QuoteTemplateItem {
+  /**
+   * Radtyp. Utelämnad tolkas som 'item' (bakåtkompatibelt med anropare
+   * som bygger items utan typ, t.ex. live-preview i offert-byggaren).
+   * - 'heading'/'text': endast `name` används (fullbreddsrad utan belopp)
+   * - 'subtotal': `name` (etikett) + `total` (lagrad delsumma)
+   * - 'discount': `total` är alltid NEGATIVT (normaliseras i data-builder),
+   *   mallarna visar "−X kr" så att synliga rader summerar till delsumman
+   */
+  itemType?: QuoteTemplateItemType
   name: string
   description?: string | null
   quantity: number

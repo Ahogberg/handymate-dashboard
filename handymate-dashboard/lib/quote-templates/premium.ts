@@ -6,7 +6,21 @@ import { escapeHtml, formatCurrency } from '@/lib/document-html'
  * Ignorerar accent_color — paletten är låst för att bevara identiteten.
  */
 export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string => {
-  const itemsHtml = data.quote.items.map(item => `
+  const itemsHtml = data.quote.items.map(item => {
+    const itemType = item.itemType || 'item'
+    if (itemType === 'heading') {
+      return `<div class="item-heading">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'text') {
+      return `<div class="item-text">${escapeHtml(item.name)}</div>`
+    }
+    if (itemType === 'subtotal') {
+      return `<div class="item-subtotal"><span class="lbl">${escapeHtml(item.name || 'Delsumma')}</span><span class="val">${formatCurrency(item.total)}</span></div>`
+    }
+    if (itemType === 'discount') {
+      return `<div class="item discount"><div><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></div><div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div><div class="num">${formatCurrency(Math.abs(item.unitPrice))}</div><div class="num">−${formatCurrency(Math.abs(item.total))}</div></div>`
+    }
+    return `
     <div class="item">
       <div>
         <div class="item-name">${escapeHtml(item.name)}</div>
@@ -16,7 +30,8 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
       <div class="num">${formatCurrency(item.unitPrice)}</div>
       <div class="num">${formatCurrency(item.total)}</div>
     </div>
-  `).join('')
+  `
+  }).join('')
 
   const rotRow = data.quote.rotDeduction
     ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
@@ -31,6 +46,18 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
   ].filter(Boolean)
 
   const tagline = data.quote.title || data.business.tagline || ''
+
+  // Pilot-feedback 2026-05-20: rendera BÅDE beskrivning och inledningstext
+  // som separata stycken när båda finns — beskrivningen först, sedan intro.
+  const descriptionHtml = data.quote.description
+    ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>`
+    : ''
+  const introHtml = data.quote.introductionText
+    ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>`
+    : ''
+  const conclusionHtml = data.quote.conclusionText
+    ? `<p class="quote-sub conclusion">${escapeHtml(data.quote.conclusionText)}</p>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="sv">
@@ -77,7 +104,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .party-line { font-size: 13px; color: var(--ink); margin-top: 2px; }
 .party-meta { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.6; }
 .quote-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 24px; color: var(--dark); letter-spacing: -0.01em; margin-bottom: 6px; }
-.quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; max-width: 540px; }
+.quote-sub { color: var(--muted); font-size: 13px; margin-bottom: 22px; max-width: 540px; white-space: pre-line; }
 .items { margin-bottom: 28px; }
 .items-head { display: grid; grid-template-columns: 1fr 80px 110px 120px; gap: 16px; padding: 8px 0 12px; border-bottom: 1.5px solid var(--dark); font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); }
 .items-head .num { text-align: right; }
@@ -85,11 +112,17 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .item:nth-child(odd) { border-left-color: var(--dark); }
 .item .num { text-align: right; font-variant-numeric: tabular-nums; align-self: center; white-space: nowrap; }
 .item-name { font-weight: 600; color: var(--dark); font-size: 13px; }
-.item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.5; }
+.item-desc { color: var(--muted); font-size: 12px; margin-top: 2px; line-height: 1.5; white-space: pre-line; }
+.item-heading { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--dark); padding: 20px 0 8px; border-bottom: 1px solid var(--line); }
+.item-text { font-size: 12px; color: var(--muted); line-height: 1.6; padding: 10px 0; border-bottom: 1px solid var(--line); white-space: pre-line; }
+.item-subtotal { display: flex; justify-content: flex-end; gap: 24px; padding: 10px 0; border-bottom: 1px solid var(--dark); font-size: 13px; }
+.item-subtotal .lbl { color: var(--muted); font-weight: 600; }
+.item-subtotal .val { font-weight: 700; color: var(--dark); font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
+.item.discount .item-name, .item.discount .num { color: var(--amber); }
 .totals-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 28px; align-items: stretch; }
 .terms-card { border: 1px solid var(--line); padding: 18px; background: #fff; }
 .terms-card h3 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); margin-bottom: 8px; }
-.terms-card p { font-size: 11px; color: var(--muted); line-height: 1.7; }
+.terms-card p { font-size: 11px; color: var(--muted); line-height: 1.7; white-space: pre-line; }
 .terms-card p strong { color: var(--ink); }
 .terms-card p + p { margin-top: 8px; }
 .totals-stack { display: flex; flex-direction: column; }
@@ -171,7 +204,8 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
     </section>
 
     <h1 class="quote-title">${escapeHtml(data.quote.title)}</h1>
-    ${data.quote.description ? `<p class="quote-sub">${escapeHtml(data.quote.description)}</p>` : data.quote.introductionText ? `<p class="quote-sub">${escapeHtml(data.quote.introductionText)}</p>` : ''}
+    ${descriptionHtml}
+    ${introHtml}
 
     <div class="items">
       <div class="items-head">
@@ -202,6 +236,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
       </div>
     </div>
 
+    ${conclusionHtml}
     <div class="pay-row">
       ${data.business.bankgiro ? `<div class="pay-card"><div class="l">Bankgiro</div><div class="v">${escapeHtml(data.business.bankgiro)}</div><div class="s">Faktura skickas vid avslut</div></div>` : ''}
       ${data.business.swish ? `<div class="pay-card"><div class="l">Swish företag</div><div class="v">${escapeHtml(data.business.swish)}</div><div class="s">Ange offertnummer i meddelandet</div></div>` : ''}
