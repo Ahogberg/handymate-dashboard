@@ -55,7 +55,13 @@ export async function POST(request: NextRequest) {
       quantity: item.quantity || 1,
       unit: item.unit || 'st',
       unit_price: item.unit_price || item.price || 0,
-      total: (item.quantity || 1) * (item.unit_price || item.price || 0),
+      // Endast riktiga 'item'-rader räknas om (antal × á-pris). Delsummor
+      // (quantity 0, lagrad total = summan) nollades av omräkningen, och
+      // rabatter (lagrad NEGATIV total) fick fel tecken i fakturans JSONB.
+      // Rubrik/text/delsumma/rabatt behåller därför sin lagrade total.
+      total: (item.item_type || 'item') === 'item'
+        ? (item.quantity || 1) * (item.unit_price || item.price || 0)
+        : (item.total || 0),
       type: item.type,
       is_rot_eligible: item.is_rot_eligible || false,
       is_rut_eligible: item.is_rut_eligible || false,

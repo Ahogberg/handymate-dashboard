@@ -418,7 +418,22 @@ export async function POST(request: NextRequest) {
       }))
 
       const { error: itemsError } = await supabase.from('quote_items').insert(itemInserts)
-      if (itemsError) console.error('Insert quote_items error:', itemsError)
+      if (itemsError) {
+        console.error('Insert quote_items error:', itemsError)
+        // En offert utan rader är korrupt — ta bort det nyskapade huvudet
+        // så användaren kan försöka igen utan halvsparad data. (Insert av
+        // raderna är ett enda statement och därmed atomiskt: vid fel har
+        // inga rader skapats, så det räcker att radera huvudet.)
+        await supabase
+          .from('quotes')
+          .delete()
+          .eq('quote_id', quoteId)
+          .eq('business_id', businessId)
+        return NextResponse.json(
+          { error: 'Kunde inte spara offertens rader — försök igen' },
+          { status: 500 }
+        )
+      }
     }
 
     // Sync deal value + quote_id if deal_id provided
@@ -611,10 +626,25 @@ export async function PUT(request: NextRequest) {
       updates.rot_rut_deduction = totalDeduction
       updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
 
-      // Replace quote_items rows
-      await supabase.from('quote_items').delete().eq('quote_id', quote_id)
+      // Byt ut quote_items-raderna utan att någonsin tappa data:
+      // (1) hämta gamla radernas id, (2) infoga de NYA raderna först,
+      // (3) radera de gamla raderna först NÄR insert lyckats. Tabellen har
+      // bara `id` som PK och ingen unik constraint på (quote_id, sort_order)
+      // (sql/quote_overhaul.sql), så gamla + nya rader kan samexistera
+      // kortvarigt. Tidigare raderades allt först — ett misslyckat insert
+      // (t.ex. item_type utanför CHECK-constrainten) raderade då samtliga
+      // rader permanent medan offerthuvudet sparades "framgångsrikt".
+      const { data: oldRows } = await supabase
+        .from('quote_items')
+        .select('id')
+        .eq('quote_id', quote_id)
+      const oldIds = (oldRows || []).map((r) => r.id)
+
       const itemInserts = structuredItems.map((item, idx) => ({
-        id: item.id || ('qi_' + Math.random().toString(36).substr(2, 12)),
+        // Alltid färskt id: inkommande item.id är ofta ett befintligt rad-id
+        // och skulle kollidera med gamla radens PK medan båda uppsättningarna
+        // samexisterar. Inget (FK eller kod) refererar quote_items.id.
+        id: 'qi_' + Math.random().toString(36).substr(2, 12),
         quote_id: quote_id,
         business_id: business.business_id,
         item_type: item.item_type,
@@ -633,9 +663,35 @@ export async function PUT(request: NextRequest) {
         linked_product_id: item.linked_product_id || null,
         sort_order: idx,
       }))
-      if (itemInserts.length > 0) {
-        const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
-        if (itemsErr) console.error('Update quote_items error:', itemsErr)
+      const { error: itemsErr } = await supabase.from('quote_items').insert(itemInserts)
+      if (itemsErr) {
+        console.error('Update quote_items error:', itemsErr)
+        // Gamla raderna är orörda och offerthuvudet ännu inte uppdaterat —
+        // offerten är kvar i sitt tidigare, konsistenta skick.
+        return NextResponse.json(
+          { error: 'Kunde inte spara offertens rader — försök igen' },
+          { status: 500 }
+        )
+      }
+
+      if (oldIds.length > 0) {
+        const { error: delErr } = await supabase
+          .from('quote_items')
+          .delete()
+          .in('id', oldIds)
+        if (delErr) {
+          console.error('Delete old quote_items error:', delErr)
+          // Rulla tillbaka de nyinfogade raderna så offerten inte får
+          // dubbla rader, och lämna det gamla skicket intakt.
+          await supabase
+            .from('quote_items')
+            .delete()
+            .in('id', itemInserts.map((i) => i.id))
+          return NextResponse.json(
+            { error: 'Kunde inte spara offertens rader — försök igen' },
+            { status: 500 }
+          )
+        }
       }
     } else if (body.items !== undefined) {
       // Legacy JSONB items recalculation
