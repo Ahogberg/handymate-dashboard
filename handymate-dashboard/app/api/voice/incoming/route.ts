@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
         forward_phone_number,
         personal_phone,
         call_recording_enabled,
-        call_recording_consent_message
+        call_recording_consent_message,
+        onboarding_data
       `)
       .eq('assigned_phone_number', to)
       .single()
@@ -75,6 +76,67 @@ export async function POST(request: NextRequest) {
     if (businessError || !business) {
       console.error('No business found for number:', to)
       return NextResponse.json({ "hangup": "no_business_found" })
+    }
+
+    // ── Aha-onboardingens ring-test (spec: tasks/aha-onboarding-spec.md) ──
+    // Armerat testfönster → deterministisk fångst UTANFÖR regelmotorn
+    // (reglerna är inte seedade under onboardingen + nattspärr skulle tyst
+    // skippa). Helt innesluten i armerings-checken; fel här får ALDRIG
+    // störa normala samtal (yttre try/catch → faller vidare till vanlig routing).
+    try {
+      const { isTestCallArmed, writeTestCall } = await import('@/lib/onboarding/test-call')
+      const testState = ((business as any).onboarding_data?.test_call) || null
+      if (isTestCallArmed(testState, Date.now())) {
+        console.log('[Voice] Ring-testet armerat — fångar', { from, businessId: business.business_id })
+
+        // 1. Lead + deal, märkt som test (kund dedupas på telefon)
+        let leadId: string | null = null, dealId: string | null = null, custId: string | null = null
+        try {
+          const { createLeadAndDeal } = await import('@/lib/leads/golden-path')
+          const gp = await createLeadAndDeal({
+            businessId: business.business_id,
+            businessPhoneNumber: to,
+            name: '🧪 Testsamtal (du)',
+            phone: from,
+            email: null,
+            message: 'Ring-testet från onboardingen — det här leadet är du.',
+            source: 'vapi_call',
+          }, supabase)
+          leadId = gp.leadId; dealId = gp.dealId; custId = gp.customerId
+        } catch (gpErr) {
+          console.error('[Voice] test-lead misslyckades (fortsätter — SMS:et är aha:t):', gpErr)
+        }
+
+        // 2. Catch-SMS OMEDELBART — landar medan de håller telefonen
+        const { sendSmsViaElks } = await import('@/lib/sms-send')
+        const smsResult = await sendSmsViaElks({
+          supabase,
+          businessId: business.business_id,
+          businessName: business.business_name || null,
+          to: from,
+          message: `Hej! Det här är Lisa på ${business.business_name || 'ditt företag'}. Precis så här snabbt svarar jag dina kunder när du inte hinner 🚀`,
+          customerId: custId,
+          relatedId: leadId,
+          messageType: 'onboarding_test',
+        })
+
+        // 3. Skriv stegen + AVARMERA (nästa samtal behandlas normalt)
+        await writeTestCall(supabase, business.business_id, {
+          armed_until: null,
+          called_at: new Date().toISOString(),
+          sms_sent: smsResult.success === true,
+          sms_error: smsResult.success ? null : (smsResult.error || 'okänt fel'),
+          lead_id: leadId, customer_id: custId, deal_id: dealId,
+        })
+
+        // 4. Lisas hälsning + handled=1 (ingen dubbel call_missed)
+        return NextResponse.json({
+          play: `${APP_URL}/api/voice/greeting?business_id=${business.business_id}`,
+          whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`,
+        })
+      }
+    } catch (testErr) {
+      console.error('[Voice] ring-test-gren fel (non-blocking, normal routing fortsätter):', testErr)
     }
 
     // Hämta call_handling_mode från automation_settings
