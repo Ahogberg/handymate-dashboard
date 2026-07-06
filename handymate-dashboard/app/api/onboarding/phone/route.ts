@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-
-const ELKS_API_USER = process.env.ELKS_API_USER!
-const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+import { purchaseAndAssignNumber } from '@/lib/phone/purchase-number'
 
 /**
  * POST - Provisionera telefonnummer under onboarding
@@ -85,70 +82,39 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Köp nummer från 46elks
-    console.log('Purchasing number from 46elks for onboarding...')
+    // Köp nummer från 46elks via delad hjälpare (lib/phone/purchase-number)
+    const result = await purchaseAndAssignNumber(supabase, businessId)
 
-    const purchaseResponse = await fetch('https://api.46elks.com/a1/numbers', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64'),
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        country: 'se',
-        voice_start: `${APP_URL}/api/voice/incoming`,
-        sms_url: `${APP_URL}/api/sms/incoming`
-      }).toString()
-    })
-
-    if (!purchaseResponse.ok) {
-      const errorText = await purchaseResponse.text()
-      console.error('46elks purchase error:', errorText)
+    if (!result.ok) {
+      const message = result.error === 'db_save_failed'
+        ? 'Failed to save number to database'
+        : 'Failed to purchase number from 46elks'
       return NextResponse.json({
-        error: 'Failed to purchase number from 46elks',
-        details: errorText
+        error: message,
+        details: result.details
       }, { status: 500 })
     }
 
-    const numberData = await purchaseResponse.json()
-    console.log('Number purchased:', numberData)
-
-    // Spara numret i business_config
-    const { error: updateError } = await supabase
+    // Spara samtalsinställningarna (hjälparen sätter enbart nummer-fälten)
+    const { error: settingsError } = await supabase
       .from('business_config')
       .update({
-        assigned_phone_number: numberData.number,
         forward_phone_number: forward_phone_number || null,
-        elks_number_id: numberData.id,
-        call_recording_enabled: true,
-        call_recording_consent_message: 'Detta samtal kan komma att spelas in för kvalitets- och utbildningsändamål.',
         call_mode: call_mode || 'human_first',
         phone_setup_type: phone_setup_type || 'keep_existing',
       })
       .eq('business_id', businessId)
 
-    if (updateError) {
-      console.error('Database update error:', updateError)
-      // Försök ta bort numret från 46elks
-      await fetch(`https://api.46elks.com/a1/numbers/${numberData.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Basic ' + Buffer.from(`${ELKS_API_USER}:${ELKS_API_PASSWORD}`).toString('base64')
-        }
-      })
-
-      return NextResponse.json({
-        error: 'Failed to save number to database',
-        details: updateError.message
-      }, { status: 500 })
+    if (settingsError) {
+      return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 })
     }
 
     return NextResponse.json({
       success: true,
-      number: numberData.number,
-      number_id: numberData.id,
+      number: result.phone_number,
+      number_id: result.number_id,
       forward_to: forward_phone_number,
-      message: `Telefonnummer ${numberData.number} har tilldelats ${business.business_name}`
+      message: `Telefonnummer ${result.phone_number} har tilldelats ${business.business_name}`
     })
 
   } catch (error: any) {
