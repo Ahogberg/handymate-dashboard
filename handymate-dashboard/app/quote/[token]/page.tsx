@@ -30,6 +30,19 @@ interface QuoteItem {
   type?: 'labor' | 'material' | 'service'
 }
 
+// Rader från quote_items-tabellen (moderna offerter) — renderas i sort_order
+interface StructuredQuoteItem {
+  id: string
+  item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+  group_name?: string | null
+  description: string | null
+  quantity: number | null
+  unit: string | null
+  unit_price: number | null
+  total: number | null
+  sort_order: number
+}
+
 interface BusinessInfo {
   name: string
   contact_name: string
@@ -46,6 +59,7 @@ interface QuoteData {
   title?: string
   description?: string
   items: QuoteItem[]
+  structured_items?: StructuredQuoteItem[]
   labor_total: number
   material_total: number
   subtotal: number
@@ -579,6 +593,7 @@ export default function QuoteSignPage() {
 
   if (!quote) return null
 
+  const structuredItems = quote.structured_items || []
   const itemGroups = groupItems(quote.items || [])
   const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
 
@@ -664,11 +679,62 @@ export default function QuoteSignPage() {
               </div>
             </div>
             {quote.description && (
-              <p className="text-gray-500 text-sm mt-3 leading-relaxed">{quote.description}</p>
+              <p className="text-gray-500 text-sm mt-3 leading-relaxed whitespace-pre-line">{quote.description}</p>
             )}
           </div>
 
-          {/* Items grouped by type */}
+          {/* Items: quote_items-rader i sort_order (moderna offerter) */}
+          {structuredItems.length > 0 ? (
+            <div className="bg-gray-100/30 rounded-xl border border-gray-200 overflow-hidden divide-y divide-gray-200/50">
+              {structuredItems.map((item, idx) => {
+                const key = item.id || idx
+                switch (item.item_type) {
+                  case 'heading':
+                    return (
+                      <div key={key} className="px-4 py-3 bg-gray-50 text-sm font-semibold text-gray-900">
+                        {item.description}
+                      </div>
+                    )
+                  case 'text':
+                    return (
+                      <div key={key} className="px-4 py-2.5 text-xs text-gray-500 leading-relaxed whitespace-pre-line">
+                        {item.description}
+                      </div>
+                    )
+                  case 'subtotal':
+                    return (
+                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm font-medium">
+                        <span className="text-gray-500">{item.description || 'Delsumma'}</span>
+                        <span className="text-gray-900 shrink-0">{formatSEK(item.total || 0)}</span>
+                      </div>
+                    )
+                  case 'discount':
+                    return (
+                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
+                        <span className="text-gray-500">{item.description || 'Rabatt'}</span>
+                        <span className="text-emerald-600 font-medium shrink-0">
+                          −{formatSEK(Math.abs(item.total || 0))}
+                        </span>
+                      </div>
+                    )
+                  default:
+                    return (
+                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
+                        <div className="min-w-0">
+                          <p className="text-gray-900">{item.description}</p>
+                          {(item.quantity || 0) > 0 && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-gray-900 font-medium shrink-0">{formatSEK(item.total || 0)}</span>
+                      </div>
+                    )
+                }
+              })}
+            </div>
+          ) : (
           <div className="space-y-6">
             {Object.entries(itemGroups).map(([type, items]) => {
               if (items.length === 0) return null
@@ -728,6 +794,7 @@ export default function QuoteSignPage() {
               )
             })}
           </div>
+          )}
 
           {/* Summary */}
           <div className="mt-6 pt-6 border-t border-gray-200">

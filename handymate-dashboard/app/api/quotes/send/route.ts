@@ -7,6 +7,7 @@ import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { escapeHtml } from '@/lib/document-html'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -101,6 +102,17 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
     return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
   }
 
+  // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
+  // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
+  const businessName = escapeHtml(business.business_name)
+  const customerName = escapeHtml(quote.customer?.name || 'kund')
+  const quoteTitle = escapeHtml(quote.title || 'Offert')
+  const quoteDescription = escapeHtml(quote.description)
+  const businessPhone = escapeHtml(business.phone_number)
+  const businessEmail = escapeHtml(business.contact_email)
+  const businessOrgNumber = escapeHtml(business.org_number)
+  const businessLogoUrl = escapeHtml(business.logo_url)
+
   const formatDate = (date: string) => {
     return new Date(date).toLocaleDateString('sv-SE', {
       year: 'numeric',
@@ -129,8 +141,8 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
       <!-- CTA -->
       <div style="text-align: center; margin: 30px 0;">
         <p style="color: #444; margin-bottom: 15px;">Har du frågor eller vill boka? Kontakta oss:</p>
-        <a href="tel:${business.phone_number}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-          Ring ${business.phone_number}
+        <a href="tel:${businessPhone}" style="display: inline-block; background: #0d9488; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+          Ring ${businessPhone}
         </a>
       </div>`
 
@@ -145,15 +157,15 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
   <div style="max-width: 600px; margin: 0 auto;">
     <!-- Header -->
     <div style="background: #0d9488; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-      ${business.logo_url ? `<img src="${business.logo_url}" alt="${business.business_name}" style="max-height: 48px; margin-bottom: 12px;" />` : ''}
-      <h1 style="color: white; margin: 0; font-size: 28px;">${business.business_name}</h1>
+      ${business.logo_url ? `<img src="${businessLogoUrl}" alt="${businessName}" style="max-height: 48px; margin-bottom: 12px;" />` : ''}
+      <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
       <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Offert</p>
     </div>
 
     <!-- Content -->
     <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
       <p style="font-size: 16px; color: #1a1a1a; margin: 0 0 20px 0;">
-        Hej ${quote.customer?.name || 'kund'}!
+        Hej ${customerName}!
       </p>
 
       <p style="color: #444; line-height: 1.6;">
@@ -163,9 +175,9 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
       <!-- Quote Box -->
       <div style="background: #f0fdfa; border-left: 4px solid #0d9488; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
         <h2 style="margin: 0 0 10px 0; font-size: 18px; color: #1a1a1a;">
-          ${quote.title || 'Offert'}
+          ${quoteTitle}
         </h2>
-        ${quote.description ? `<p style="color: #666; margin: 0; font-size: 14px;">${quote.description}</p>` : ''}
+        ${quote.description ? `<p style="color: #666; margin: 0; font-size: 14px; white-space: pre-line;">${quoteDescription}</p>` : ''}
       </div>
 
       <!-- Price -->
@@ -186,15 +198,15 @@ function generateEmailHTML(quote: any, business: any, signUrl?: string, tracking
 
       <!-- Footer -->
       <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 12px;">
-        <p style="margin: 0 0 5px 0;"><strong>${business.business_name}</strong></p>
-        <p style="margin: 0;">${business.phone_number} | ${business.contact_email}</p>
-        ${business.org_number ? `<p style="margin: 5px 0 0 0;">Org.nr: ${business.org_number}</p>` : ''}
+        <p style="margin: 0 0 5px 0;"><strong>${businessName}</strong></p>
+        <p style="margin: 0;">${businessPhone} | ${businessEmail}</p>
+        ${business.org_number ? `<p style="margin: 5px 0 0 0;">Org.nr: ${businessOrgNumber}</p>` : ''}
       </div>
     </div>
 
     <!-- Disclaimer -->
     <p style="text-align: center; color: #999; font-size: 11px; margin-top: 20px;">
-      Detta email skickades från ${business.business_name} via Handymate.
+      Detta email skickades från ${businessName} via Handymate.
     </p>
   </div>
 ${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />` : ''}

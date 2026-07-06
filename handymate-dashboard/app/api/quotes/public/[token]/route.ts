@@ -30,6 +30,15 @@ export async function GET(
       return NextResponse.json({ error: 'Offert hittades inte eller länken är ogiltig' }, { status: 404 })
     }
 
+    // Riktiga offertrader ligger i quote_items-tabellen — moderna offerter har
+    // JSONB-fältet quotes.items medvetet tomt. Utan detta renderar publika
+    // sidan noll rader. Exponeras som structured_items vid sidan av legacy items.
+    const { data: structuredItems } = await supabase
+      .from('quote_items')
+      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order')
+      .eq('quote_id', quote.quote_id)
+      .order('sort_order', { ascending: true })
+
     // Hämta kund separat (FK-relation kan saknas)
     let customer: any = null
     if (quote.customer_id) {
@@ -56,6 +65,7 @@ export async function GET(
       quote: {
         ...quote,
         business_id: undefined, // Don't expose
+        structured_items: structuredItems && structuredItems.length > 0 ? structuredItems : undefined,
       },
       business: {
         name: business?.business_name || '',
