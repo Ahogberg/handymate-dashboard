@@ -5,6 +5,10 @@ import { ArrowRight, Check, FileText, Loader2, PenTool, Sparkles, X } from 'luci
 import SignatureCanvas, { type SignatureCanvasHandle } from './SignatureCanvas'
 import { formatCurrency } from '../helpers'
 import type { Quote } from '../types'
+import {
+  calculatePublicQuoteTotals,
+  type PublicStructuredItem,
+} from '@/lib/quote-calculations'
 
 interface PortalQuoteSigningModalProps {
   quote: Quote
@@ -32,9 +36,68 @@ export default function PortalQuoteSigningModal({
   const [saving, setSaving] = useState(false)
   const canvasRef = useRef<SignatureCanvasHandle>(null)
 
+  // Tillval: rader + moms/rabatt-parametrar hämtas via befintliga publika
+  // GET:en. Kundens val är endast visning — servern räknar om totalen själv.
+  const [structuredItems, setStructuredItems] = useState<PublicStructuredItem[]>([])
+  const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set())
+  const [quoteParams, setQuoteParams] = useState<{ discountPercent: number; vatRate: number }>({
+    discountPercent: 0,
+    vatRate: 25,
+  })
+
   useEffect(() => {
     if (step === 1) setTimeout(() => canvasRef.current?.init(), 100)
   }, [step])
+
+  useEffect(() => {
+    if (!quote.sign_token) return
+    let cancelled = false
+    fetch(`/api/quotes/public/${quote.sign_token}`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (cancelled || !data?.quote) return
+        const items = (data.quote.structured_items || []) as PublicStructuredItem[]
+        setStructuredItems(items)
+        setSelectedOptions(
+          new Set(
+            items
+              .filter(i => i.item_type === 'option' && i.option_selected === true)
+              .map(i => i.id)
+          )
+        )
+        setQuoteParams({
+          discountPercent: data.quote.discount_percent ?? 0,
+          vatRate: data.quote.vat_rate ?? 25,
+        })
+      })
+      .catch(() => { /* tillval visas ej — signering fungerar ändå */ })
+    return () => { cancelled = true }
+  }, [quote.sign_token])
+
+  const optionRows = structuredItems.filter(i => i.item_type === 'option')
+  const liveTotals =
+    optionRows.length > 0
+      ? calculatePublicQuoteTotals(
+          structuredItems,
+          selectedOptions,
+          quoteParams.discountPercent,
+          quoteParams.vatRate
+        )
+      : null
+  const dispTotal = liveTotals ? liveTotals.total : quote.total
+  const dispDeduction = liveTotals
+    ? liveTotals.rotDeduction + liveTotals.rutDeduction
+    : quote.rot_rut_deduction
+  const dispToPay = dispDeduction > 0 ? dispTotal - dispDeduction : dispTotal
+
+  function toggleOption(id: string) {
+    setSelectedOptions(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   async function sign() {
     if (!quote.sign_token || !name.trim() || !hasSig || saving) return
@@ -52,6 +115,7 @@ export default function PortalQuoteSigningModal({
           action: 'sign',
           name: name.trim(),
           signature_data: signatureData,
+          selected_option_ids: Array.from(selectedOptions),
         }),
       })
       if (!res.ok) {
@@ -151,9 +215,9 @@ export default function PortalQuoteSigningModal({
                     letterSpacing: '-0.02em',
                   }}
                 >
-                  {formatCurrency(quote.total)}
+                  {formatCurrency(dispTotal)}
                 </div>
-                {quote.rot_rut_type && quote.rot_rut_deduction > 0 && (
+                {quote.rot_rut_type && dispDeduction > 0 && (
                   <div
                     style={{
                       marginTop: 10,
@@ -169,10 +233,100 @@ export default function PortalQuoteSigningModal({
                     }}
                   >
                     <Sparkles size={14} />
-                    {quote.rot_rut_type.toUpperCase()}-avdrag {formatCurrency(quote.rot_rut_deduction)} ingår
+                    {quote.rot_rut_type.toUpperCase()}-avdrag {formatCurrency(dispDeduction)} ingår
                   </div>
                 )}
               </div>
+
+              {optionRows.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: 'var(--muted)',
+                      letterSpacing: '0.08em',
+                      marginBottom: 8,
+                    }}
+                  >
+                    TILLVAL — VÄLJ VAD SOM SKA INGÅ
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {optionRows.map(row => {
+                      const selected = selectedOptions.has(row.id)
+                      return (
+                        <button
+                          key={row.id}
+                          type="button"
+                          onClick={() => toggleOption(row.id)}
+                          aria-pressed={selected}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            width: '100%',
+                            padding: '12px 14px',
+                            background: selected ? 'var(--bg)' : '#fff',
+                            border: `1.5px solid ${selected ? 'var(--bee-600)' : 'var(--border)'}`,
+                            borderRadius: 'var(--r-md)',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            textAlign: 'left',
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: 6,
+                              border: `2px solid ${selected ? 'var(--bee-600)' : 'var(--border-strong)'}`,
+                              background: selected ? 'var(--bee-600)' : '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                              color: '#fff',
+                            }}
+                          >
+                            {selected && <Check size={14} strokeWidth={3} />}
+                          </span>
+                          <span style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.4 }}>
+                            {row.description}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: selected ? 'var(--ink)' : 'var(--muted)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            {selected ? '' : '+'}{formatCurrency(row.total || 0)}
+                          </span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginTop: 10,
+                      padding: '10px 14px',
+                      background: 'var(--bg)',
+                      borderRadius: 'var(--r-md)',
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-2)' }}>
+                      Att betala
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)' }}>
+                      {formatCurrency(dispToPay)}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {quote.sign_token && (
                 <div style={{ marginBottom: 18 }}>
@@ -349,7 +503,7 @@ export default function PortalQuoteSigningModal({
               onClick={sign}
             >
               {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-              Signera offert · {formatCurrency(quote.total)}
+              Signera offert · {formatCurrency(dispTotal)}
             </button>
           )}
         </div>

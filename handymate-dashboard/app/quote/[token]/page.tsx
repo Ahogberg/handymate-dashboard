@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Loader2,
+  Check,
   CheckCircle,
   AlertTriangle,
   Zap,
@@ -18,6 +19,7 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react'
+import { calculatePublicQuoteTotals } from '@/lib/quote-calculations'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,9 @@ interface StructuredQuoteItem {
   unit_price: number | null
   total: number | null
   sort_order: number
+  is_rot_eligible?: boolean | null
+  is_rut_eligible?: boolean | null
+  rot_rut_type?: 'rot' | 'rut' | null
   /** Endast 'option'-rader: kundens val (☑/☐) — quote_items.option_selected */
   option_selected?: boolean | null
   /** Endast 'option'-rader: hantverkarens Förvald-toggle */
@@ -68,6 +73,7 @@ interface QuoteData {
   material_total: number
   subtotal: number
   discount_amount?: number
+  discount_percent?: number
   vat_amount?: number
   vat_rate?: number
   total: number
@@ -131,6 +137,9 @@ export default function QuoteSignPage() {
   const [declineReason, setDeclineReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [daysLeft, setDaysLeft] = useState<number | null>(null)
+  // Kundens tillvalsval (id:n för ikryssade option-rader). Endast visning —
+  // servern validerar id:na och räknar om totalen själv vid signering.
+  const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set())
 
   // Canvas refs and drawing state
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -161,6 +170,13 @@ export default function QuoteSignPage() {
 
         setQuote(quoteData)
         setBusiness(businessData)
+
+        // Initiera tillvalsvalen från lagrat option_selected (Förvald-toggle
+        // vid skapande, kundens val efter signering).
+        const optionIds = ((quoteData.structured_items || []) as StructuredQuoteItem[])
+          .filter((i) => i.item_type === 'option' && i.option_selected === true)
+          .map((i) => i.id)
+        setSelectedOptions(new Set(optionIds))
 
         if (quoteData.customer?.name) {
           setName(quoteData.customer.name)
@@ -325,6 +341,17 @@ export default function QuoteSignPage() {
     setHasDrawn(false)
   }
 
+  // ── Tillval ────────────────────────────────────────────────────────────────
+
+  function toggleOption(id: string) {
+    setSelectedOptions((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
   // ── Submit signature ───────────────────────────────────────────────────────
 
   async function handleSubmit() {
@@ -346,6 +373,7 @@ export default function QuoteSignPage() {
           action: 'sign',
           name: name.trim(),
           signature_data: signatureData,
+          selected_option_ids: Array.from(selectedOptions),
         }),
       })
 
@@ -601,6 +629,37 @@ export default function QuoteSignPage() {
   const itemGroups = groupItems(quote.items || [])
   const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
 
+  // ── Tillval: live-total på klienten via SAMMA motor som servern ────────────
+  // Endast visning — servern räknar alltid om själv vid signering.
+  // Låst läge (signerad offert): visa lagrat option_selected, ingen toggling.
+  const optionsLocked = !!quote.signed_at
+  const hasOptionRows = structuredItems.some((i) => i.item_type === 'option')
+  const liveTotals = hasOptionRows
+    ? calculatePublicQuoteTotals(
+        structuredItems,
+        selectedOptions,
+        quote.discount_percent ?? 0,
+        quote.vat_rate ?? 25
+      )
+    : null
+  const dispLaborTotal = liveTotals ? liveTotals.laborTotal : quote.labor_total
+  const dispMaterialTotal = liveTotals ? liveTotals.materialTotal : quote.material_total
+  const dispSubtotal = liveTotals
+    ? liveTotals.subtotal
+    : quote.subtotal || quote.labor_total + quote.material_total
+  const dispDiscountAmount = liveTotals ? liveTotals.discountAmount : quote.discount_amount ?? 0
+  const dispVatAmount = liveTotals ? liveTotals.vat : quote.vat_amount ?? 0
+  const dispTotal = liveTotals ? liveTotals.total : quote.total
+  // ROT/RUT-boxen: samma kombinerade avdrag som serverns rot_rut_deduction-kolumn
+  const dispRotRutDeduction = liveTotals
+    ? liveTotals.rotDeduction + liveTotals.rutDeduction
+    : quote.rot_rut_deduction || 0
+  const dispCustomerPays = liveTotals
+    ? dispRotRutDeduction > 0
+      ? liveTotals.total - dispRotRutDeduction
+      : liveTotals.total
+    : quote.customer_pays ?? quote.total - (quote.rot_rut_deduction || 0)
+
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
       {/* Background blobs */}
@@ -722,14 +781,32 @@ export default function QuoteSignPage() {
                       </div>
                     )
                   case 'option': {
-                    // Statisk visning av tillvalsrad — kryssbar interaktivitet
-                    // byggs separat. ☑ = valt, ☐ = bortvalt (räknas ej i totalen).
-                    const selected = item.option_selected === true
+                    // Kryssbar tillvalsrad. Låst (visar lagrat val) när offerten
+                    // redan är signerad. ☑ = valt (räknas i totalen), ☐ = bortvalt.
+                    const selected = optionsLocked
+                      ? item.option_selected === true
+                      : selectedOptions.has(item.id)
                     return (
-                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
+                      <button
+                        key={key}
+                        type="button"
+                        disabled={optionsLocked}
+                        onClick={() => toggleOption(item.id)}
+                        aria-pressed={selected}
+                        className={`w-full text-left px-4 py-3 flex justify-between gap-4 text-sm transition-colors ${
+                          optionsLocked ? 'cursor-default' : 'cursor-pointer hover:bg-primary-50/40 active:bg-primary-50/60'
+                        }`}
+                      >
                         <div className="min-w-0 flex items-start gap-2">
-                          <span className={`text-base leading-5 shrink-0 ${selected ? 'text-primary-700' : 'text-gray-400'}`}>
-                            {selected ? '☑' : '☐'}
+                          <span
+                            className={`mt-0.5 shrink-0 rounded border flex items-center justify-center ${
+                              selected
+                                ? 'bg-primary-700 border-primary-700'
+                                : 'bg-white border-gray-300'
+                            }`}
+                            style={{ width: 18, height: 18 }}
+                          >
+                            {selected && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
                           </span>
                           <div>
                             <p className={selected ? 'text-gray-900' : 'text-gray-500'}>
@@ -743,12 +820,17 @@ export default function QuoteSignPage() {
                                 {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
                               </p>
                             )}
+                            {!optionsLocked && (
+                              <p className="text-[11px] text-primary-700/70 mt-0.5">
+                                {selected ? 'Tryck för att välja bort' : 'Tryck för att lägga till'}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <span className={`font-medium shrink-0 ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {formatSEK(item.total || 0)}
+                          {selected ? '' : '+'}{formatSEK(item.total || 0)}
                         </span>
-                      </div>
+                      </button>
                     )
                   }
                   default:
@@ -833,49 +915,47 @@ export default function QuoteSignPage() {
           {/* Summary */}
           <div className="mt-6 pt-6 border-t border-gray-200">
             <div className="space-y-2">
-              {quote.labor_total > 0 && (
+              {dispLaborTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Arbete</span>
-                  <span className="text-gray-700">{formatSEK(quote.labor_total)}</span>
+                  <span className="text-gray-700">{formatSEK(dispLaborTotal)}</span>
                 </div>
               )}
-              {quote.material_total > 0 && (
+              {dispMaterialTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Material</span>
-                  <span className="text-gray-700">{formatSEK(quote.material_total)}</span>
+                  <span className="text-gray-700">{formatSEK(dispMaterialTotal)}</span>
                 </div>
               )}
-              {(quote.labor_total > 0 || quote.material_total > 0) && (
+              {(dispLaborTotal > 0 || dispMaterialTotal > 0) && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Delsumma</span>
-                  <span className="text-gray-700">
-                    {formatSEK(quote.subtotal || quote.labor_total + quote.material_total)}
-                  </span>
+                  <span className="text-gray-700">{formatSEK(dispSubtotal)}</span>
                 </div>
               )}
-              {quote.discount_amount != null && quote.discount_amount > 0 && (
+              {dispDiscountAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Rabatt</span>
-                  <span className="text-emerald-600">-{formatSEK(quote.discount_amount)}</span>
+                  <span className="text-emerald-600">-{formatSEK(dispDiscountAmount)}</span>
                 </div>
               )}
-              {quote.vat_amount != null && quote.vat_amount > 0 && (
+              {dispVatAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
                     Moms{quote.vat_rate ? ` (${quote.vat_rate}%)` : ''}
                   </span>
-                  <span className="text-gray-700">{formatSEK(quote.vat_amount)}</span>
+                  <span className="text-gray-700">{formatSEK(dispVatAmount)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-300">
                 <span className="text-gray-900">Totalt</span>
-                <span className="text-gray-900">{formatSEK(quote.total)}</span>
+                <span className="text-gray-900">{formatSEK(dispTotal)}</span>
               </div>
             </div>
           </div>
 
           {/* ROT/RUT box */}
-          {quote.rot_rut_type && quote.rot_rut_deduction && quote.rot_rut_deduction > 0 && (
+          {quote.rot_rut_type && dispRotRutDeduction > 0 && (
             <div className="mt-6 p-5 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
               <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">
                 {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
@@ -883,19 +963,17 @@ export default function QuoteSignPage() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Totalt belopp</span>
-                  <span className="text-gray-700">{formatSEK(quote.total)}</span>
+                  <span className="text-gray-700">{formatSEK(dispTotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">
                     {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
                   </span>
-                  <span className="text-emerald-600">-{formatSEK(quote.rot_rut_deduction)}</span>
+                  <span className="text-emerald-600">-{formatSEK(dispRotRutDeduction)}</span>
                 </div>
                 <div className="flex justify-between text-base font-bold pt-2 border-t border-emerald-500/20">
                   <span className="text-gray-900">Du betalar</span>
-                  <span className="text-emerald-600">
-                    {formatSEK(quote.customer_pays ?? quote.total - quote.rot_rut_deduction)}
-                  </span>
+                  <span className="text-emerald-600">{formatSEK(dispCustomerPays)}</span>
                 </div>
                 {quote.personnummer && (
                   <div className="flex justify-between pt-2 text-xs">

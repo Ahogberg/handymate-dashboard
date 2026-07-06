@@ -96,6 +96,60 @@ export function calculateQuoteTotals(
 }
 
 /**
+ * Rad från publika GET:ens structured_items (quote_items-rad med nullbara
+ * fält från databasen) — minsta form som klientsidans live-total behöver.
+ */
+export interface PublicStructuredItem {
+  id: string
+  item_type: string
+  description?: string | null
+  quantity?: number | null
+  unit?: string | null
+  unit_price?: number | null
+  total?: number | null
+  sort_order?: number
+  is_rot_eligible?: boolean | null
+  is_rut_eligible?: boolean | null
+  rot_rut_type?: RotRutType
+  option_selected?: boolean | null
+  option_default?: boolean | null
+}
+
+/**
+ * Live-total för publika offertvyn och portalens signeringsmodal: mappar
+ * structured_items + kundens aktuella tillvalsval till QuoteItem-form och kör
+ * SAMMA calculateQuoteTotals som servern använder vid signering — semantik-
+ * drift omöjlig. Klientens siffra är endast visning; servern räknar alltid
+ * om själv och är enda skrivaren.
+ */
+export function calculatePublicQuoteTotals(
+  items: PublicStructuredItem[],
+  selectedOptionIds: Set<string>,
+  discountPercent: number = 0,
+  vatRate: number = 25
+): QuoteTotals {
+  const mapped: QuoteItem[] = items.map(it => ({
+    id: it.id,
+    item_type: it.item_type as QuoteItem['item_type'],
+    description: it.description || '',
+    quantity: it.quantity || 0,
+    unit: it.unit || 'st',
+    unit_price: it.unit_price || 0,
+    total: it.total || 0,
+    is_rot_eligible: it.is_rot_eligible || false,
+    is_rut_eligible: it.is_rut_eligible || false,
+    // null → undefined så getItemRotRutType faller tillbaka på boolean-
+    // flaggorna för äldre rader där rot_rut_type aldrig sattes.
+    rot_rut_type: it.rot_rut_type || undefined,
+    sort_order: it.sort_order ?? 0,
+    option_selected:
+      it.item_type === 'option' ? selectedOptionIds.has(it.id) : it.option_selected === true,
+    option_default: it.option_default === true,
+  }))
+  return calculateQuoteTotals(mapped, discountPercent, vatRate)
+}
+
+/**
  * Calculate subtotal for items above the subtotal row within the same group
  */
 export function calculateSubtotal(items: QuoteItem[], subtotalIndex: number): number {
