@@ -96,10 +96,18 @@ export default function ItemRow({
 }: ItemRowProps) {
   const badge = ITEM_TYPE_BADGE[item.item_type]
   const rowStyle = ITEM_TYPE_STYLES[item.item_type]
-  const isEditable = item.item_type === 'item' || item.item_type === 'discount'
-  const showTotal = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'subtotal'
+  const isEditable = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'option'
+  const showTotal = isEditable || item.item_type === 'subtotal'
   const displayTotal = item.item_type === 'subtotal' ? recalculatedTotal : item.total
   const isCreatingCategory = showNewCategoryInput === item.id && onCreateCategory
+  const isOption = item.item_type === 'option'
+
+  // Förvald-toggle: hantverkarens förval ÄR kundens initiala val — båda
+  // fälten sätts alltid ihop (kunden kan sedan ändra option_selected i portalen).
+  const toggleOptionDefault = (checked: boolean) => {
+    onUpdate(item.id, 'option_default', checked)
+    onUpdate(item.id, 'option_selected', checked)
+  }
 
   // "Spara i prislistan" — endast för 'item'-rader med beskrivning,
   // när orchestrator har wirat upp callback:en
@@ -199,6 +207,19 @@ export default function ItemRow({
         {showTotal && !isEditable && (
           <div className="text-right"><span className="text-xs font-medium text-gray-900">{formatCurrency(displayTotal)}</span></div>
         )}
+
+        {/* Row 3: Förvald — endast tillvalsrader */}
+        {isOption && (
+          <label className="flex items-center gap-1.5 w-fit cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={item.option_default ?? false}
+              onChange={(e) => toggleOptionDefault(e.target.checked)}
+              className="w-3.5 h-3.5 rounded border-gray-300 accent-teal-600 cursor-pointer"
+            />
+            <span className="text-xs font-medium text-teal-700">Förvald</span>
+          </label>
+        )}
       </div>
 
       {/* ── Desktop layout (≥ md) ────────────────────────────── */}
@@ -223,15 +244,31 @@ export default function ItemRow({
           <span aria-hidden />
         )}
 
-        {/* Description — takes all remaining space */}
-        <input
-          type="text"
-          value={item.description}
-          onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
-          placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : item.item_type === 'subtotal' ? 'Delsumma' : 'Beskrivning'}
-          className={`w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 ${
-            item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
-        />
+        {/* Description — takes all remaining space (+ Förvald-toggle för tillvalsrader) */}
+        <div className="flex items-center gap-2 min-w-0">
+          <input
+            type="text"
+            value={item.description}
+            onChange={(e) => onUpdate(item.id, 'description', e.target.value)}
+            placeholder={item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext...' : item.item_type === 'subtotal' ? 'Delsumma' : 'Beskrivning'}
+            className={`flex-1 w-full min-w-0 px-2 py-1.5 bg-white/80 border border-gray-200 rounded-md text-gray-900 text-xs focus:outline-none focus:ring-1 focus:ring-primary-600 focus:border-primary-600 ${
+              item.item_type === 'heading' ? 'font-bold' : ''} ${item.item_type === 'text' ? 'italic' : ''}`}
+          />
+          {isOption && (
+            <label
+              className="flex items-center gap-1 shrink-0 cursor-pointer select-none"
+              title="Förvald — tillvalet är ikryssat när kunden öppnar offerten"
+            >
+              <input
+                type="checkbox"
+                checked={item.option_default ?? false}
+                onChange={(e) => toggleOptionDefault(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 accent-teal-600 cursor-pointer"
+              />
+              <span className="text-[10px] font-medium text-teal-700">Förvald</span>
+            </label>
+          )}
+        </div>
 
         {/* Quantity */}
         {isEditable ? (

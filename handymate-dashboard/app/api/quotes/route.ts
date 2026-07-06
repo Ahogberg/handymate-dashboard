@@ -413,6 +413,8 @@ export async function POST(request: NextRequest) {
         is_rot_eligible: item.is_rot_eligible || false,
         is_rut_eligible: item.is_rut_eligible || false,
         rot_rut_type: item.rot_rut_type || null,
+        option_selected: item.option_selected ?? false,
+        option_default: item.option_default ?? false,
         linked_product_id: item.linked_product_id || null,
         sort_order: idx,
       }))
@@ -660,6 +662,8 @@ export async function PUT(request: NextRequest) {
         is_rot_eligible: item.is_rot_eligible || false,
         is_rut_eligible: item.is_rut_eligible || false,
         rot_rut_type: item.rot_rut_type || null,
+        option_selected: item.option_selected ?? false,
+        option_default: item.option_default ?? false,
         linked_product_id: item.linked_product_id || null,
         sort_order: idx,
       }))

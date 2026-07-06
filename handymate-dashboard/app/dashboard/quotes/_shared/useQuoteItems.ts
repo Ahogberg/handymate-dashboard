@@ -64,8 +64,8 @@ export function useQuoteItems(
         prev.map(item => {
           if (item.id !== id) return item
           const updated = { ...item, [field]: value }
-          // Recalc line total for normal items and discounts
-          if (updated.item_type === 'item') {
+          // Recalc line total for normal items, options and discounts
+          if (updated.item_type === 'item' || updated.item_type === 'option') {
             updated.total = updated.quantity * updated.unit_price
           } else if (updated.item_type === 'discount') {
             updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))

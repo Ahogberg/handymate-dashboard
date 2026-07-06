@@ -172,6 +172,7 @@ export function QuoteEditItemsSection({
               <div className="absolute left-0 top-9 z-20 bg-white border border-slate-200 rounded-xl shadow-lg w-44 overflow-hidden py-1">
                 {[
                   { type: 'heading' as const, label: 'Rubrik' },
+                  { type: 'option' as const, label: 'Tillval' },
                   { type: 'text' as const, label: 'Fritext' },
                   { type: 'subtotal' as const, label: 'Delsumma' },
                   { type: 'discount' as const, label: 'Rabatt' },

@@ -476,6 +476,8 @@ export default function EditQuotePage() {
           article_number: item.article_number || undefined,
           is_rot_eligible: item.is_rot_eligible || false,
           is_rut_eligible: item.is_rut_eligible || false,
+          option_selected: item.option_selected ?? false,
+          option_default: item.option_default ?? false,
           category_slug: item.category_slug || undefined,
           linked_product_id: item.linked_product_id || undefined,
           sort_order: item.sort_order ?? idx,

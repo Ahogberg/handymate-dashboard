@@ -35,7 +35,7 @@ export async function GET(
     // sidan noll rader. Exponeras som structured_items vid sidan av legacy items.
     const { data: structuredItems } = await supabase
       .from('quote_items')
-      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order')
+      .select('id, item_type, group_name, description, quantity, unit, unit_price, total, sort_order, option_selected, option_default')
       .eq('quote_id', quote.quote_id)
       .order('sort_order', { ascending: true })
 
