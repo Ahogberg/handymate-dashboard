@@ -620,6 +620,9 @@ export default function EditQuotePage() {
       paymentTermsText, paymentPlan, totals.total, referencePerson, customerReference,
       projectAddress, detailLevel, showUnitPrices, showQuantities, personnummer,
       fastighetsbeteckning, hasRotItems, hasRutItems, validDays, templateStyle,
+      // termsText ingår i payloaden (terms_text) — utan den här memoiserar
+      // buildPayload en gammal villkorstext och sparar den tyst.
+      termsText,
     ],
   )
 
