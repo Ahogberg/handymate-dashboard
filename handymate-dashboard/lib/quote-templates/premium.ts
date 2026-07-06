@@ -20,6 +20,11 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
     if (itemType === 'discount') {
       return `<div class="item discount"><div><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></div><div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div><div class="num">${formatCurrency(Math.abs(item.unitPrice))}</div><div class="num">−${formatCurrency(Math.abs(item.total))}</div></div>`
     }
+    if (itemType === 'option') {
+      // Tillvalsrad: ☑ = ikryssad av kunden, ☐ = bortvald (räknas ej i totalen)
+      const box = item.optionSelected ? '☑' : '☐'
+      return `<div class="item option${item.optionSelected ? '' : ' unselected'}"><div><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}</div><div class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</div><div class="num">${formatCurrency(item.unitPrice)}</div><div class="num">${formatCurrency(item.total)}</div></div>`
+    }
     return `
     <div class="item">
       <div>
@@ -32,6 +37,13 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
     </div>
   `
   }).join('')
+
+  // Not under items-sektionen på OSIGNERAD offert med minst ett tillval —
+  // kunden ska veta att valen görs i portalen innan signering.
+  const hasOptions = data.quote.items.some(i => i.itemType === 'option')
+  const optionsNote = hasOptions && !data.isSigned
+    ? `<div class="options-note">Välj dina tillval i kundportalen innan du signerar.</div>`
+    : ''
 
   const rotRow = data.quote.rotDeduction
     ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
@@ -119,6 +131,12 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .item-subtotal .lbl { color: var(--muted); font-weight: 600; }
 .item-subtotal .val { font-weight: 700; color: var(--dark); font-variant-numeric: tabular-nums; min-width: 120px; text-align: right; }
 .item.discount .item-name, .item.discount .num { color: var(--amber); }
+.item.option .opt-box { color: var(--amber); font-size: 15px; line-height: 1; }
+.item.option.unselected .item-name, .item.option.unselected .num { color: var(--muted); }
+.item.option.unselected .opt-box { color: var(--muted); }
+.opt-badge { display: inline-block; font-family: 'Syne', sans-serif; font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.16em; color: var(--amber); border: 1px solid var(--amber); border-radius: 2px; padding: 1px 5px; margin-left: 6px; vertical-align: 1px; }
+.item.option.unselected .opt-badge { color: var(--muted); border-color: var(--line); }
+.options-note { font-size: 11px; color: var(--muted); font-style: italic; padding: 10px 0 0; }
 .totals-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 24px; margin-bottom: 28px; align-items: stretch; }
 .terms-card { border: 1px solid var(--line); padding: 18px; background: #fff; }
 .terms-card h3 { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dark); margin-bottom: 8px; }
@@ -215,6 +233,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
         <div class="num">Summa</div>
       </div>
       ${itemsHtml}
+      ${optionsNote}
     </div>
 
     <div class="totals-grid">

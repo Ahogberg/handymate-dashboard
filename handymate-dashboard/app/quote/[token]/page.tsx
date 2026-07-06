@@ -33,7 +33,7 @@ interface QuoteItem {
 // Rader från quote_items-tabellen (moderna offerter) — renderas i sort_order
 interface StructuredQuoteItem {
   id: string
-  item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+  item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
   group_name?: string | null
   description: string | null
   quantity: number | null
@@ -41,6 +41,10 @@ interface StructuredQuoteItem {
   unit_price: number | null
   total: number | null
   sort_order: number
+  /** Endast 'option'-rader: kundens val (☑/☐) — quote_items.option_selected */
+  option_selected?: boolean | null
+  /** Endast 'option'-rader: hantverkarens Förvald-toggle */
+  option_default?: boolean | null
 }
 
 interface BusinessInfo {
@@ -717,6 +721,36 @@ export default function QuoteSignPage() {
                         </span>
                       </div>
                     )
+                  case 'option': {
+                    // Statisk visning av tillvalsrad — kryssbar interaktivitet
+                    // byggs separat. ☑ = valt, ☐ = bortvalt (räknas ej i totalen).
+                    const selected = item.option_selected === true
+                    return (
+                      <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">
+                        <div className="min-w-0 flex items-start gap-2">
+                          <span className={`text-base leading-5 shrink-0 ${selected ? 'text-primary-700' : 'text-gray-400'}`}>
+                            {selected ? '☑' : '☐'}
+                          </span>
+                          <div>
+                            <p className={selected ? 'text-gray-900' : 'text-gray-500'}>
+                              {item.description}
+                              <span className={`ml-2 inline-block align-[1px] text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-px ${selected ? 'bg-primary-50 text-primary-700' : 'bg-gray-100 text-gray-400'}`}>
+                                Tillval
+                              </span>
+                            </p>
+                            {(item.quantity || 0) > 0 && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {item.quantity} {item.unit || 'st'} × {formatSEK(item.unit_price || 0)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <span className={`font-medium shrink-0 ${selected ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {formatSEK(item.total || 0)}
+                        </span>
+                      </div>
+                    )
+                  }
                   default:
                     return (
                       <div key={key} className="px-4 py-3 flex justify-between gap-4 text-sm">

@@ -36,6 +36,22 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
     </div>
   `
     }
+    if (itemType === 'option') {
+      // Tillvalsrad: ☑ = ikryssad av kunden, ☐ = bortvald (räknas ej i totalen).
+      // Får ingen löpande siffra — kryssrutan tar numrets plats.
+      const box = item.optionSelected ? '☑' : '☐'
+      return `
+    <div class="item-card option${item.optionSelected ? '' : ' unselected'}">
+      <div class="item-num opt">${box}</div>
+      <div class="item-body">
+        <div class="name">${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>
+        ${item.description ? `<div class="desc">${escapeHtml(item.description)}</div>` : ''}
+        <div class="qty">${formatNumber(item.quantity)} ${escapeHtml(item.unit)} á ${formatCurrency(item.unitPrice)}</div>
+      </div>
+      <div class="item-amt">${formatCurrency(item.total)}</div>
+    </div>
+  `
+    }
     itemNo += 1
     return `
     <div class="item-card">
@@ -49,6 +65,13 @@ export const renderFriendly: TemplateRenderFn = (data: QuoteTemplateData): strin
     </div>
   `
   }).join('')
+
+  // Not under items-sektionen på OSIGNERAD offert med minst ett tillval —
+  // kunden ska veta att valen görs i portalen innan signering.
+  const hasOptions = data.quote.items.some(i => i.itemType === 'option')
+  const optionsNote = hasOptions && !data.isSigned
+    ? `<div class="options-note">Välj dina tillval i kundportalen innan du signerar.</div>`
+    : ''
 
   const customerLines = [
     [data.customer.address, data.customer.postalCode, data.customer.city].filter(Boolean).join(', '),
@@ -140,6 +163,12 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 .subtotal-line .val { font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
 .item-card.discount .item-num { background: var(--green-bg); color: #166534; }
 .item-card.discount .item-amt { color: #166534; }
+.item-card.option .item-num.opt { background: var(--teal-50); color: var(--teal-dark); font-size: 16px; }
+.item-card.option.unselected .item-num.opt { background: #E2E8F0; color: var(--muted); }
+.item-card.option.unselected .name, .item-card.option.unselected .item-amt { color: var(--muted); }
+.opt-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--teal-dark); background: var(--teal-100); border-radius: 999px; padding: 1px 8px; margin-left: 6px; vertical-align: 1px; }
+.item-card.option.unselected .opt-badge { color: var(--muted); background: #E2E8F0; }
+.options-note { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 10px; padding: 0 4px; }
 .conclusion-text { color: var(--muted); font-size: 13px; white-space: pre-line; }
 .totals-card { padding: 22px 24px; }
 .totals-rows { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
@@ -224,6 +253,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
   <section class="card items-section">
     <div class="card-title">Vad som ingår</div>
     <div class="items-grid">${itemsHtml}</div>
+    ${optionsNote}
   </section>
 
   <section class="card totals-card">

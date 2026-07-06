@@ -24,6 +24,11 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
     if (itemType === 'discount') {
       return `<tr class="row-discount"><td><div class="item-name">${escapeHtml(item.name || 'Rabatt')}</div></td><td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td><td class="num">${formatCurrency(Math.abs(item.unitPrice))}</td><td class="num">−${formatCurrency(Math.abs(item.total))}</td></tr>`
     }
+    if (itemType === 'option') {
+      // Tillvalsrad: ☑ = ikryssad av kunden, ☐ = bortvald (räknas ej i totalen)
+      const box = item.optionSelected ? '☑' : '☐'
+      return `<tr class="row-option${item.optionSelected ? '' : ' unselected'}"><td><div class="item-name"><span class="opt-box">${box}</span> ${escapeHtml(item.name)} <span class="opt-badge">Tillval</span></div>${item.description ? `<div class="item-desc">${escapeHtml(item.description)}</div>` : ''}</td><td class="num">${formatNumber(item.quantity)} ${escapeHtml(item.unit)}</td><td class="num">${formatCurrency(item.unitPrice)}</td><td class="num">${formatCurrency(item.total)}</td></tr>`
+    }
     return `
     <tr>
       <td>
@@ -36,6 +41,13 @@ export const renderModern: TemplateRenderFn = (data: QuoteTemplateData): string 
     </tr>
   `
   }).join('')
+
+  // Not under items-sektionen på OSIGNERAD offert med minst ett tillval —
+  // kunden ska veta att valen görs i portalen innan signering.
+  const hasOptions = data.quote.items.some(i => i.itemType === 'option')
+  const optionsNote = hasOptions && !data.isSigned
+    ? `<div class="options-note">Välj dina tillval i kundportalen innan du signerar.</div>`
+    : ''
 
   const rotRow = data.quote.rotDeduction
     ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
@@ -137,6 +149,12 @@ tbody tr.row-heading td { font-family: 'Space Grotesk', sans-serif; font-weight:
 tbody tr.row-text td { color: var(--muted); font-size: 12px; white-space: pre-line; }
 tbody tr.row-subtotal td { font-weight: 600; color: var(--ink); text-align: right; border-top: 1px solid var(--border); }
 tbody tr.row-discount .item-name, tbody tr.row-discount td.num { color: var(--teal); }
+tbody tr.row-option .opt-box { color: var(--teal); font-size: 15px; line-height: 1; }
+tbody tr.row-option.unselected .item-name, tbody tr.row-option.unselected td.num { color: var(--muted); }
+tbody tr.row-option.unselected .opt-box { color: var(--muted); }
+.opt-badge { display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--teal); background: var(--teal-50); border: 1px solid var(--teal-100); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+tbody tr.row-option.unselected .opt-badge { color: var(--muted); background: transparent; border-color: var(--border); }
+.options-note { font-size: 11px; color: var(--muted); font-style: italic; margin: -14px 0 24px; }
 .totals-wrap { display: flex; justify-content: flex-end; margin-bottom: 28px; }
 .totals { width: 50%; min-width: 280px; }
 .total-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--border); }
@@ -230,6 +248,7 @@ tbody tr.row-discount .item-name, tbody tr.row-discount td.num { color: var(--te
     </thead>
     <tbody>${itemsHtml}</tbody>
   </table>
+  ${optionsNote}
 
   <div class="totals-wrap">
     <div class="totals">

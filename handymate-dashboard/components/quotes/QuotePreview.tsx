@@ -114,6 +114,35 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
     return groups
   }, [itemsToRender, data.showCategorySubtotals, data.customCategories])
 
+  // Tillvalsrad: ☑ = ikryssad, ☐ = bortvald. Totals kommer från
+  // calculateQuoteTotals som bara räknar valda tillval — raden här är ren visning.
+  const renderOptionRow = (item: QuoteItem) => {
+    const selected = item.option_selected === true
+    const lineTotal = item.quantity * item.unit_price
+    const rowColor = selected ? undefined : SECONDARY
+    return (
+      <tr key={item.id} style={{ borderBottom: `0.5px solid #F1F5F9`, color: rowColor }}>
+        <td style={{ padding: '4px 0', verticalAlign: 'top' }}>
+          <span style={{ fontSize: '8px', color: selected ? ACCENT : SECONDARY, marginRight: 3 }}>
+            {selected ? '☑' : '☐'}
+          </span>
+          <span style={{ fontWeight: 500, fontSize: '7.5px', color: selected ? undefined : SECONDARY }}>{item.description}</span>
+          <span style={{ display: 'inline-block', fontSize: '5px', fontWeight: 500, color: selected ? ACCENT : SECONDARY, background: selected ? '#CCFBF1' : '#F1F5F9', padding: '0 3px', borderRadius: 2, marginLeft: 3 }}>Tillval</span>
+        </td>
+        {data.showQuantities && (
+          <>
+            <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{item.quantity}</td>
+            <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{getUnitLabel(item.unit)}</td>
+          </>
+        )}
+        {data.showUnitPrices && (
+          <td style={{ textAlign: 'right', padding: '4px 0', color: SECONDARY }}>{formatCurrency(item.unit_price)}</td>
+        )}
+        <td style={{ textAlign: 'right', padding: '4px 0', fontWeight: 500, color: rowColor }}>{formatCurrency(lineTotal)}</td>
+      </tr>
+    )
+  }
+
   return (
     <div
       className="origin-top-left bg-white border border-[#E2E8F0] rounded-lg overflow-hidden"
@@ -266,6 +295,9 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                           </tr>
                         )
                       }
+                      if (item.item_type === 'option') {
+                        return renderOptionRow(item)
+                      }
                       return null
                     })}
                   </>
@@ -307,6 +339,9 @@ export default function QuotePreview({ data, businessName, contactName }: QuoteP
                           </td>
                         </tr>
                       )
+                    }
+                    if (item.item_type === 'option') {
+                      return renderOptionRow(item)
                     }
                     // item
                     const lineTotal = item.quantity * item.unit_price

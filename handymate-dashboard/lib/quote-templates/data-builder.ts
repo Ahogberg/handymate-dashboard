@@ -53,7 +53,7 @@ export function buildQuoteTemplateData(
   if (structured.length > 0) {
     // Mappa ALLA radtyper i ursprunglig ordning — rubriker, fritext,
     // delsummor och rabatter är del av dokumentet, inte bara 'item'-rader.
-    const knownTypes = ['item', 'heading', 'text', 'subtotal', 'discount']
+    const knownTypes = ['item', 'heading', 'text', 'subtotal', 'discount', 'option']
     items = structured.map(i => {
       const itemType: QuoteTemplateItem['itemType'] =
         knownTypes.includes(i.item_type) ? i.item_type : 'item'
@@ -67,6 +67,8 @@ export function buildQuoteTemplateData(
       }
       return {
         itemType,
+        // Endast tillvalsrader: kundens val (☑/☐) — quote_items.option_selected
+        optionSelected: itemType === 'option' ? i.option_selected === true : undefined,
         name: i.description || '',
         description: i.long_description || null,
         quantity,
@@ -148,6 +150,9 @@ export function buildQuoteTemplateData(
   const businessAddress = config?.address || business?.address || ''
 
   return {
+    // Signerad/accepterad offert → tillvals-valen är låsta; mallarna
+    // döljer då "Välj dina tillval i kundportalen"-noten.
+    isSigned: quote.status === 'accepted' || !!quote.signed_at,
     business: {
       name: businessName,
       orgNumber: config?.org_number || business?.org_number || '',

@@ -54,6 +54,10 @@ const MODERN_CSS = `
 .modern-canvas tbody tr.row-text td { color: #64748B; font-size: 12px; white-space: pre-line; }
 .modern-canvas tbody tr.row-subtotal td { font-weight: 600; color: #0F172A; text-align: right; border-top: 1px solid #E2E8F0; }
 .modern-canvas tbody tr.row-discount .item-name, .modern-canvas tbody tr.row-discount td.num { color: var(--canvas-accent); }
+.modern-canvas .opt-box { color: var(--canvas-accent); font-size: 15px; line-height: 1; margin-right: 4px; }
+.modern-canvas tr.row-option-unselected .opt-box { color: #64748B; }
+.modern-canvas .opt-badge { display: inline-block; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--canvas-accent); background: var(--canvas-accent-50); border: 1px solid var(--canvas-accent-100); border-radius: 4px; padding: 1px 6px; margin-left: 6px; vertical-align: 1px; }
+.modern-canvas tr.row-option-unselected .opt-badge { color: #64748B; background: transparent; border-color: #E2E8F0; }
 .modern-canvas .row-action { opacity: 0; transition: opacity 0.15s; }
 .modern-canvas tr.row-hover:hover .row-action { opacity: 1; }
 .modern-canvas .row-action button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; color: #94a3b8; font-size: 14px; line-height: 1; }
@@ -267,18 +271,27 @@ export default function ModernCanvas({ data, handlers }: Props) {
                     </tr>
                   )
                 }
+                // Tillvalsrader ('option') redigeras som vanliga item-rader,
+                // men visar kryss-symbol (☑ vald / ☐ bortvald) + Tillval-badge.
+                const isOption = itemType === 'option'
                 return (
-                <tr key={idx} className="row-hover">
+                <tr key={idx} className={`row-hover${isOption && !item.optionSelected ? ' row-option-unselected' : ''}`}>
                   <td style={{ position: 'relative' }}>
                     <span className="row-action" style={{ position: 'absolute', left: -22, top: 12 }}>
                       <button onClick={() => handlers.onItemRemove(idx)} title="Ta bort rad">×</button>
                     </span>
                     <div className="item-name">
+                      {isOption && (
+                        <span className="opt-box" title={item.optionSelected ? 'Förvalt tillval' : 'Ej förvalt tillval'}>
+                          {item.optionSelected ? '☑' : '☐'}
+                        </span>
+                      )}
                       <EditableText
                         value={item.name}
                         onChange={v => handlers.onItemChange(idx, { ...item, name: v })}
                         placeholder="Rubrik"
                       />
+                      {isOption && <span className="opt-badge">Tillval</span>}
                     </div>
                     <div className="item-desc">
                       <EditableText

@@ -89,6 +89,9 @@ export interface QuoteTemplateData {
   business: QuoteTemplateBusiness
   customer: QuoteTemplateCustomer
   quote: QuoteTemplateQuote
+  /** true när offerten är signerad/accepterad — mallarna döljer då
+      "Välj dina tillval i kundportalen"-noten (valen är låsta). */
+  isSigned?: boolean
 }
 
 export type TemplateStyle = 'modern' | 'premium' | 'friendly'
