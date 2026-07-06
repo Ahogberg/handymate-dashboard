@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, Check, Loader2, PenTool, Sparkles, X } from 'lucide-react'
+import { ArrowRight, Check, FileText, Loader2, PenTool, Sparkles, X } from 'lucide-react'
 import SignatureCanvas, { type SignatureCanvasHandle } from './SignatureCanvas'
 import { formatCurrency } from '../helpers'
 import type { Quote } from '../types'
@@ -174,33 +174,29 @@ export default function PortalQuoteSigningModal({
                 )}
               </div>
 
-              <h4 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>Innehåll</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
-                {[
-                  'Material och förbrukning',
-                  'Arbetstid enligt offerten',
-                  'Bortforsling och städning',
-                  'Garanti enligt branschregler',
-                ].map((it, i) => (
-                  <div
-                    key={i}
+              {quote.sign_token && (
+                <div style={{ marginBottom: 18 }}>
+                  <a
+                    className="bp-cta ghost"
+                    href={`/api/quotes/pdf?token=${quote.sign_token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <FileText size={18} /> Läs offerten
+                  </a>
+                  <p
                     style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      padding: '10px 12px',
-                      background: 'var(--surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--r-md)',
+                      fontSize: 12,
+                      color: 'var(--muted)',
+                      marginTop: 8,
+                      lineHeight: 1.4,
+                      textAlign: 'center',
                     }}
                   >
-                    <span style={{ color: 'var(--bee-700)' }}>
-                      <Check size={16} strokeWidth={2.5} />
-                    </span>
-                    <span style={{ fontSize: 13 }}>{it}</span>
-                  </div>
-                ))}
-              </div>
+                    Läs igenom hela offerten innan du signerar. Den öppnas i en ny flik.
+                  </p>
+                </div>
+              )}
 
               <label
                 style={{
