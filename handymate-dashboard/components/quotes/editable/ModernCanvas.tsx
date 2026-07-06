@@ -39,7 +39,7 @@ const MODERN_CSS = `
 .modern-canvas .party-line { font-size: 13px; color: #0F172A; margin-top: 2px; }
 .modern-canvas .party-meta { font-size: 12px; color: #64748B; margin-top: 4px; line-height: 1.6; }
 .modern-canvas .quote-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 22px; color: #0F172A; letter-spacing: -0.015em; margin-bottom: 4px; }
-.modern-canvas .quote-sub { color: #64748B; font-size: 13px; margin-bottom: 24px; }
+.modern-canvas .quote-sub { color: #64748B; font-size: 13px; margin-bottom: 24px; white-space: pre-line; }
 .modern-canvas table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
 .modern-canvas thead th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #64748B; border-bottom: 1.5px solid #0F172A; }
 .modern-canvas thead th.num { text-align: right; }
@@ -49,6 +49,11 @@ const MODERN_CSS = `
 .modern-canvas .item-name { font-weight: 600; color: #0F172A; }
 .modern-canvas .item-desc { color: #64748B; font-size: 12px; margin-top: 2px; }
 .modern-canvas td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.modern-canvas tbody tr.row-heading, .modern-canvas tbody tr.row-text, .modern-canvas tbody tr.row-subtotal { background: transparent; }
+.modern-canvas tbody tr.row-heading td { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 13px; color: #0F172A; padding: 18px 12px 6px; border-bottom: 1px solid #E2E8F0; }
+.modern-canvas tbody tr.row-text td { color: #64748B; font-size: 12px; white-space: pre-line; }
+.modern-canvas tbody tr.row-subtotal td { font-weight: 600; color: #0F172A; text-align: right; border-top: 1px solid #E2E8F0; }
+.modern-canvas tbody tr.row-discount .item-name, .modern-canvas tbody tr.row-discount td.num { color: var(--canvas-accent); }
 .modern-canvas .row-action { opacity: 0; transition: opacity 0.15s; }
 .modern-canvas tr.row-hover:hover .row-action { opacity: 1; }
 .modern-canvas .row-action button { background: transparent; border: none; cursor: pointer; padding: 2px 4px; color: #94a3b8; font-size: 14px; line-height: 1; }
@@ -226,7 +231,43 @@ export default function ModernCanvas({ data, handlers }: Props) {
               </tr>
             </thead>
             <tbody>
-              {data.quote.items.map((item, idx) => (
+              {data.quote.items.map((item, idx) => {
+                // Speciella radtyper renderas som i den statiska modern-mallen
+                // (lib/quote-templates/modern.ts) — utan inline-redigering.
+                const itemType = item.itemType || 'item'
+                if (itemType === 'heading') {
+                  return (
+                    <tr key={idx} className="row-heading">
+                      <td colSpan={4}>{item.name}</td>
+                    </tr>
+                  )
+                }
+                if (itemType === 'text') {
+                  return (
+                    <tr key={idx} className="row-text">
+                      <td colSpan={4}>{item.name}</td>
+                    </tr>
+                  )
+                }
+                if (itemType === 'subtotal') {
+                  return (
+                    <tr key={idx} className="row-subtotal">
+                      <td colSpan={3}>{item.name || 'Delsumma'}</td>
+                      <td className="num">{formatCurrency(item.total)}</td>
+                    </tr>
+                  )
+                }
+                if (itemType === 'discount') {
+                  return (
+                    <tr key={idx} className="row-discount">
+                      <td><div className="item-name">{item.name || 'Rabatt'}</div></td>
+                      <td className="num">{formatNumber(item.quantity)} {item.unit}</td>
+                      <td className="num">{formatCurrency(Math.abs(item.unitPrice))}</td>
+                      <td className="num">−{formatCurrency(Math.abs(item.total))}</td>
+                    </tr>
+                  )
+                }
+                return (
                 <tr key={idx} className="row-hover">
                   <td style={{ position: 'relative' }}>
                     <span className="row-action" style={{ position: 'absolute', left: -22, top: 12 }}>
@@ -272,7 +313,8 @@ export default function ModernCanvas({ data, handlers }: Props) {
                   </td>
                   <td className="num">{formatCurrency(item.total)}</td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
           </table>
 

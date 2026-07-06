@@ -14,7 +14,7 @@ import {
   generateItemId,
   recalculateItems,
 } from '@/lib/quote-calculations'
-import { getAllCategories } from '@/lib/constants/categories'
+import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
   type DetailLevel,
   type PaymentPlanEntry,
@@ -188,6 +188,10 @@ export default function EditQuotePage() {
   // Grossist search modal
   const [showGrossistSearch, setShowGrossistSearch] = useState(false)
 
+  // Custom categories — inline create (samma mönster som new-vyn)
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
+  const [newCategoryLabel, setNewCategoryLabel] = useState('')
+
   // Spara-i-prislistan modal — vilken offertrad som ska sparas
   const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
   const [savingProduct, setSavingProduct] = useState(false)
@@ -207,7 +211,15 @@ export default function EditQuotePage() {
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const { priceList, customCategories, hydrated: priceListHydrated } = usePriceListLookup(business.business_id)
-  const allCategories = useMemo(() => getAllCategories(customCategories), [customCategories])
+
+  // Custom categories är lokalt state eftersom vi tillåter inline-skapande;
+  // initieras från hook-resultatet när det finns (samma mönster som new-vyn)
+  const [localCustomCategories, setLocalCustomCategories] = useState<CustomCategory[]>([])
+  useEffect(() => {
+    if (priceListHydrated) setLocalCustomCategories(customCategories)
+  }, [priceListHydrated, customCategories])
+
+  const allCategories = useMemo(() => getAllCategories(localCustomCategories), [localCustomCategories])
 
   const vatRate = pricingSettings?.vat_rate ?? 25
   const { recalculated, totals, calculatedPaymentPlan, paymentPlanValid } = useQuoteCalculations(
@@ -226,7 +238,7 @@ export default function EditQuotePage() {
     handleDragEnd,
     addFromGrossist,
     addFromPriceList,
-  } = useQuoteItems(items, setItems, customCategories, !!pricingSettings)
+  } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
 
   // ─── Derived: standard texts grouped by type ──────────────────────
   const textsByType = useMemo(() => {
@@ -248,6 +260,32 @@ export default function EditQuotePage() {
   // ROT/RUT flags
   const hasRotItems = items.some(i => i.is_rot_eligible)
   const hasRutItems = items.some(i => i.is_rut_eligible)
+
+  // ─── Custom category creation (speglar new-vyn) ────────────────────
+  async function createCustomCategory(label: string, itemId: string) {
+    const slug =
+      'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
+    const { data, error } = await supabase
+      .from('custom_quote_categories')
+      .insert({
+        business_id: business.business_id,
+        slug,
+        label,
+        rot_eligible: false,
+        rut_eligible: false,
+      })
+      .select('*')
+      .single()
+    if (error) {
+      toast.error('Kunde inte skapa kategori')
+      return
+    }
+    const newCat = data as CustomCategory
+    setLocalCustomCategories(prev => [...prev, newCat])
+    updateItem(itemId, 'category_slug', newCat.slug)
+    setShowNewCategoryInput(null)
+    setNewCategoryLabel('')
+  }
 
   // ─── Debounced preview data ──────────────────────────────────────
   useEffect(() => {
@@ -273,7 +311,7 @@ export default function EditQuotePage() {
         showUnitPrices,
         showQuantities,
         showCategorySubtotals,
-        customCategories,
+        customCategories: localCustomCategories,
       })
     }, 500)
     return () => clearTimeout(timer)
@@ -281,7 +319,7 @@ export default function EditQuotePage() {
     title, selectedCustomer, customers, validDays, recalculated, discountPercent, vatRate,
     introductionText, conclusionText, notIncluded, ataTerms, calculatedPaymentPlan,
     referencePerson, customerReference, projectAddress, detailLevel, showUnitPrices,
-    showQuantities, showCategorySubtotals, customCategories,
+    showQuantities, showCategorySubtotals, localCustomCategories,
   ])
 
   // Payload till TemplatePreviewFrame
@@ -612,7 +650,8 @@ export default function EditQuotePage() {
     selectedCustomer, title, description, items, discountPercent, validDays,
     personnummer, fastighetsbeteckning, referencePerson, customerReference,
     projectAddress, introductionText, conclusionText, notIncluded, ataTerms,
-    paymentTermsText, paymentPlan, detailLevel, showUnitPrices, showQuantities,
+    paymentTermsText, termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities,
+    templateStyle,
   ])
 
   useEffect(() => {
@@ -865,7 +904,7 @@ export default function EditQuotePage() {
               items={items}
               recalculated={recalculated}
               allCategories={allCategories}
-              customCategories={customCategories}
+              customCategories={localCustomCategories}
               priceList={priceList}
               dndSensors={dndSensors}
               onDragEnd={handleDragEnd}
@@ -910,6 +949,11 @@ export default function EditQuotePage() {
                 ])
               }}
               onOpenGrossistSearch={() => setShowGrossistSearch(true)}
+              onCreateCategory={createCustomCategory}
+              showNewCategoryInput={showNewCategoryInput}
+              setShowNewCategoryInput={setShowNewCategoryInput}
+              newCategoryLabel={newCategoryLabel}
+              setNewCategoryLabel={setNewCategoryLabel}
               onSaveToProducts={row => setProductModalRow(row)}
             />
 

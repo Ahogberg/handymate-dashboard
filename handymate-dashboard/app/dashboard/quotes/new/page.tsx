@@ -9,7 +9,7 @@ import { useToast } from '@/components/Toast'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuotePreviewData } from '@/components/quotes/QuotePreview'
-import type { QuoteTemplateData } from '@/lib/quote-templates/types'
+import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import { generateItemId, recalculateItems } from '@/lib/quote-calculations'
 import { getAllCategories, type CustomCategory } from '@/lib/constants/categories'
 import {
@@ -395,23 +395,25 @@ export default function NewQuotePage() {
   const templatePreviewPayload: TemplatePreviewPayload = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
-    const subtotalRaw = items.reduce((sum, it: any) => sum + ((it.quantity || 0) * (it.unit_price || 0)), 0)
-    const discountAmount = subtotalRaw * (discountPercent / 100)
-    const subtotal = subtotalRaw - discountAmount
-    const vatAmount = subtotal * (vatRate / 100)
-    const total = subtotal + vatAmount
     return {
       quote: {
         title: title || 'Offert',
         description: null,
         status: 'draft',
         items: [],
-        subtotal,
+        subtotal: totals.subtotal,
         discount_percent: discountPercent,
-        discount_amount: discountAmount,
+        discount_amount: totals.discountAmount,
         vat_rate: vatRate,
-        vat_amount: vatAmount,
-        total,
+        vat_amount: totals.vat,
+        total: totals.total,
+        rot_work_cost: totals.rotWorkCost,
+        rot_deduction: totals.rotDeduction,
+        rot_customer_pays: totals.rotCustomerPays,
+        rut_work_cost: totals.rutWorkCost,
+        rut_deduction: totals.rutDeduction,
+        rut_customer_pays: totals.rutCustomerPays,
+        customer_pays: totals.rotCustomerPays || totals.rutCustomerPays || totals.total,
         valid_until: validUntil.toISOString().split('T')[0],
         introduction_text: introductionText || null,
         conclusion_text: conclusionText || null,
@@ -429,14 +431,14 @@ export default function NewQuotePage() {
         fastighetsbeteckning: fastighetsbeteckning || null,
         template_style: templateStyle,
       },
-      quote_items: items.map((it, idx) => ({ ...it, sort_order: idx })),
+      quote_items: recalculated.map((it, idx) => ({ ...it, sort_order: idx })),
       customer_id: selectedCustomer || null,
       deal_id: dealIdFromQuery,
       template_style: templateStyle,
     }
   }, [
-    title, selectedCustomer, validDays, items, discountPercent, vatRate,
-    introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText,
+    title, selectedCustomer, validDays, recalculated, totals, discountPercent, vatRate,
+    introductionText, conclusionText, notIncluded, ataTerms, paymentTermsText, termsText,
     referencePerson, customerReference, projectAddress, detailLevel,
     showUnitPrices, showQuantities, personnummer, fastighetsbeteckning,
     templateStyle, dealIdFromQuery,
@@ -446,11 +448,11 @@ export default function NewQuotePage() {
   const liveTemplateData: QuoteTemplateData = useMemo(() => {
     const validUntil = new Date()
     validUntil.setDate(validUntil.getDate() + (validDays || 30))
-    const subtotalRaw = items.reduce((sum, it: any) => sum + ((it.quantity || 0) * (it.unit_price || 0)), 0)
-    const discountAmount = subtotalRaw * (discountPercent / 100)
-    const subtotalExVat = subtotalRaw - discountAmount
-    const vatAmount = subtotalExVat * (vatRate / 100)
-    const totalIncVat = subtotalExVat + vatAmount
+    const amountToPay = totals.rotDeduction > 0
+      ? totals.rotCustomerPays
+      : totals.rutDeduction > 0
+        ? totals.rutCustomerPays
+        : totals.total
     const formatDate = (d: Date) =>
       d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 
@@ -489,22 +491,28 @@ export default function NewQuotePage() {
         validUntilDate: formatDate(validUntil),
         title: title || 'Offert',
         description: null,
-        items: items
-          .filter((i: any) => (i.item_type || 'item') === 'item')
-          .map((i: any) => ({
+        items: recalculated.map((i): QuoteTemplateItem => {
+          const itemType = ((i.item_type || 'item') as QuoteTemplateItem['itemType'])
+          return {
+            itemType,
             name: i.description || '',
             description: null,
             quantity: Number(i.quantity || 0),
             unit: i.unit || 'st',
             unitPrice: Number(i.unit_price || 0),
-            total: Number(i.total || 0),
+            total: itemType === 'discount'
+              ? -Math.abs(Number(i.total || 0))
+              : Number(i.total || 0),
             isRotEligible: !!i.is_rot_eligible,
             isRutEligible: !!i.is_rut_eligible,
-          })),
-        subtotalExVat,
-        vatAmount,
-        totalIncVat,
-        amountToPay: totalIncVat,
+          }
+        }),
+        subtotalExVat: totals.subtotal,
+        vatAmount: totals.vat,
+        totalIncVat: totals.total,
+        rotDeduction: totals.rotDeduction > 0 ? totals.rotDeduction : undefined,
+        rutDeduction: totals.rutDeduction > 0 ? totals.rutDeduction : undefined,
+        amountToPay,
         paymentTerms: paymentTermsText
           || (selectedCustomerObj?.default_payment_days
             ? `${selectedCustomerObj.default_payment_days} dagar`
@@ -515,7 +523,7 @@ export default function NewQuotePage() {
         notIncluded: notIncluded || null,
       },
     }
-  }, [business, businessConfig, selectedCustomerObj, title, items, validDays, discountPercent, vatRate, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
+  }, [business, businessConfig, selectedCustomerObj, title, recalculated, totals, validDays, paymentTermsText, introductionText, conclusionText, notIncluded, personnummer, customerReference])
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
@@ -525,13 +533,13 @@ export default function NewQuotePage() {
       onIntroChange: setIntroductionText,
       onCustomerNameChange: undefined,
       onPaymentTermsChange: setPaymentTermsText,
+      // ModernCanvas renderar ALLA rader (inkl. rubrik/text/delsumma/rabatt)
+      // i samma ordning som items — index i canvasen = index i items-arrayen.
+      // Endast 'item'-rader är redigerbara i canvasen, men vi guardar ändå.
       onItemChange: (idx: number, updated: any) => {
-        const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
-        const target = itemRows[idx]
-        if (!target) return
         setItems(prev =>
-          prev.map(it =>
-            it.id === target.id
+          prev.map((it, i) =>
+            i === idx && (it.item_type || 'item') === 'item'
               ? {
                   ...it,
                   description: updated.name,
@@ -544,28 +552,29 @@ export default function NewQuotePage() {
         )
       },
       onItemAdd: () => {
-        const newItem: QuoteItem = {
-          id: 'tmp_' + Math.random().toString(36).slice(2, 10),
-          item_type: 'item',
-          description: '',
-          quantity: 1,
-          unit: 'st',
-          unit_price: 0,
-          total: 0,
-          is_rot_eligible: false,
-          is_rut_eligible: false,
-          sort_order: items.length,
-        }
-        setItems(prev => [...prev, newItem])
+        setItems(prev => [
+          ...prev,
+          {
+            id: 'tmp_' + Math.random().toString(36).slice(2, 10),
+            item_type: 'item',
+            description: '',
+            quantity: 1,
+            unit: 'st',
+            unit_price: 0,
+            total: 0,
+            is_rot_eligible: false,
+            is_rut_eligible: false,
+            sort_order: prev.length,
+          } satisfies QuoteItem,
+        ])
       },
       onItemRemove: (idx: number) => {
-        const itemRows = items.filter((i: any) => (i.item_type || 'item') === 'item')
-        const target = itemRows[idx]
-        if (!target) return
-        setItems(prev => prev.filter(it => it.id !== target.id))
+        setItems(prev =>
+          prev.filter((it, i) => i !== idx || (it.item_type || 'item') !== 'item'),
+        )
       },
     }),
-    [items],
+    [],
   )
 
   // ═══════════════════════════════════════════════════════════════════

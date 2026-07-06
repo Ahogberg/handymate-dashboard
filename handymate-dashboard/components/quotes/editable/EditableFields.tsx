@@ -118,6 +118,7 @@ export function EditableText({ value, onChange, className = '', placeholder, mul
         transition: 'background 0.1s',
         display: 'inline-block',
         minWidth: '1ch',
+        whiteSpace: 'pre-line',
       }}
       onMouseEnter={e => { e.currentTarget.style.background = 'rgba(15, 118, 110, 0.08)' }}
       onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
