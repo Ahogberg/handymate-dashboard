@@ -1,6 +1,6 @@
 // Quote system types – used across editor, API, and PDF generation
 
-export type QuoteItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+export type QuoteItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
 export type RotRutType = 'rot' | 'rut' | null
 export type DetailLevel = 'detailed' | 'subtotals_only' | 'total_only'
 export type StandardTextType = 'introduction' | 'conclusion' | 'not_included' | 'ata_terms' | 'payment_terms'
@@ -22,6 +22,12 @@ export interface QuoteItem {
   is_rot_eligible: boolean
   is_rut_eligible: boolean
   rot_rut_type?: RotRutType
+  /** Endast item_type 'option': kundens val — true = tillvalet är ikryssat
+      och räknas i totalen (initieras från option_default; skrivs vid signering). */
+  option_selected?: boolean
+  /** Endast item_type 'option': hantverkarens "Förvald"-toggle —
+      true = tillvalet är förikryssat när kunden öppnar offerten. */
+  option_default?: boolean
   sort_order: number
   // Spårar om raden sparats till prislistan ("Spara i prislistan"-flödet).
   // Tomt = inte sparad. UUID = sparad och kopplad till products.id.

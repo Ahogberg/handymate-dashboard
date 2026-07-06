@@ -31,7 +31,10 @@ export function calculateQuoteTotals(
   discountPercent: number = 0,
   vatRate: number = 25
 ): QuoteTotals {
-  const regularItems = items.filter(i => i.item_type === 'item')
+  // Tillvalsrader räknas ENDAST när kunden (eller Förvald) bockat i dem —
+  // EN summa-sanning för editor, previews och serverns omräkning vid signering.
+  const selectedOptions = items.filter(i => i.item_type === 'option' && i.option_selected === true)
+  const regularItems = [...items.filter(i => i.item_type === 'item'), ...selectedOptions]
   const discountItems = items.filter(i => i.item_type === 'discount')
 
   // Sum by ROT/RUT eligibility
@@ -145,7 +148,7 @@ export function generateItemId(): string {
 /**
  * Create a default empty item of given type
  */
-export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: number, groupName?: string): QuoteItem {
+export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: number = 0, groupName?: string): QuoteItem {
   const base: QuoteItem = {
     id: generateItemId(),
     item_type: type,
@@ -170,6 +173,9 @@ export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: numbe
       return { ...base, description: 'Delsumma' }
     case 'discount':
       return { ...base, description: 'Rabatt', unit: 'st', quantity: 1 }
+    case 'option':
+      // Tillvalsrad: som item men avbockad tills kunden (eller Förvald) väljer den
+      return { ...base, quantity: 1, unit: 'st', option_selected: false, option_default: false }
     default:
       return { ...base, quantity: 1, unit: 'st' }
   }
@@ -180,7 +186,8 @@ export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: numbe
  */
 export function recalculateItems(items: QuoteItem[]): QuoteItem[] {
   return items.map((item, index) => {
-    if (item.item_type === 'item') {
+    // Option-rader beräknas som item (spread behåller option_selected/option_default)
+    if (item.item_type === 'item' || item.item_type === 'option') {
       return { ...item, total: item.quantity * item.unit_price }
     }
     if (item.item_type === 'discount') {

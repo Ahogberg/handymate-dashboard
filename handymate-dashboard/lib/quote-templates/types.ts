@@ -34,7 +34,7 @@ export interface QuoteTemplateCustomer {
 }
 
 /** Radtyp — speglar quote_items.item_type i databasen. */
-export type QuoteTemplateItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
+export type QuoteTemplateItemType = 'item' | 'heading' | 'text' | 'subtotal' | 'discount' | 'option'
 
 export interface QuoteTemplateItem {
   /**
@@ -46,6 +46,9 @@ export interface QuoteTemplateItem {
    *   mallarna visar "−X kr" så att synliga rader summerar till delsumman
    */
   itemType?: QuoteTemplateItemType
+  /** Endast itemType 'option': kundens val — true = ikryssat tillval (☑),
+      false/utelämnad = bortvalt (☐). Speglar quote_items.option_selected. */
+  optionSelected?: boolean
   name: string
   description?: string | null
   quantity: number

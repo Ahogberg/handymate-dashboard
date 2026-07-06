@@ -25,6 +25,7 @@ export const ITEM_TYPE_STYLES: Record<QuoteItem['item_type'], string> = {
   text: '',
   subtotal: 'bg-slate-50',
   discount: 'bg-red-50/40',
+  option: 'bg-teal-50/40',
 }
 
 // Vanliga 'item'-rader saknar badge — skarp visuell avgränsning ges enbart åt
@@ -35,6 +36,7 @@ export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cl
   text: { label: 'Fritext', cls: 'bg-slate-100 text-slate-700 border border-slate-200' },
   subtotal: { label: 'Delsumma', cls: 'bg-slate-200 text-slate-700 border border-slate-300' },
   discount: { label: 'Rabatt', cls: 'bg-red-50 text-red-700 border border-red-100' },
+  option: { label: 'Tillval', cls: 'bg-teal-50 text-teal-700 border border-teal-100' },
 }
 
 export function formatCurrency(amount: number) {
