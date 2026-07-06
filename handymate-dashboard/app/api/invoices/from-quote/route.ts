@@ -47,28 +47,37 @@ export async function POST(request: NextRequest) {
         .order('sort_order', { ascending: true })
       if (structured && structured.length) quoteItems = structured
     }
-    const items = quoteItems.map((item: any, i: number) => ({
-      id: 'ii_' + Math.random().toString(36).substr(2, 12),
-      item_type: item.item_type || 'item',
-      group_name: item.group_name || undefined,
-      description: item.description || item.name || '',
-      quantity: item.quantity || 1,
-      unit: item.unit || 'st',
-      unit_price: item.unit_price || item.price || 0,
-      // Endast riktiga 'item'-rader räknas om (antal × á-pris). Delsummor
-      // (quantity 0, lagrad total = summan) nollades av omräkningen, och
-      // rabatter (lagrad NEGATIV total) fick fel tecken i fakturans JSONB.
-      // Rubrik/text/delsumma/rabatt behåller därför sin lagrade total.
-      total: (item.item_type || 'item') === 'item'
-        ? (item.quantity || 1) * (item.unit_price || item.price || 0)
-        : (item.total || 0),
-      type: item.type,
-      is_rot_eligible: item.is_rot_eligible || false,
-      is_rut_eligible: item.is_rut_eligible || false,
-      sort_order: item.sort_order ?? i,
-      cost_price: item.cost_price,
-      article_number: item.article_number,
-    }))
+    // Tillval (item_type 'option'): fakturan skall spegla exakt kundens val.
+    // Valda tillval (option_selected === true) blir vanliga 'item'-rader —
+    // då räknas de automatiskt in i regularItems/subtotal och ROT/RUT nedan.
+    // Ovalda tillval exkluderas helt och når aldrig fakturan.
+    const items = quoteItems
+      .filter((item: any) => item.item_type !== 'option' || item.option_selected === true)
+      .map((item: any, i: number) => {
+        const itemType = item.item_type === 'option' ? 'item' : (item.item_type || 'item')
+        return {
+          id: 'ii_' + Math.random().toString(36).substr(2, 12),
+          item_type: itemType,
+          group_name: item.group_name || undefined,
+          description: item.description || item.name || '',
+          quantity: item.quantity || 1,
+          unit: item.unit || 'st',
+          unit_price: item.unit_price || item.price || 0,
+          // Endast riktiga 'item'-rader räknas om (antal × á-pris). Delsummor
+          // (quantity 0, lagrad total = summan) nollades av omräkningen, och
+          // rabatter (lagrad NEGATIV total) fick fel tecken i fakturans JSONB.
+          // Rubrik/text/delsumma/rabatt behåller därför sin lagrade total.
+          total: itemType === 'item'
+            ? (item.quantity || 1) * (item.unit_price || item.price || 0)
+            : (item.total || 0),
+          type: item.type,
+          is_rot_eligible: item.is_rot_eligible || false,
+          is_rut_eligible: item.is_rut_eligible || false,
+          sort_order: item.sort_order ?? i,
+          cost_price: item.cost_price,
+          article_number: item.article_number,
+        }
+      })
 
     // Dry run: returnera bara items utan att skapa faktura
     if (dry_run) {
