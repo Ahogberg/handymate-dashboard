@@ -131,10 +131,15 @@ export function ProductEditorModal({
       return
     }
 
-    // Helt tomma komponentrader släpps tyst; delvis ifyllda måste vara giltiga
-    const keptRows = rows.filter(
-      r => r.description.trim() || r.quantity_per_unit.trim() !== '' || r.unit_cost.trim() !== ''
-    )
+    // Orörda komponentrader släpps tyst: tom beskrivning + tom/0-kostnad +
+    // mängd kvar på defaulten '1'. Delvis ifyllda måste vara giltiga.
+    const keptRows = rows.filter(r => {
+      const untouched =
+        r.description.trim() === '' &&
+        (r.unit_cost.trim() === '' || parseFloat(r.unit_cost) === 0) &&
+        (r.quantity_per_unit.trim() === '' || r.quantity_per_unit.trim() === '1')
+      return !untouched
+    })
     const components: ComponentPayload[] = []
     for (const r of keptRows) {
       const qty = parseFloat(r.quantity_per_unit)

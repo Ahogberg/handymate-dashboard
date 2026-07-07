@@ -354,7 +354,7 @@ export default function DashboardPage() {
       })
 
     const priceListPromise = supabase
-      .from('price_list')
+      .from('products')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', business.business_id)
       .eq('is_active', true)

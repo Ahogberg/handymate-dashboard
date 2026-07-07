@@ -140,7 +140,7 @@ export async function GET(
         // Canonical: hämta items från quote_items-tabellen
         const { data: qi, error: itemsError } = await supabase
           .from('quote_items')
-          .select('id, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name')
+          .select('id, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, labor_amount')
           .eq('quote_id', project.quote_id)
           .order('sort_order', { ascending: true })
 
@@ -173,6 +173,8 @@ export async function GET(
             item_type: item.item_type || 'item',
             sort_order: item.sort_order ?? i,
             group_name: item.group_name || null,
+            // ?? (inte ||): labor_amount 0 = ren material och skall bevaras
+            labor_amount: item.labor_amount ?? null,
             _source: 'legacy_jsonb',
           }))
         } else {
@@ -305,12 +307,14 @@ export async function GET(
     const invoicedAtasTotal = sumAtas(invoicedAtas)
 
     // ── 7. ROT/RUT summary från quote_items ─────────────────────
+    // Per berättigad rad: labor_amount (arbetsandelen, v67) ?? radens total.
+    // ?? (ALDRIG ||): labor_amount 0 = ren material och skall ge bas 0.
     const rotWorkCost = quoteItems
       .filter(it => it.is_rot_eligible)
-      .reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0)
+      .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
     const rutWorkCost = quoteItems
       .filter(it => it.is_rut_eligible)
-      .reduce((s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0)
+      .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
 
     let rotRutSummary:
       | { type: 'ROT' | 'RUT'; eligible_amount: number; deduction_percent: 30 | 50; deduction_amount: number; customer_pays: number }

@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown, FileText, Plus } from 'lucide-react'
+import { ChevronDown, FileText, Plus, Search } from 'lucide-react'
 import { closestCenter, DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import ItemRow from '@/components/quotes/ItemRow'
 import type { QuoteItem } from '@/lib/types/quote'
 import type { CustomCategory } from '@/lib/constants/categories'
 import { QuoteAddRowCombo } from '../../../_shared/QuoteAddRowCombo'
+import { QuoteProductSearchModal } from '../../../_shared/QuoteProductSearchModal'
 import type { ProductWithComponents } from '../../../_shared/applyProductToItem'
 
 /**
@@ -74,6 +75,7 @@ export function QuoteEditItemsSection({
   setNewCategoryLabel,
 }: QuoteEditItemsSectionProps) {
   const [showAdvancedTypes, setShowAdvancedTypes] = useState(false)
+  const [showProductBrowse, setShowProductBrowse] = useState(false)
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
@@ -216,6 +218,14 @@ export function QuoteEditItemsSection({
                 {product.is_favorite ? '★ ' : ''}{product.name}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => setShowProductBrowse(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-primary-200 hover:border-primary-300 hover:bg-primary-50 rounded-lg text-primary-700 text-xs font-medium bg-white transition-colors"
+            >
+              <Search className="w-3.5 h-3.5" />
+              Bläddra i produktbanken
+            </button>
           </div>
         </div>
       ) : (
@@ -232,6 +242,13 @@ export function QuoteEditItemsSection({
           <p className="text-[10px] text-slate-400 mt-0.5">Öppnas i ny flik</p>
         </div>
       )}
+
+      {/* Bläddra i produktbanken — samma addFromProduct-väg som snabbvalen */}
+      <QuoteProductSearchModal
+        open={showProductBrowse}
+        onClose={() => setShowProductBrowse(false)}
+        onSelect={onSelectProduct}
+      />
     </div>
   )
 }

@@ -47,7 +47,7 @@ export default function ProductsPage() {
         const data = await res.json()
         const list: ProductRow[] = data.products || []
         setProducts(list)
-        // Flytt-bannern: en gång, bara om gamla prislisterader saknar kategori
+        // Kategori-bannern: en gång, bara om produkter saknar kategori
         if (!bannerChecked.current && !searchTerm) {
           bannerChecked.current = true
           try {
@@ -187,14 +187,20 @@ export default function ProductsPage() {
   }
 
   async function toggleFavorite(product: ProductRow) {
+    const next = !product.is_favorite
+    setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, is_favorite: next } : p)))
     try {
-      await fetch('/api/products', {
+      const res = await fetch('/api/products', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: product.id, is_favorite: !product.is_favorite }),
+        body: JSON.stringify({ id: product.id, is_favorite: next }),
       })
-      fetchProducts(search)
-    } catch { /* ignore */ }
+      if (!res.ok) throw new Error()
+      fetchProducts(search) // favoriter sorteras först — hämta om listan
+    } catch {
+      setProducts(prev => prev.map(p => (p.id === product.id ? { ...p, is_favorite: !next } : p)))
+      toast.error('Kunde inte ändra favorit')
+    }
   }
 
   async function handleSave(payload: Record<string, unknown>, components: ComponentPayload[] | null) {
@@ -283,11 +289,11 @@ export default function ProductsPage() {
           </button>
         </div>
 
-        {/* Flytt-banner (gamla prislistan → produktbanken) */}
+        {/* Kategori-banner (produkter som saknar kategori) */}
         {showBanner && (
           <div className="flex items-start gap-3 mb-4 bg-primary-50 border border-primary-200 rounded-xl px-4 py-3">
             <p className="flex-1 text-sm text-primary-700">
-              Din gamla prislista har flyttat in här — sätt gärna kategorier på produkterna.
+              Produkter utan kategori — sätt kategorier så blir sökningen i offerter bättre.
             </p>
             <button
               onClick={dismissBanner}

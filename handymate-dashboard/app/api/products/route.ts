@@ -118,6 +118,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Andel arbete måste vara mellan 0 och 1' }, { status: 400 })
     }
 
+    if (body.rot_eligible && body.rut_eligible) {
+      return NextResponse.json({ error: 'En produkt kan inte vara både ROT- och RUT-berättigad' }, { status: 400 })
+    }
+
     // Auto-calculate markup if purchase_price provided
     let markup_percent = body.markup_percent ?? null
     if (body.purchase_price && body.purchase_price > 0 && body.sales_price > 0 && markup_percent === null) {
@@ -172,6 +176,10 @@ export async function PUT(request: NextRequest) {
 
     if (!body.id) {
       return NextResponse.json({ error: 'id krävs' }, { status: 400 })
+    }
+
+    if (body.rot_eligible && body.rut_eligible) {
+      return NextResponse.json({ error: 'En produkt kan inte vara både ROT- och RUT-berättigad' }, { status: 400 })
     }
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
