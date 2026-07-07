@@ -5,8 +5,9 @@ en riktig kund kan registrera sig, uppleva värdet och betala._
 
 ## Läge vid start
 Byggt & deployat men EJ prod-verifierat: aha-onboardingen, tillval, förtjänad
-autonomi (v65 körd), Bee-fixarna, offert-fixvågen. Radarn deployas inom kort
-(Task 2-4 rullar). Stripe: aldrig ett skarpt köp; billing_plan har okänt schema.
+autonomi (v65 körd), Bee-fixarna, offert-fixvågen. Radarn DEPLOYAD 2026-07-07
+(motor + API + dashboard-kort + Karins måndagsrad, 158 tester gröna) → A5 körbar.
+Stripe: aldrig ett skarpt köp; billing_plan har okänt schema.
 
 ---
 
@@ -75,7 +76,7 @@ autonomi (v65 körd), Bee-fixarna, offert-fixvågen. Radarn deployas inom kort
       hantverkare via Christoffers nätverk/referral. Målet: EN betald månad.
 
 ## Parallellt (Claude, blockerar inget)
-Radarn deployas (Task 2-4). Röst-Lisa-designen startar EFTER sprintbeslut —
+Radarn deployad ✅ (2026-07-07). Röst-Lisa-designen startar EFTER sprinten —
 medvetet parkerad så sprinten inte konkurrerar om fokus.
 
 ## Definition of done
