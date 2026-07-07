@@ -222,6 +222,23 @@ inte 16 200, (c) tre visningslägen växlar i förhandsgranskning + PDF + portal
 Inte: lagersaldo, marginalvyer, leverantörskoppling, CSV-import (TD), efterkalkyl-VY (TD),
 >2 kategorinivåer. Rör inte execution-chain/approvals. AI-items-formatet bevaras.
 
+## Addendum efter fullständig kartläggning (tredje agenten, 2026-07-07)
+
+1. **Snabbsöken finns delvis redan**: `QuoteProductSearchModal` (_shared, används i både
+   new- och edit-vyn) söker `/api/products` och skapar rader med sku→article_number +
+   ROT-flaggor; "Spara i prislistan"-flödet skriver redan rader → products →
+   `linked_product_id`. **Del A blir därmed:** (a) utöka API-söket till artikelnr
+   (idag bara `ilike('name')`), (b) inline-combobox direkt i radens beskrivningsfält
+   (Christoffers "skriv artikelnr eller namn → dropdown" — modalen kräver extra klick),
+   (c) kategoristöd i modal + API, (d) snapshot/split/timmar vid val. Modalen behålls
+   som bläddringsväg.
+2. **Fjärde visningsflaggan**: `showCategorySubtotals` är klient-state (ej DB-kolumn) i
+   edit-vyn + gamla QuotePreview. Nivåväljaren ersätter den — "Bara delsummor"-läget
+   tar över jobbet; togglen tas bort ur UI:t (ingen DB-migrering behövs).
+3. **AI-konverteringen bekräftad**: `convertLegacyItems` (quotes/new) mappar AI:ns
+   `type:'labor'|'material'` → `item_type:'item'` + ROT-flaggor; agent-toolen skriver
+   legacy-JSONB. Båda vägarna orörda av designen — motorns `?? total`-fallback täcker dem.
+
 ## TD-logg
 - Efterkalkyl-vy: jämför estimated_hours (offert) mot time_entry per projekt — datamodellen klar
 - CSV-import av produkter
